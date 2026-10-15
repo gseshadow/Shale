@@ -1,6 +1,292 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest assessment:** see [captured behavior and separate retirement candidate](#captured-legacy-login-behavior-and-separate-retirement-candidate--2026-10-15). Installation remains blocked pending caller/drain/compatibility evidence.
+**Latest assessment:** see [post-#1874 evidence and bounded usage observation](#post-1874-evidence-and-bounded-usage-observation--2026-10-15). Retirement and installation remain blocked; cache sampling cannot certify nonuse.
+
+## Post-#1874 evidence and bounded usage observation — 2026-10-15
+
+**Retirement and installation remain BLOCKED. Observation is not permission-change or installation
+approval.** This task fetched live `codex/latest` at `572b96756c1e2a6573be5b1887ccbb70cdcfe8a1`;
+GitHub reports #1874 merged, and local Git ancestry independently confirms its merge is in the base.
+Work branch: `codex/legacy-login-observation-20261015`. Original captures, unchanged preflight,
+#1874 exact retirement/rollback safeguards, installed-client compatibility, Stage A/B gates and every
+RLS prerequisite remain authoritative. No live retirement, Stage A installation, Stage B restriction,
+RLS change or deployment has occurred according to the operator; none was performed in this task.
+The historical records below remain attributed to their original revisions.
+
+### Evidence ledger and limits
+
+| Provenance | October 15 evidence | What it establishes / does not establish |
+| --- | --- | --- |
+| Operator report after #1874 | Native Windows disposable SQL harness: credential_identity, remembered_rotation, runtime_isolation PASS; exit 0 | Supersedes the pending native Windows retest for the operator's reported post-#1874 run. Exact checkout/tool/artifact hashes were not supplied. Codex did not execute that Windows run; installed desktop acceptance and actual-login mapping remain open. |
+| Operator consumer inventory | Desktop 1.0.136; app.myshale.com through Shale API; Azure live updates; no other consumers known | Working inventory only. Does not establish exhaustive fleet, job, integration, dormant/offline-client or dynamic/wrapper coverage. |
+| Operator Azure Function inventory | Function App `negotiate` has HTTP functions `negotiate` and `live-case-updated`; settings list has Web PubSub, Storage and monitoring, with no observed SQL settings/connection strings | Supports a messaging-only hypothesis for the observed component. Settings-list absence is not proof that every code/configuration/identity path lacks SQL access. |
+| Operator artifact provenance | Both source files and DLL supplied previously; DLL downloaded with Azure **Download app content**, app settings excluded | Attachments are absent from this session. They were not inspected or rehashed here. Preserve them privately; no binaries or private captures in Git. |
+| Prior assistant static inspection, relayed in this task | DLL startup/function methods consistent with supplied source, Web PubSub operations, no SQL calls or legacy-login procedure references found | Prior static evidence only; neither independent inspection in this task nor runtime/exhaustive nonuse proof. |
+| Operator artifact/deployment identifiers | DLL SHA-256 `19acf16bd78f754d147ebbb7ad5050eb057fa5692a72815238e7209b713361e1`; active deployment displayed `845a735`, February 25, 2026, VS Code push / Run-From-Zip | Digest identifies the reported artifact, not a digest independently computed here. Deployment ID is **not established as a source Git commit**; no assumed source/deployed parity. |
+| Operator Query Store report | READ_WRITE, AUTO, retention setting 30 days; each exact legacy procedure has zero captured statements, zero retained executions, NULL first/last execution | No retained usage found by that query. AUTO can filter queries; retention configuration is not a complete 30-day observation record. Cannot certify nonuse. |
+| Existing automated tests | #1874 records local synthetic SQL, focused, selected and critical passes | Regression evidence for the captured bodies and safeguards, not deployed usage or installed-fleet acceptance. New checks for this task are recorded separately below. |
+| Independently verified here | Live GitHub merge metadata, fetched Git base/ancestry, tracked source/runbook and current official Microsoft documentation | No Azure connection, attachment inspection, deployed runtime verification or new operator approval is implied. |
+
+**Separate live-update authorization finding — OPEN:** the prior source review reports that `negotiate`
+derives tenant/user from request parameters and grants join/send group roles without Shale-session
+validation in the reviewed method. That is a tenant authorization concern, separate from SQL legacy
+procedure use. Platform authentication/other upstream controls and full deployed behavior are not
+established here. Track independent owner review of authenticated tenant/user derivation, group-role
+scope and negative cross-tenant/session tests. Do not modify or deploy that component in this task;
+absence of observed SQL references does not resolve its authorization concern.
+
+### Smallest supported method and concrete limitation
+
+Prefer an **already approved, adequate** observation record if an owner can supply one with exact
+module coverage, UTC boundaries, loss/gap/health evidence and retention covering the window. None is
+established by the supplied Query Store AUTO result. Microsoft’s [Query Store best practices](https://learn.microsoft.com/en-us/sql/relational-databases/performance/best-practice-with-the-query-store) describe AUTO filtering and automatic cleanup/state transitions.
+Do not change its capture mode, query raw SQL text,
+or enable broad SQL Audit/RPC/batch/statement tracing to compensate.
+
+The smallest supported additional read is the existing
+[`sys.dm_exec_procedure_stats`](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-procedure-stats-transact-sql)
+cache counters, filtered by **current database ID and exactly the three object IDs**, never name patterns:
+`dbo.sp_login_get_hash`, `dbo.sp_login_mark_failure`, `dbo.sp_login_mark_success`.
+The separate [sample candidate](../sql/auth/permission-cutover/sample-legacy-login-usage.sql) reads
+only module identity, UTC sample/cache/last-execution times and counts; it creates no persistent object,
+event, target, audit or database setting. It uses the existing approved dbo metadata connection,
+not auth/runtime impersonation or new grants. Microsoft documents service-tier-specific DMV authority:
+Basic/S0/S1 and elastic pools require server/Entra admin or `##MS_ServerStateReader##`; other Azure SQL
+Database service objectives permit VIEW DATABASE STATE or that server role. If the existing identity
+cannot read it, stop; this plan does not authorize granting additional authority. Dbo database context
+alone does not establish that service-tier authority. Wrong database, missing/hidden modules, non-UTC
+engine, ambient transaction or a DMV error must stop the sample.
+
+**This is a positive-evidence fallback, not a sufficient retirement observation system.** Microsoft
+states counters cover completed executions of cached plans; rows disappear on eviction. Aborted,
+in-flight, recompiled/evicted-between-samples and pre-entry failures can be missed. A retained last
+execution in the approved UTC window is evidence to investigate use and block retirement. Earlier
+retained executions are historical context. Counts are cumulative per cached plan: do not sum successive
+snapshots or claim their difference is an exact call count. Multiple plans are aggregated; changes in
+plan count/earliest cache time/counters can reveal some resets, never establish continuity. A missing
+row yields NULL retained count/times, not zero calls. Every row says `INCOMPLETE_CACHE_OBSERVATION`,
+even when collection succeeds. A quiet series **cannot close #1874's drain/nonuse gate**.
+
+UTC is supported by Microsoft's [GETDATE documentation](https://learn.microsoft.com/en-us/sql/t-sql/functions/getdate-transact-sql):
+Azure SQL Database follows UTC; Managed Instance is an exception. The sampler refuses a nonzero engine
+offset rather than silently labeling local SQL Server timestamps UTC. Its sampling boundary follows
+materialization; the view is not an atomic invocation ledger. Catalog changes, object-ID reuse or
+recreated modules invalidate mapping: serialize module metadata during sampling and review the original
+captured-definition baseline separately before/after, without replacing original captures.
+
+### Why no activatable event-session candidate is supplied
+
+Microsoft's [Azure SQL Extended Events documentation](https://learn.microsoft.com/en-us/azure/azure-sql/database/xevent-db-diff-from-svr)
+confirms database-scoped `ON DATABASE` sessions, common event metadata DMVs, in-memory targets, and
+`event_file` persistence to Azure Storage with separate credential/RBAC requirements. That is platform
+support, **not verification of a particular Azure build's complete event payload**. This session has
+neither a version-specific Azure event schema nor raw synthetic event payloads establishing that a
+module-entry/exit event excludes every forbidden field. No event configuration can be labeled privacy
+verified here. The shipped sampler emits no event payload at all; it does not create a new event pipeline. This is an evidence limitation, not a claim that Azure SQL cannot support safe events.
+The permitted bounded fallback above therefore stays insufficient for negative proof.
+
+A separately approved follow-up can first inspect available `sqlserver.module_start`/`module_end`
+metadata through [`sys.dm_xe_object_columns`](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-xe-object-columns-transact-sql)
+(readonly/data/customizable fields, defaults and configurable controls), without creating a session.
+Then, on a disposable Azure SQL database with synthetic modules/arguments, review **entire raw event
+payloads before activation in Shale**: every intrinsic data field, action, causal/activity metadata and
+target serialization, not just displayed/exported columns. Verify SQL text/statement fields are absent
+or disabled in the emitted payload itself, not masked afterward. No SQL text, arguments, email,
+credentials, hashes, tokens or application data may enter the event pipeline even if the chosen target
+stores only counts. Reject unexpected fields and unsupported options. Do not infer that no ACTION
+clause means no intrinsic statement field. Raw validation uses synthetic sentinels only, never real
+legacy calls against Azure. Review version/build drift before later activation.
+
+If that succeeds, review a distinct exact-object-predicate module-entry counter candidate for each
+procedure, with no actions and only necessary identity/timing/count fields. Three filtered
+`event_counter` sessions could avoid histogram collisions; per-session ownership, monitoring overhead,
+UTC collection boundaries and restart continuity still need validation. A single histogram is smaller
+but Microsoft's [target documentation](https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server)
+warns collisions can misattribute procedure counts and zero buckets. Aggregating targets **do not**
+make an unsafe source payload private. A ring buffer stores raw events, loses old events and may
+truncate its XML at 4 MB. It is not a durable multi-day record. Event files add Storage access,
+retention/rollover, credentials and cleanup scope; none is approved or created here. Do not use
+NO_EVENT_LOSS as a blanket completeness guarantee or block application work to make observation perfect.
+
+Any later session candidate must supply tested exact Windows create/start/status/collect/stop/drop
+commands, unique task names and saved identity/configuration guards; refuse preexisting sessions and
+unexpected configuration. It must not adopt/drop existing telemetry, shared credentials or storage.
+**There are deliberately no Azure XE activation/drop commands in this revision:** safe event payloads
+and a complete observation design are not verified. Approval of this PR authorizes no such activation.
+
+### Coverage, health, window and decision
+
+| Risk | Required treatment |
+| --- | --- |
+| Missed/aborted/pre-entry calls | Cache counters only report finished executions. Module-entry events would still miss permission/compile failures before entry; exit-only events can miss aborted calls. Neither proves attempted-call absence. |
+| Nested/dynamic invocation | Filter the target module identity, not caller RPC text. Wrappers/dynamic SQL that reach it may contribute counters; calls that fail before entry do not. Validate nested, same-owner wrapper and dynamic paths in any later event candidate; inventory remains mandatory. |
+| Event loss/aggregation | Future event candidates must record session/target state, loss counters and collection watermarks before/after each interval. Counter aggregation and histogram collisions need explicit testing. Unknown loss is incomplete; no dropped-event counter alone proves health. |
+| Restart/failover/cache eviction | Cache state can vanish; event targets/session counters can reset and stopped sessions stop capturing. Preserve prior snapshots, mark a gap and start a new interval. STARTUP_STATE alone cannot recover downtime or in-memory data. |
+| Retention/capture gaps | Query Store 30-day setting is not 30 days of AUTO coverage. Local snapshots exist only after successful collection. Future files need bounded rollover/lifecycle and retrieval verification. Missing files, inaccessible storage, partial exports or stopped capture invalidate the affected interval. |
+| Monitoring health | Record expected/actual UTC collections, operator availability, target/database identity and known maintenance privately. Nonzero SQLCMD exit, timeout, missing/invalid three-row output, stale status, clock reversal, changed object IDs or cache discontinuities are gaps/UNKNOWN. Successful polling is collection health only, never complete call coverage. |
+
+**Window proposal, not an approved schedule:** first obtain actual activity dates/frequency for desktop
+1.0.136 (password login and checked/unchecked remembered startup/restart), Shale API/web authentication,
+and live-update negotiation/reconnect. Review already approved records/configuration; do not generate
+legacy Azure calls or collect user identities/payloads for this inventory. Obtain owners' scheduled-job
+inventory, including disabled/monthly/quarterly jobs, integrations, maintenance scripts, stored wrappers,
+older/offline desktops and effective connection targets. Intervals, timezones, next due runs, idle-client
+coverage and fleet completeness are currently **UNKNOWN**; no job schedule or complete fleet is asserted.
+
+After inventory, propose **14 consecutive days** as an initial operational review window to include two
+weekly activity cycles *if owners confirm those cycles actually occur*. Start only when the known
+consumers will be active; include their normal workdays, representative restarts and the longest
+inventoried job interval plus a completed due run. If a monthly/quarterly job exceeds that bound, extend
+to its actual due cycle or keep that consumer unresolved for its own approved disposition; do not mark
+it drained. Dormant/offline clients require separate compatibility/drain evidence. Missing activity or
+health gaps extend/restart the affected interval under owner review. Fourteen days and five-minute
+sampling below are proposals, not evidence of actual schedules or a guarantee that calls are captured.
+
+At the endpoint, submit per-procedure use/unknown findings, exact UTC intervals, gaps, telemetry health,
+consumer activity and inventory coverage to the security owner. Positive use blocks retirement pending
+caller migration/disposition; no observed use with this fallback remains **UNKNOWN / insufficient**.
+Do not substitute acceptance of cache sampling for #1874's independently approved inventory, caller drain,
+installed 1.0.136 compatibility, actual principal mapping, exclusive change window, baseline/rollback
+identities, unchanged Stage A preflight, Stage B fleet/job gates or RLS prerequisites.
+
+### Exact Windows fallback lifecycle — only after separate read-only collection approval
+
+No commands below were run against Azure. Approve the fixed sampler revision, existing connection
+identity/target, 14-day maximum initial collection, proposed five-minute cadence, operator staffing,
+private destination and retention first. The connection array is the existing approved mechanism;
+no secrets/URLs are supplied here. Do not add SQL/query echo or command-line passwords. This is a
+manual per-sample procedure: no unattended scheduler or background Azure job is installed. A staffed
+collector may invoke the collect block at the approved cadence; missed rounds remain recorded gaps.
+Use a fresh PowerShell session and keep its exact path/token/file list for guarded local cleanup.
+
+```powershell
+# START: local bookkeeping only. $privateObservationParent must already be an approved private folder.
+$ErrorActionPreference = 'Stop'
+$observationToken = [guid]::NewGuid().ToString('N')
+$privateObservationParent = (Resolve-Path -LiteralPath $privateObservationParent).Path
+$observationDir = Join-Path $privateObservationParent "shale-legacy-observation-$observationToken"
+if (Test-Path -LiteralPath $observationDir) { throw 'Refuse existing observation directory' }
+New-Item -ItemType Directory -Path $observationDir | Out-Null
+$markerPath = Join-Path $observationDir 'owner.txt'
+$startPath = Join-Path $observationDir 'start-utc.txt'
+$stopPath = Join-Path $observationDir 'stop-utc.txt'
+Set-Content -LiteralPath $markerPath -Value $observationToken
+Set-Content -LiteralPath $startPath -Value ([DateTime]::UtcNow.ToString('o'))
+$ownedObservationFiles = @($markerPath, $startPath)
+$observationStopped = $false
+$observationStartUtc = [DateTime]::Parse((Get-Content -LiteralPath $startPath)).ToUniversalTime()
+
+# STATUS: local status only, NOT Azure capture health or zero-use evidence.
+Get-Content -LiteralPath $startPath
+Get-Item -LiteralPath $ownedObservationFiles | Select-Object Name, Length, LastWriteTimeUtc
+if (Test-Path -LiteralPath $stopPath) { Get-Content -LiteralPath $stopPath }
+
+# COLLECT: one separately approved read-only DB connection; repeat only within approved bounds.
+if ([DateTime]::UtcNow -gt $observationStartUtc.AddDays(14) -or
+    $ownedObservationFiles.Count -ge 4035) { throw 'Initial collection bound reached; stop for review' }
+if ($observationStopped -or (Test-Path -LiteralPath $stopPath)) { throw 'Collection stopped' }
+if ((Get-Content -LiteralPath $markerPath -Raw).Trim() -cne $observationToken) { throw 'Owner mismatch' }
+$samplePath = Join-Path $observationDir ("sample-" + [guid]::NewGuid().ToString('N') + '.txt')
+$ownedObservationFiles += $samplePath # retain even failed output; never overwrite prior samples
+sqlcmd @approvedSqlcmdOptions -b -V 16 -l 30 -t 30 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/sample-legacy-login-usage.sql -v ExpectedDatabase=Shale -o $samplePath
+if ($LASTEXITCODE -ne 0) { throw 'Collection gap: retain failed output privately; no zero-use inference' }
+Get-Content -LiteralPath $samplePath
+# Operator validates exactly three named rows, fixed Coverage value, UTC values and counts.
+# Record missing/late rounds and resets in private change control. Never rewrite original samples.
+
+# STOP: after last collection/review, local marker only; no server telemetry exists to stop.
+if ((Get-Content -LiteralPath $markerPath -Raw).Trim() -cne $observationToken) { throw 'Owner mismatch' }
+if (Test-Path -LiteralPath $stopPath) { throw 'Already stopped; preserve original boundary' }
+Set-Content -LiteralPath $stopPath -Value ([DateTime]::UtcNow.ToString('o'))
+$ownedObservationFiles += $stopPath
+$observationStopped = $true
+```
+
+SQLCMD closes each connection, removing its table variables. Nothing to stop/drop in Azure; **do not
+clear the plan cache**, remove Query Store data, drop any event session or alter audit/Storage settings.
+Preserve snapshots privately through security-owner review. Local deletion requires a separate recorded
+retention decision and evidence retained in its approved destination; never delete the original captures.
+The cleanup below validates the complete directory before deleting an exact in-memory file list; it
+refuses unexpected files/subdirectories/reparse points, changed token, missing stop marker or lost state.
+If the terminal/file list is lost, stop for manual ownership review, never reconstruct ownership by glob.
+
+```powershell
+# CLEANUP: only after review/retention approval; set this from that actual decision, never by default.
+if ($observationCleanupApproval -cne 'APPROVED_EVIDENCE_RETAINED') { throw 'Retention decision required' }
+if (-not $observationStopped -or -not (Test-Path -LiteralPath $stopPath)) { throw 'Stop first' }
+$dir = Get-Item -LiteralPath $observationDir
+if ($dir.Name -cne "shale-legacy-observation-$observationToken" -or
+    ($dir.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unsafe directory identity' }
+if ((Get-Content -LiteralPath $markerPath -Raw).Trim() -cne $observationToken) { throw 'Owner mismatch' }
+$children = @(Get-ChildItem -LiteralPath $observationDir -Force)
+if ($children.Count -ne $ownedObservationFiles.Count) { throw 'Unexpected directory contents' }
+foreach ($child in $children) {
+    if ($child.PSIsContainer -or ($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+        $ownedObservationFiles -cnotcontains $child.FullName) { throw 'Not task-owned; stop' }
+}
+foreach ($file in $ownedObservationFiles) { Remove-Item -LiteralPath $file }
+Remove-Item -LiteralPath $observationDir # empty directory only; no recursive/wildcard deletion
+```
+
+Keep this private directory exclusive to the operator during validation/deletion (including trusted
+ancestors); the guard is not protection against a hostile concurrent filesystem writer. Partial deletion
+failure stops and requires review. This does not authorize deletion of any server telemetry or shared file.
+
+Audit compatibility: the fallback reads bounded performance/security metadata, not application rows or
+sensitive business views, and mutates no domain/security catalog. No application audit event/schema is
+added. Existing PHI/entity-action/session-security audit transactions stay unchanged; collection approvals,
+health/gaps and retention belong in private operator change control without account data or SQL payloads.
+
+### Verification of this observation revision
+
+Pre-edit test-impact review searched all three procedure names, permission-cutover scripts, the complete
+`AuthPermissionCutoverFixture`, existing auth/module/lifecycle and launcher tests, and selector ownership.
+No application symbol, DTO, auth behavior or existing test expectation changes. Changed-file review maps
+the new read-only SQL to five privacy/scope/NULL/approval/cleanup contract checks; the owning runbook adds
+operator instructions only. Existing SQL/Java fixtures and every preflight/retirement/Stage A/B/RLS file
+are unchanged. The selector chooses security-data's auth, session and neighboring audit/transaction smoke
+contracts for security tooling; no full-suite escalation. Audit integration requires no schema change.
+
+| Check executed in this task | Result and boundary |
+| --- | --- |
+| New observation Python contracts | 5 PASS: exact object/database filtering, minimum source fields/no mutation or text/handles, uncached NULL/fixed incomplete coverage, event-payload approval boundary, exact nonrecursive cleanup guards. Static checks, not Windows/Azure runtime verification. |
+| Entire auth launcher Python suite | 22 PASS, one native-Windows skip (23 tests run). |
+| Focused existing auth/module/lifecycle/support Maven tests | 15 PASS; no failures/errors/skips. |
+| Committed-base selector affected suite / critical reactor | 54 PASS / 116 PASS; no failures/errors/skips. |
+| Disposable SQL Server 2022 sampler through real SQLCMD | PASS: missing modules, wrong database and ambient transaction refuse; uncached counters/times remain NULL; exact three rows exclude same-schema near-name and other-schema decoys; direct/nested/dynamic synthetic calls produce retained counts; full returned output excludes synthetic argument sentinel; ALTER of one synthetic module evicts its cached row and returns unknown, not zero-use. |
+| Local cleanup | Exact generated container ID plus unique task label verified before removal; no ports published, no existing resource touched. Windows cleanup received static guard review only. |
+| Documentation links/fences, source scope, whitespace | PASS; only this runbook, the new sampler and its Python contracts change. No private captures/binaries committed. |
+
+Local SQL used the repository-recorded image digest
+`sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`, fresh random
+container/database and synthetic no-op procedures/argument sentinels. These reproduce neither deployed
+Azure usage nor installed desktop acceptance. Local validation used a UTC SQL Server engine; the shipped sampler has no event-session scope at all. No Azure `ON DATABASE` session,
+Azure service-tier permission, Azure event payload or failover behavior was tested.
+
+Exact repository-root commands (`work/` contains uncommitted scratch orchestration and public documentation
+copies, never operator captures; `/workspace/.tools/bin/mvn` is the existing configured wrapper):
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_observation.py' -v
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base 572b96756c1e2a6573be5b1887ccbb70cdcfe8a1 --head HEAD --format markdown --plan-output work/legacy-observation/selection.json --run
+# --run executes its selected Maven command followed by mvn test.
+python3 work/legacy-observation/local_validate.py
+git diff --check 572b96756c1e2a6573be5b1887ccbb70cdcfe8a1 HEAD
+```
+
+The initial offline focused Maven run lacked ICU/libphonenumber dependencies; the configured-proxy retry
+passed without build changes. Sandboxed Git/proxy and Docker-socket access initially failed; permitted
+shell execution resolved those access constraints. They were not counted as test passes. Official
+Microsoft pages linked above were fetched and read on October 15, 2026; they establish the documented
+capabilities/limitations, not this deployment's runtime configuration.
+
+**Unverified boundaries:** PowerShell/SQLCMD commands were not executed on native Windows in this task;
+Windows cleanup is statically reviewed, not runtime certified. Azure-specific event availability/payloads,
+DMV service-tier authority, actual target mapping, failover/restart coverage and installed 1.0.136 acceptance
+remain NOT RUN. This bounded alternative cannot certify Azure nonuse; retirement/installation stay BLOCKED.
+
 
 ## Captured legacy login behavior and separate retirement candidate — 2026-10-15
 
