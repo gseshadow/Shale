@@ -24,6 +24,7 @@ final class AuthPermissionCutoverFixture {
     private record AuthorityCheck(String condition,String securable,String permission,Integer value,String outcome) {}
     private final List<AuthorityCheck> authorityChecks=new ArrayList<>();
     private final List<Map<String,String>> legacyEvidence=new ArrayList<>();
+    private String retirementStateHash;
     private void execute(String sql)throws SQLException {
         try(var q=connection.createStatement()) {
             q.setQueryTimeout(15);
@@ -33,6 +34,10 @@ final class AuthPermissionCutoverFixture {
                     if(r.getMetaData().getColumnCount()==5 && r.getMetaData().getColumnLabel(1).equals("ConditionName"))while(r.next())
                         authorityChecks.add(new AuthorityCheck(r.getString("ConditionName"),r.getString("Securable"),
                                 r.getString("PermissionName"),(Integer)r.getObject("EffectiveValue"),r.getString("Outcome")));
+                    else if(r.getMetaData().getColumnLabel(1).equals("CheckName"))while(r.next()) {
+                        if(r.getString(1).startsWith("LegacyRetirement"))
+                            retirementStateHash=r.getString(r.getString(1).equals("LegacyRetirementCommitted")?"AfterHash":"StateHash");
+                    }
                     else if(r.getMetaData().getColumnLabel(1).equals("EvidenceKind"))while(r.next()) {
                         if(r.getString(1).startsWith("LegacyLogin")) {
                             var row=new HashMap<String,String>();
@@ -65,7 +70,7 @@ final class AuthPermissionCutoverFixture {
         catch(Exception failure){execute("IF @@TRANCOUNT>0 ROLLBACK");throw failure;}
         finally {
             // SQLCMD exits its connection on the first error. Reused JDBC test connections need temp cleanup.
-            for(String table:List.of("LegacyLoginAuthority","LegacyLoginPermissions","LegacyLoginSchemas","LegacyLoginObjects","LegacyLoginDependencies","LegacyLoginModules","PriorPermissions","PriorModules","PriorOwners","PriorMemberships","PriorPredicates","AuthAuthorityChecks","CutoverOwnership","CutoverGrantOptions","CutoverVisibility","CutoverPrincipals","CutoverObjects","CutoverColumns","ElevatedModules","AuthColumns","CutoverDelta"))
+            for(String table:List.of("LegacyElevated","LegacyTargets","LegacyFingerprint","LegacyExpectedAcl","LegacyBeforeOther","LegacyLoginAuthority","LegacyLoginPermissions","LegacyLoginSchemas","LegacyLoginObjects","LegacyLoginDependencies","LegacyLoginModules","PriorPermissions","PriorModules","PriorOwners","PriorMemberships","PriorPredicates","AuthAuthorityChecks","CutoverOwnership","CutoverGrantOptions","CutoverVisibility","CutoverPrincipals","CutoverObjects","CutoverColumns","ElevatedModules","AuthColumns","CutoverDelta"))
                 execute("DROP TABLE IF EXISTS #"+table);
         }
     }
@@ -144,6 +149,132 @@ final class AuthPermissionCutoverFixture {
         assertEquals(originalPermissions,catalog("database_permissions"));
         assertEquals(originalMemberships,catalog("database_role_members"));
         assertEquals(originalPredicates,catalog("security_predicates"));
+    }
+    /** Only these three bodies reproduce captured Azure code (2026-10-15 20:30:25 UTC).
+     * All tables, configuration values, users, grants and calls below are disposable synthetic data. */
+    private void actualLegacyRetirement()throws Exception {
+        execute("ALTER TABLE dbo.Users ADD failed_attempts int NULL,lock_until datetime2 NULL,last_login datetime2 NULL");
+        execute("CREATE TABLE dbo.AuthConfig(id int PRIMARY KEY,max_attempts int NULL,lock_minutes int NULL)");
+        var names=List.of("sp_login_get_hash","sp_login_mark_failure","sp_login_mark_success");
+        for(String name:names) {
+            // Normalize checkout line endings back to captured CRLF; preserve all spaces/trailing newline.
+            String body=Files.readString(root.resolve("shale-server/src/test/resources/auth/"+name+".sql"))
+                    .replace("\r\n","\n").replace("\n","\r\n");
+            execute(body);
+            execute("GRANT EXECUTE ON dbo."+name+" TO shale_app AS dbo");
+        }
+        execute("DENY INSERT,UPDATE,DELETE ON dbo.Users TO shale_app AS dbo");
+        execute("INSERT dbo.AuthConfig VALUES(1,2,3)");
+        execute("INSERT dbo.Users(Id,ShaleClientId,email,password_hash,is_deleted,IsRemoved,failed_attempts) VALUES"
+                +"(-1,11,N'legacy@test',N'synthetic-A',0,0,0),(-2,22,N'LEGACY@test',N'synthetic-B',NULL,1,0),"
+                +"(-3,22,N'legacy@test',N'synthetic-deleted',1,0,7),(-4,11,N'null-counter@test',N'synthetic-C',0,0,NULL)");
+        denied("shale_app","UPDATE dbo.Users SET failed_attempts=0 WHERE Id=-1");
+        as("shale_app","EXEC dbo.sp_login_mark_failure N'legacy@test'");
+        assertEquals("2",scalar("SELECT COUNT(*) FROM dbo.Users WHERE Id IN(-1,-2) AND failed_attempts=1 AND lock_until IS NULL"),
+                "same-owner CALLER updates both tenants despite direct Users UPDATE DENY and NULL deletion/removed state");
+        as("shale_app","EXEC dbo.sp_login_mark_failure N'legacy@test'");
+        assertEquals("2",scalar("SELECT COUNT(*) FROM dbo.Users WHERE Id IN(-1,-2) AND failed_attempts=2 AND lock_until>SYSUTCDATETIME()"));
+        assertEquals("7",scalar("SELECT failed_attempts FROM dbo.Users WHERE Id=-3"),"deleted row must be untouched");
+        assertEquals("0",legacyHashRows("legacy@test"),"any matching lock blocks lookup independently of password");
+        execute("UPDATE dbo.Users SET lock_until=DATEADD(SECOND,-1,SYSUTCDATETIME()) WHERE Id IN(-1,-2)");
+        assertEquals("1",legacyHashRows("legacy@test"),"TOP(1) hides duplicate tenants; do not assert an unordered winner");
+        as("shale_app","EXEC dbo.sp_login_mark_failure N'legacy@test'");
+        assertEquals("2",scalar("SELECT COUNT(*) FROM dbo.Users WHERE Id IN(-1,-2) AND failed_attempts=3 AND lock_until>SYSUTCDATETIME()"),
+                "expired lock does not reset accounting; next failure reapplies configured duration");
+        as("shale_app","EXEC dbo.sp_login_mark_success N'legacy@test'");
+        assertEquals("2",scalar("SELECT COUNT(*) FROM dbo.Users WHERE Id IN(-1,-2) AND failed_attempts=0 AND lock_until IS NULL AND last_login IS NOT NULL"),
+                "success clears both accounts and stamps last_login without credentials or authenticated identity");
+        as("shale_app","EXEC dbo.sp_login_mark_failure N'null-counter@test'");
+        assertEquals("1",scalar("SELECT COUNT(*) FROM dbo.Users WHERE Id=-4 AND failed_attempts IS NULL AND lock_until IS NULL"),"NULL + 1 stays NULL");
+        execute("DELETE dbo.AuthConfig; UPDATE dbo.Users SET failed_attempts=4 WHERE Id=-1");
+        as("shale_app","EXEC dbo.sp_login_mark_failure N'legacy@test'");
+        assertEquals("1",scalar("SELECT COUNT(*) FROM dbo.Users WHERE Id=-1 AND failed_attempts=5 AND lock_until BETWEEN DATEADD(MINUTE,14,SYSUTCDATETIME()) AND DATEADD(MINUTE,16,SYSUTCDATETIME())"),
+                "missing config uses captured 5-attempt/15-minute defaults; this is no new policy");
+        // Direct table SELECT denial still does not fence the same-owner hash procedure.
+        execute("DENY SELECT ON dbo.Users TO shale_app AS dbo");
+        denied("shale_app","SELECT TOP(0) password_hash FROM dbo.Users");
+        assertEquals("1",legacyHashRows("null-counter@test"));
+        execute("GRANT SELECT ON dbo.Users TO shale_app AS PriorGrantor");
+        // The direct DENY was dbo's separate grantor row; remove only that synthetic injection.
+        execute("REVOKE SELECT ON dbo.Users FROM shale_app AS dbo");
+        as("shale_runtime","EXEC dbo.sp_login_mark_success N'legacy@test'");
+        execute("REVOKE EXECUTE ON dbo.sp_login_mark_success FROM shale_runtime AS dbo");
+        as("shale_runtime","EXEC dbo.sp_login_mark_success N'legacy@test'");
+        rejected("preflight",58307);
+        String capturedGetHash=Files.readString(root.resolve("shale-server/src/test/resources/auth/sp_login_get_hash.sql"))
+                .replace("\r\n","\n").replace("\n","\r\n");
+        execute(capturedGetHash.replaceFirst("CREATE", "ALTER")+"\r\n-- Synthetic fixture definition drift");
+        rejected("legacy-retirement-baseline",58341);
+        execute("DROP PROCEDURE dbo.sp_login_get_hash");execute(capturedGetHash);
+        execute("GRANT EXECUTE ON dbo.sp_login_get_hash TO shale_app AS dbo");
+        script("legacy-retirement-baseline"); // pins exact captured bodies, parameters, dependencies and SET flags.
+        assertNotNull(retirementStateHash,"catalog baseline must emit a complete non-NULL digest");
+        variables.put("LegacyBeforeHash",retirementStateHash);
+        for(String key:List.of("LegacyRetirementApproval","CallerInventoryApproved","LegacyRollbackApproval"))variables.put(key,"APPROVED");
+        for(String key:List.of("LegacyCallersDrained","ExclusiveChangeWindow"))variables.put(key,"CONFIRMED");
+        variables.put("RuntimeLegacyDisposition","DENY_THREE_MODULES");
+        for(String key:List.of("CallerInventoryEvidence","CallerDrainEvidence","CompatibilityEvidence"))variables.put(key,"synthetic-fixture-evidence");
+        var permissions=catalog("database_permissions");var members=catalog("database_role_members");var predicates=catalog("security_predicates");
+        for(String key:List.of("LegacyRetirementApproval","LegacyCallersDrained","CallerInventoryEvidence","CompatibilityEvidence","RuntimeLegacyDisposition")) {
+            String value=variables.put(key,"");rejected("retire-legacy-login",58343);variables.put(key,value);
+            assertEquals(permissions,catalog("database_permissions"));
+        }
+        execute("GRANT VIEW DEFINITION ON dbo.Statuses TO shale_runtime AS dbo");
+        rejected("retire-legacy-login",58344);
+        execute("REVOKE VIEW DEFINITION ON dbo.Statuses FROM shale_runtime AS dbo");
+        // Wrong grantor/state cannot be adopted even if a new fingerprint is supplied.
+        execute("GRANT EXECUTE ON dbo.sp_login_get_hash TO shale_app WITH GRANT OPTION AS dbo");
+        script("legacy-retirement-baseline");String before=variables.put("LegacyBeforeHash",retirementStateHash);
+        rejected("retire-legacy-login",58345);
+        execute("REVOKE EXECUTE ON dbo.sp_login_get_hash FROM shale_app CASCADE AS dbo; GRANT EXECUTE ON dbo.sp_login_get_hash TO shale_app AS dbo");
+        variables.put("LegacyBeforeHash",before);
+        execute("CREATE PROCEDURE dbo.LegacyWrapper AS EXEC dbo.sp_login_get_hash N'null-counter@test'");
+        as("shale_runtime","EXEC dbo.LegacyWrapper");
+        rejected("retire-legacy-login",58342);
+        execute("DROP PROCEDURE dbo.LegacyWrapper");
+        // Force a post-mutation authority failure. All nine ACL edits must roll back together.
+        execute("CREATE ROLE ShaleAdmins; ALTER ROLE ShaleAdmins ADD MEMBER shale_runtime");
+        script("legacy-retirement-baseline");before=variables.put("LegacyBeforeHash",retirementStateHash);
+        var injected=catalog("database_permissions");
+        rejected("retire-legacy-login",58347);assertEquals(injected,catalog("database_permissions"));
+        execute("ALTER ROLE ShaleAdmins DROP MEMBER shale_runtime; DROP ROLE ShaleAdmins");
+        variables.put("LegacyBeforeHash",before);
+        script("retire-legacy-login");variables.put("LegacyAfterHash",retirementStateHash);
+        var retired=catalog("database_permissions");
+        for(String name:names)for(String principal:List.of("shale_app","shale_runtime"))denied(principal,"EXEC dbo."+name+" N'legacy@test'");
+        execute("CREATE USER LegacyFutureRuntime WITHOUT LOGIN; ALTER ROLE shale_runtime_role ADD MEMBER LegacyFutureRuntime");
+        for(String name:names)denied("LegacyFutureRuntime","EXEC dbo."+name+" N'legacy@test'");
+        execute("ALTER ROLE shale_runtime_role DROP MEMBER LegacyFutureRuntime; DROP USER LegacyFutureRuntime");
+        as("shale_app","SELECT TOP(0) id,password_hash FROM dbo.Users WHERE email=N'legacy@test' AND is_deleted=0");
+        as("shale_app","EXEC dbo.ResolveDesktopRememberCredential 0x00,NULL,NULL");
+        script("preflight"); // unchanged guard passes only after retiring actual capabilities.
+        rejected("retire-legacy-login",58344);
+        String after=variables.put("LegacyAfterHash","0x00");rejected("rollback-legacy-login",58344);variables.put("LegacyAfterHash",after);
+        execute("GRANT SELECT ON dbo.AuthConfig TO shale_app AS dbo");
+        rejected("rollback-legacy-login",58344);execute("REVOKE SELECT ON dbo.AuthConfig FROM shale_app AS dbo");
+        String rollbackApproval=variables.put("LegacyRollbackApproval","");
+        rejected("rollback-legacy-login",58348);variables.put("LegacyRollbackApproval",rollbackApproval);
+        String originalBefore=variables.put("LegacyBeforeHash","0x"+"00".repeat(32));
+        rejected("rollback-legacy-login",58346);assertEquals(retired,catalog("database_permissions"),
+                "failed final rollback equality must not reopen any capability");
+        variables.put("LegacyBeforeHash",originalBefore);
+        script("rollback-legacy-login");
+        assertEquals(permissions,catalog("database_permissions"),"rollback must restore exact original G/W/D/R and grantors, never guessed grants");
+        assertEquals(members,catalog("database_role_members"));assertEquals(predicates,catalog("security_predicates"));
+        as("shale_app","EXEC dbo.sp_login_mark_success N'legacy@test'");
+        as("shale_runtime","EXEC dbo.sp_login_mark_success N'legacy@test'");
+        script("retire-legacy-login");assertEquals(retired,catalog("database_permissions"));
+        // Keep the retired modules through the existing Stage A/B roundtrip. No lockout policy or body changes.
+        execute("DELETE dbo.Users WHERE Id<0");
+    }
+    private String legacyHashRows(String email)throws SQLException {
+        execute("EXECUTE AS USER=N'shale_app'");
+        try(var q=connection.createStatement()) {
+            boolean result=q.execute("EXEC dbo.sp_login_get_hash N'"+email+"'");
+            int count=0;
+            if(result)try(var r=q.getResultSet()){while(r.next())count++;}
+            return Integer.toString(count);
+        } finally {execute("REVERT");}
     }
     private String scalar(String sql)throws SQLException {
         try(var q=connection.createStatement();var r=q.executeQuery(sql)){assertTrue(r.next());return r.getString(1);}
@@ -227,6 +358,7 @@ final class AuthPermissionCutoverFixture {
                 "reported grants plus VIEW DEFINITION DENY alone must pass without unknown authority");
         authAuthorityDiagnostics();
         legacyLoginEvidence();
+        actualLegacyRetirement();
         // Establish the dangerous baseline with the same broad database/schema grants reported by operator.
         execute("BEGIN TRANSACTION");
         String installer=Files.readString(root.resolve("docs/sql/2026-10-14_pretenant_authentication_modules.sql"));
@@ -271,6 +403,10 @@ final class AuthPermissionCutoverFixture {
         execute("CREATE USER FutureRuntime WITHOUT LOGIN; ALTER ROLE shale_runtime_role ADD MEMBER FutureRuntime");
         denied("FutureRuntime","EXEC dbo.LookupAuthenticationCredentialV1 @Email=N'missing@test'");
         execute("ALTER ROLE shale_runtime_role DROP MEMBER FutureRuntime; DROP USER FutureRuntime");
+        for(String name:List.of("sp_login_get_hash","sp_login_mark_failure","sp_login_mark_success")) {
+            denied("shale_app","EXEC dbo."+name+" N'missing@test'");
+            denied("shale_runtime","EXEC dbo."+name+" N'missing@test'");
+        }
         // Stage A preserves old desktops and all direct read/write permissions.
         as("shale_app","SELECT TOP(0) id,password_hash FROM dbo.Users");
         as("shale_app","EXEC dbo.ResolveDesktopRememberCredential 0x00,NULL,NULL");
@@ -310,6 +446,7 @@ final class AuthPermissionCutoverFixture {
         rejected("rollback-reads",58321);
         execute("REVOKE VIEW DEFINITION ON OBJECT::dbo.Statuses FROM ShaleAuthTableFenceV1 AS dbo");
         script("rollback-reads");
+        denied("shale_runtime","EXEC dbo.sp_login_mark_success N'missing@test'");
         assertEquals(beforeReadFence,catalog("database_permissions"),"rollback must restore original grantors/states, including W and column R");
         execute("REVOKE SELECT ON OBJECT::dbo.Users FROM shale_app AS dbo");
         assertEquals(installed,catalog("database_permissions"));

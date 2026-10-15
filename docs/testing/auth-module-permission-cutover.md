@@ -1,6 +1,225 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest blocker:** the operator identified three `sp_login_*` EXECUTE grants after #1872.
+**Latest assessment:** see [captured behavior and separate retirement candidate](#captured-legacy-login-behavior-and-separate-retirement-candidate--2026-10-15). Installation remains blocked pending caller/drain/compatibility evidence.
+
+## Captured legacy login behavior and separate retirement candidate — 2026-10-15
+
+**Current decision: retirement candidate ready for review; installation remains BLOCKED.**
+The complete private `legacy-login.txt` capture collected **2026-10-15 20:30:25.8430398 UTC**
+was reviewed, including definitions, SET flags, parameter metadata, ownership, dependencies,
+principal/role context and exact ACL states/grantors. It supplements the original prior-state
+capture; neither raw capture nor unrelated principal/permission inventory is committed.
+Live `codex/latest` was fetched at `9a812953028b8f58876172ecc39d3d9b502cdd85`; GitHub metadata
+and Git ancestry verify merged #1873. Separate branch: `codex/legacy-login-retirement-20261015`.
+Earlier unknown-definition statements below describe the evidence available to those earlier revisions.
+This section supersedes them for these three captured procedures only.
+
+| Captured fact | Consequence |
+| --- | --- |
+| All three accept only `@email nvarchar(320)`, compare `LOWER(email)` without tenant qualification, and accept `is_deleted IS NULL` | Duplicate emails can affect multiple tenants; removed status is not checked. |
+| get_hash checks for any future lock first, then unordered `TOP (1) password_hash` | One matching account can suppress all results; ambiguity is hidden. No password verification occurs. |
+| mark_failure updates every eligible match, increments the existing value, and uses AuthConfig id 1 with NULL/missing defaults 5/15 | Expired locks do not reset the counter; threshold failures assign a new lock deadline. NULL counters stay NULL. No lockout policy change is proposed. |
+| mark_success updates every eligible match to zero failures, NULL lock and current last_login | A caller can clear locks and stamp successful-login accounting without presenting credentials or authenticated identity. |
+| CALLER context, NULL explicit object owner, effective dbo ownership, no captured signatures/triggers/inbound dependencies; outbound Users and AuthConfig only | Same-owner ownership chaining skips table permission checks. CALLER and direct Users DML DENYs do not confine these capabilities. Static metadata is not an external/dynamic caller inventory. |
+| Auth has exactly three object EXECUTE G/GRANT rows, grantor dbo | A narrow exact-state REVOKE is possible only after independently approved caller retirement. W/D/R or other grantors are rejected rather than rewritten. |
+| Runtime has database EXECUTE plus role dbo-schema EXECUTE | REVOKE on auth does not retire runtime access; table read fences do not block the hash procedure or accounting writes. |
+
+The test resources contain **only the three reviewed procedure bodies**, normalized to LF in Git and
+restored to captured CRLF before SQL creation. Their SQL Server SHA-256 hashes must equal:
+
+```text
+get_hash     0x1B0D6F1117829EA94326E04EF955243EC7BF8110692C550876F1ADBA1C9D7453
+mark_failure 0x08AF95D876F0DBA465DE97AB5A7371544604B64B916B464722DA5D040F374112
+mark_success 0xA76F60DAEA06E046D46A7CAB99770C819449474AA8A214DD27C13F5EB24C0C6E
+```
+
+### Exact permission delta and approval boundaries
+
+`retire-legacy-login.sql` is a **separate pre-Stage-A operator candidate**, never included by an
+installer or preflight. Its one transaction removes the three captured auth object EXECUTE grants
+**AS dbo** and adds exactly six object EXECUTE DENYs **AS dbo**, one for each procedure on each of
+`shale_runtime` and `shale_runtime_role`. This explicit runtime scope is required to defeat the reported
+inherited EXECUTE and future role members; broad database/schema grants remain unchanged. No module,
+user data, AuthConfig value, session context, remembered credential, RLS predicate, role or membership
+is edited. This does not establish least privilege: runtime's direct Users access, broader schema
+CRUD/EXECUTE and audit permissions remain independent findings.
+
+Before mutation, an operator must retain and reference all of the following privately:
+
+1. Security-owner approval specifically for retiring **all three auth and runtime capabilities** and
+   the reopened-risk rollback, distinct from Stage A/B approval. Establish actual installed desktop,
+   server, job and connection identities, original-login/server-token authority and exact artifact hashes.
+2. A complete caller inventory covering installed 1.0.136/older clients, server versions, jobs,
+   integrations, stored wrappers, dynamic SQL, synonyms and external consumers. Repository source absence
+   and empty dependency metadata do not establish absence of use. Any required caller must first be
+   migrated through separately reviewed compatible work; this candidate does not create a substitute.
+3. A bounded observation/drain record for the inventoried consumers with a documented start/end,
+   longest scheduled-job interval and connection/session drain, owners and zero remaining invocations.
+   Do not invoke these procedures against Azure to create evidence. Use already-approved private
+   operational/configuration/telemetry records; a missing observation source remains a blocker requiring
+   a separately approved telemetry collection plan, not guessed zero usage.
+4. Compatibility evidence tying unchanged password/bcrypt and remembered flows to the installed
+   artifacts and actual configured principals, including 1.0.136's direct Users read and old remembered
+   resolver. This can justify retiring unused grants while retaining old-client reads; it cannot justify
+   disabling a deployed/external consumer. If accounting/lockout callers are active, stop for their own
+   migration/disposition rather than silently bypassing or redesigning their policy.
+5. Exclusive serialized operator control of security/module metadata during baseline collection,
+   apply and rollback. No concurrent DDL/permission editing; the scripts do not impose a global DDL lock.
+
+Acknowledgements and nonempty evidence references record these decisions; they do not prove them.
+**Those records have not been supplied. No live retirement or installation is approved by this PR.**
+
+`legacy-retirement-baseline.sql` is a bounded read-only catalog/hash action on the existing approved dbo
+metadata connection. It pins the captured bodies/SET flags/parameters/owners, rejects signatures,
+Users/AuthConfig triggers, inbound static callers and matching synonyms, and verifies the four outbound
+dependencies. It outputs a single database-specific catalog digest. Retain it independently only after
+reviewing the associated current private catalog evidence; never calculate an expected hash inside the
+mutation invocation or replace an original failed baseline with current state merely to pass a guard.
+It does not replace the original prior-state capture. Its digest covers exact permission/grantor/state,
+principal SID/owner, membership, schema/object ownership, module hashes/SET/execution flags, parameters/column/type metadata,
+signatures, dependencies, synonyms, triggers and security policies/predicates. Application rows and
+server/login authority are intentionally outside this metadata digest. Changed/unsupported evidence stops.
+
+Apply refuses drift before editing and compares the complete expected ACL delta plus unchanged other
+metadata before commit. Auth authority diagnostics remain unchanged and must pass after revocation;
+runtime effective checks must show no escalation and no legacy EXECUTE. A same-owner wrapper can bypass
+nested procedure DENY, so known inbound callers are rejected and external/dynamic paths remain an inventory
+gate. Later/new wrappers or authority changes require renewed review; the DENYs are not a sandbox for
+arbitrary dbo modules. Run full unchanged Stage A preflight separately after retirement, with its original
+identity/security-owner gates. A successful retirement does not authorize installation.
+
+### Windows operator commands and the remaining bounded action
+
+**Next action now:** have the security owner complete the five-item evidence review above and record a
+per-procedure, per-auth/runtime-consumer retire-or-migrate decision. If the records cannot establish no
+remaining dependent callers, stop here; provide the missing consumer/telemetry plan for separate approval.
+No Azure call, permission change or installation is part of this Codex task.
+
+Once separately authorized, from the reviewed repository root use the existing approved connection
+array and private output paths. SQLCMD variables accept trusted fixed literals, safe change-control IDs
+and emitted hex digests only; never interpolate quotes, SQL, credentials, URLs or private contents.
+Do not put invented evidence references in these variables. Use one SQLCMD connection per script and
+stop on every error; SQLCMD exits/closes the connection so an uncommitted transaction rolls back.
+
+```powershell
+# Read-only; retain the output privately. No approval of mutation is implied.
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/legacy-retirement-baseline.sql -v ExpectedDatabase=Shale -o $privateLegacyBaselineOutput
+if ($LASTEXITCODE -ne 0) { throw 'Stop: captured legacy baseline is incompatible or incomplete' }
+# Set $legacyBeforeHash from the independently reviewed output, never an inline current-state query.
+# Fill these safe IDs only from approved private change-control records.
+$legacyApproval = @('ExpectedDatabase=Shale', 'ReviewedIdentityMapping=CONFIRMED', 'LegacyRetirementApproval=APPROVED', 'CallerInventoryApproved=APPROVED', 'LegacyCallersDrained=CONFIRMED', 'RuntimeLegacyDisposition=DENY_THREE_MODULES', 'ExclusiveChangeWindow=CONFIRMED', "CallerInventoryEvidence=$inventoryRecordId", "CallerDrainEvidence=$drainRecordId", "CompatibilityEvidence=$compatibilityRecordId")
+$legacyApply = $legacyApproval + @("LegacyBeforeHash=$legacyBeforeHash")
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/retire-legacy-login.sql -v @legacyApply -o $privateLegacyRetirementOutput
+if ($LASTEXITCODE -ne 0) { throw 'Stop: retirement failed; verify unchanged catalogs before any next action' }
+# Independently save AfterHash as $legacyAfterHash from that successful output.
+# Recheck the actual configured auth/runtime login tokens and effective permissions, without invoking legacy modules.
+# Existing Stage A approval remains separate; @review is the previously evidenced original acknowledgement set.
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/preflight.sql -v @review -o $privatePreflightRetestOutput
+if ($LASTEXITCODE -ne 0) { throw 'Stop: installation remains blocked' }
+```
+
+Afterward, actual auth must have zero effective EXECUTE on each legacy procedure and retain direct Users
+SELECT/old resolver EXECUTE. Actual runtime must have zero EXECUTE on all three and retain approved
+noncredential projections/password-management writes. Review original-login/server-token and dynamic
+wrapper authority separately; database-user impersonation tests do not establish those facts.
+No legacy procedure execution against Azure is requested, including as a postcheck.
+
+### Stage B disposition and exact rollback
+
+The three retired auth grants **stay absent** and all six runtime DENYs **stay present through Stage A,
+Stage B and rollback of either stage**. The existing scripts already preserve unrelated permissions; no
+Stage B allowlist or guard change is needed. Stage B's full compatible fleet/job drain, caller inventory,
+module identities and RLS prerequisites remain independently mandatory. The legacy retirement's smaller
+caller drain is not a substitute for the Stage B old-client read drain. Neither a Users SELECT DENY nor
+runtime hash-column DENY would prevent these procedures' internal access; this is why the explicit
+EXECUTE retirement is required before considering Stage B complete for this profile.
+
+`rollback-legacy-login.sql` supports only the captured original **G/GRANT AS dbo** profile. It requires
+separate rollback approval, compatibility/reopened-capability review, the original independently saved
+BeforeHash and AfterHash, and the same inventory/drain/exclusive-window evidence. It rejects extra target
+ACLs, changed grantors/states/SIDs/metadata and missing hashes. It removes exactly six new DENYs AS dbo,
+replays exactly the three original grants AS dbo without GRANT OPTION, then requires the **entire original
+catalog digest** before commit. No CASCADE, grantor substitution, broad grant replay or module edits.
+Unsupported original W/D/R/other-grantor states fail closed rather than using this rollback.
+
+Rollback order: while Stage A/B exist the legacy rollback intentionally refuses; drain/roll back their
+consumers and use their own guarded rollbacks first. If any later unrelated catalog change remains,
+AfterHash will still differ: stop for separately reviewed reconciliation, never overwrite saved hashes.
+Review the reopened hash disclosure, unauthenticated accounting and inherited runtime risks before
+restoring access. Failed rollback closes the connection and rolls back its complete transaction.
+
+```powershell
+$legacyRollback = $legacyApproval + @('LegacyRollbackApproval=APPROVED', 'RollbackCompatibilityReviewed=CONFIRMED', "LegacyBeforeHash=$legacyBeforeHash", "LegacyAfterHash=$legacyAfterHash")
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/rollback-legacy-login.sql -v @legacyRollback -o $privateLegacyRollbackOutput
+if ($LASTEXITCODE -ne 0) { throw 'Stop: exact legacy rollback refused; do not replay grants manually' }
+```
+
+Audit compatibility: this is a security-catalog change, not an application business-data mutation or
+sensitive application read. Existing PHI/entity-action/session-security transactions and schemas remain
+unchanged; use private operator change control for approval, source hashes, evidence and catalog digests.
+Do not place raw metadata, bodies, SQL, credentials or account data in application audit rows.
+
+### Verification of this candidate
+
+Pre-edit test-impact inventory: existing auth lookup/module/lifecycle, remembered store/migration,
+User creation/removal/projection and `AuthVerificationSupportTest`, the full permission fixture, local SQL
+harness, launcher and security-data selector ownership were inspected. No runtime auth symbols or DTOs
+change. The expanded fixture runs captured behavior first, then the actual retirement/rollback scripts,
+then the existing unchanged Stage A/B and password/remembered/isolation scenarios. Retired modules remain
+present through that roundtrip, preventing accidental test-only removal of the capability blocker.
+
+All accounts, AuthConfig values, table shapes and calls in the fixture are **synthetic**. Only the three
+hash-verified module bodies reproduce the capture. Coverage includes duplicate emails across tenants,
+NULL/deleted/removed eligibility, threshold/expiry/default/NULL accounting, unauthenticated success,
+ownership-chain read/update despite direct DML DENY, runtime inherited EXECUTE after object REVOKE,
+future role-member denial, caller/dependency/approval/hash/ACL drift refusal, rollback of all nine ACL
+changes on postcheck failure, and exact original G/W/D/R/other-grantor preservation outside the target delta.
+Native Windows execution and installed 1.0.136 acceptance of this revision remain NOT RUN.
+
+
+
+Linux results for this revision (Maven 3.9.11 / JDK 21; SQL Server 2022 pinned to the digest
+already recorded below, task-owned container bound only to 127.0.0.1:14333):
+
+| Check | Result |
+| --- | --- |
+| Focused auth/module/lifecycle/store/User tests | 38 PASS; no failures/errors/skips. |
+| Committed-base repository selector / affected security-data suite | 54 PASS; no full-suite escalation. Auth, tenant/session and neighboring audit/transaction contracts are relevant to permission tooling. |
+| Critical reactor `mvn test` | 116 PASS; no failures/errors/skips. |
+| Final disposable SQL fixture / public quiet launcher | All three PASS lines; exit 0. Captured-body behavior, retirement/rollback and existing Stage A/B roundtrip execute before the current password/remembered/isolation scenarios. |
+| Real SQLCMD `-b -V 16` | PASS: missing drain 58343/exit 16; post-mutation authority failure 58347/exit 16 with complete rollback; drift 58344/exit 16; wrong final rollback identity 58346/exit 16 with no reopened grants; exact original digest restored. |
+| Python auth / selector / unchanged Case launcher | 17 PASS plus one native-Windows skip / 24 PASS / 4 PASS. No Case SQL execution. |
+| Captured-body UTF-16 hashes, SQL includes/aliases, runbook links/fences, scope and Git checks | PASS. Original preflight, Stage A/B, RLS, runtime authentication and remembered-credential code unchanged. |
+
+Commands executed from repository root (`mvn` uses the existing configured JDK/proxy/CA wrapper;
+`work/` helpers provide private synthetic credentials and exact nonce-owned local resources only):
+
+```bash
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest,SqlRememberCredentialStoreTest,DesktopRememberCredentialMigrationContractTest,UserDaoCreateUserTest,UserManagementRemovalContractTest,CaseSummaryUserDetailContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+python3 -m unittest discover -s build/case-read-verification -p 'test_*.py'
+python3 work/legacy-login/local_sql.py test
+python3 work/legacy-login/sqlcmd_roundtrip.py
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base 9a812953028b8f58876172ecc39d3d9b502cdd85 --head HEAD --format markdown --plan-output work/legacy-login/selection.json --run
+# The selector runs its printed affected Maven command, followed by mvn test.
+python3 work/legacy-login/local_sql.py launcher
+git diff --check 9a812953028b8f58876172ecc39d3d9b502cdd85 HEAD
+```
+
+The first new SQL attempts exposed empty-catalog XML NULL serialization and synthetic grant-option
+cleanup requirements. Empty catalog serializations now have explicit canonical empty roots, and an
+independently enforced non-NULL digest check; effective-permission UNKNOWN handling is unchanged.
+A definition-drift injection was made explicit rather than relying on CREATE/ALTER spelling. Private
+SQLCMD setup also needed captured SET flags and exact UTF-16 definition transport. Final runs above
+passed after those corrections; failed attempts are not acceptance. Private diagnostic helpers were
+removed from test sources. The final documented Windows launcher procedure remains available below;
+**native Windows execution, installed 1.0.136 acceptance and actual-login checks remain NOT RUN**.
+No Azure connection, live permission change, installation, release, RLS change, merge or deployment
+occurred. Only task-owned disposable SQL resources were removed. Caller/drain/compatibility evidence,
+independent owner approval and the existing Stage A/B/RLS/security gates remain open.
+
+**Historical #1873 blocker:** the operator identified three `sp_login_*` EXECUTE grants after #1872.
 The [current assessment and one bounded dbo query](#identified-1872-blocker-three-legacy-login-executes--2026-10-15)
 keep installation blocked pending deployed definitions/authority and accounting/caller evidence.
 
