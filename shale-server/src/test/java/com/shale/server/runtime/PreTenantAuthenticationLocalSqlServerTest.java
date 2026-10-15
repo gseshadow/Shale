@@ -72,7 +72,7 @@ class PreTenantAuthenticationLocalSqlServerTest {
         try(var c=admin("master")) {
             try(var q=c.createStatement();var r=q.executeQuery("SELECT CONVERT(int,SERVERPROPERTY('EngineEdition'))")){require(r.next());require(r.getInt(1)!=5&&r.getInt(1)!=8);}
             try(var q=c.prepareStatement("SELECT DB_ID(?),SUSER_ID(?),SUSER_ID(?)")){q.setString(1,db);q.setString(2,authLogin);q.setString(3,runtimeLogin);try(var r=q.executeQuery()){require(r.next());require(r.getObject(1)==null&&r.getObject(2)==null&&r.getObject(3)==null);}}
-            execute(c,"CREATE DATABASE ["+db+"]");created=true;
+            execute(c,"CREATE DATABASE ["+db+"] COLLATE SQL_Latin1_General_CP1_CI_AS");created=true;
             execute(c,"CREATE LOGIN ["+authLogin+"] WITH PASSWORD='"+authSecret+"', CHECK_POLICY=OFF");authCreated=true;authSid=loginSid(c,authLogin);
             execute(c,"CREATE LOGIN ["+runtimeLogin+"] WITH PASSWORD='"+runtimeSecret+"', CHECK_POLICY=OFF");runtimeCreated=true;runtimeSid=loginSid(c,runtimeLogin);
         }
@@ -80,21 +80,34 @@ class PreTenantAuthenticationLocalSqlServerTest {
             execute(c,"CREATE TABLE dbo.AuthVerifierOwner(Marker uniqueidentifier NOT NULL)");
             try(var q=c.prepareStatement("INSERT dbo.AuthVerifierOwner VALUES(?)")){q.setObject(1,UUID.fromString(marker));q.executeUpdate();}marked=true;
             execute(c,"CREATE TABLE dbo.ShaleClients(Id int PRIMARY KEY)");execute(c,"INSERT dbo.ShaleClients VALUES(11),(22)");
-            execute(c,"CREATE TABLE dbo.Users(Id int PRIMARY KEY,ShaleClientId int NULL,email nvarchar(255),password_hash nvarchar(255),name_first nvarchar(50),name_last nvarchar(50),color nvarchar(20),is_attorney bit,is_admin bit,is_deleted bit NULL,IsRemoved bit,default_organization int,organization_id int,initials nvarchar(20))");
+            execute(c,"CREATE TABLE dbo.Users(Id int PRIMARY KEY,ShaleClientId int NULL,email nvarchar(255),password_hash nvarchar(255),password_alg varchar(20),name_first nvarchar(50),name_last nvarchar(50),color nvarchar(20),is_attorney bit,is_admin bit,is_deleted bit NULL,IsRemoved bit,default_organization int,organization_id int,initials nvarchar(20))");
             execute(c,"CREATE TABLE dbo.UserSessions(SessionId uniqueidentifier PRIMARY KEY,ShaleClientId int NOT NULL,UserId int NOT NULL,CurrentAccessJti uniqueidentifier NOT NULL,ExpiresAt datetime2(7),RevokedAt datetime2(7),LastRefreshedAt datetime2(7),UpdatedAt datetime2(7))");
             execute(c,"CREATE TABLE dbo.DesktopRememberCredentials(ShaleClientId int,UserId int,SessionId uniqueidentifier,InstallationId uniqueidentifier,CredentialHash binary(32) UNIQUE,AbsoluteExpiresAt datetime2(7),ConsumedAt datetime2(7),RotatedAt datetime2(7),UpdatedAt datetime2(7))");
+            execute(c,"CREATE TABLE dbo.auditLog(Id int,EntryCode int)");
+            execute(c,"CREATE TABLE dbo.Statuses(Id int)");
             execute(c,"CREATE SCHEMA sec AUTHORIZATION dbo");
             execute(c,"CREATE FUNCTION sec.fn_FilterByTenant(@Tenant int) RETURNS TABLE WITH SCHEMABINDING AS RETURN SELECT 1 AS AccessResult WHERE USER_NAME()=N'dbo' OR IS_MEMBER(N'ShaleAdmins')=1 OR @Tenant=TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))");
-            // TEST FIXTURE ONLY: simulate the future strict Users policy, never alter the authoritative export.
-            execute(c,"CREATE SECURITY POLICY sec.AuthFixturePolicy ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.Users, ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.UserSessions WITH(STATE=ON)");
-            String modules=Files.readString(Path.of("..","docs","sql","2026-10-14_pretenant_authentication_modules.sql"));
-            try {for(String batch:modules.split("(?im)^GO\\s*$"))if(!batch.isBlank())execute(c,batch);}catch(Exception e){execute(c,"IF @@TRANCOUNT>0 ROLLBACK");throw e;}
-            execute(c,"CREATE ROLE ShalePreTenantAuthentication AUTHORIZATION dbo");execute(c,"CREATE ROLE ShaleTenantRuntime AUTHORIZATION dbo");
-            execute(c,"CREATE USER ["+authLogin+"] FOR LOGIN ["+authLogin+"]");execute(c,"CREATE USER ["+runtimeLogin+"] FOR LOGIN ["+runtimeLogin+"]");
-            execute(c,"ALTER ROLE ShalePreTenantAuthentication ADD MEMBER ["+authLogin+"]");execute(c,"ALTER ROLE ShaleTenantRuntime ADD MEMBER ["+runtimeLogin+"]");
-            execute(c,"GRANT EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO ShalePreTenantAuthentication");execute(c,"GRANT EXECUTE ON dbo.ResolveDesktopRememberCredentialV2 TO ShalePreTenantAuthentication");
-            execute(c,"GRANT SELECT ON dbo.Users TO ShaleTenantRuntime");execute(c,"DENY SELECT ON dbo.Users(password_hash) TO ShaleTenantRuntime");
-            execute(c,"GRANT SELECT,UPDATE ON dbo.UserSessions TO ShaleTenantRuntime");execute(c,"GRANT SELECT,INSERT,UPDATE,DELETE ON dbo.DesktopRememberCredentials TO ShaleTenantRuntime");
+            execute(c,"CREATE SECURITY POLICY sec.AuthFixturePolicy ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.UserSessions WITH(STATE=ON)");
+            execute(c,"CREATE ROLE shale_runtime_role AUTHORIZATION dbo");
+            execute(c,"CREATE USER shale_app FOR LOGIN ["+authLogin+"]");
+            execute(c,"CREATE USER shale_runtime FOR LOGIN ["+runtimeLogin+"]");
+            execute(c,"ALTER ROLE shale_runtime_role ADD MEMBER shale_runtime");
+            execute(c,"GRANT SELECT,INSERT,UPDATE,DELETE ON SCHEMA::dbo TO shale_runtime");
+            execute(c,"GRANT SELECT,INSERT,UPDATE,DELETE,EXECUTE ON SCHEMA::dbo TO shale_runtime_role");
+            execute(c,"GRANT EXECUTE TO shale_runtime");
+            // Non-dbo prior grantor and G/W/D/R rows exercise exact preservation, not guessed replay.
+            execute(c,"CREATE USER PriorGrantor WITHOUT LOGIN");
+            execute(c,"GRANT SELECT ON dbo.Users TO PriorGrantor WITH GRANT OPTION");
+            execute(c,"GRANT SELECT ON dbo.Users TO shale_app AS PriorGrantor");
+            execute(c,"GRANT SELECT ON dbo.auditLog TO PriorGrantor");
+            execute(c,"REVOKE SELECT ON dbo.auditLog(EntryCode) FROM PriorGrantor");
+            execute(c,"DENY UPDATE ON dbo.auditLog TO PriorGrantor");
+            String old=Files.readString(Path.of("..","docs","sql","2026-10-06_desktop_remember_credentials_permissions.sql"));
+            for(String batch:old.split("(?im)^GO\\s*$"))if(!batch.isBlank())execute(c,batch);
+            new AuthPermissionCutoverFixture(c,db).verifyAndInstall();
+            // TEST FIXTURE ONLY: future strict Users protection is independently simulated AFTER
+            // candidate checks proved installation/restrictions/rollback preserve all existing predicates.
+            execute(c,"ALTER SECURITY POLICY sec.AuthFixturePolicy ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.Users");
             String hash=org.mindrot.jbcrypt.BCrypt.hashpw("synthetic-password",org.mindrot.jbcrypt.BCrypt.gensalt(4));
             for(int id=1;id<=9;id++)try(var q=c.prepareStatement("INSERT dbo.Users(Id,ShaleClientId,email,password_hash,is_deleted,IsRemoved,is_admin,is_attorney) VALUES(?,?,?,?,?,?,0,0)")) {
                 q.setInt(1,id);if(id==5)q.setNull(2,Types.INTEGER);else q.setInt(2,id==2?22:id==9?33:11);
@@ -107,7 +120,7 @@ class PreTenantAuthenticationLocalSqlServerTest {
             require(r.next());require(expected.equals(r.getString(1)));require(r.getInt(2)==0&&r.getInt(3)==0&&r.getInt(4)==0);
         }
         for(String sql:List.of("SELECT password_hash FROM dbo.Users","SELECT * FROM dbo.DesktopRememberCredentials")) {
-            if(expected.equals(authLogin))assertThrows(SQLException.class,()->execute(c,sql));
+            if(expected.equals("shale_app"))assertThrows(SQLException.class,()->execute(c,sql));
         }
         assertThrows(SQLException.class,()->execute(c,"EXECUTE AS USER='dbo'"));
         require(context(c,"ShaleClientId")==null);
@@ -119,11 +132,16 @@ class PreTenantAuthenticationLocalSqlServerTest {
         assertEquals(22,auth.login("owner2@test","synthetic-password").getShaleClientId());
         for(String email:List.of("missing@test","owner3@test","owner4@test","owner5@test","owner9@test","duplicate@test"))assertThrows(AuthException.class,()->auth.login(email,"synthetic-password"));
         assertThrows(AuthException.class,()->auth.login("owner1@test","wrong"));
-        try(var c=authPool.getConnection()){caller(c,authLogin);require(context(c,"PrincipalUserId")==null);}
+        try(var c=authPool.getConnection()){caller(c,"shale_app");require(context(c,"PrincipalUserId")==null);}
         // Failure inside the elevated module must restore its caller too.
-        try(var c=admin(db)){execute(c,"ALTER AUTHORIZATION ON OBJECT::dbo.LookupAuthenticationCredentialV1 TO ["+authLogin+"]");execute(c,"GRANT EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO ShalePreTenantAuthentication");}
-        try {assertThrows(AuthException.class,()->auth.login("owner1@test","synthetic-password"));try(var c=authPool.getConnection()){caller(c,authLogin);}}
-        finally{try(var c=admin(db)){execute(c,"ALTER AUTHORIZATION ON OBJECT::dbo.LookupAuthenticationCredentialV1 TO dbo");execute(c,"GRANT EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO ShalePreTenantAuthentication");}}
+        try(var c=admin(db)){execute(c,"ALTER AUTHORIZATION ON OBJECT::dbo.LookupAuthenticationCredentialV1 TO shale_app");execute(c,"GRANT EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO shale_app");}
+        try {assertThrows(AuthException.class,()->auth.login("owner1@test","synthetic-password"));try(var c=authPool.getConnection()){caller(c,"shale_app");}}
+        finally{try(var c=admin(db)){
+            execute(c,"ALTER AUTHORIZATION ON OBJECT::dbo.LookupAuthenticationCredentialV1 TO dbo");
+            execute(c,"GRANT EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO shale_app");
+            execute(c,"DENY EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO shale_runtime");
+            execute(c,"DENY EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO shale_runtime_role");
+        }}
     }
     private static Calendar utc(){return Calendar.getInstance(TimeZone.getTimeZone("UTC"));}
     private void remembered()throws Exception {
@@ -173,7 +191,7 @@ class PreTenantAuthenticationLocalSqlServerTest {
             assertTrue(store.rotate(rejected,device,new byte[32],UUID.randomUUID(),Instant.now()).isEmpty(),"disabled/removed/NULL-tenant/expired identity must not rotate");
         }
         diagnostics.step(CALLER_RESTORATION);
-        try(var c=authPool.getConnection()){caller(c,authLogin);}
+        try(var c=authPool.getConnection()){caller(c,"shale_app");}
     }
     private void runtimeIsolation()throws Exception {
         var runtime=new RuntimeSessionService(runtimePool);Integer spid=null;
@@ -185,7 +203,17 @@ class PreTenantAuthenticationLocalSqlServerTest {
                 try(var q=c.prepareStatement("SELECT Id FROM dbo.Users WHERE ShaleClientId<>?")){q.setInt(1,identity[0]);try(var r=q.executeQuery()){assertFalse(r.next());}}
                 assertThrows(SQLException.class,()->execute(c,"SELECT password_hash FROM dbo.Users"));
                 assertThrows(SQLException.class,()->execute(c,"EXEC dbo.LookupAuthenticationCredentialV1 @Email=N'owner1@test'"));
+                assertThrows(SQLException.class,()->execute(c,"EXEC dbo.ResolveDesktopRememberCredentialV2 0x00,NULL,NULL"));
                 assertThrows(SQLException.class,()->execute(c,"EXECUTE AS USER='dbo'"));
+                // Preserve direct tenant User projection and actual password writes without hash SELECT.
+                try(var q=c.prepareStatement("SELECT id,name_first,name_last,email,color,is_admin,is_attorney,ShaleClientId FROM dbo.Users WHERE id=? AND ShaleClientId=?")) {
+                    q.setInt(1,identity[1]);q.setInt(2,identity[0]);try(var r=q.executeQuery()){assertTrue(r.next());}
+                }
+                c.setAutoCommit(false);
+                try(var q=c.prepareStatement("UPDATE dbo.Users SET password_hash=?,password_alg='bcrypt' WHERE id=? AND ShaleClientId=?")) {
+                    q.setString(1,org.mindrot.jbcrypt.BCrypt.hashpw("synthetic-replacement",org.mindrot.jbcrypt.BCrypt.gensalt(4)));
+                    q.setInt(2,identity[1]);q.setInt(3,identity[0]);assertEquals(1,q.executeUpdate());
+                }finally{c.rollback();c.setAutoCommit(true);}
             }
         }
         try(var c=runtimePool.getConnection()){execute(c,"EXEC sys.sp_set_session_context N'ShaleClientId',NULL");execute(c,"EXEC sys.sp_set_session_context N'PrincipalUserId',NULL");

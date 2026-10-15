@@ -1,5 +1,24 @@
 # Shale Web V2 architecture and phased implementation roadmap
 
+## Auth permission evidence and cutover candidate — 2026-10-15
+
+The [owning permission cutover runbook](../testing/auth-module-permission-cutover.md) records the user's native Windows
+auth SQL PASS for credential_identity, remembered_rotation and runtime_isolation, exit 0, and the
+user-run Azure collation/principal/effective-permission evidence. These supersede earlier pending
+Windows retest/unknown catalog statements for those reported observations only. Actual deployed
+server/desktop credential configuration and compatible installed fleet remain UNCONFIRMED.
+
+Existing runtime database/schema EXECUTE would expose new dbo owner-executed modules. The candidate
+installs both modules with runtime principal/role object DENY fences atomically, grants auth only object
+EXECUTE, and separately gates additive auth-table/runtime-hash read fences on approved caller inventory
+and old-client drain. Existing User projections and password-management writes are preserved. Original
+grants/grantors/states are captured and never rewritten; exact staged postchecks and rollback are owned
+there. Broader runtime audit SELECT/INSERT/UPDATE/DELETE remediation remains OPEN: deployed history must
+not be described as database-enforced append-only. No three FILTERs, existing predicates, original export,
+Case harness or R4 accepted reports change. CASE SQL NOT RUN; security acceptance OPEN; deployment BLOCKED.
+No Azure connection/live grant/migration, client release, configuration change, merge or deployment here.
+
+
 **Reviewed:** 2026-10-12. **Inventory/documentation:** COMPLETE. **R2 selected-read decisions:** ACCEPTED; broader/live/deployment acceptance OPEN.
 **Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
 Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — Phase 3A safe login return-path restoration and Phase 3B startup
@@ -1369,15 +1388,22 @@ sufficient auth SQL and installed-client compatibility evidence; no security acc
 
 <a id="12-next-bounded-prompt--hosted-web-delivery-preparation"></a>
 
-## 12. Next bounded prompt — local SQL execution and remaining acceptance
+<a id="12-next-bounded-prompt--local-sql-execution-and-remaining-acceptance"></a>
 
-Review and verify the [pre-tenant auth candidate](../testing/case-read-local-security-verification.md#pre-tenant-authentication-prerequisite-implementation--2026-10-14)
-before proposing the separately reviewed targeted RLS migration and local candidate verification prompt.
-Auth SQL and installed-client compatibility remain unverified; that next implementation prompt is deferred. The authoritative
-offline snapshot is now supplied and confirms missing Users/auditLog/Statuses coverage; it must remain
-unchanged/uncommitted. Resolve actual identity/grant/module ownership and email/NULL-user prerequisites
-through approved operator evidence. Preserve shared BCrypt/auth/session contracts and compatible desktop
-login/remembered bootstrap; do not broaden shared sec predicates or grant runtime SQL admin bypass.
+## 12. Next bounded prompt — permission cutover and remaining acceptance
+
+The [auth permission candidate](../testing/auth-module-permission-cutover.md) now owns the reported
+native Windows auth SQL PASS, confirmed Azure catalog/effective broad grants, atomic module installation
+with runtime DENY fences, separately gated read restrictions, exact evidence capture/postchecks/rollback
+and disposable local tests. Actual deployed server/desktop credential mapping, independent security-owner
+approval and compatible installed fleet/drain remain UNCONFIRMED; deployment BLOCKED. Complete those
+concrete gates before separately authorizing any operator stage. This PR performs no release/configuration
+or live grant/migration action. The next targeted FILTER/candidate-verification task stays deferred.
+
+The authoritative offline snapshot confirms missing Users/auditLog/Statuses coverage and remains
+unchanged/uncommitted. Preserve shared BCrypt/auth/session contracts and compatible desktop login/
+remembered bootstrap; do not broaden shared sec predicates or grant runtime SQL admin bypass. The owning
+runbook explicitly retains audit write/admin remediation and the original Case harness/security gates.
 
 After compatible callers/old-client drain and reviewed targeted policy preparation, the unchanged
 [local harness](../testing/case-read-local-security-verification.md) can verify a **labelled candidate**
