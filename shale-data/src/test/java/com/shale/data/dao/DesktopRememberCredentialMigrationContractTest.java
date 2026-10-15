@@ -21,7 +21,8 @@ class DesktopRememberCredentialMigrationContractTest {
         assertTrue(migration.contains("InstallationId uniqueidentifier NOT NULL"),"installation identity must remain a UUID");
         assertTrue(migration.contains("AbsoluteExpiresAt datetime2(7) NOT NULL"),"the absolute deadline must remain datetime2(7)");
         assertTrue(store.contains("q.setBytes(5,hash)"),"credential hashes must be bound as bytes, never text");
-        assertTrue(store.contains("q.setTimestamp(6,Timestamp.from(expires))"),"the deadline must be bound as a timestamp");
+        assertTrue(store.replaceAll("\\s+","").contains("q.setTimestamp(6,Timestamp.from(expires),utc())"),
+                "datetime2 deadline must be bound as a UTC timestamp, independent of the JVM timezone");
     }
 
     @Test void verifierIsReadOnlyAndCoversConstraintsPredicatesAndApiPrincipalPermissions()throws Exception{
