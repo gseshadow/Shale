@@ -1,6 +1,46 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest assessment:** see [post-#1874 evidence and bounded usage observation](#post-1874-evidence-and-bounded-usage-observation--2026-10-15). Retirement and installation remain blocked; cache sampling cannot certify nonuse.
+**Latest assessment:** see [synthetic Azure invocation validation](#synthetic-azure-invocation-validation-follow-up--2026-10-15). Production activation, retirement and installation remain blocked; cache sampling cannot certify nonuse.
+
+## Synthetic Azure invocation validation follow-up — 2026-10-15
+
+**Production monitoring, retirement and installation remain BLOCKED.** The separately isolated
+[executable operator package](../sql/auth/invocation-validation/README.md) tests raw module-entry/exit
+payload privacy and bounded coverage in a separately approved, empty synthetic Azure SQL Database.
+It supplies discovery, guarded setup, synthetic workload, full raw collection, offline assertions,
+stop and exact-owner cleanup. It provisions nothing and has not connected to Azure. No live candidate
+is supplied; synthetic diagnostic start/end sessions must never be activated against Shale or its copies.
+
+Operator evidence at **2026-10-15 22:29:04 UTC**: the #1875 sampler ran against Shale, exit 0;
+each of `dbo.sp_login_get_hash`, `dbo.sp_login_mark_failure`, `dbo.sp_login_mark_success` had
+`CachedPlanCount=0`, NULL execution counts/times and `INCOMPLETE_CACHE_OBSERVATION`.
+Record these as **unavailable cache evidence, not zero usage**. Query Store AUTO also retained no
+statements for them. These attributed reports do not establish nonuse; no original output was supplied
+or regenerated in this task. Preserve the original captures and #1874 retirement/rollback, unchanged
+preflight, Stage A/B, desktop compatibility and RLS prerequisites. The live-update tenant/user
+negotiate authorization concern remains separate and OPEN.
+
+Live base fetched: `be55d7187cddc2bc7bf2fbfbbfd00a19c4b614e4`; GitHub reports #1875 merged at
+2026-10-15 22:21:20 UTC, and local ancestry confirms its merge in the base. Task branch:
+`codex/azure-synthetic-invocation-validation-20261015`; a separate worktree preserves the prior checkout.
+Reviewed completely: AGENTS.md, architecture/codex-prompt-rules.md and this runbook; database-schema
+and tenancy-and-rls routing and the existing auth/module/lifecycle/permission fixture and launcher tests
+were inspected before edits. No application symbol, auth behavior, permission, preflight, historical
+capture, retirement/rollback, Stage A/B or RLS contract changes. Audit integration needs no application
+schema/event: synthetic DDL/security metadata and retention use private operator change control.
+
+Microsoft documentation and local supported metadata were inspected before choosing this bounded
+experiment. Local module_start/module_end expose intrinsic statement plus configurable collect_statement;
+setting it to zero emitted an empty statement field locally. That is **not Azure payload verification**.
+The package requires actual Azure metadata review before setup, rejects full-payload privacy violations,
+checks exact module/database predicates, counts and health, and deliberately demonstrates/rejects bounded
+target loss. Cross-database context, restart/failover and durable operational coverage remain explicit gaps.
+Even successful synthetic assertions always refuse production activation and cannot close #1874's drain gate.
+The package lists minimum actual resource facts, provenance, identity, experiment/review and retention
+approvals; none is invented or granted here. If privacy/coverage cannot be established, use the documented
+practical alternatives or keep retirement blocked without weakening any gate.
+
+Verification results and exact local commands will be recorded below before review.
 
 ## Post-#1874 evidence and bounded usage observation — 2026-10-15
 

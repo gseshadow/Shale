@@ -1,0 +1,15 @@
+{
+  "Endpoint": "",
+  "SqlServerName": "",
+  "Database": "",
+  "DatabaseId": null,
+  "DatabaseUser": "",
+  "ResourceId": "",
+  "DedicatedEmptySynthetic": "",
+  "ApprovalReference": "",
+  "ProvenanceReference": "",
+  "IdentityApprovalReference": "",
+  "MetadataReviewReference": "",
+  "EvidenceRetentionReference": "",
+  "ExclusiveWindowReference": ""
+}
