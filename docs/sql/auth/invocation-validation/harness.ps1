@@ -40,7 +40,6 @@ function Query([string]$Sql, $Connection=$script:Connection) {
  } finally { $cmd.Dispose() }
  return $rows.ToArray()
 }
-function Literal([string]$Value) { return $Value.Replace("'","''") }
 function Open-Connection {
  $f=$script:State.Facts
  $builder=New-Object Data.SqlClient.SqlConnectionStringBuilder
@@ -49,10 +48,11 @@ function Open-Connection {
  $builder.ConnectTimeout=30; $builder.Pooling=$false
  $builder['Asynchronous Processing']=$true
  $builder.ApplicationName='SyntheticInvocationValidation'
- $con=New-Object Data.SqlClient.SqlConnection($builder.ConnectionString)
+ $con=[Data.SqlClient.SqlConnection]::new($builder.ConnectionString)
  if ($AccessToken) { $con.AccessToken=$AccessToken }
  elseif ($Credential) {
-  $con.Credential=New-Object Data.SqlClient.SqlCredential($Credential.UserName,$Credential.Password)
+  $securePassword=$Credential.Password.Copy();$securePassword.MakeReadOnly()
+  $con.Credential=[Data.SqlClient.SqlCredential]::new($Credential.UserName,$securePassword)
  } else { throw 'Supply a separately approved synthetic-only credential or in-memory access token' }
  try {
   $con.Open()
@@ -61,7 +61,7 @@ function Open-Connection {
      $identity[0].DatabaseName -cne $f.Database -or $identity[0].DatabaseId -ne $f.DatabaseId -or
      $identity[0].EngineEdition -ne 5 -or $identity[0].DatabaseUser -cne 'dbo' -or $identity[0].DatabaseUser -cne $f.DatabaseUser -or
      $identity[0].TransactionCount -ne 0) { throw 'Wrong synthetic target or identity' }
-  if($script:State.Version -and $identity[0].ProductVersion -cne $script:State.Version) { throw 'Engine version changed; review new metadata in a fresh run' }
+  if($Phase -ne 'Stop' -and $script:State.Version -and $identity[0].ProductVersion -cne $script:State.Version) { throw 'Engine version changed; review new metadata in a fresh run' }
   return $con
  } catch { $con.Dispose(); throw 'Connection/identity guard failed; no fallback identity permitted' }
 }
@@ -91,6 +91,7 @@ function Verify-Objects {
     $hash.Count -ne 1 -or $hash[0].CatalogHash -cne $script:State.CatalogHash) { throw 'Exact synthetic object ownership/configuration changed' }
 }
 function Verify-Session($Session) {
+ if($Session.Kind -cnotin @('normal','stress','wrongdb') -or [int]$Session.Id -le 0 -or $Session.Hash -cnotmatch '^[A-F0-9]{64}$') { throw 'Invalid saved session identity' }
  if($Session.Name -cne ('iv_'+$script:State.Token+'_'+$Session.Kind)) { throw 'Session name ownership mismatch' }
  $actual=@(Query (Template 'session-catalog.sql' @{session=$Session.Name}))
  if($actual.Count -ne 1 -or $actual[0].SessionId -ne $Session.Id -or
@@ -124,7 +125,7 @@ try {
  if($Phase -eq 'Discover') {
   if(Test-Path -LiteralPath $StatePath) { throw 'Refuse existing state' }
   $f=Get-Content -LiteralPath $FactsPath -Raw | ConvertFrom-Json
-  foreach($key in @('Endpoint','SqlServerName','Database','DatabaseId','DatabaseUser','ResourceId','ApprovalReference','ProvenanceReference','IdentityApprovalReference','MetadataReviewReference','EvidenceRetentionReference','ExclusiveWindowReference')) {
+  foreach($key in @('Endpoint','SqlServerName','Database','DatabaseId','DatabaseUser','ResourceId','ApprovalReference','ProvenanceReference','IdentityApprovalReference','MetadataReviewReference','EvidenceRetentionReference','ExclusiveWindowReference','Region','ServiceObjectiveOrPool','ApprovedSourceRevision','CostApprovalReference','OperatorReference')) {
    if(-not $f.$key) { throw ('Missing real resource fact/approval: '+$key) }
   }
   if($f.DedicatedEmptySynthetic -cne 'APPROVED_NO_SHALE_DATA_OR_CREDENTIALS' -or
@@ -175,7 +176,7 @@ try {
    foreach($kind in @('normal','stress','wrongdb')) {
     $name='iv_'+$script:State.Token+'_'+$kind
     $v=@{session=$name;a=$script:State.Modules[0].Id;b=$script:State.Modules[1].Id;c=$script:State.Modules[2].Id;limit=1000;buffer=4096}
-    if($kind -eq 'stress') { $v.limit=8;$v.buffer=64 }
+    if($kind -eq 'stress') { $v.limit=8;$v.buffer=1024 }
     if($kind -eq 'wrongdb') { $v.dbid=[int]$script:State.Facts.DatabaseId+1 }
     if(@(Query (Template 'session-catalog.sql' @{session=$name})).Count -ne 0) { throw 'Refuse preexisting session' }
     [void](Query (Template 'session.sql' $v))
@@ -199,6 +200,7 @@ try {
       # Direct and same-owner nested calls, plus same-schema and near-name negatives.
       foreach($p in @('probe_a','probe_b','probe_c','unrelated','probe_a_decoy')) { Invoke-Call $p }
       Invoke-Call 'wrapper'
+      [void](Query ('EXEC ['+$script:State.Schema+'_decoy].[probe_a] @input=N''IV_FORBIDDEN_OTHER_SCHEMA'';'))
       foreach($p in @('probe_a','probe_b','probe_c')) {
        $cmd=$script:Connection.CreateCommand();$cmd.CommandTimeout=30
        $cmd.CommandText="/* IV_FORBIDDEN_SQL */ EXEC sys.sp_executesql N'EXEC ["+$script:State.Schema+"].["+$p+"] @v',N'@v nvarchar(4000)',@v=N'IV_FORBIDDEN_DYNAMIC'"
@@ -206,10 +208,12 @@ try {
        # Two genuinely overlapping requests on distinct guarded connections.
        $parallel=@()
        try {
+        # Open/guard BOTH connections before firing either one-second request.
         foreach($i in 1..2) {
          $con=Open-Connection;$command=New-Call $con $p 3
-         $parallel+=@([pscustomobject]@{Connection=$con;Command=$command;Pending=$command.BeginExecuteNonQuery()})
+         $parallel+=@([pscustomobject]@{Connection=$con;Command=$command;Pending=$null})
         }
+        foreach($item in $parallel) { $item.Pending=$item.Command.BeginExecuteNonQuery() }
         foreach($item in $parallel) { [void]$item.Command.EndExecuteNonQuery($item.Pending) }
        } finally { foreach($item in $parallel) { $item.Command.Dispose();$item.Connection.Dispose() } }
        Invoke-Call $p 1
@@ -244,7 +248,7 @@ try {
      } elseif($session.Kind -eq 'wrongdb') {
       foreach($p in @('probe_a','probe_b','probe_c')) { Invoke-Call $p }
      } else {
-      # 2000 source events exceed the eight-event target; session buffers are bounded at 64 KB.
+      # 2000 source events exceed the eight-event target; session buffers are bounded at 1024 KB.
       [void](Query ('DECLARE @i int=0; WHILE @i<1000 BEGIN EXEC ['+$script:State.Schema+'].[probe_a] @input=N''IV_FORBIDDEN_STRESS'';SET @i+=1;END;'))
      }
      Start-Sleep -Seconds 2
@@ -272,7 +276,7 @@ try {
      [void](Query ('ALTER EVENT SESSION ['+$session.Name+'] ON DATABASE STATE=STOP'))
     }
    }
-   Save-Evidence ('stop-'+[guid]::NewGuid().ToString('N')+'.json') @{Utc=[DateTime]::UtcNow.ToString('o')}
+   Save-Evidence ('stop-'+[guid]::NewGuid().ToString('N')+'.json') @(Query "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ProductVersion')) AS ProductVersion,CONVERT(nvarchar(33),SYSUTCDATETIME(),126) AS Utc")
   }
   'Cleanup' {
    Verify-Objects
@@ -293,7 +297,7 @@ try {
    }
    foreach($session in $script:State.Sessions) { [void](Query ('DROP EVENT SESSION ['+$session.Name+'] ON DATABASE')) }
    [void](Query (Template 'cleanup.sql'))
-   $left=@(Query ("SELECT COUNT_BIG(*) AS RemainingCount FROM sys.schemas WHERE name=N'"+$script:State.Schema+"'"))
+   $left=@(Query ("SELECT COUNT_BIG(*) AS RemainingCount FROM sys.schemas WHERE name IN (N'"+$script:State.Schema+"',N'"+$script:State.Schema+"_decoy')"))
    if($left[0].RemainingCount -ne 0) { throw 'Cleanup incomplete; review exact resources' }
    Save-Evidence 'cleanup.json' @{Utc=[DateTime]::UtcNow.ToString('o');EvidencePreserved=$true}
    $script:State.Status='Cleaned';Save-State
@@ -305,3 +309,5 @@ try {
  Write-Error 'Harness refused or failed. Preserve state/evidence; run guarded Stop if ownership is intact. No production authorization.' -ErrorAction Continue
  exit 1
 } finally { if($script:Connection) { $script:Connection.Dispose() } }
+
+exit 0

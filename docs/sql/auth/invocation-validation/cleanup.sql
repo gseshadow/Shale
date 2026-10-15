@@ -11,4 +11,8 @@ DROP PROCEDURE [{{schema}}].[probe_c];
 EXEC sys.sp_dropextendedproperty @name=N'InvocationValidationOwner',
  @level0type=N'SCHEMA',@level0name=N'{{schema}}';
 DROP SCHEMA [{{schema}}];
+DROP PROCEDURE [{{schema}}_decoy].[probe_a];
+EXEC sys.sp_dropextendedproperty @name=N'InvocationValidationOwner',
+ @level0type=N'SCHEMA',@level0name=N'{{schema}}_decoy';
+DROP SCHEMA [{{schema}}_decoy];
 COMMIT;

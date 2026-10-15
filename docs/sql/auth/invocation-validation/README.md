@@ -111,7 +111,7 @@ outside Git and under exclusively controlled non-reparse-point folders (includin
    ```
 
    Every connection pins encrypted certificate-verified endpoint/database/database ID/dbo identity,
-   Azure engine edition 5 and the discovered version. There is no fallback identity, database or local
+   Azure engine edition 5 and the discovered version (Stop permits version drift solely to disable owned sessions and records the new version). There is no fallback identity, database or local
    SQL mode. Discovery reads metadata only and refuses nonempty databases/existing telemetry.
 
 2. Review `identity.json` and **every** `metadata.json` row privately: package/event availability,
@@ -130,8 +130,8 @@ outside Git and under exclusively controlled non-reparse-point folders (includin
    if ($LASTEXITCODE -ne 0) { throw 'Stop; setup refused or failed' }
    ```
 
-   Setup rechecks metadata bytes and target, refuses existing task schema/sessions, creates six synthetic
-   procedures under a random task schema, then three **stopped** diagnostic sessions. No production
+   Setup rechecks metadata bytes and target, refuses existing task schema/sessions, creates seven synthetic
+   procedures under two random task schemas, then three **stopped** diagnostic sessions. No production
    definitions/permissions are used. Review all three `*-config.json` files (complete configuration XML,
    including predicates, fields, actions, targets and options); fingerprints protect later lifecycle steps.
    Serialize catalog changes throughout. Lost state/partial setup requires manual exact-ownership review;
@@ -139,9 +139,9 @@ outside Git and under exclusively controlled non-reparse-point folders (includin
 
 3. Run the bounded workload once. The script starts/collects/stops each session; there is no unattended
    multi-day collection or startup activation. Normal workload: each module gets direct, nested wrapper,
-   dynamic, two overlapping asynchronous calls, a thrown failure and a cancelled WAITFOR call. It also
-   attempts parameter-conversion failure before entry (expects 8114), a same-schema unrelated procedure
-   and a near-name decoy. Concurrency uses distinct guarded connections and a one-second synthetic wait.
+   dynamic, two overlapping asynchronous calls (overlap must also be proved by the raw timestamps), a thrown failure and a cancelled WAITFOR call. It also
+   attempts parameter-conversion failure before entry (expects 8114), a same-schema unrelated procedure,
+   a near-name decoy and an identically named module in another task schema. Concurrency uses distinct guarded connections and a one-second synthetic wait.
    Cancellation requires raw module-entry acknowledgement before Cancel; no fixed sleep substitutes for
    entry proof. Expected per module: seven starts; six or seven ends, with the cancelled-end outcome
    reported explicitly. Any different outcome fails and needs investigation; do not adjust expected counts.
@@ -153,7 +153,7 @@ outside Git and under exclusively controlled non-reparse-point folders (includin
    if ($LASTEXITCODE -ne 0) { throw 'Privacy/coverage not established; no live activation' }
    ```
 
-   The stress session has 64 KB session buffers, 1024 KB target memory and an eight-event limit; 1000
+   The stress session has 1024 KB session buffers, 1024 KB target memory and an eight-event limit; 1000
    probe calls should exceed the target. The assertions must **reject** that interval as incomplete even
    with zero session drop counters. Actual session loss under these bounds is measured, not promised;
    zero drops is not proof for a future rate/concurrency/tier. A third session uses a deliberately wrong
@@ -202,7 +202,7 @@ outside Git and under exclusively controlled non-reparse-point folders (includin
 
    Cleanup verifies the exact ownership token, full synthetic object/ACL catalog fingerprint, exact
    session IDs/configurations, stopped state and all retained-copy file hashes. It drops only the three
-   recorded sessions and six explicitly named task procedures/schema. No wildcard/prefix matching,
+   recorded sessions and seven explicitly named task procedures/two schemas. No wildcard/prefix matching,
    database deletion, Storage/credential deletion or local evidence deletion occurs. Unexpected objects,
    dependencies or drift refuse cleanup. Session drops and object cleanup are separate operations; a
    partial failure needs exact manual review, not blind replay. Preserve all raw evidence and the original

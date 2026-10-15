@@ -11,5 +11,5 @@ SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(nvarchar(max),(
     OR (p.class=1 AND p.major_id IN (SELECT object_id FROM sys.objects WHERE schema_id=s.schema_id))
    ORDER BY p.class,p.major_id,p.minor_id,p.grantee_principal_id,p.grantor_principal_id,p.type
    FOR XML PATH('permission'),TYPE)
- FROM sys.schemas s WHERE s.name=N'{{schema}}' FOR XML PATH('schema'),TYPE
+ FROM sys.schemas s WHERE s.name IN (N'{{schema}}',N'{{schema}}_decoy') ORDER BY s.schema_id FOR XML PATH('schema'),TYPE
 ))),2) AS CatalogHash;

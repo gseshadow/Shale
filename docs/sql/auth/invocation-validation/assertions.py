@@ -75,6 +75,17 @@ def raw_payload(raw, database_id, modules):
     return root, counts
 
 
+def overlapping_trial(root, oid):
+    times = {'module_start': [], 'module_end': []}
+    for event in root:
+        if int(event.find("data[@name='object_id']/value").text) == oid:
+            times[event.get('name')].append(event.get('timestamp'))
+    starts = sorted(times['module_start'])
+    ends = sorted(times['module_end'])
+    require(len(starts) >= 5 and len(ends) >= 5 and
+            max(starts[3:5]) < min(ends[3:5]), 'concurrent calls did not demonstrably overlap')
+
+
 def complete(root, row, expected_total):
     for key in ('DroppedEvents', 'DroppedBuffers', 'LargestDroppedEvent', 'FailedTargetBuffers'):
         require(type(row.get(key)) is int and row[key] == 0, 'session event loss or unavailable health')
@@ -101,6 +112,20 @@ def validate(directory, state):
     modules = {int(m['Id']): m['Name'] for m in state['Modules']}
     require(len(modules) == 3 and set(modules.values()) == {'probe_a', 'probe_b', 'probe_c'}, 'module mapping incomplete')
     dbid = int(state['Facts']['DatabaseId'])
+    # Inspect EVERY captured raw target, including final/emergency/cancel-entry snapshots.
+    def inspect(value):
+        if isinstance(value, list):
+            for child in value:
+                inspect(child)
+        elif isinstance(value, dict):
+            for key, child in value.items():
+                if key == 'RawTarget':
+                    require(isinstance(child, str), 'raw payload missing')
+                    raw_payload(child, dbid, modules)
+                else:
+                    inspect(child)
+    for item in state['Files']:
+        inspect(read(item['Name']))
     results = {}
     for kind in ('normal', 'stress', 'wrongdb'):
         before = as_rows(read(kind + '-before.json'))
@@ -120,6 +145,7 @@ def validate(directory, state):
             for oid in modules:
                 require(counts[oid, 'module_start'] == 7, 'direct/nested/dynamic/concurrent/failed/cancelled entry count mismatch')
                 require(counts[oid, 'module_end'] in (6, 7), 'exit coverage differs; cancelled completion unresolved')
+                overlapping_trial(root, oid)
             complete(root, a, sum(counts.values()))
             results['normal'] = {modules[o]: {'starts': counts[o, 'module_start'], 'ends': counts[o, 'module_end']} for o in modules}
         elif kind == 'wrongdb':

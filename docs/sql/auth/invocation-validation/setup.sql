@@ -3,7 +3,7 @@
 SET XACT_ABORT ON;
 IF EXISTS (SELECT 1 FROM sys.objects WHERE is_ms_shipped=0)
  OR EXISTS (SELECT 1 FROM sys.database_event_sessions)
- OR SCHEMA_ID(N'{{schema}}') IS NOT NULL
+ OR SCHEMA_ID(N'{{schema}}') IS NOT NULL OR SCHEMA_ID(N'{{schema}}_decoy') IS NOT NULL
  THROW 59010,'Dedicated database must be empty; refuse adoption',1;
 BEGIN TRANSACTION;
 EXEC(N'CREATE SCHEMA [{{schema}}] AUTHORIZATION dbo');
@@ -26,4 +26,8 @@ BEGIN EXEC [{{schema}}].[probe_a] @input; EXEC [{{schema}}].[probe_b] @input;
 EXEC [{{schema}}].[probe_c] @input; END');
 EXEC(N'CREATE PROCEDURE [{{schema}}].[unrelated] @input nvarchar(4000) AS RETURN 0');
 EXEC(N'CREATE PROCEDURE [{{schema}}].[probe_a_decoy] @input nvarchar(4000) AS RETURN 0');
+EXEC(N'CREATE SCHEMA [{{schema}}_decoy] AUTHORIZATION dbo');
+EXEC sys.sp_addextendedproperty @name=N'InvocationValidationOwner',@value=N'{{token}}',
+ @level0type=N'SCHEMA',@level0name=N'{{schema}}_decoy';
+EXEC(N'CREATE PROCEDURE [{{schema}}_decoy].[probe_a] @input nvarchar(4000) AS RETURN 0');
 COMMIT;

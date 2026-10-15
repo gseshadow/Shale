@@ -40,7 +40,65 @@ The package lists minimum actual resource facts, provenance, identity, experimen
 approvals; none is invented or granted here. If privacy/coverage cannot be established, use the documented
 practical alternatives or keep retirement blocked without weakening any gate.
 
-Verification results and exact local commands will be recorded below before review.
+### Verification of the synthetic validation package
+
+Pre-edit inventory searched legacy procedure names and existing observation, launcher, auth/module,
+lifecycle, permission fixture and selector contracts. Existing tests/production expectations remain
+unchanged; six new offline contracts cover forbidden intrinsic values and sentinels, unexpected raw
+actions/fields/causality/nested XML, exact identities, target overwrite despite zero session drops,
+complete evidence/stale/restarted/stopped capture and hidden final-snapshot leaks, concurrency overlap
+and evidence-preserving ownership cleanup. Changed-file review maps only this new package and tests
+to these contracts and the selector's security-data auth/session/audit/transaction smoke suite.
+
+| Executed check | Result / boundary |
+| --- | --- |
+| New offline assertions / full auth Python suite | 6 PASS / 28 PASS and one native-Windows skip (29 tests run). Includes adversarial synthetic XML and complete synthetic evidence fixtures; not Azure acceptance. |
+| Existing focused auth/module/lifecycle/support Maven | 15 PASS; no failures/errors/skips. |
+| Committed-base selector affected security-data suite / critical reactor | 54 PASS / 116 PASS; no failures/errors/skips, no full-suite escalation. |
+| Disposable SQL Server 2022 supported metadata and raw source payloads | PASS: inspected all module_start/module_end/target columns before selection; collect_statement=0 emits empty intrinsic statement; full raw payload allowlist/sentinel checks pass. |
+| Local synthetic SQL workload and predicates | PASS: per probe seven starts/seven ends, 42 total events; direct, nested, dynamic, overlapping concurrent, thrown failure, pre-entry conversion and entry-acknowledged SQLCMD timeout/cancellation trials. Same-schema unrelated/near-name and other-schema same-name calls excluded; wrong source-database-ID session receives zero events. |
+| Local target bounds/loss and ownership | PASS: eight-event target retains 8 of 2000 processed events, droppedCount=0 and truncated=0; loss is detectable by total/retained mismatch. Exact session config fingerprint stable across start/stop, module-catalog drift detected and explicit SQL object cleanup succeeds. |
+| Source scope, relative documentation links/fences, Python compilation and Git whitespace | PASS; no private/operator evidence, binaries, original captures or application changes committed. |
+
+Local SQL uses the previously recorded Microsoft image digest
+`sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`, a fresh task-labelled,
+network-isolated container with no published ports, random synthetic credentials/databases/schemas and
+only task-owned resources. Exact container ID and unique label are checked before container removal.
+Local XE uses **ON SERVER**, server catalogs and SQL Server health support; the Azure database-session
+catalog guard is not executable locally and was omitted only in scratch local orchestration. The shipped
+Azure guards remain intact. Azure's failed_buffer_count is documented but absent locally: no Azure
+health result or synthetic full Azure lifecycle pass is claimed. The Windows .NET runner was statically
+reviewed; it was not executed or parser-certified on native Windows. It remains runtime-unverified there.
+
+An initial 64 KB local session buffer was rejected with a minimum-size error; the bounded stress
+configuration now uses 1024 KB and passed. Scratch orchestration also required batch separation and
+handling SQLCMD's timeout output: local SQLCMD printed `Timeout expired` with exit 0, so that local
+cancellation was validated by entry acknowledgement, explicit timeout output and raw events, **not by
+exit status**. The shipped .NET workload uses explicit Cancel and requires a thrown SqlException. Failed
+scratch attempts were corrected/rerun and are not counted as passes. The first sandboxed Maven dependency
+fetch failed; its configured-proxy retry passed without dependency/build changes.
+
+Exact repository-root commands (existing configured Maven wrapper; work/ contains uncommitted synthetic
+scratch helpers/public documentation copies, not operator captures):
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p test_invocation_validation.py -v
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 -m py_compile docs/sql/auth/invocation-validation/assertions.py
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base be55d7187cddc2bc7bf2fbfbbfd00a19c4b614e4 --head HEAD --format markdown --plan-output work/invocation/selection.json --run
+# --run executes the selected affected Maven command, followed by mvn test.
+python3 work/invocation/validate-local.py
+python3 work/invocation/local.py stop
+# Final committed-file selection is checked again without repeating unchanged Maven suites.
+git diff --check be55d7187cddc2bc7bf2fbfbbfd00a19c4b614e4 HEAD
+```
+
+**Unrun:** Azure connections/provisioning/activation, Azure ON DATABASE lifecycle/authority/payloads,
+Azure target failure counters, native Windows .NET/PowerShell execution, cross-database context/colliding
+object-ID/replica trials, restart/failover, sustained-rate/durable multi-day coverage and installed desktop
+acceptance. None is inferred from local results. No permission change, production procedure call,
+installation, release, merge or deployment occurred. Production activation and retirement remain BLOCKED.
 
 ## Post-#1874 evidence and bounded usage observation — 2026-10-15
 

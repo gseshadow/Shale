@@ -11,5 +11,10 @@
   "IdentityApprovalReference": "",
   "MetadataReviewReference": "",
   "EvidenceRetentionReference": "",
-  "ExclusiveWindowReference": ""
+  "ExclusiveWindowReference": "",
+  "Region": "",
+  "ServiceObjectiveOrPool": "",
+  "ApprovedSourceRevision": "",
+  "CostApprovalReference": "",
+  "OperatorReference": ""
 }
