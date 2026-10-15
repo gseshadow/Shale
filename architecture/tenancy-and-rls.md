@@ -1,5 +1,24 @@
 # Tenant Architecture
 
+## Auth permission evidence and cutover candidate — 2026-10-15
+
+The [owning permission cutover runbook](../docs/testing/auth-module-permission-cutover.md) records the user's native Windows
+auth SQL PASS for credential_identity, remembered_rotation and runtime_isolation, exit 0, and the
+user-run Azure collation/principal/effective-permission evidence. These supersede earlier pending
+Windows retest/unknown catalog statements for those reported observations only. Actual deployed
+server/desktop credential configuration and compatible installed fleet remain UNCONFIRMED.
+
+Existing runtime database/schema EXECUTE would expose new dbo owner-executed modules. The candidate
+installs both modules with runtime principal/role object DENY fences atomically, grants auth only object
+EXECUTE, and separately gates additive auth-table/runtime-hash read fences on approved caller inventory
+and old-client drain. Existing User projections and password-management writes are preserved. Original
+grants/grantors/states are captured and never rewritten; exact staged postchecks and rollback are owned
+there. Broader runtime audit SELECT/INSERT/UPDATE/DELETE remediation remains OPEN: deployed history must
+not be described as database-enforced append-only. No three FILTERs, existing predicates, original export,
+Case harness or R4 accepted reports change. CASE SQL NOT RUN; security acceptance OPEN; deployment BLOCKED.
+No Azure connection/live grant/migration, client release, configuration change, merge or deployment here.
+
+
 All business data is tenant scoped.
 
 Primary tenant key:
