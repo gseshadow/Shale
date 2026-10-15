@@ -1,5 +1,9 @@
 # Authentication module permission cutover — 2026-10-15
 
+**Latest blocker:** the operator identified three `sp_login_*` EXECUTE grants after #1872.
+The [current assessment and one bounded dbo query](#identified-1872-blocker-three-legacy-login-executes--2026-10-15)
+keep installation blocked pending deployed definitions/authority and accounting/caller evidence.
+
 **Review candidate; deployment BLOCKED.** Base `7b1a0a5f04d40ff2389cfd14f6a60b9888f364c0`
 was fetched from live `codex/latest`; merged #1868, #1869 and #1870 were verified with GitHub metadata
 and Git ancestry. Separate branch: `codex/auth-module-permission-cutover`.
@@ -122,6 +126,154 @@ module postchecks already reject NULL EXECUTE with fail-closed COALESCE; read po
 column access and NULL required writes. The expanded fixture exercises these paths under the metadata DENY.
 
 ## Caller review and bounded decision
+
+### Identified #1872 blocker: three legacy login EXECUTEs — 2026-10-15
+
+**Operator-reported Azure result:** `shale_app` has database VIEW DEFINITION DENY; the effective token
+contains `public` and `shale_app`. The diagnostic reports 3299 NOT_GRANTED, 3 GRANTED and zero UNKNOWN.
+The three findings are object EXECUTE on `dbo.sp_login_get_hash`, `dbo.sp_login_mark_failure` and
+`dbo.sp_login_mark_success`; SQLCMD exits 16 / error 58307. This identifies the guard inputs, not their
+definitions, grantors, execution authority or safety. It supersedes the earlier unresolved-condition
+statement above. **Stage A remains NOT installed, desktop 1.0.136 remains in use, installation BLOCKED.**
+Codex has made no Azure connection or live change.
+
+Fetched live `codex/latest` at `cfc62956b209265d7c56829b5e8e1af3773c99c1` (merged #1872), with complete
+available Git history; separate task branch `codex/1872-legacy-auth-evidence`. The initial sandboxed
+Git fetch could not reach its proxy. A GitHub API fetch verified the complete base tree and signed commit;
+the subsequent approved shell fetch/unshallow confirmed that same live base and supplied history.
+
+| Evidence reviewed | Finding and limit |
+| --- | --- |
+| Current tracked repository and available history, exact searches for all three module names | No definitions or callers found before this investigation. The schema reference names `failed_attempts`, `lock_until` and `last_login`, but supplies no accounting algorithm or module authority. No original schema export is available in this task workspace; none was regenerated or inferred. |
+| Release commit `c2c77830` (`Release Shale 1.0.136`), `shale-data/.../auth/AuthServiceImpl.java` | Direct parameterized `SELECT TOP 1` from Users by email with `is_deleted=0`; `password_hash AS pw_hash`; bcrypt verification in Java. No lockout check, failure increment, success reset or last-login update in this path. Its retry counter is connection retry only. |
+| Released `DesktopUiAuthService.login`, shared auth adapter and server auth controller | Desktop delegates to the shared auth service, then stages the separate server credential exchange. No `sp_login_*` call is present. This is source evidence; installed binary hashes, actual configured identities and external clients/jobs remain unverified. |
+| Current `AuthServiceImpl` and `LookupAuthenticationCredentialV1` | New bounded credential lookup plus Java bcrypt; no new lockout/accounting algorithm. Neither current nor released source proves that deployed modules/triggers/external consumers are unused. |
+| Ownership/execution/permission authority of the three Azure procedures | **Unknown.** dbo schema/name does not establish explicit object owner, CALLER versus OWNER/named execution, signatures, chaining, parameter semantics or grantor/state. Even CALLER modules can reach same-owner data through ownership chaining. |
+
+**Decision:** these are unreviewed executable capabilities. Evidence does not yet support classifying
+them as necessary narrowly scoped legacy capabilities, obsolete grants, or unsafe implementations.
+Do not whitelist by name, revoke them, edit their bodies, or relax 58307. No production permission or
+authentication correction is justified yet. Preserve deployed lockout/failure/success behavior by making
+no change to it. Repository absence is not permission-removal evidence.
+
+#### One bounded read-only deployed-evidence query
+
+On the existing approved **dbo metadata connection**, from repository root, the operator can run:
+
+```powershell
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/inspect-legacy-login.sql -v ExpectedDatabase=Shale -o $privateLegacyLoginEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Stop: legacy module evidence incomplete; installation remains blocked' }
+```
+
+This single script performs only catalog reads, session SET and temporary metadata tables; it does not
+impersonate, invoke modules, query application rows, alter permissions, capture a replacement prior state,
+or install anything. Full Unicode definitions and SHA-256 hashes are private review evidence. Parameter
+types/directions/lengths are returned, never parameter default values. Module owners (explicit, schema,
+effective), CALLER/OWNER/named execution, SET flags, signer identities/thumbprints without keys/signature
+bytes, direct inbound/outbound dependency metadata, related owners/triggers, complete database-principal
+and nested-role context, and exact applicable permission class/major/minor IDs, G/W/D/R states,
+grantors and grantees are included. ACLs cover database, related schemas/objects/columns, USER/type
+authority and all explicit grants to auth/runtime, module owners/execution identities/signers and their
+nested roles, including authority beyond direct dependencies. Fixed-role and dbo authority is not
+limited to explicit ACL rows. Server/login authority still needs the existing actual-connection review.
+
+Bounds are explicit: three bodies of at most 1 MiB each, 200 dependency records/related objects/signatures/
+triggers, 6303 parameter rows, 1000 principals/membership rows each and 5000 relevant permission rows.
+Over-limit evidence stops with 58330 rather than truncating. Missing/encrypted/non-T-SQL modules report
+their status then stop with 58331. SQLCMD must retain complete `-y 0 -Y 0 -u` output. Serialize catalog
+changes during collection. An exit 0 means collection succeeded, **not preflight approval**. Definitions
+may contain sensitive embedded literals; review/redact privately before sharing. No application rows,
+credential values from application storage, SIDs, key material or parameter defaults are returned.
+
+#### Evidence/action required before any correction
+
+1. Review those deployed bodies/parameters/SET flags, explicit/effective owners, execution identities,
+   signatures and exact ACL/grantors. Trace every dependency, synonym, dynamic SQL, trigger and external
+   caller; catalog dependencies are not a complete dynamic/external call graph. Obtain separately bounded
+   private evidence for unresolved/transitive bodies or trigger behavior rather than assuming absence.
+2. Establish installed 1.0.136 artifact/configuration mapping and jobs/older consumers. Verify how credentials
+   are selected and how failed attempts, threshold, duration, expiry, deleted/removed users, successful login,
+   last-login updates and concurrent attempts are accounted for. No live authentication execution is requested
+   by this metadata step. Obtain approved behavior evidence; do not invent a lockout policy from names.
+3. Classify each module. If necessary and safe, a subsequent correction must pin independently reviewed
+   deployed definitions/SET semantics, parameters, owners, execution/signature authority, exact ACL states/
+   grantors and permitted caller/role closure; reject drift, broad or grant-option authority and unexpected
+   dependencies. Reproduce the **actual reviewed behavior** in disposable SQL, including lockout boundaries,
+   concurrent failure/success accounting and released-client compatibility, before permitting a capability.
+   If obsolete or unsafe, obtain a separately reviewed consumer migration/drain and exact-state permission/
+   module correction with rollback. No blanket REVOKE or guessed GRANT replay is acceptable.
+4. Keep the original private prior-state capture and original schema export unchanged. Supplement them with
+   this timestamped evidence; never overwrite them. Any later authorized change requires its own exact
+   delta, independent baseline hashes/signature and grantor/state constraints, drift refusal, failure atomicity
+   and exact rollback. Recheck deployed metadata and actual auth/runtime connections before Stage A.
+
+Stage B still requires complete caller inventory and compatible installed-fleet/job drain, including these
+three modules if used. A Stage B table SELECT fence alone must not be claimed to block a same-owner procedure's
+internal read or update. Any admitted legacy path requires an explicit Stage B disposition and regression tests.
+The current candidate remains blocked with these grants; none of its staged scripts, prior-state capture,
+schema export or RLS gates has been changed. The existing rollback commands do not authorize modifying these
+three deployed procedures. **This revision's rollback is reverting its query/test/documentation commit;
+there is no database delta to undo.**
+
+#### Test impact and verification boundary
+
+Pre-edit review covered `AuthCredentialLookupTest`, `AuthUserLifecycleSecurityTest`,
+`PreTenantAuthenticationModuleContractTest`, `AuthPermissionCutoverFixture`,
+`PreTenantAuthenticationLocalSqlServerTest`, `SqlRememberCredentialStoreTest`, remembered migration,
+User creation/removal/projection tests, the auth launcher tests and the selector's security-data inventory.
+Only the fixture, new metadata script and this runbook change. Shared login, bcrypt, account lifecycle,
+password-management SQL, historical installers, capture and RLS definitions are unchanged.
+
+The disposable fixture creates all three exact names with explicitly **synthetic** parameterized bodies,
+grants each EXECUTE as dbo, and calls them under the metadata-denied auth principal. It requires diagnostic,
+preflight and installer to reject all three at 58307 before module installation; harmless-looking names/bodies
+are never adopted. It exercises the new dbo collector, full definitions/hash/parameters/owners/ACL grantors,
+missing-module rejection, execution/definition drift, and certificate signer authority beyond dependencies.
+It then removes only its synthetic probes and compares exact original permissions/memberships/predicates
+before the existing staged roundtrip and credential/remembered/isolation checks. These probes reproduce the
+grant blocker and collector behavior; **Azure module behavior/lockout reproduction remains NOT RUN until
+the deployed definitions and behavioral evidence arrive.** Synthetic counts vary with fixture schema and
+are not asserted equal to Azure's 3299 negative checks. Native Windows execution of this revision remains
+NOT RUN. No Case SQL or Azure execution is part of this revision.
+
+Audit compatibility: private security metadata collection adds no business mutation, application sensitive
+view or audit schema. Existing application/security audit transactions remain authoritative. Retain approved
+metadata privately in operator change control; do not log bodies, credentials or SQL into application audits.
+
+Linux verification for this revision uses the same SQL Server 2022 digest recorded below, a new task-owned
+container bound only to `127.0.0.1:14333`, generated synthetic credentials, and random nonce/SID-guarded
+databases/logins. No operator-retained resource or original export was used.
+
+| Check | Result |
+| --- | --- |
+| Focused auth/module/store/User tests | 38 PASS. |
+| Selector affected security-data/server suite | 54 PASS; no full-suite escalation. These preserve auth/lifecycle and neighboring transaction/audit/session contracts selected for SQL security tooling. |
+| Critical `mvn test` | 116 PASS. |
+| Expanded disposable SQL fixture and final public quiet launcher | All three scenario PASS lines, exit 0. Exact three GRANTED / zero UNKNOWN; all three entry points reject 58307. Missing/encrypted bodies reject 58331; oversized evidence rejects 58330 before output. Original ACLs/memberships/predicates and staged rollback checks pass. |
+| Real SQLCMD `-b -V 16` | Three exact EXECUTEs report GRANTED and exit 16 / 58307; collector exits 0; a missing module exits 16 / 58331. Fresh independently nonce-guarded synthetic database removed. |
+| Python auth / selector / unchanged Case launcher tests | 17 PASS plus one native-Windows skip / 24 PASS / 4 PASS. No Case SQL. |
+| Changed-file/test review, SQL metadata/include/scope/alias, runbook links/fences, Git whitespace | PASS; only the collector, fixture and owning runbook changed. |
+
+Commands executed from repository root (`mvn` uses the existing `/workspace/.tools/bin/mvn` proxy/CA/JDK
+wrapper; `work/` helpers are private local orchestration, not application configuration):
+
+```bash
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest,SqlRememberCredentialStoreTest,DesktopRememberCredentialMigrationContractTest,UserDaoCreateUserTest,UserManagementRemovalContractTest,CaseSummaryUserDetailContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+python3 -m unittest discover -s build/case-read-verification -p 'test_*.py'
+python3 work/local_sql.py test
+python3 work/sqlcmd_probe.py
+python3 work/local_sql.py launcher
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base cfc62956b209265d7c56829b5e8e1af3773c99c1 --head HEAD --format markdown --plan-output work/committed-selection.json --run
+git diff --check cfc62956b209265d7c56829b5e8e1af3773c99c1 HEAD
+```
+
+The public Windows launcher procedure below reproduces the committed Java fixture; the local helpers
+only supply private synthetic credentials and test real SQLCMD. An initial offline Maven dependency miss
+(`libphonenumber`) was resolved through the configured proxy; no build change was needed. Passing local
+checks validates this evidence tooling and continued blocking, **not the deployed procedures or their
+lockout behavior**. Installation remains BLOCKED; security acceptance OPEN.
 
 Repository-wide credential-field/SQL/call-site search at this base found:
 

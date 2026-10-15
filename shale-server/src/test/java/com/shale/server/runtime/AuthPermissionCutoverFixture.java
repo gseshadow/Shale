@@ -23,6 +23,7 @@ final class AuthPermissionCutoverFixture {
     }
     private record AuthorityCheck(String condition,String securable,String permission,Integer value,String outcome) {}
     private final List<AuthorityCheck> authorityChecks=new ArrayList<>();
+    private final List<Map<String,String>> legacyEvidence=new ArrayList<>();
     private void execute(String sql)throws SQLException {
         try(var q=connection.createStatement()) {
             q.setQueryTimeout(15);
@@ -32,6 +33,14 @@ final class AuthPermissionCutoverFixture {
                     if(r.getMetaData().getColumnCount()==5 && r.getMetaData().getColumnLabel(1).equals("ConditionName"))while(r.next())
                         authorityChecks.add(new AuthorityCheck(r.getString("ConditionName"),r.getString("Securable"),
                                 r.getString("PermissionName"),(Integer)r.getObject("EffectiveValue"),r.getString("Outcome")));
+                    else if(r.getMetaData().getColumnLabel(1).equals("EvidenceKind"))while(r.next()) {
+                        if(r.getString(1).startsWith("LegacyLogin")) {
+                            var row=new HashMap<String,String>();
+                            for(int i=1;i<=r.getMetaData().getColumnCount();i++)
+                                row.put(r.getMetaData().getColumnLabel(i),r.getString(i));
+                            legacyEvidence.add(row);
+                        }
+                    }
                 }
                 results=q.getMoreResults();
             }
@@ -47,6 +56,7 @@ final class AuthPermissionCutoverFixture {
     }
     private void script(String name)throws Exception {
         authorityChecks.clear();
+        legacyEvidence.clear();
         // Only compile-time fixed repo script paths/known safe fixture substitutions; no user SQL inputs.
         String sql=expand(root.resolve("docs/sql/auth/permission-cutover/"+name+".sql"));
         for(var e:variables.entrySet()) sql=sql.replace("$("+e.getKey()+")",e.getValue());
@@ -55,9 +65,85 @@ final class AuthPermissionCutoverFixture {
         catch(Exception failure){execute("IF @@TRANCOUNT>0 ROLLBACK");throw failure;}
         finally {
             // SQLCMD exits its connection on the first error. Reused JDBC test connections need temp cleanup.
-            for(String table:List.of("PriorPermissions","PriorModules","PriorOwners","PriorMemberships","PriorPredicates","AuthAuthorityChecks","CutoverOwnership","CutoverGrantOptions","CutoverVisibility","CutoverPrincipals","CutoverObjects","CutoverColumns","ElevatedModules","AuthColumns","CutoverDelta"))
+            for(String table:List.of("LegacyLoginAuthority","LegacyLoginPermissions","LegacyLoginSchemas","LegacyLoginObjects","LegacyLoginDependencies","LegacyLoginModules","PriorPermissions","PriorModules","PriorOwners","PriorMemberships","PriorPredicates","AuthAuthorityChecks","CutoverOwnership","CutoverGrantOptions","CutoverVisibility","CutoverPrincipals","CutoverObjects","CutoverColumns","ElevatedModules","AuthColumns","CutoverDelta"))
                 execute("DROP TABLE IF EXISTS #"+table);
         }
+    }
+    /** Prevents name-based adoption of unreviewed deployed code. These bodies are deliberately
+     * synthetic authority probes, never a reconstruction of Azure login/lockout behavior. */
+    private void legacyLoginEvidence()throws Exception {
+        var originalPermissions=catalog("database_permissions");
+        var originalMemberships=catalog("database_role_members");
+        var originalPredicates=catalog("security_predicates");
+        rejected("inspect-legacy-login",58331);
+        assertEquals(3,legacyEvidence.stream().filter(r->"MISSING".equals(r.get("DefinitionStatus"))).count());
+        var names=List.of("sp_login_get_hash","sp_login_mark_failure","sp_login_mark_success");
+        try {
+            for(String name:names) {
+                execute("CREATE PROCEDURE dbo."+name+" @FixtureId int AS SELECT Id FROM dbo.Users WHERE Id=@FixtureId AND 1=0");
+                execute("GRANT EXECUTE ON dbo."+name+" TO shale_app AS dbo");
+                as("shale_app","EXEC dbo."+name+" @FixtureId=-1");
+            }
+            for(String entry:List.of("diagnose-auth","preflight","install")) {
+                rejected(entry,58307);
+                assertEquals(3,authorityChecks.stream().filter(c->Integer.valueOf(1).equals(c.value())).count(),
+                        "the reported profile must produce exactly three grants");
+                assertTrue(authorityChecks.stream().noneMatch(c->c.value()==null),
+                        "metadata DENY must not turn these known capabilities into UNKNOWN evidence");
+                for(String name:names)assertTrue(authorityChecks.stream().anyMatch(c->
+                        c.securable().equals("[dbo].["+name+"]") && c.permission().equals("EXECUTE")
+                        && Integer.valueOf(1).equals(c.value()) && c.outcome().equals("GRANTED")),
+                        "each exact reported module must remain blocked: "+entry+"/"+name);
+                assertEquals("0",scalar("SELECT COUNT(*) FROM sys.objects WHERE name IN (N'LookupAuthenticationCredentialV1',N'ResolveDesktopRememberCredentialV2')"),
+                        "blocked Stage A must not install either module");
+            }
+            var permissions=catalog("database_permissions");
+            script("inspect-legacy-login");
+            var modules=legacyEvidence.stream().filter(r->"LegacyLoginModule".equals(r.get("EvidenceKind"))).toList();
+            assertEquals(3,modules.size());
+            assertTrue(modules.stream().allMatch(r->"AVAILABLE".equals(r.get("DefinitionStatus"))
+                    && "CALLER".equals(r.get("ExecutionContext")) && "dbo".equals(r.get("EffectiveOwner"))
+                    && r.get("definition").contains("AND 1=0")),"dbo evidence must retain full synthetic bodies/authority under auth metadata DENY");
+            assertEquals(3,legacyEvidence.stream().filter(r->"LegacyLoginParameter".equals(r.get("EvidenceKind"))
+                    && "@FixtureId".equals(r.get("name"))).count());
+            assertEquals(3,legacyEvidence.stream().filter(r->"LegacyLoginPermission".equals(r.get("EvidenceKind"))
+                    && "shale_app".equals(r.get("Grantee")) && "dbo".equals(r.get("Grantor"))
+                    && "EXECUTE".equals(r.get("permission_name")) && "G".equals(r.get("state"))
+                    && r.get("Securable").startsWith("[dbo].[sp_login_")).count());
+            String oldHash=modules.stream().filter(r->"sp_login_mark_failure".equals(r.get("ModuleName"))).findFirst().orElseThrow().get("DefinitionHash");
+            execute("ALTER PROCEDURE dbo.sp_login_mark_failure @FixtureId int WITH EXECUTE AS OWNER AS SELECT Id FROM dbo.Users WHERE Id=@FixtureId AND 1=0");
+            script("inspect-legacy-login");
+            assertTrue(legacyEvidence.stream().anyMatch(r->"sp_login_mark_failure".equals(r.get("ModuleName"))
+                    && "OWNER".equals(r.get("ExecutionContext")) && !oldHash.equals(r.get("DefinitionHash"))),
+                    "definition and execution-authority drift must be visible, never adopted by name");
+            execute("CREATE CERTIFICATE LegacyLoginFixtureCert ENCRYPTION BY PASSWORD='Synthetic-fixture-only!29' WITH SUBJECT='Disposable metadata probe'");
+            execute("CREATE USER LegacyLoginFixtureSigner FROM CERTIFICATE LegacyLoginFixtureCert");
+            execute("GRANT UPDATE ON dbo.Statuses TO LegacyLoginFixtureSigner AS dbo");
+            execute("ADD SIGNATURE TO dbo.sp_login_mark_success BY CERTIFICATE LegacyLoginFixtureCert WITH PASSWORD='Synthetic-fixture-only!29'");
+            script("inspect-legacy-login");
+            assertTrue(legacyEvidence.stream().anyMatch(r->"LegacyLoginSignature".equals(r.get("EvidenceKind"))
+                    && "LegacyLoginFixtureSigner".equals(r.get("SignerPrincipal"))),"signer identity must be visible without exporting keys/signature bytes");
+            assertTrue(legacyEvidence.stream().anyMatch(r->"LegacyLoginPermission".equals(r.get("EvidenceKind"))
+                    && "LegacyLoginFixtureSigner".equals(r.get("Grantee")) && "UPDATE".equals(r.get("permission_name"))),
+                    "signer authority beyond a module's direct dependencies must be reported");
+            rejected("preflight",58307);
+            execute("DROP SIGNATURE FROM dbo.sp_login_mark_success BY CERTIFICATE LegacyLoginFixtureCert");
+            execute("DROP USER LegacyLoginFixtureSigner; DROP CERTIFICATE LegacyLoginFixtureCert");
+            assertEquals(permissions,catalog("database_permissions"),"inspection/rejection must preserve exact grantors/states");
+            execute("ALTER PROCEDURE dbo.sp_login_get_hash AS /*"+"x".repeat(524289)+"*/ SELECT 1 AS SyntheticOnly");
+            rejected("inspect-legacy-login",58330);
+            assertTrue(legacyEvidence.isEmpty(),"over-limit collection must stop before emitting partial evidence");
+            execute("ALTER PROCEDURE dbo.sp_login_get_hash WITH ENCRYPTION AS SELECT 1 AS SyntheticOnly");
+            rejected("inspect-legacy-login",58331);
+            assertTrue(legacyEvidence.stream().anyMatch(r->"sp_login_get_hash".equals(r.get("ModuleName"))
+                    && "UNAVAILABLE".equals(r.get("DefinitionStatus"))),"encrypted code must remain incomplete evidence");
+        } finally {
+            for(String name:names)execute("DROP PROCEDURE IF EXISTS dbo."+name);
+            execute("DROP USER IF EXISTS LegacyLoginFixtureSigner; IF EXISTS(SELECT 1 FROM sys.certificates WHERE name=N'LegacyLoginFixtureCert') DROP CERTIFICATE LegacyLoginFixtureCert");
+        }
+        assertEquals(originalPermissions,catalog("database_permissions"));
+        assertEquals(originalMemberships,catalog("database_role_members"));
+        assertEquals(originalPredicates,catalog("security_predicates"));
     }
     private String scalar(String sql)throws SQLException {
         try(var q=connection.createStatement();var r=q.executeQuery(sql)){assertTrue(r.next());return r.getString(1);}
@@ -140,6 +226,7 @@ final class AuthPermissionCutoverFixture {
         assertTrue(authorityChecks.stream().noneMatch(c->c.value()==null || c.value()==1),
                 "reported grants plus VIEW DEFINITION DENY alone must pass without unknown authority");
         authAuthorityDiagnostics();
+        legacyLoginEvidence();
         // Establish the dangerous baseline with the same broad database/schema grants reported by operator.
         execute("BEGIN TRANSACTION");
         String installer=Files.readString(root.resolve("docs/sql/2026-10-14_pretenant_authentication_modules.sql"));
