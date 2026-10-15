@@ -99,6 +99,9 @@ class PreTenantAuthenticationLocalSqlServerTest {
             execute(c,"CREATE USER PriorGrantor WITHOUT LOGIN");
             execute(c,"GRANT SELECT ON dbo.Users TO PriorGrantor WITH GRANT OPTION");
             execute(c,"GRANT SELECT ON dbo.Users TO shale_app AS PriorGrantor");
+            // Exact reported auth profile includes CONNECT and an explicit metadata DENY.
+            execute(c,"GRANT CONNECT TO shale_app AS dbo");
+            execute(c,"DENY VIEW DEFINITION TO shale_app AS dbo");
             execute(c,"GRANT SELECT ON dbo.auditLog TO PriorGrantor");
             execute(c,"REVOKE SELECT ON dbo.auditLog(EntryCode) FROM PriorGrantor");
             execute(c,"DENY UPDATE ON dbo.auditLog TO PriorGrantor");

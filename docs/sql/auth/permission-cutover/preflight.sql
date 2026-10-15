@@ -31,59 +31,16 @@ IF EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id IN
 GO
 -- Effective checks, not merely direct ACLs. Caller is restored on every catch path.
 -- Snapshot metadata under dbo before impersonation: denied metadata can otherwise disappear.
-SELECT principal_id,name INTO #CutoverPrincipals FROM sys.database_principals WHERE type IN ('S','E','X','R');
-SELECT object_id,QUOTENAME(OBJECT_SCHEMA_NAME(object_id))+N'.'+QUOTENAME(name) AS Securable INTO #CutoverObjects FROM sys.objects WHERE is_ms_shipped=0 AND type IN ('U','V','P','FN','IF','TF');
-SELECT QUOTENAME(OBJECT_SCHEMA_NAME(object_id))+N'.'+QUOTENAME(OBJECT_NAME(object_id)) AS Securable,name AS ColumnName
- INTO #CutoverColumns FROM sys.columns WHERE object_id IN (SELECT object_id FROM #CutoverObjects);
+:r docs/sql/auth/permission-cutover/auth-authority-snapshot.sql
 SELECT o.object_id,QUOTENAME(OBJECT_SCHEMA_NAME(o.object_id))+N'.'+QUOTENAME(o.name) AS Securable
  INTO #ElevatedModules FROM sys.objects o JOIN sys.sql_modules m ON m.object_id=o.object_id
  WHERE o.is_ms_shipped=0 AND (m.execute_as_principal_id IS NOT NULL OR m.definition IS NULL
  OR EXISTS(SELECT 1 FROM sys.crypt_properties cp WHERE cp.class=1 AND cp.major_id=o.object_id))
  AND o.object_id NOT IN (COALESCE(OBJECT_ID(N'dbo.LookupAuthenticationCredentialV1'),-1),
  COALESCE(OBJECT_ID(N'dbo.ResolveDesktopRememberCredentialV2'),-1));
-DECLARE @PreflightAuthUnsafe bit=0;
-EXECUTE AS USER=N'shale_app';
-BEGIN TRY
- IF COALESCE(IS_MEMBER(N'db_owner'),0)<>0
- OR COALESCE(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY USER'),1)<>0
- OR COALESCE(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY SCHEMA'),1)<>0
- OR COALESCE(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY SECURITY POLICY'),1)<>0
- OR EXISTS(SELECT 1 FROM sys.user_token t JOIN sys.database_principals p ON p.principal_id=t.principal_id
-           WHERE p.is_fixed_role=1 AND p.name<>N'public')
- OR EXISTS(SELECT 1 FROM #CutoverPrincipals p WHERE p.name<>USER_NAME()
-           AND HAS_PERMS_BY_NAME(p.name,'USER','IMPERSONATE')=1)
- OR EXISTS(SELECT 1 FROM sys.schemas WHERE principal_id IN (SELECT principal_id FROM sys.user_token))
- OR EXISTS(SELECT 1 FROM sys.objects WHERE principal_id IN (SELECT principal_id FROM sys.user_token))
- OR COALESCE(IS_MEMBER(N'ShaleAdmins'),0)<>0
- OR COALESCE(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','CONTROL'),1)<>0
- OR COALESCE(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY ROLE'),1)<>0
- OR COALESCE(HAS_PERMS_BY_NAME(N'dbo','SCHEMA','ALTER'),1)<>0
- OR COALESCE(HAS_PERMS_BY_NAME(N'dbo','USER','IMPERSONATE'),1)<>0
- OR EXISTS(SELECT 1 FROM sys.fn_my_permissions(NULL,'DATABASE') WHERE permission_name NOT IN
-      (N'CONNECT',N'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION',N'VIEW ANY COLUMN MASTER KEY DEFINITION'))
- OR EXISTS(SELECT 1 FROM sys.database_permissions WHERE state='W'
-      AND grantee_principal_id IN (SELECT principal_id FROM sys.user_token))
- OR EXISTS(SELECT 1 FROM #CutoverColumns WHERE
-      HAS_PERMS_BY_NAME(Securable,'OBJECT','UPDATE',ColumnName,'COLUMN')=1
-      OR (Securable<>N'[dbo].[Users]' AND HAS_PERMS_BY_NAME(Securable,'OBJECT','SELECT',ColumnName,'COLUMN')=1))
- OR EXISTS(SELECT 1 FROM #CutoverObjects WHERE
-      HAS_PERMS_BY_NAME(Securable,'OBJECT','ALTER')=1
-      OR HAS_PERMS_BY_NAME(Securable,'OBJECT','CONTROL')=1
-      OR HAS_PERMS_BY_NAME(Securable,'OBJECT','INSERT')=1
-      OR HAS_PERMS_BY_NAME(Securable,'OBJECT','UPDATE')=1
-      OR HAS_PERMS_BY_NAME(Securable,'OBJECT','DELETE')=1
-      OR (Securable<>N'[dbo].[Users]' AND HAS_PERMS_BY_NAME(Securable,'OBJECT','SELECT')=1)
-      OR (Securable NOT IN (N'[dbo].[ResolveDesktopRememberCredential]',N'[dbo].[LookupAuthenticationCredentialV1]',
-          N'[dbo].[ResolveDesktopRememberCredentialV2]') AND HAS_PERMS_BY_NAME(Securable,'OBJECT','EXECUTE')=1))
- OR COALESCE(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','EXECUTE'),1)<>0
- OR COALESCE(HAS_PERMS_BY_NAME(N'dbo','SCHEMA','EXECUTE'),1)<>0
-  SET @PreflightAuthUnsafe=1;
- REVERT;
-END TRY BEGIN CATCH
- IF @@TRANCOUNT>0 ROLLBACK;
- REVERT; THROW;
-END CATCH;
-IF @PreflightAuthUnsafe=1 THROW 58307,N'Auth identity has unexpected broad or escalation authority.',1;
+GO
+:r docs/sql/auth/permission-cutover/auth-authority-diagnostics.sql
+:r docs/sql/auth/permission-cutover/auth-authority-check.sql
 DECLARE @PreflightRuntimeUnsafe bit=0;
 EXECUTE AS USER=N'shale_runtime';
 BEGIN TRY
@@ -95,8 +52,7 @@ BEGIN TRY
            WHERE p.is_fixed_role=1 AND p.name<>N'public')
  OR EXISTS(SELECT 1 FROM #CutoverPrincipals p WHERE p.name<>USER_NAME()
            AND HAS_PERMS_BY_NAME(p.name,'USER','IMPERSONATE')=1)
- OR EXISTS(SELECT 1 FROM sys.schemas WHERE principal_id IN (SELECT principal_id FROM sys.user_token))
- OR EXISTS(SELECT 1 FROM sys.objects WHERE principal_id IN (SELECT principal_id FROM sys.user_token))
+ OR EXISTS(SELECT 1 FROM #CutoverOwnership WHERE principal_id IN (SELECT principal_id FROM sys.user_token))
  OR COALESCE(IS_MEMBER(N'ShaleAdmins'),0)<>0
  OR COALESCE(IS_MEMBER(N'shale_runtime_role'),0)<>1
  OR COALESCE(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','CONTROL'),1)<>0
@@ -115,6 +71,10 @@ END CATCH;
 IF @PreflightRuntimeUnsafe=1 THROW 58308,N'Runtime identity has unexpected membership or escalation authority.',1;
 GO
 
+DROP TABLE #AuthAuthorityChecks;
+DROP TABLE #CutoverOwnership;
+DROP TABLE #CutoverGrantOptions;
+DROP TABLE #CutoverVisibility;
 DROP TABLE #CutoverPrincipals;
 DROP TABLE #CutoverObjects;
 DROP TABLE #CutoverColumns;

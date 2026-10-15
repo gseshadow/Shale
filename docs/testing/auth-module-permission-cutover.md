@@ -40,6 +40,87 @@ User-run Azure Shale metadata/effective-permission evidence:
 **Actual deployed server and desktop auth/runtime credential configuration is still UNCONFIRMED.**
 No independently approved security-owner acceptance of dbo module authority/internal hash access is implied.
 
+## 58307 investigation after #1871 — 2026-10-15
+
+**Operator-reported evidence, not a Codex Azure/Windows execution:** the expanded native Windows
+fixture produced all three PASS lines and exit 0; prior-state capture succeeded with exit 0 and is
+retained privately. Azure preflight stopped at 58307. On the actual `shale_app` connection, database
+CONTROL, ALTER ANY USER/SCHEMA/SECURITY POLICY/ROLE, dbo schema ALTER/EXECUTE, dbo user IMPERSONATE and
+database EXECUTE all returned 0. Auth has Users SELECT, old resolver EXECUTE, CONNECT and an explicit
+database VIEW DEFINITION DENY, without db_owner/ShaleAdmins. **Stage A has not been installed; employees
+still use desktop 1.0.136.** Preserve that captured state and the original schema; neither is regenerated
+or committed here. The expanded Windows report supersedes the pending #1871 fixture retest for that
+reported revision only; this diagnostic revision has not been run natively on Windows by Codex. These
+observations do not enumerate effective column permissions or every token path.
+
+**Disposable result:** the reported auth grants **including VIEW DEFINITION DENY** pass preflight and
+the existing install/postcheck/restrict/rollback fixture on SQL Server 2022. DENY alone does not reproduce
+58307. No Azure root cause or extra live permission is established; no live permission change is proposed.
+The new output names the decision inputs so the operator can distinguish an actual extra capability from
+UNKNOWN evidence. This is a diagnostic/tooling change, not security acceptance or cutover authorization.
+
+Every auth condition formerly combined in the 58307 OR list now contributes to one shared diagnostic
+relation and shared fail-closed decision. It checks:
+
+| ConditionName | Authority tested / reported securable |
+| --- | --- |
+| role / fixed-role | db_owner, ShaleAdmins, every fixed database role in the effective token except public |
+| database / database-permission | ALTER ANY USER/SCHEMA/SECURITY POLICY/ROLE, CONTROL, EXECUTE; every fn_my_permissions database capability outside CONNECT and the two existing column-encryption metadata exceptions |
+| dbo-schema / dbo-user / impersonate-user | dbo ALTER/EXECUTE, dbo IMPERSONATE and other impersonatable database users; roles are not USER securables |
+| ownership | schema and explicit object owners matched against the complete effective token |
+| grant-option | every W-state permission matched to the token, including class/major/minor IDs, entity/column where applicable, grantee and original grantor |
+| column | every dbo-inventoried column UPDATE, and every non-Users column SELECT |
+| object | ALTER/CONTROL/INSERT/UPDATE/DELETE, non-Users SELECT and EXECUTE outside the three existing resolver/V1/V2 exceptions; includes callable elevated/signed/encrypted modules without printing bodies |
+
+Token output includes public and nested roles. Ownership, grant-option, principal, object and column
+inventories are captured under dbo before impersonation; filtered caller catalogs are not proof of absence.
+Database VIEW DEFINITION's raw effective value and matching token ACLs are context, not a requirement to
+grant metadata visibility. Effective 1 is GRANTED, 0 is NOT_GRANTED, SQL NULL is UNKNOWN. Any GRANTED guard
+input or UNKNOWN stops with 58307. No unknown is coerced to a safe zero or mislabeled a grant. The database
+user test still does not replace actual-login/server-token review. Serialize metadata changes during probes.
+
+Output is metadata only: no application query, hash, SID, secret or module body. It contains at most 200
+finding details and 200 token rows, grouped finding counts, total counts and explicit truncation flags.
+Truncation leaves the investigation incomplete; retain private output and narrow the affected condition in
+a separately reviewed read-only follow-up before drawing conclusions. No broad permissions should be
+removed to make the count disappear. Dbo-known absence of the optional ShaleAdmins role is distinguished
+from a NULL membership result for an existing role.
+
+### Next bounded operator query and exact retest commands
+
+From repository root, on the **existing approved dbo metadata connection**, run this read-only diagnostic
+before proposing permission changes. It does not require new security-approval acknowledgements and does
+not include capture, installation or restriction scripts:
+
+```powershell
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/diagnose-auth.sql -v ExpectedDatabase=Shale -o $privateAuthDiagnosticOutput
+$authDiagnosticExit = $LASTEXITCODE
+# A nonzero exit with 58307 is expected when GRANTED/UNKNOWN findings exist. Stop and review them.
+if ($authDiagnosticExit -ne 0) { throw 'Stop: review bounded auth diagnostics; do not change permissions or install' }
+```
+
+`diagnose-auth.sql` is the bounded read-only query artifact: only SET, temporary catalog snapshots,
+EXECUTE AS/REVERT and metadata/effective-permission queries. It works before Stage A. It reports the same
+auth inputs as preflight and restores dbo before reporting/throwing. Preserve the prior-state capture as-is;
+do not rerun capture merely to replace the original failure evidence. Share only approved condition,
+securable, permission, outcome and truncation metadata, never retained private captures/module definitions.
+If all inputs are zero, compare the exact script revision, selected database and connection identity with
+the failed run; do not assume that permission state or original-login authority is unchanged.
+
+After reviewing the diagnostic, retest only the read-only preflight with the **previously evidenced**
+review acknowledgements (do not assert unapproved decisions):
+
+```powershell
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/preflight.sql -v @review -o $privatePreflightRetestOutput
+if ($LASTEXITCODE -ne 0) { throw 'Stop: preflight still blocked' }
+```
+
+No Stage A/B, release or permission-change command is authorized by this investigation. The native Windows
+synthetic retest uses the launcher commands in the Windows section below; use a dedicated local disposable SQL
+instance, never Azure. Installer, restriction and rollback paths include the same preflight. Existing
+module postchecks already reject NULL EXECUTE with fail-closed COALESCE; read postchecks reject NULL forbidden
+column access and NULL required writes. The expanded fixture exercises these paths under the metadata DENY.
+
 ## Caller review and bounded decision
 
 Repository-wide credential-field/SQL/call-site search at this base found:
@@ -77,6 +158,56 @@ schema CRUD. This is not a restriction on every legacy credential-related column
 least-privilege rewrite. Remaining credential fields and alternate elevated modules require inventory.
 Stage A intentionally retains old auth SELECT/resolver compatibility; Stage B intentionally ends it.
 Do not run Stage B merely because the synthetic auth test passed.
+
+### Verification of this diagnostic revision
+
+Fetched live base `bfca3e3346aa1b4abeb357788484d655b9087a7e` (merged #1871); isolated branch
+`codex/diagnose-1871-auth-preflight`. Codex executed Linux/local disposable checks only, using the same
+SQL Server 2022 image digest recorded below, a newly created task-labelled container bound to
+127.0.0.1:14333, random nonce/SID-guarded fixture databases/logins and private synthetic credentials.
+No retained operator resource, prior capture, original schema or Azure connection was used.
+
+| Check | Result |
+| --- | --- |
+| Focused auth/module/store/migration/User tests | 38 PASS, zero failures/errors/skips. |
+| Committed-base selector affected security-data/server suite | 54 PASS, one explicit opt-in SQL skip; modified fixture compiled. No full-suite escalation. |
+| Critical `mvn test` | 116 PASS, zero failures/errors/skips. |
+| Expanded disposable Java SQL and final quiet launcher | All three PASS lines, exit 0; reported CONNECT/Users SELECT/old resolver EXECUTE/VIEW DEFINITION DENY retained through staged roundtrip and exact ACL/member/predicate comparisons. |
+| Negative diagnostic probes | Database/schema EXECUTE, fixed/ShaleAdmins membership, column UPDATE/non-Users SELECT, public/nested inheritance, W state, schema ownership, user impersonation and elevated module EXECUTE each reject 58307 and name a GRANTED condition. Unsupported permission probe returns real SQL NULL, reports UNKNOWN and fails the shared decision. |
+| Real SQLCMD `-b -V 16` standalone diagnostic | Baseline exit 0 with metadata DENY shown; injected Users.email UPDATE reports GRANTED and exits 16 on 58307. Disposable injection removed. |
+| Python auth / selector / unchanged Case launcher | 17 PASS plus one native-Windows skip / 24 PASS / 4 PASS. No Case SQL. |
+| SQL include, privacy/scope, alias, changed-file and Git checks | PASS. No capture/historical SQL/schema/RLS/Case-tooling changes; new diagnostics have no permission mutations, module definitions, hashes or application SELECTs. |
+
+The first offline Maven attempts lacked cached dependencies (libphonenumber and later jna-platform);
+configured-proxy retries passed without build-file changes. Early fixture development exposed a W-state
+test cleanup requirement, a result-decoder collision with grouped condition counts and the fact that
+missing securables under denied metadata can return 0 rather than NULL. The final UNKNOWN test uses an
+unsupported permission to obtain a real NULL; no missing object is asserted to be denied by that test.
+Dbo inventories, explicit prerequisites and serialized metadata changes remain essential. These failed
+attempts are not counted as acceptance. Existing SQL postchecks passed under the DENY without guard removal.
+
+Exact local commands (the private `work/` helpers supply only task-local credentials and expand the
+committed SQL; reproduce the Java coverage using the documented public quiet launcher):
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+python3 -m unittest discover -s build/case-read-verification -p 'test_*.py'
+/workspace/.tools/bin/mvn -o -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest,SqlRememberCredentialStoreTest,DesktopRememberCredentialMigrationContractTest,UserDaoCreateUserTest,UserManagementRemovalContractTest,CaseSummaryUserDetailContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base bfca3e3346aa1b4abeb357788484d655b9087a7e --head HEAD --format markdown --plan-output work/auth-58307/selection.json
+/workspace/.tools/bin/mvn -o -pl shale-data,shale-server -am -Dtest=com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.server.runtime.AuthPermissionCutoverFixture,com.shale.server.runtime.PreTenantAuthenticationLocalSqlServerTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest -Dsurefire.failIfNoSpecifiedTests=false test
+/workspace/.tools/bin/mvn test
+python3 work/auth-58307/run_fixture.py
+python3 work/auth-58307/check_sqlcmd.py
+python3 work/auth-58307/run_launcher.py
+git diff --check bfca3e3346aa1b4abeb357788484d655b9087a7e HEAD
+```
+
+Audit compatibility: diagnostics read only security metadata and add no application/business mutation or
+sensitive application view, so no application audit event or schema migration is introduced. Retain
+approved diagnostic evidence in private operator change control. **The Azure 58307 cause remains
+unresolved until the bounded diagnostic is run there by the operator. Deployment BLOCKED; security
+acceptance OPEN; desktop 1.0.136 compatibility and the original prior state remain preserved.**
 
 ## Exact operator preflight and staged next steps
 
