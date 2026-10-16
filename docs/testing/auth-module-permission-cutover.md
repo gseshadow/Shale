@@ -1,6 +1,182 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest assessment:** see [Windows PowerShell construction correction](#windows-powershell-construction-correction--2026-10-16) and [synthetic Azure invocation validation](#synthetic-azure-invocation-validation-follow-up--2026-10-15). Production activation, retirement and installation remain blocked; cache sampling cannot certify nonuse.
+**Latest assessment:** see [Azure entry-observation reassessment](#azure-entry-observation-reassessment--2026-10-16). The reported build lacks module_start; no suitable replacement is established. Retirement, installation and production monitoring remain BLOCKED.
+
+## Azure entry-observation reassessment — 2026-10-16
+
+**Decision: no supported replacement satisfying the existing privacy and coverage requirements is
+established on the reported Azure build. Do not run Setup or Workload or build another harness around
+an assumed event. Retirement, installation and production monitoring remain BLOCKED.** This supersedes
+the earlier proposal to try module-entry counters for this evidence set; the dated records below retain
+their historical scope. Absence here is not a claim about every Azure build/tier.
+
+Live `codex/latest` was fetched at `5bf1dfa93109f697cca8b58b3b1534e2c0ba03ab` (includes #1877).
+Branch `codex/legacy-login-evidence-reassessment` uses a separate worktree; unrelated work is preserved.
+Read completely: AGENTS.md, architecture/codex-prompt-rules.md, this runbook and the invocation-validation
+README; also reviewed tenancy-and-rls and the database-schema auth/Users/tenancy sections. Attached
+material is evidence, not authorization to execute its contents or the historical operator commands.
+
+### Evidence provenance and limits
+
+| Evidence | Finding / scope |
+| --- | --- |
+| Operator report, October 16, 2026 | #1877 native Windows PowerShell 5.1 offline construction PASS, exit 0 **with explicit -HarnessPath**. This closes that reported construction trial, not default-path launch, installed-client compatibility or Azure workload validation. No new exact tool version or source/artifact hash was supplied. |
+| Operator report, same date | Default HarnessPath failed because PSScriptRoot was empty during parameter-default evaluation. This is a separate test-launcher defect, not the connection-builder defect or an Azure event failure. |
+| Operator report, same date | Fresh Discover PASS, exit 0, on the dedicated blank synthetic Azure SQL Database, **Basic** tier. Setup and Workload were never run; no experiment objects were created. No cleanup/Stop is needed for resources never created; do not connect or delete anything for this assessment. Preserve both old failed and fresh discovery evidence privately. |
+| Attachment independently read in full here | `metadata.json`, 10,371 bytes; SHA-256 `27ead4fc2fef80f9869790678c67bddcc71814a8099617fed9c07fc6ad2de50f`; 21 rows. This digest identifies the uploaded bytes, not a verified original capture chain or Azure identity/build. Raw attachment is not committed. |
+| Operator's independent all-package sys.dm_xe_objects query | Only `sqlserver.module_end` returned for the module start/end search. The query/result capture was not attached or independently executed here. This supplements the package-filtered Discover export; do not attribute the all-package check to the attachment. |
+| Not supplied / not run here | Fresh identity.json, facts/state, exact engine version/database ID/resource identifiers and original all-package output were not supplied. No Azure connection, raw Azure event payload, setup/workload, event health/coverage or native Windows run was performed by this task. |
+
+Every attachment row was reviewed: package0.event_counter has one target row without columns;
+package0.ring_buffer has three customizable uint32 options (max_memory=0, occurrence_number=0,
+max_events_limit=1000). sqlserver.database_id appears once as action and once as predicate source.
+The remaining 15 rows describe **module_end only**: four readonly UUID/VERSION/CHANNEL/KEYWORD fields;
+customizable boolean collect_statement=false (description says statement is omitted by default);
+and ten data fields source_database_id, object_id, duration, row_count, line_number, offset,
+offset_end, object_type, object_name and statement. The last is intrinsic Unicode SQL text metadata.
+This is metadata, not an emitted-payload privacy pass. No module_start row or alternate entry event is
+in the attachment. Basic is a reported resource fact; it does not establish that Basic caused the absence
+or that a tier change would supply the event. No tier/resource change is proposed.
+
+### Supported-mechanism review before any new experiment
+
+Official Microsoft documentation read October 16, 2026; conclusions about suitability below are the
+assessment of these documented semantics against the actual evidence, not Microsoft's certification
+of this deployment:
+
+| Mechanism and official source | Limitation / disposition |
+| --- | --- |
+| [Azure SQL XE availability and scope](https://learn.microsoft.com/en-us/azure/azure-sql/database/xevent-db-diff-from-svr), [XE objects](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-xe-objects-transact-sql), [column metadata](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-xe-object-columns-transact-sql) | Azure sessions are database-scoped; query actual supported objects/columns. The exact proposed source was sqlserver.module_start filtered by source_database_id and each exact object_id, with statement collection disabled. It is absent in supplied discovery and operator-reported all-package results. Generic XE support or local SQL Server availability does not supply it. Even an available entry source would miss failures before entry and still need complete privacy, health, continuity and retention validation. |
+| Available sqlserver.module_end | Described by the actual metadata as end of execution. No entry acknowledgement; cancelled/aborted/in-flight coverage cannot be inferred. collect_statement=false cannot change event timing or repair missing entry coverage. Rejected; no end-only substitution. |
+| [RPC:Starting](https://learn.microsoft.com/en-us/sql/relational-databases/event-classes/rpc-starting-event-class), [SP:StmtStarting](https://learn.microsoft.com/en-us/sql/relational-databases/event-classes/sp-stmtstarting-event-class) and [Trace-to-XE conversion](https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/convert-an-existing-sql-trace-script-to-an-extended-events-session) | RPC start describes a client request, not every module reached by nested wrappers/dynamic SQL. A statement start describes execution inside a procedure, not one entry per invocation; an entry followed by cancellation before a statement is not established by it. The conversion example names sp_statement_starting, not a replacement module-entry contract. Trace event-class pages do not prove Azure XE availability or a safe intrinsic payload. No RPC/batch/statement tracing, text parsing, line/offset heuristic or broad capture is proposed. |
+| Exact-object EXECUTE Audit / SCHEMA_OBJECT_ACCESS_GROUP: [Azure Audit configuration](https://learn.microsoft.com/en-us/powershell/module/az.sql/set-azsqldatabaseaudit), [action semantics](https://learn.microsoft.com/en-us/sql/relational-databases/security/auditing/sql-server-audit-action-groups-and-actions), [Azure log format](https://learn.microsoft.com/en-us/azure/azure-sql/database/audit-log-format), [privacy limitations](https://learn.microsoft.com/en-us/azure/azure-sql/database/auditing-overview) | Object-specific EXECUTE audit is supported, but permission-use/issued-EXECUTE records are not documented as a complete module-entry ledger through same-owner chains. Azure records include statement text and principal information; the reviewed configuration does not establish source-level text/argument suppression. Filtering objects or projecting/redacting stored output cannot satisfy the source privacy requirement. No audit activation or broader action group is proposed. |
+| [Procedure cache statistics](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-procedure-stats-transact-sql), Query Store AUTO | Finished cached executions/retained selected queries remain positive evidence only; absence, eviction and NULLs do not prove zero invocations. Earlier conclusions remain unchanged. |
+| event_counter, histogram or another target | A target cannot manufacture a missing source event, change exit to entry, or sanitize sensitive intrinsic data before capture. Counts alone also do not establish loss-free durable coverage. No alternate target harness is justified. |
+
+No further metadata is essential to the present **blocked** decision: the independent all-package
+start/end check has already been reported. Do not repeat discovery or request unrestricted event dumps
+just to search for a plausible name. Before reopening mechanism work, a separate review must identify
+an exact documented Azure-supported source with equivalent entry semantics, exact module/database
+filtering and source-level privacy controls, then obtain only its bounded metadata if needed. A new
+harness is contingent on that review; a familiar event name, tier upgrade or local test is insufficient.
+No suitable supported alternative is established by the evidence reviewed here.
+
+### Concrete caller inventory, migration and drain proposal — separate review only
+
+This produces migration evidence; **inventory alone does not prove zero invocations**. No instrumentation,
+release, resource or permission operation is authorized or implemented by this proposal.
+
+1. **Create a private per-consumer/per-procedure register.** For each of get_hash, mark_failure and
+   mark_success, record owner, consumer/build/artifact digest, effective connection target and actual
+   auth/runtime principal mapping reference, call mode (direct/nested/dynamic/synonym), last/next expected
+   activity, timezone/frequency, enabled/disabled status, offline/dormant instances, evidence reference,
+   retire-or-migrate decision and unresolved gaps. No emails, arguments, secrets or raw SQL in this register.
+   Cover installed desktop 1.0.136 and older/offline builds, Shale API/web versions, both live-update
+   functions and deployment/configuration provenance, jobs (including disabled/monthly/quarterly),
+   integrations, administrative scripts, stored wrappers, synonyms and dynamic/external callers.
+   Owners must reconcile installer/fleet, deployment and scheduler records; repository/dependency absence
+   and the current “no other consumers known” statement do not close rows. Keep unknown consumers explicit.
+2. **Review required behavior before migration.** For each active row, obtain separate compatible design
+   review. get_hash consumers need the reviewed bounded pre-tenant lookup/bcrypt path and ambiguity,
+   deleted/disabled and actual-identity acceptance; no direct runtime hash-read fallback. mark_failure
+   and mark_success require explicit owner disposition of the captured lockout/accounting policy,
+   concurrent updates and authenticated authority; the current V1 lookup is not a replacement accounting
+   implementation. Do not silently omit those effects or invent policy. Preserve remembered rotation,
+   password/reset/session revocation, User projections and audit compatibility. Reproduce approved
+   behavior in disposable tests; tie acceptance to installed artifacts/configuration, not source alone.
+3. **Plan a separately authorized deployment and consumer drain.** For each migrated/retired row, retain
+   old/new artifact and configuration identities, compatibility tests, rollback artifacts and an owner
+   signoff. Schedule the window only from real activity records. Use the longest inventoried job interval
+   plus an actual due run; 14 days is insufficient for an unexercised monthly/quarterly job. Require
+   representative password/remembered startups, restarts and reconnects. Offline clients remain unresolved
+   until reconciled/upgraded/withdrawn by their owners; do not infer drain from silence. Later authorized
+   operations must prove old workers/schedulers stopped, queued/retry work exhausted, and old connections,
+   sessions, pools and in-flight calls drained. Specify maximum task/retry/connection lifetimes from actual
+   configuration; unknown or unbounded lifetimes block signoff. Do not kill sessions or change credentials
+   as part of this task. Any fallback/rollback that reintroduces an old consumer reopens its drain.
+4. **Assemble the decision packet without inventing negative evidence.** Retain per-procedure coverage,
+   exact UTC start/end, owners, due runs, shutdown/drain attestations, artifact/configuration mapping,
+   gaps, original captures and independently approved operational evidence. Positive cache evidence
+   blocks retirement; quiet cache/Query Store or owner attestations alone do not prove zero remaining
+   invocations. If no already-approved adequate observation record exists, leave the zero-invocation
+   requirement unresolved. Trusted-seam application instrumentation would be a separate design review
+   requiring privacy, every deployed caller/path including failures, continuity and durable health proof;
+   it is not supplied here and cannot cover unknown external callers by assertion.
+
+Mapping to the **five existing pre-retirement requirements** in “Exact permission delta and approval
+boundaries” (possible outcomes after independently reviewed execution, none claimed satisfied now):
+
+| Existing requirement | What this alternative can supply | What remains blocked / separate |
+| --- | --- | --- |
+| 1 — separate security-owner retirement/reopened-risk approval and actual identities/artifacts | Owner register, artifact hashes and actual configuration/token evidence references for review. | Approval itself, original-login/server authority and acceptance of reopened capabilities must still be supplied. Inventory does not grant them. |
+| 2 — complete caller inventory; migrate required callers first | Reconciled fleet/job/wrapper/external register and separately tested migrations can satisfy this requirement **only if coverage is demonstrated complete**. | Unknown/dormant/external consumers, unreviewed accounting behavior or unaccepted installed artifacts keep it open. |
+| 3 — bounded observation/drain, longest interval, connection/session drain, owners, zero remaining invocations | Real dates/due-run records and shutdown/queue/retry/pool/session evidence can satisfy the documented scheduling and operational-drain components for covered consumers. | Complete zero-invocation evidence remains BLOCKED without adequate approved coverage; register completion and attestations alone do not satisfy it. Do not set LegacyCallersDrained=CONFIRMED from this plan. |
+| 4 — installed password/bcrypt/remembered compatibility and actual principals; accounting disposition | Separate installed-artifact tests and approved behavior disposition can satisfy compatibility for the demonstrated consumers while retaining 1.0.136 reads where required. | Offline/unverified artifacts or active accounting callers without compatible migration remain blockers. No Stage B old-client read drain is inferred. |
+| 5 — exclusive serialized security/module change window | Named operator/window, source/baseline/rollback references and handoff can be prepared. | Actual exclusive control, independently retained BeforeHash/AfterHash and unchanged catalog/effective checks remain mandatory at any later authorized change. |
+
+No acknowledgement, allowlist, preflight, retirement or rollback SQL changes. All three auth revocations
+and six runtime DENYs in the separate candidate, exact grantors/states/identity hashes, failure atomicity
+and rollback order remain intact. Stage A still requires successful unchanged preflight and separate
+approval; Stage B still requires its broader compatible fleet/job/old-read drain. Original captures,
+installed 1.0.136 compatibility, Case/RLS prerequisites and the separate live-update authorization and
+audit-permission findings remain open and unchanged.
+
+### Separate offline launcher correction and verification
+
+The launcher now leaves HarnessPath optional in param() and resolves its omitted default from PSScriptRoot
+in the script body. Explicit paths remain supported. It still evaluates only closed connection
+construction and never opens/authenticates. The Windows regression covers **both** launch forms from an
+unrelated working directory; the source regression prevents reintroducing parameter-default evaluation.
+Pre-edit test-impact review searched HarnessPath, builder/launcher references, module_start consumers,
+invocation assertions, observation tests and selector ownership. Existing payload, coverage and lifecycle
+contracts remain unchanged. Only the offline launcher and its Python tests change executable behavior;
+the Azure harness/session/setup/retirement/rollback/preflight/Stage A/B/RLS files are unchanged.
+
+Audit compatibility: documentation and offline closed construction introduce no application sensitive
+read/domain mutation or audit schema/event. Existing PHI/entity-action/session-security seams remain
+intact. Proposed inventory/approval/metadata retention stays in private change control.
+
+
+Local verification for this reassessment (Linux; no native Windows/Azure execution):
+
+| Check | Result / boundary |
+| --- | --- |
+| Focused builder Python | 2 source checks PASS; 1 native-Windows skip. New default-path regression also rejects the live-base launcher. |
+| Entire auth Python suite | 30 PASS, 2 native-Windows skips (32 total); all six invocation privacy/coverage/ownership assertions still pass. |
+| Focused existing auth/module/lifecycle/support Maven | 15 PASS; no failures/errors/skips. |
+| Committed base-to-head selector affected suite / critical reactor | 54 PASS / 116 PASS; no failures/errors/skips. Security-data selects auth, tenant/session and neighboring audit/transaction contracts for this security-tooling path; no full-suite escalation. |
+| Changed-file/test review, relative documentation links/fences, Python compilation and Git whitespace | PASS. Exactly four changed files: offline launcher, its tests, package README and this runbook. No Azure lifecycle or safeguard SQL changes; raw attachment/private captures are excluded. |
+| Corrected default-path launcher / two-form native regression | NOT RUN: no native Windows PowerShell 5.1 on this host. The default-path fix remains runtime-UNVERIFIED; the operator's earlier explicit-path PASS is separately attributed above. |
+
+The initial network-enabled execution request timed out in automatic approval review before starting.
+An offline focused attempt then lacked cached libphonenumber 9.0.40; the default-network attempt could
+not reach the sandbox proxy. The permitted configured-proxy retry passed without dependency/build
+changes. Failed/unstarted attempts are not passes. No installation was performed.
+
+Exact repository-root verification commands (existing configured Maven/JDK/proxy/CA wrapper; scratch
+logs and selection plan are outside Git):
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_connection_builder.py' -v
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py' -v
+python3 -m py_compile build/auth-verification/test_connection_builder.py
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base 5bf1dfa93109f697cca8b58b3b1534e2c0ba03ab --head HEAD --format markdown --plan-output /workspace/work/login-selection.json --run
+# --run executes the selected affected Maven suite followed by mvn test.
+git diff --check 5bf1dfa93109f697cca8b58b3b1534e2c0ba03ab HEAD
+```
+
+Required native retest from the reviewed repository root (offline only):
+
+```powershell
+python -m unittest discover -s build/auth-verification -p 'test_connection_builder.py' -v
+if ($LASTEXITCODE -ne 0) { throw 'Corrected default/explicit launcher remains unverified' }
+```
+
+This runs the real launcher both without and with an explicit HarnessPath from an unrelated working
+directory. No Azure connection, instrumentation, permission/resource change, deletion, installation,
+release, merge or deployment was performed. Retirement/installation and production monitoring remain
+BLOCKED; the native launcher fix remains unverified until its corrected forms pass on Windows 5.1.
 
 ## Windows PowerShell construction correction — 2026-10-16
 

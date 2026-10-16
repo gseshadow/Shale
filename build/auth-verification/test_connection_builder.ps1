@@ -1,9 +1,14 @@
 #requires -Version 5.1
 # Offline regression for the pre-Open failure. Never invoke the harness or Open-Connection.
 [CmdletBinding()]
-param([string]$HarnessPath = (Join-Path $PSScriptRoot '../../docs/sql/auth/invocation-validation/harness.ps1'))
+param([string]$HarnessPath)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# PS 5.1 can leave PSScriptRoot empty while evaluating parameter defaults.
+# Resolve the optional default in the script body, independent of the caller's working directory.
+if (-not $PSBoundParameters.ContainsKey('HarnessPath')) {
+    $HarnessPath = Join-Path $PSScriptRoot '../../docs/sql/auth/invocation-validation/harness.ps1'
+}
 if ($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5 -or
     $PSVersionTable.PSVersion.Minor -ne 1) {
     throw 'Native Windows PowerShell 5.1 Desktop required; other runtimes do not certify this regression'

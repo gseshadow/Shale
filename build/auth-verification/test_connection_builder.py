@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,14 +29,30 @@ class ConnectionBuilderTest(unittest.TestCase):
                             'Use the explicit CLR getter for the related connection-string read')
         self.assertRegex(source, r'\$builder\s*\.\s*get_ConnectionString\s*\(\s*\)')
 
+    def test_optional_harness_path_resolves_in_script_body(self):
+        source = NATIVE.read_text(encoding='utf-8')
+        self.assertRegex(source, r'param\s*\(\s*\[string\]\$HarnessPath\s*\)',
+                         'PS 5.1 must not evaluate PSScriptRoot in a parameter default')
+        fallback = source.index("if (-not $PSBoundParameters.ContainsKey('HarnessPath'))")
+        resolve = source.index("$HarnessPath = Join-Path $PSScriptRoot")
+        parse = source.index('::ParseFile(')
+        self.assertLess(fallback, resolve)
+        self.assertLess(resolve, parse, 'Resolve the script-relative default before parsing the harness')
+
     @unittest.skipUnless(os.name == 'nt', 'Native Windows PowerShell 5.1 unavailable; source checks only')
     def test_native_windows_powershell_51_offline_construction(self):
         powershell = shutil.which('powershell.exe')
         self.assertIsNotNone(powershell, 'Windows requires powershell.exe; pwsh is not native PS 5.1')
-        result = subprocess.run([powershell, '-NoLogo', '-NoProfile', '-NonInteractive',
-                                 '-File', str(NATIVE)], cwd=ROOT, text=True, capture_output=True, timeout=60)
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn('PASS native Windows PowerShell 5.1.', result.stdout)
+        # Both public launch forms must work away from the repository working directory.
+        with tempfile.TemporaryDirectory(prefix='offline builder ') as directory:
+            for arguments in ([], ['-HarnessPath', str(HARNESS)]):
+                with self.subTest(arguments=arguments):
+                    result = subprocess.run(
+                        [powershell, '-NoLogo', '-NoProfile', '-NonInteractive',
+                         '-File', str(NATIVE), *arguments], cwd=directory,
+                        text=True, capture_output=True, timeout=60)
+                    self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                    self.assertIn('PASS native Windows PowerShell 5.1.', result.stdout)
 
 
 if __name__ == '__main__':
