@@ -23,14 +23,20 @@ are quoted, and variables use `SecurityOwner="Brian Downing"`. Executable paths 
 ProcessStartInfo.FileName; no shell or password argument is introduced. Prepared commands
 retain the resolved ODBC executable automatically.
 
+The rehearsal setup now terminates its initial final `GO` once and places every canonical
+`:r` directly at the next batch start. It adds no leading blank line to failure/success
+definitions. Expected hashes, canonical resources and all SQL guards remain unchanged.
+The offline native regression captures the real generated setup and compares all three
+CREATE batches exactly, including CRLF whitespace; help parsing alone is not rehearsal evidence.
+
 Before preparing a corrected packet, use a **new isolated checkout** of the full reviewed
 fix commit. From the existing repository root in Windows PowerShell 5.1:
 
 ```powershell
 # $reviewedPackageCommit must be the full corrected commit from the fix PR, after review.
-git fetch origin codex/fix-retirement-odbc-arguments
+git fetch origin codex/fix-retirement-rehearsal-batches
 if ($LASTEXITCODE -ne 0) { throw 'Fetch failed; stop' }
-$newRoot = 'C:\ShaleVerification\RetirementOperator-ODBC-Fix-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')
+$newRoot = 'C:\ShaleVerification\RetirementOperator-Batch-Fix-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')
 if (Test-Path -LiteralPath $newRoot) { throw 'New directory required' }
 $checkout = Join-Path $newRoot 'Checkout'
 git worktree add --detach $checkout $reviewedPackageCommit
@@ -44,16 +50,17 @@ if ($LASTEXITCODE -ne 0) { throw 'Real Windows ODBC help regression failed; stop
 & .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Prepare -ReviewedRevision $reviewedPackageCommit -SqlcmdPath $odbc -EvidencePath 'C:\ShaleVerification\RetirementOperator-1881\Packet' -PacketPath (Join-Path $newRoot 'Packet')
 if ($LASTEXITCODE -ne 0) { throw 'Preparation failed; preserve output and stop' }
 # ONE separately opted-in loopback rehearsal, <=15 minutes, with dedicated LOCAL credentials:
-& .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Rehearse -ReviewedRevision $reviewedPackageCommit -SqlcmdPath $odbc -LocalPort 14333 -PacketPath (Join-Path $newRoot 'LocalRehearsal-ODBC')
+& .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Rehearse -ReviewedRevision $reviewedPackageCommit -SqlcmdPath $odbc -LocalPort 14333 -PacketPath (Join-Path $newRoot 'LocalRehearsal-Batch-Fix')
 if ($LASTEXITCODE -ne 0) { throw 'Rehearsal failed; preserve evidence/resource; no automatic retry or cleanup' }
 ```
 
-The existing `RetirementOperator-1881\Packet`, `LocalRehearsal` and `LocalRehearsal-ODBC`
+The existing `RetirementOperator-1881\Packet`, `LocalRehearsal`, `LocalRehearsal-ODBC`
+and every other earlier failed/successful packet, output and nonce-owned database
 are preserved unchanged. Prepare reads only the original three capture files from that Packet;
 it regenerates all staged scripts/hashes in the NEW packet automatically. Do not copy/patch old
 scripts, manifests or seals. If those original capture files are unavailable, stop for review.
-The failed Go run may have left its nonce-owned database: this sequence never adopts, retries
-or cleans it. No wildcard cleanup, forced disconnect or production operation is authorized.
+Earlier Go and ODBC runs may have left nonce-owned databases: this sequence never adopts,
+retries or cleans them. No wildcard cleanup, forced disconnect or production operation is authorized.
 
 Expected output: `PASS retirement operator offline behavior on Desktop 5.1...`, then
 `PASS real Windows ODBC quoted-switch reproduction and corrected help parsing on Desktop 5.1...`.
