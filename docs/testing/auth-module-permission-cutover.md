@@ -4,6 +4,79 @@
 
 
 
+## Local rehearsal batch assembly correction — 2026-10-16
+
+The operator's Windows PowerShell 5.1 / Microsoft ODBC SQLCMD 180 run of
+`e6203b6ee20b6003b6a4cb954da63a75dcac2de1` completed setup but baseline refused with
+58341. Attributed read-only inspection found get_hash exact (1252 UTF-16LE bytes),
+failure 1532 instead of 1528 and success 600 instead of 596. Both incorrect hashes
+were independently reproduced by one leading CRLF before the canonical CRLF bodies;
+reported SET/owner/execution-context metadata matched. Earlier private packets, failed
+outputs and nonce-owned databases were unavailable here and remain untouched.
+
+The generated setup here-string ends with an unterminated `GO` line. The loop previously
+prepended CRLF to every `:r`: necessary for the first include, but after each loop's
+already terminated final `GO` it inserted a blank line into the next CREATE batch.
+SQL Server retains that whitespace in sys.sql_modules.definition. The fix terminates
+the initial setup once and starts every include directly after the preceding GO line.
+No expected hashes, canonical resources, production SQL, baseline guards or definition
+comparisons change; no trimming is introduced.
+
+Pre-edit impact inventory reviewed AGENTS/prompt rules, database-schema, tenancy-and-rls,
+this owning runbook, OPERATOR/evidence-scope, invocation README, the entire offline
+PowerShell lifecycle, Python transport/native/Core coverage, neighboring controlled
+retirement tests and existing fixture contracts. The existing offline test now captures
+the actual rehearsal-generated setup through a test-only transport stub, expands its
+includes, and compares every complete CREATE batch to the canonical CRLF resource,
+including all whitespace and exact UTF-16LE lengths. It passes on Core 7.4.6 and fails
+against the original runner specifically at sp_login_mark_failure. This model check is
+supplemented by real SQL execution below, not treated as SQLCMD implementation proof.
+
+Complete real local rehearsal **PASSED on Linux/Core**, using Microsoft ODBC SQLCMD
+18.4.0001.1, ODBC driver 18.5.1.1 and a new dedicated loopback-only SQL Server 2022
+Developer container (image digest
+`sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`).
+Executed code revision: `3e7763fcc266679cf1647753aef6afffbb2a6a9a`; subsequent changes
+only document these results. A private scratch harness supplied synthetic-only prompt
+responses; it did not replace SQL generation, guards, transport or execution. All
+17 real SQLCMD invocations are retained: setup/baseline, missing-decision 58360,
+expired-window 58361, before-drift 58344, injected post-mutation refusal 58347 and exact
+injected baseline equality after connection close, apply, catalog postcheck, wrong
+rollback hash 58344, rollback, full original catalog digest equality and exact nonce
+cleanup. An independent master query confirmed that exact database absent. All five
+refusals exited 16; all twelve success cases exited 0; no deadline expired. Canonical
+staged lengths/hashes were independently checked unchanged. SQL-only rollback plus
+reverification took 0.39164 seconds; manual recovery was NOT measured. The task-owned
+instance and all outputs remain retained. Scratch post-run bookkeeping initially
+expected 18 records rather than 17; a separate read-only check validated every retained
+record and equality result. No SQL operation was retried.
+
+Focused auth Python: **38 PASS, four explicit skips (42 total)** with Core and real
+ODBC supplied. Native Windows PowerShell 5.1 / Windows ODBC and real Go-client checks
+remain **UNVERIFIED here**. The selector maps these operator paths to security-data
+without full-suite escalation; its broader Java/Maven recommendations were not run,
+following the explicit request for no unrelated broad test cycle. No Java/application
+contract changed. Exact commands executed:
+
+```bash
+XDG_CACHE_HOME=/workspace/work/cache XDG_CONFIG_HOME=/workspace/work/config XDG_DATA_HOME=/workspace/work/data /workspace/work/tools/pwsh/pwsh -NoLogo -NoProfile -NonInteractive -File build/auth-verification/test_retirement_operator.ps1
+# Negative control: same test with -RunnerPath pointing to a scratch copy of the original runner/resources; expected exit 1 at failure's leading CRLF.
+PYTHONDONTWRITEBYTECODE=1 XDG_CACHE_HOME=/workspace/work/cache XDG_CONFIG_HOME=/workspace/work/config XDG_DATA_HOME=/workspace/work/data ODBCSYSINI=/workspace/work/tools/odbc-config SHALE_OPERATOR_TEST_PWSH=/workspace/work/tools/pwsh/pwsh SHALE_OPERATOR_TEST_ODBC=/workspace/work/tools/odbc/opt/mssql-tools18/bin/sqlcmd python3 -m unittest discover -s build/auth-verification -p 'test_*.py' -v
+python3 /workspace/work/rehearsal-validation/run.py
+python3 /workspace/work/rehearsal-validation/verify-retained.py
+python3 build/test-selection/select_tests.py --base 4b67ddf578e5c61550edc939c65c2a9869842cf0 --head HEAD --format markdown --plan-output work/rehearsal-selection.json
+git diff --check 4b67ddf578e5c61550edc939c65c2a9869842cf0 HEAD
+```
+
+For the new reviewed Windows checkout/private packet and ONE local rehearsal use the
+updated [exact operator commands](../sql/auth/permission-cutover/OPERATOR.md). Preserve
+all previous captures/packets/outputs/databases, stop on failure and never edit packets
+or retry automatically. Brian's single-operator process and every security/recovery
+guard remain. Audit compatibility stays in private operator change control; no application
+audit schema/event or domain/sensitive-read seam changes. No Azure or production connection,
+production operation, manual packet editing or broad cleanup occurred. Production risk,
+package/window approvals and manual recovery remain PENDING; production is unauthorized.
+
 ## ODBC argument serialization correction — 2026-10-16
 
 The operator reports two Windows PowerShell 5.1 failures from #1881: Go SQLCMD 1.10.0
