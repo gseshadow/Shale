@@ -1,6 +1,211 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest assessment:** see [Azure entry-observation reassessment](#azure-entry-observation-reassessment--2026-10-16). The reported build lacks module_start; no suitable replacement is established. Retirement, installation and production monitoring remain BLOCKED.
+**Latest proposal: [maintenance-window acceptance — NOT APPROVED](#proposed-maintenance-window-acceptance-policy--not-approved--2026-10-16).** Existing retirement policy remains in force; retirement, installation and production monitoring remain BLOCKED. The reported build lacks module_start; no suitable observation replacement is established.
+
+## Proposed maintenance-window acceptance policy — NOT APPROVED — 2026-10-16
+
+**Proposal only. The existing retirement requirements remain in force.** This planning PR neither
+approves nor activates this alternative. Retirement, installation and production monitoring remain
+BLOCKED. No executable permission, observation, preflight, rollback or harness file changes here.
+
+Fetched live `codex/latest` at `9e23c1b611e40dac5ad6bf22ea80b9af9192178c`; GitHub confirms #1878
+merged and the fetched commit is its merge commit. Separate task branch:
+`codex/legacy-login-maintenance-acceptance`, in a separate worktree preserving the original checkout.
+Read AGENTS.md, architecture/codex-prompt-rules.md, this full runbook and invocation-validation README;
+reviewed architecture/database-schema.md auth/Users/tenancy sections and architecture/tenancy-and-rls.md.
+
+**New operator-reported verification:** the #1878 Windows offline regression passed all three tests,
+exit 0, including native PowerShell 5.1 default and explicit HarnessPath forms. This supersedes the
+pending native launcher retest in the dated #1878 record below for that reported run only. It was not
+executed independently here; no exact checkout/artifact digest or additional tool version was supplied.
+It establishes neither installed-desktop compatibility nor Azure workload/privacy/coverage validation.
+Earlier failure captures and historical results remain intact; no new Discover/Setup/Workload is needed.
+
+### Risk and the exact policy decision
+
+Retaining these capabilities permits hash disclosure/offline password attack and unauthenticated
+failure/lock/success/last-login manipulation. The captured email-only match is not tenant-qualified,
+permits NULL is_deleted and ignores removed status; duplicate emails can affect several tenants.
+get_hash hides ambiguity with unordered TOP (1); mark_failure can lock matching accounts and
+mark_success can clear locks without credential proof. Dbo ownership chaining defeats direct table
+DML/read fences; inherited runtime EXECUTE exposes the same capabilities. Retention also keeps the
+unchanged Stage A security preflight blocked. Retirement reduces these particular capabilities, while
+broader shared credentials, runtime CRUD/EXECUTE and audit permissions remain separate security debt.
+
+Retiring an undiscovered dependent caller can break password login or background work, miss failure
+increments, leave stale locks or last_login, and lose operations even if the caller swallows the SQL
+error. An offline desktop, infrequent job or external/dynamic caller can return after a quiet window.
+Known-consumer artifact review and successful checks cannot prove that no such caller exists.
+
+The proposed replacement is specifically for items **2 and 3** under
+[Exact permission delta and approval boundaries](#exact-permission-delta-and-approval-boundaries):
+
+- Item 2 currently requires a **complete caller inventory**, with required callers migrated first.
+  Replace its universal completeness claim with a reconciled, bounded inventory of the named estate
+  and its declared exclusions/unknowns, signed by its accountable owners. Every identified required
+  caller must still be compatibly migrated or explicitly withdrawn before retirement. A known missing
+  artifact, owner or configuration is a blocker, not an unknown-caller exception.
+- Item 3 currently requires an observation/drain record with **zero remaining invocations** and says a
+  missing observation source blocks retirement pending a telemetry plan. Replace that negative-proof
+  component with verified known-consumer artifacts/configuration, documented operational drain and
+  a controlled retirement trial with representative acceptance, symptom detection and exact rollback.
+  Keep start/end times, actual schedule/lifetime bounds, owner signoffs and connection/session drain
+  for known consumers. Absence in cache/Query Store remains UNKNOWN; no silence becomes proof.
+
+Items 1, 4 and 5 remain required: separate security-owner retirement/reopened-risk approval, actual
+identities and artifact compatibility/accounting disposition, and exclusive serialized metadata control.
+The earlier five-requirement mapping remains an assessment under the existing policy, not evidence that
+this proposed replacement is approved. No supported privacy-safe complete invocation source is
+established; this alternative does not depend on finding one or require proof about every conceivable caller.
+
+**Required explicit approval:** the designated Shale security owner must accept the policy replacement,
+residual unknown-caller/security risks and exact rollback exposure in a recorded decision. The accountable
+Shale service/operations owner must co-approve the disruption limit, staffing and recovery/reconciliation
+plan; desktop, API and job/integration owners sign their inventory, compatibility and drain evidence.
+If one person holds several roles, record each capacity. Named people and decision IDs are currently
+missing and must be supplied in checklist item 5. Repository review or merging this proposal alone must
+not be interpreted as those approvals. A later separately reviewed implementation and a specific
+maintenance-window go/no-go authorization are also required before any permission operation.
+
+### Finite operator checklist and missing-fact collection
+
+All entries are OPEN unless explicitly attributed above. Keep a private packet with source revision,
+collection time, owner, digest/reference, finding and gap/disposition for each row. Collection described
+here is future work under existing or separately obtained read/operation authorization, not an Azure
+instruction for this task. Inspect existing records first; do not collect passwords, tokens, application
+hashes, emails, arguments, raw SQL or new event payloads. Stop at the specified estate boundary and
+record residual exclusions rather than expanding an endless search.
+
+| Order / missing fact | Exact bounded collection action | Completion criterion |
+| --- | --- | --- |
+| 1 — installed desktop versions and artifacts | Desktop owner reconciles the current managed-device/installer distribution list with the support roster, including known offline devices, 1.0.136 and older supported installations. For each distinct installed build obtain its installed executable/JAR/MSI digest and packaged auth implementation; privately resolve configuration precedence and target/principal references. Record the dated estate list and exceptions. | Every listed installation maps to a reviewed build/configuration or an owner-attested withdrawal preventing reconnect; counts reconcile across those two lists. Missing known/offline installations block. Unknown devices outside the declared estate remain an explicit residual risk. Release source alone is insufficient. |
+| 2 — deployed API identity/build | API owner obtains the active deployment manifest and artifact digest for each serving slot/instance from existing release records; compares packaged auth code and effective configuration precedence to that artifact. Retains the existing actual auth/runtime identity/token handoff, or separately authorizes that bounded SELECT-only handoff from the Case runbook for each distinct mapping. | All serving instances map to exact artifacts and intended database, distinct shale_app/shale_runtime identities, original-login/server and nested/public/fixed-token review; no unexplained instance/override or guessed identity. Record web-to-API routing/build. |
+| 3 — remaining named callers and inventory boundary | Service owners reconcile existing scheduler/job definitions (enabled, disabled, monthly/quarterly), integration/admin-script register and DB dependency/synonym evidence for these three exact modules. Include both live-update functions, their deployed artifact/configuration provenance, and external/dynamic/wrapper paths. Review only those registered artifacts and their transitive call/configuration paths; retain the prior Function DLL report as attributed evidence until provenance is verified. | A per-consumer/per-procedure register covers this named estate with owner, artifact, effective identity/target reference, call mode, last/next activity, timezone/interval and retire/migrate/no-call disposition. Every discovered required caller has accepted migration/withdrawal evidence; unresolved known paths block. Owners sign the boundary/exclusions, not universal nonuse. |
+| 4 — compatibility and accounting behavior | Owners compare each distinct artifact/configuration path in rows 1–3 to the captured procedure semantics and run the representative matrix below on an approved disposable environment, then the separately authorized installed-artifact acceptance. Retain pass/fail and artifact references only. | All expected outcomes pass under actual configured principals; any active mark_failure/mark_success consumer has a separately reviewed compatible migration or withdrawal and explicit security-owner accounting disposition. V1 lookup alone is not an accounting replacement. No direct runtime hash-read fallback. |
+| 5 — accountable approvals, operational bounds and detection | Change owner names security/service/consumer owners, SQL operator, independent verifier, incident lead and support contact. Obtain actual task/retry/connection/pool/in-flight maxima and due-run dates from row 3 configurations. Review existing permitted status/error counters, support path and acceptance outcomes; complete the window worksheet below. | Signed packet supplies names, evidence/approval IDs, UTC start/end, per-consumer drain deadlines, exact detection channel/cadence, measured rehearsal times, rollback deadline and follow-up due runs. No unbounded lifetime or unstaffed interval. If existing safe symptoms cannot detect the representative failures, stop; no new instrumentation is assumed. |
+| 6 — exact rollback feasibility and baseline | SQL operator/verifier review retained original schema/prior-state/legacy captures and existing baseline/apply/rollback scripts. In an already approved disposable environment rehearse the exact nine-row delta and rollback, retain timing and full equality results. Before a later live attempt separately authorize the existing bounded baseline and actual-identity checks, serialized against catalog editing. | Original captures remain untouched; independently saved BeforeHash and subsequently emitted AfterHash are retained with complete ACL/grantor/state/SID/owner/module evidence. Captured G AS dbo profile and exact-state guards pass; Stage A/B are absent and no unrelated drift prevents rollback. Rehearsal fits the approved bound. No inline current hash used as expected state. |
+| 7 — drain and final go/no-go | In the separately authorized window consumer owners pause admission/schedules using their approved procedures, complete queued/retry/in-flight work and close old connections/pools gracefully. Verify their stopped/empty status using existing controls and actual configured maxima; no session killing is assumed. Review hashes, approvals, staffing and checklist again. | Each known old path is stopped/withdrawn or compatibly replaced, with timestamped owner evidence and no pending work. Unknown/unbounded drain, failed due run or positive legacy-use evidence stops. Only the incident lead and security owner can record go; never set existing acknowledgement variables from this proposal. |
+| 8 — controlled trial, follow-up and closure | Only after policy/implementation/window approval, apply the unchanged exact delta with SQLCMD stop-on-error, independently save AfterHash, verify catalog/effective results without invoking legacy procedures, and execute the matrix. Owners review each registered next due run and planned offline return; record each outcome and investigate complaints. | Every check passes before resume, all due-run/return dates have finite owners/deadlines and all incidents/reconciliation are closed before final retirement acceptance. A failed or missed run stays open or triggers rollback; late unknown callers remain incident risks after closure. No zero-invocation claim. |
+
+Representative matrix: each distinct supported installed desktop build/configuration must exercise
+password/bcrypt success and rejection, second API credential exchange, checked/unchecked remembered
+startup, ordinary close/Windows restart, rotation/replay/outage Retry, disabled/revoked rejection and
+DPAPI-unavailable behavior. API checks cover login, enrollment, /me, issue/refresh/logout, user switching
+and pooled tenant/actor isolation. Verify User directory/Team/detail/assignment/history and approved
+create/reset/revocation writes and audit behavior. Check both live-update negotiation/reconnect and
+representative job/integration due work. For migrated accounting callers verify captured threshold,
+expiry/default/NULL, concurrent failure/success and last-login outcomes in disposable tests; no legacy
+procedure invocation against Azure to manufacture evidence. Retain 1.0.136 direct auth Users reads and
+old remembered resolver until Stage B's independently satisfied broader drain. Source tests and the
+new offline Windows pass do not replace these installed-artifact checks.
+
+### Window limits, symptoms and rollback decision
+
+Proposed ceiling for explicit owner acceptance: **30 minutes of planned login/dependent-work
+unavailability**, starting when admission is paused, including graceful drain, trial, rollback and
+verification. This is a proposed budget, not a measured recovery guarantee. The packet must specify
+UTC start, hard end, and a rollback reserve measured in item 6 (at least 10 minutes). Do not apply if
+drain/checks leave less than that reserve. Begin rollback no later than hard end minus the reserve;
+never extend the window silently. If rehearsal cannot fit, reject this window proposal and return for
+separate review of a concrete larger budget. An unplanned recovery overrun is an incident, not a claim
+that disruption stayed within the ceiling. Missed accounting/data effects can outlast service recovery.
+
+Keep the SQL operator, independent catalog verifier and incident lead/service owner present throughout;
+desktop/API/job owners and support must be reachable immediately. Security owner must be available for
+the pre-agreed rollback decision, including acceptance of reopened capabilities. No staffed coverage,
+no go. Keep this window pre-Stage-A and prohibit Stage A/B or unrelated DDL/security changes until the
+trial decision and rollback exposure review finish, so the saved legacy AfterHash remains usable.
+
+During the trial check existing privacy-approved login/error/availability summaries and queue/task
+completion at least once per minute, with a support route for swallowed errors or user symptoms.
+Compare to a same-path pre-window baseline and the matrix's expected outcomes; record timestamps,
+pass/fail and permitted error codes only. Do not enable SQL text, principal/argument tracing or any
+new monitoring harness. Before resume require every matrix path to pass. Staff the first hour after
+resume with the same one-minute checks; then assign a named daily review through the latest registered
+due-run/offline-return date. Dates and responsible owners must be fixed before go, with escalation
+coverage in between; unknown future callers can still fail after that finite review ends.
+
+Stop before apply for any missing fact/signoff above, known unreviewed dependency/accounting path,
+positive use without disposition, drift/unsupported grantor/state, incomplete captures, failed identity
+mapping, unexpected privilege, absent rollback artifacts, failed acceptance, unbounded drain, unavailable
+staff/detection or exhausted time budget. A nonzero SQLCMD result stops immediately: close its connection,
+retain output and verify transaction rollback/catalog equality before considering any next step.
+
+After apply, **any** unexpected authentication/remembered failure, permission error (including 229),
+missing/delayed job result, incorrect accounting/lock state, tenant/audit anomaly, unexpected ACL delta,
+unknown-caller report, lost symptom visibility or insufficient remaining rollback time triggers an
+incident and pauses affected admission/work. The incident lead invokes the pre-approved guarded rollback
+with the SQL operator/verifier; no repeated trial or extra grants to mask the symptom. If drift prevents
+exact rollback, stop for exact-state incident review, maintain the outage notice and escalate to security
+and service owners. Never overwrite expected hashes or bypass a guard to meet the clock.
+
+Rollback is exactly the existing `rollback-legacy-login.sql`: validate the independently saved
+BeforeHash/AfterHash and complete expected state, remove only the six new runtime/role DENYs AS dbo,
+restore only the three original auth EXECUTE G rows AS dbo without GRANT OPTION, and require the entire
+original catalog digest before commit. W/D/R, other grantors, changed SIDs/owners/definitions/dependencies
+or extra ACLs remain rejected. No CASCADE, broad grant script, grantor substitution or guessed replay.
+If Stage A/B have subsequently been authorized and installed, legacy rollback still refuses: drain their
+consumers and use their guarded rollbacks in the documented order first; do not promise the same 30-minute
+recovery in that later state. Review that risk before permitting any later stage.
+
+Restoring grants reopens hash disclosure, unauthenticated lock/accounting manipulation and inherited
+runtime access. The security owner must explicitly accept this temporary exposure and assign a dated
+remediation review. It does **not** replay lost operations, restore missed failure counts/last_login,
+repair lock decisions, reverse partial external effects or reconstruct missing audit events. Consumer
+owners must reconcile each affected operation from existing approved business evidence, assess retries
+for duplication/idempotency, and separately approve any data correction. Never fabricate history or
+blindly replay failed work; uncertain accounting/security outcomes remain incidents after grants return.
+
+### Preserved safeguards and later implementation
+
+The exact three auth REVOKEs and six runtime/role DENYs, captured definitions/SET flags/parameters,
+original captures, independent baseline hashes, grantors/states/SIDs, catalog/effective drift rejection,
+transaction atomicity and all rollback guards are unchanged. Security preflight/58307 is unchanged;
+retirement does not approve installation. Stage A and Stage B keep separate approvals, module/fence
+identities, installed compatibility and broader fleet/job/read-drain gates. No Users/auditLog/Statuses
+FILTER, shared TenantFilter function, Case harness, original schema export or R4 acceptance changes.
+RLS prerequisites, actual-login authority review and separate audit/live-update security findings stay open.
+
+If the policy is approved, a later separately reviewable change must define an explicit alternative
+acceptance/evidence contract in operator instructions and acknowledgement validation, so
+LegacyCallersDrained=CONFIRMED never silently means unproved zero invocations. Update affected tests and
+rehearse missing approval/evidence, unknown known-consumer facts, deadline failure, drift refusal and exact
+rollback without weakening permission/preflight guards. Supply a reviewed window worksheet, artifact
+matrix, graceful-drain/resume procedures, reconciliation ownership and rollback timing from real evidence.
+No new monitoring harness is needed or proposed. Existing scripts must not be used under this alternative
+until that contract is reviewed; this planning PR leaves all executable scripts byte-for-byte unchanged.
+
+Audit compatibility: this documentation changes no application sensitive read, mutation or schema/event.
+Existing PHI/entity-action/session-security transaction seams remain authoritative. Private operator
+change control holds approvals and evidence; later business reconciliation must use the established
+audit framework, with any unrepresentable gap explicitly reviewed rather than ad-hoc audit records.
+
+Planning-PR validation (Linux): pre-edit searches reviewed the existing observation runbook assertions,
+invocation privacy/coverage tests, approval validation and exact apply/rollback scripts; no production
+symbol or existing test contract changes. `python3 -m unittest discover -s build/auth-verification
+-p 'test_*.py' -v` passed 30 tests with two native-Windows skips. The committed base-to-head selector
+(`python3 build/test-selection/select_tests.py --base 9e23c1b611e40dac5ad6bf22ea80b9af9192178c
+--head HEAD --format markdown --plan-output work/selection.json`) selected no affected Maven area for
+this documentation-only change and no full-suite escalation. Its critical command was run with the
+existing configured wrapper, `/workspace/.tools/bin/mvn test`: 116 passed, zero failures/errors/skips.
+Relative file links/fences, runbook-only scope/executable equality and
+`git diff --check 9e23c1b611e40dac5ad6bf22ea80b9af9192178c HEAD` passed. Local regression results do
+not verify the proposed operational procedure. No Azure connection, telemetry activation, permission
+change, session termination, resource deletion, installation, release, merge or deployment occurred.
+Private evidence and credentials are excluded.
+
+**First operator action:** the desktop owner creates the dated private installed-version/artifact register
+in checklist item 1 from the current managed-device/installer list and support roster, identifying each
+known offline installation and obtaining the digest for each distinct installed build. No Azure call.
+
+**Approval decision requested, not granted:** the named security owner, with service/operations owner
+concurrence, would accept replacement of requirements 2's universal inventory completeness and 3's
+zero-invocation telemetry proof by this bounded known-estate evidence and controlled trial; explicitly
+accept residual unknown-caller failures, potentially irreversible missed accounting/operations, the
+30-minute proposed disruption ceiling and guarded rollback's reopened security exposure. That policy
+decision alone authorizes no execution; implementation review and a separately signed window go/no-go
+remain required. Otherwise keep the existing gate and retirement BLOCKED.
+
 
 ## Azure entry-observation reassessment — 2026-10-16
 
