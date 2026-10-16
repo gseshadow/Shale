@@ -4,6 +4,46 @@
 
 
 
+## Complete Windows ODBC variable quoting — 2026-10-16
+
+The operator reports Windows PowerShell 5.1.26100.9549 and ODBC SQLCMD 180,
+runner `2e4d0046c6e5ac7bacbf427f4bb5e43713256363`: offline/Prepare passed,
+creation/setup/baseline completed, but invocation 4 (missing-decision) exited 1
+before SQL output existed. Stderr contained `:58:55 WindowEndUtc=...` and
+`Invalid argument`. The prior whitespace-only serializer left all three ISO
+values unquoted. The fix emits `Name="value"` for EVERY `-v` assignment while
+keeping switches bare. Timestamp formats, expected hashes, SQL bodies, time guards,
+packet seals, approvals, password handling, deadlines and nonce ownership stay intact.
+
+Pre-edit test-impact inventory: AGENTS/prompt rules, database-schema/tenancy guidance,
+this owning runbook, OPERATOR/evidence-scope, the complete runner and offline tests,
+Python native/Core/process tests, real ODBC help tests and neighboring controlled
+retirement contracts. The existing real ODBC test now captures the actual complete
+rehearsal invocation-4 variables with test-only transport, builds production approvals
+through Get-ApprovalVariables, and parses rehearsal/apply/rollback/verify shapes with
+all three timestamps, before/after hashes, spaced owner names/evidence references,
+spaced file paths and trailing backslashes under both -C and -N. Help is last and
+no credentials/connection are supplied. Native Windows must also reproduce both
+quoted-switch and whitespace-only timestamp failures as negative controls. Test
+argument/result records are retained in its fresh reported directory. These parsing
+checks do not establish SQL execution or substitution roundtrip fidelity.
+
+Expected-refusal diagnostics now preserve the transport failure and report retained
+stderr/result/stdout/optional SQL output paths, including the client parser text
+when no SQL output exists. Acceptance needs a caught nonzero exit other than 1,
+no expired deadline, and the intended SQL Server `Msg ..., Level 16` header.
+Offline cases reject exit 1 even with an error header, deadline expiry, exit 0,
+wrong/bare error numbers and uncaught success. A real subprocess test exercises
+exit 1 with stderr and no SQL output. No refusal follows merely from exit 1.
+
+Native Windows PS5.1 / Windows ODBC full-list parsing and the complete local rehearsal
+remain **UNVERIFIED here**. Linux/Core evidence cannot certify Windows parsing.
+Use the [fresh-directory operator commands](../sql/auth/permission-cutover/OPERATOR.md)
+with the reviewed commit from this PR. No prior packet/log/nonce-owned database is
+modified, adopted or retried. Audit compatibility continues in private operator
+change control; no application audit schema/event or sensitive-read/mutation seam
+changes. Production/manual recovery and all approval decisions remain PENDING.
+
 ## Local rehearsal batch assembly correction — 2026-10-16
 
 The operator's Windows PowerShell 5.1 / Microsoft ODBC SQLCMD 180 run of
