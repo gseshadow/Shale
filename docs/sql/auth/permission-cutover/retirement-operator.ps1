@@ -100,6 +100,60 @@ function Get-SavedHashes([string]$Output, [string]$Kind, [string]$Before = '') {
     if ($matchesFound.Count -ne 1) { throw 'Complete unambiguous saved hash output required.' }
     return $matchesFound[0].Groups[1].Value
 }
+function ConvertTo-SqlcmdArguments([string[]]$Arguments) {
+    # Windows ODBC SQLCMD parses the raw command line itself: quoted switches are
+    # not options. Quote only values that need it; -v uses Name="value with spaces".
+    $variables = $false
+    $encoded = foreach ($argument in $Arguments) {
+        if ($argument -match '["\r\n\x00]') { throw 'Unsafe process argument.' }
+        if ($argument -ceq '-v') { $variables=$true; '-v'; continue }
+        $prefix=''; $value=$argument
+        if ($variables) {
+            if ($argument -notmatch '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { throw 'Invalid SQLCMD variable assignment.' }
+            $prefix=$Matches[1]+'='; $value=$Matches[2]
+        }
+        if ($value -eq '' -or $value -match '\s') {
+            # Preserve trailing backslashes before a closing quote under Windows argv rules.
+            $value='"'+[regex]::Replace($value, '(\\+)$', '$1$1')+'"'
+        }
+        $prefix+$value
+    }
+    return ($encoded -join ' ')
+}
+function New-SqlcmdStartInfo([string]$Executable, [string]$Root, [string[]]$Arguments) {
+    $command = Get-Command $Executable -CommandType Application -ErrorAction Stop
+    $psi = New-Object Diagnostics.ProcessStartInfo
+    # FileName is a path, never a quoted command string. No shell is involved.
+    $psi.FileName=$command.Source; $psi.WorkingDirectory=$Root
+    $psi.Arguments=ConvertTo-SqlcmdArguments $Arguments
+    $psi.UseShellExecute=$false; $psi.RedirectStandardOutput=$true; $psi.RedirectStandardError=$true
+    foreach ($name in @($psi.EnvironmentVariables.Keys)) {
+        if ($name -like 'SQLCMD*') { $psi.EnvironmentVariables.Remove($name) }
+    }
+    return $psi
+}
+function Assert-SupportedSqlcmd([string]$Executable) {
+    $action = 'Use Microsoft ODBC SQLCMD 17/18 with explicit -SqlcmdPath (for example C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\180\Tools\Binn\SQLCMD.EXE). Go SQLCMD is unsupported. No credentials or rehearsal resource should be supplied/created; preserve earlier evidence/resources and choose a new directory.'
+    $process=New-Object Diagnostics.Process
+    try {
+        # Help only: no server, input SQL, credentials or connection. Scrub SQLCMDINI too.
+        $process.StartInfo=New-SqlcmdStartInfo $Executable $script:SourceRoot @('-?')
+        if (-not $process.Start()) { throw 'Help process did not start.' }
+        $stdout=$process.StandardOutput.ReadToEndAsync(); $stderr=$process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(10000)) { $process.Kill(); $process.WaitForExit(); throw 'Help probe exceeded 10 seconds.' }
+        $help=$stdout.GetAwaiter().GetResult()+$stderr.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0 -or $help -notmatch 'Microsoft \(R\) SQL Server Command Line Tool' -or
+            $help -notmatch '(?m)^Version\s+1[78]\.' -or $help -match '(?i)go-sqlcmd|--version|Version: v') {
+            throw 'Unrecognized/unsupported SQLCMD help signature.'
+        }
+        foreach ($option in @('u','y','Y','w','b','V','i','o')) {
+            if ($help -cnotmatch ('\[-'+$option+'(?:[ \[])')) { throw "Required ODBC option missing: -$option" }
+        }
+        Write-Host "SQLCMD PREFLIGHT PASSED - Microsoft ODBC - help only - no connection: $($process.StartInfo.FileName)"
+        return $process.StartInfo.FileName
+    } catch { throw "SQLCMD PREFLIGHT REFUSED: $($_.Exception.Message) $action" }
+    finally { $process.Dispose() }
+}
 function Invoke-PacketSql([string]$Root, [string]$Server, [string]$Database, [string]$User,
     [Security.SecureString]$Password, [string]$InputFile, [string[]]$Variables, [string]$Log,
     [string]$Executable, [Nullable[datetime]]$Deadline = $null, [switch]$LocalOnly) {
@@ -107,19 +161,11 @@ function Invoke-PacketSql([string]$Root, [string]$Server, [string]$Database, [st
     # Only the child environment gets SQLCMDPASSWORD. No password argument, transcript or global env edit.
     if ($Server -notmatch '^[A-Za-z0-9][A-Za-z0-9.,:_-]{0,254}$' -or $User -notmatch '^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$') { throw 'Unsafe connection selector.' }
     Assert-SafeValue $Database
-    $command = Get-Command $Executable -CommandType Application -ErrorAction Stop
     $args = @('-S',$Server,'-d',$Database,'-U',$User,'-b','-V','16','-l','30','-t','30','-y','0','-Y','0','-w','65535','-u',
         '-i',$InputFile,'-o',($Log+'.sqlcmd.txt'))
     if ($LocalOnly) { $args += '-C' } else { $args += '-N' } # production: encrypted, certificate verified
     if ($Variables.Count) { $args += '-v'; $args += $Variables }
-    if (@($args | Where-Object { $_ -match '["\r\n\x00]' }).Count) { throw 'Unsafe process argument.' }
-    $psi = New-Object Diagnostics.ProcessStartInfo
-    $psi.FileName = $command.Source; $psi.WorkingDirectory = $Root
-    $psi.Arguments = ($args | ForEach-Object { '"'+$_+'"' }) -join ' '
-    $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
-    foreach ($name in @($psi.EnvironmentVariables.Keys)) {
-        if ($name -like 'SQLCMD*') { $psi.EnvironmentVariables.Remove($name) }
-    }
+    $psi = New-SqlcmdStartInfo $Executable $Root $args
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
     try { $psi.EnvironmentVariables['SQLCMDPASSWORD'] = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
@@ -147,7 +193,7 @@ function Invoke-PacketSql([string]$Root, [string]$Server, [string]$Database, [st
         }
         $result = @{ExitCode=$process.ExitCode; DeadlineExceeded=$expired; EndUtc=[datetime]::UtcNow.ToString('o')}
         Write-NewJson ($Log+'.result.json') $result
-        if ($expired -or $process.ExitCode -ne 0) { throw 'SQLCMD failed/interrupted: preserve ALL output; commit status may be UNCERTAIN. No apply replay.' }
+        if ($expired -or $process.ExitCode -ne 0) { throw "SQLCMD failed/interrupted: ExitCode=$($process.ExitCode); DeadlineExceeded=$expired; output prefix: $Log. Preserve ALL output; commit status may be UNCERTAIN. No apply replay." }
     } finally {
         $psi.EnvironmentVariables.Remove('SQLCMDPASSWORD')
         if ($started -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
@@ -173,6 +219,7 @@ function Prepare-Packet {
     $root = Assert-PrivatePath $PacketPath $script:SourceRoot
     $evidence = Assert-PrivatePath $EvidencePath $script:SourceRoot
     if (Test-Path -LiteralPath $root) { throw 'Use a NEW private packet directory; preserve every earlier packet.' }
+    $SqlcmdPath = Assert-SupportedSqlcmd $SqlcmdPath
     $baselineFile = Join-Path $evidence 'legacy-retirement-baseline.txt'
     if ((Get-SavedHashes $baselineFile 'Baseline') -ine $script:Baseline) { throw 'Original reported baseline differs. Stop for review, do not adopt current state.' }
     $server = Read-Host 'Existing approved Shale SQL server endpoint (no connection will be made)'
@@ -209,7 +256,7 @@ function Prepare-Packet {
     Write-NewText (Join-Path $root 'BeforeHash.txt') $script:Baseline
     Write-NewText (Join-Path $root 'decisions-PENDING.txt') "Risk acceptance PENDING. Completed-package approval PENDING. Exact execution window PENDING.`r`nNo approval or compatibility finding follows from preparation. Read OPERATOR.md and evidence-scope.md in staged source."
     $runner = Join-Path $root 'source/docs/sql/auth/permission-cutover/retirement-operator.ps1'
-    $prefix = "& '$($runner.Replace("'","''"))' -PacketPath '$($root.Replace("'","''"))'"
+    $prefix = "& '$($runner.Replace("'","''"))' -PacketPath '$($root.Replace("'","''"))' -SqlcmdPath '$($SqlcmdPath.Replace("'","''"))'"
     Write-NewText (Join-Path $root 'commands.ps1.txt') @"
 # Review only. Apply requires exact UTC values and explicit interactive Brian approvals.
 $prefix -Phase Apply -WindowStartUtc 'YYYY-MM-DDTHH:mm:ssZ' -WindowEndUtc 'YYYY-MM-DDTHH:mm:ssZ' -RollbackStartByUtc 'YYYY-MM-DDTHH:mm:ssZ'
@@ -270,6 +317,7 @@ function Invoke-Retirement {
     if ((Get-Content -LiteralPath (Join-Path $root 'BeforeHash.txt') -Raw).Trim() -ine $packet.BeforeHash) { throw 'Original BeforeHash changed.' }
     if ($Phase -eq 'Apply') {
         if (Test-Path -LiteralPath (Join-Path $root 'apply-attempt.json')) { throw 'Apply already attempted; NEVER replay. Inspect outputs/verify/guarded rollback.' }
+        $SqlcmdPath = Assert-SupportedSqlcmd $SqlcmdPath
         $ready = Read-Json (Join-Path $root 'readiness.json'); Assert-Readiness $ready
         $readySeal=Get-Digest (Join-Path $root 'readiness.json')
         Write-Host "Review readiness.json SHA256 $readySeal with packet SHA256 $seal"
@@ -312,6 +360,7 @@ function Invoke-Retirement {
     if ($auth.PacketSHA256 -cne $seal -or (Get-Digest (Join-Path $root 'authorization.json')) -cne
         (Get-Content -LiteralPath (Join-Path $root 'authorization-sha256.txt') -Raw).Trim()) { throw 'Original authorization changed.' }
     $after = Get-AfterHash $root $packet # parse even nonzero original apply: commit may have happened; never recalculate
+    $SqlcmdPath = Assert-SupportedSqlcmd $SqlcmdPath
     $password = Read-Host 'Brian: SQL operator password' -AsSecureString
     try {
         if ($Phase -eq 'Rollback') {
@@ -362,6 +411,7 @@ function Invoke-LocalRehearsal {
     $revision = Get-SourceRevision $script:SourceRoot $ReviewedRevision
     $root = Assert-PrivatePath $PacketPath $script:SourceRoot
     if (Test-Path -LiteralPath $root) { throw 'Use a fresh LOCAL rehearsal output directory.' }
+    $SqlcmdPath = Assert-SupportedSqlcmd $SqlcmdPath
     Confirm-Exact 'This creates and later removes ONE new synthetic database on the existing dedicated LOCAL disposable instance. No Shale data/copies/credentials. No existing database is adopted.' 'LOCAL DISPOSABLE SQLCMD REHEARSAL'
     $user=Read-Host 'Dedicated LOCAL SQL admin username (never production credentials)'
     $password=Read-Host 'Dedicated LOCAL SQL admin password' -AsSecureString

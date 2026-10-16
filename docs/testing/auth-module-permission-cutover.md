@@ -4,6 +4,56 @@
 
 
 
+## ODBC argument serialization correction — 2026-10-16
+
+The operator reports two Windows PowerShell 5.1 failures from #1881: Go SQLCMD 1.10.0
+created a synthetic database before failing a quoted absolute `:r` include; explicit
+Microsoft ODBC SQLCMD 180 failed at the first create with `'-S': Unknown Option`.
+The retained private evidence/resources were not available here and were not modified.
+The Go database may remain; it must not be adopted, automatically retried or broadly cleaned.
+
+`Invoke-PacketSql` previously surrounded EVERY token in quotes in the raw Windows
+ProcessStartInfo.Arguments string. Windows ODBC's option parser requires bare switches.
+The corrected shared serializer emits bare switches, quotes values containing whitespace,
+uses `Name="value with spaces"` for SQLCMD variables, preserves trailing backslashes when
+quoting and rejects quote/CR/LF/NUL and malformed variable names. `-V` severity remains
+distinct from `-v` variables. FileName remains the resolved executable path, without shell
+execution. The original SQL, includes, nonce/local ownership guards and packet-integrity,
+no-replay, child-only password, output/deadline and exact saved-hash contracts are retained.
+
+A bounded no-connection `-?` probe rejects Go and unknown variants before Prepare/Rehearse
+prompts or rehearsal resource creation and before connected-phase credentials; the Apply
+attempt marker still refuses replay first. Generated packet commands retain the resolved
+ODBC path. [Operator instructions](../sql/auth/permission-cutover/OPERATOR.md) supply a
+new checkout/packet and one local rehearsal, reading original captures without editing
+saved packets or hashes. Production remains unauthorized.
+
+Pre-edit impact inventory: existing Python transport/native/Core tests, the entire offline
+PowerShell lifecycle and neighboring controlled-retirement/guard contracts were inspected.
+New serializer adversarial tests and a real ODBC help-only script protect the actual raw
+command line; the Windows script requires the old serializer to fail with Unknown Option
+before accepting corrected switches, spaced input/output paths and variables. The fake
+transport remains solely capture/exit/deadline/password evidence, never ODBC parsing proof.
+
+Verification here: PowerShell Core 7.4.6 on Linux; real Microsoft ODBC SQLCMD
+18.4.0001.1 Linux accepted corrected help-only arguments with local/production encryption
+switches, spaced files and variables; real Go SQLCMD 1.10.0 was refused before prompts or
+output directory creation. Full auth Python: **39 PASS, three explicit native-Windows skips
+(42 total)**. No SQL connection or database rehearsal was performed. Native Windows
+PowerShell 5.1, Windows ODBC negative/positive parsing and full local SQL rehearsal remain
+**UNVERIFIED** here; Linux/Core cannot certify those results. Run the supplied native
+checks before the one new local rehearsal. No Maven reruns under the explicit task scope.
+
+```bash
+SHALE_OPERATOR_TEST_PWSH=/workspace/work/tools/pwsh/pwsh SHALE_OPERATOR_TEST_ODBC=/workspace/work/tools/odbc/opt/mssql-tools18/bin/sqlcmd SHALE_OPERATOR_TEST_GO_SQLCMD=/workspace/work/tools/go-sqlcmd/sqlcmd python3 -m unittest discover -s build/auth-verification -p 'test_*.py' -v
+python3 build/test-selection/select_tests.py --base 9bdbac7907c872f225041a9f265d963f07b8a06e --head HEAD --format markdown --plan-output work/odbc-selection.json
+git diff --check
+```
+
+Audit compatibility continues to use private operator change control; no application
+sensitive-read/domain-mutation seam, audit event/schema or SQL permission changes. No Azure,
+production operation, approval or retained-resource cleanup occurred.
+
 ## Final operator runner — PREPARED, NOT AUTHORIZED — 2026-10-16
 
 Use [Brian's operator instructions](../sql/auth/permission-cutover/OPERATOR.md) and the

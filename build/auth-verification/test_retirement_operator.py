@@ -1,4 +1,4 @@
-"""Operator orchestration/transport regressions; no real SQL, Azure or production actions."""
+"""Operator transport and real ODBC help parsing; no SQL connection or production actions."""
 import json
 import os
 from pathlib import Path
@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / 'docs/sql/auth/permission-cutover/retirement-operator.ps1'
 BEHAVIOR = Path(__file__).with_suffix('.ps1')
 NATIVE = shutil.which('powershell.exe') if os.name == 'nt' else None
+ODBC = os.environ.get('SHALE_OPERATOR_TEST_ODBC')
+GO_SQLCMD = os.environ.get('SHALE_OPERATOR_TEST_GO_SQLCMD')
 CORE = os.environ.get('SHALE_OPERATOR_TEST_PWSH') or shutil.which('pwsh')
 
 
@@ -67,7 +69,7 @@ try {
   if($name -eq 'slow'){$deadline=[datetime]::UtcNow.AddSeconds(1)}
   $caught=$false
   try { $null=Invoke-PacketSql $c.root 'sql.invalid' 'Shale' 'testuser' $password 'unused.sql' @('ExpectedDatabase=Shale') $log $c.executable $deadline }
-  catch { $caught=$true }
+  catch { $caught=$true; if ($name -eq 'success') { throw } }
   if (($name -eq 'success') -eq $caught) { throw "Wrong process result: $name" }
   $r=Read-Json ($log+'.result.json')
   if($name -eq 'failure' -and $r.ExitCode -ne 16){throw 'Native nonzero exit lost'}
@@ -85,6 +87,43 @@ try {
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             self.assertIn('PASS actual subprocess', result.stdout)
             self.assertNotIn('SYNTHETIC_ONLY_PASSWORD', result.stdout + result.stderr)
+
+    @unittest.skipUnless(ODBC and (NATIVE or CORE), 'Real ODBC executable/runtime not supplied')
+    def test_real_odbc_help_argument_parsing(self):
+        result = subprocess.run([NATIVE or CORE, '-NoLogo', '-NoProfile', '-NonInteractive',
+                                 '-File', str(BEHAVIOR.with_name('test_retirement_odbc.ps1')),
+                                 '-SqlcmdPath', ODBC], cwd=ROOT, capture_output=True, text=True, timeout=45)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn('PASS real', result.stdout)
+        if NATIVE:
+            self.assertIn('Windows ODBC quoted-switch reproduction', result.stdout)
+            self.assertIn('Desktop 5.1.', result.stdout)
+
+    @unittest.skipUnless(GO_SQLCMD and (NATIVE or CORE), 'Real Go SQLCMD executable/runtime not supplied')
+    def test_real_go_refused_before_prompts_or_resources(self):
+        with tempfile.TemporaryDirectory(prefix='retirement go refusal ') as directory:
+            config = Path(directory) / 'config.json'
+            packet = Path(directory) / 'must-not-exist'
+            config.write_text(json.dumps(dict(runner=str(RUNNER), executable=GO_SQLCMD,
+                                              packet=str(packet))), encoding='utf-8')
+            script = Path(directory) / 'refuse.ps1'
+            script.write_text(r'''param($Config)
+$c=Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json
+. $c.runner
+$PacketPath=$c.packet; $SqlcmdPath=$c.executable
+function Get-SourceRevision { return ('a'*40) }
+function Read-Host { throw 'TEST ERROR: prompted before variant refusal' }
+$message=''
+try { Invoke-LocalRehearsal } catch { $message=$_.Exception.Message }
+if($message -notmatch 'SQLCMD PREFLIGHT REFUSED' -or $message -notmatch 'Go SQLCMD is unsupported'){throw "Wrong refusal: $message"}
+if(Test-Path -LiteralPath $PacketPath){throw 'Resource evidence directory created before variant refusal'}
+Write-Output 'PASS real Go SQLCMD refused before prompts/resources'
+''', encoding='utf-8')
+            result = subprocess.run([NATIVE or CORE, '-NoLogo', '-NoProfile', '-NonInteractive',
+                                     '-File', str(script), '-Config', str(config)], cwd=ROOT,
+                                    capture_output=True, text=True, timeout=20)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            self.assertFalse(packet.exists())
 
     def test_verifier_invokes_no_legacy_or_application_module(self):
         import re
