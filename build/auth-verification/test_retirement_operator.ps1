@@ -16,6 +16,24 @@ function Assert-Equal($Actual,$Expected,[string]$Message) { if ($Actual -cne $Ex
 $testRoot=Join-Path ([IO.Path]::GetTempPath()) ('retirement-offline-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 try {
+    Assert-Equal (ConvertTo-SqlcmdArguments @('-S','tcp:127.0.0.1,14333','-i','C:\SQL files\setup.sql','-v','SecurityOwner=Brian Downing','ExpectedDatabase=Shale')) '-S tcp:127.0.0.1,14333 -i "C:\SQL files\setup.sql" -v SecurityOwner="Brian Downing" ExpectedDatabase=Shale' 'ODBC switches/value quoting regressed'
+    Assert-Equal (ConvertTo-SqlcmdArguments @('-V','16','-v','Owner=Brian Downing')) '-V 16 -v Owner="Brian Downing"' 'Severity -V confused with variables -v'
+    Assert-Equal (ConvertTo-SqlcmdArguments @('-i','C:\SQL files\')) '-i "C:\SQL files\\"' 'Trailing backslash lost'
+    foreach ($bad in @('bad"quote',"bad`rline","bad`nline","bad`0nul")) {
+        Expect-Failure { ConvertTo-SqlcmdArguments @('-i',$bad) } 'unsafe process argument'
+    }
+    Expect-Failure { ConvertTo-SqlcmdArguments @('-v','-S=inject') } 'variable name injection'
+    # Unsupported clients must refuse before any prompt, directory or SQL transport.
+    # A nonexistent executable exercises refusal without depending on installed tools.
+    $PacketPath=Join-Path $testRoot 'unsupported-must-not-exist'
+    $SqlcmdPath=Join-Path $testRoot 'missing-sqlcmd.exe'
+    function Get-SourceRevision { return ('a'*40) }
+    function Read-Host { throw 'TEST ERROR: unsupported client requested input' }
+    $message=''
+    try { Invoke-LocalRehearsal } catch { $message=$_.Exception.Message }
+    if ($message -notmatch 'SQLCMD PREFLIGHT REFUSED' -or $message -notmatch 'explicit -SqlcmdPath') { throw "Wrong preflight refusal: $message" }
+    if (Test-Path -LiteralPath $PacketPath) { throw 'Unsupported client created rehearsal evidence' }
+    . $RunnerPath
     $now=Get-Utc '2026-10-16T20:00:00Z'
     Assert-Window $now ($now.AddMinutes(30)) ($now.AddMinutes(20)) 600 ($now.AddMinutes(1))
     Expect-Failure { Get-Utc '2026-10-16T20:00:00' } 'UTC suffix required'
@@ -94,6 +112,7 @@ try {
         if($Prompt -like '*endpoint*'){return 'sql.invalid'}
         return 'syntheticoperator'
     }
+    function Assert-SupportedSqlcmd { param($Executable) return $Executable } # lifecycle only; real client checked separately
     function Invoke-PacketSql { throw 'Prepare must not connect' }
     Invoke-Retirement
     $packet=Read-Packet $PacketPath

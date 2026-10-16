@@ -14,12 +14,56 @@ logging. Nothing here installs tools, changes credentials, Stage A/B or authenti
 Brian serves every role. **Independent human verification is absent**, explicitly accepted
 as a process choice; this package does not require another person.
 
-From the clean reviewed package checkout root, with `$reviewedPackageCommit` set to the
-full commit Brian actually reviewed:
+The runner now checks `-?` help in a child process (10-second bound, SQLCMD environment
+scrubbed) before prompts in Prepare/Rehearse and before credentials in connected phases.
+Only Microsoft ODBC 17/18 is accepted; Go SQLCMD, missing executables and unrecognized help
+are refused with an explicit `-SqlcmdPath` example. This is client identification, not a
+connection or SQL compatibility test. Switches are serialized bare, spaced file arguments
+are quoted, and variables use `SecurityOwner="Brian Downing"`. Executable paths stay in
+ProcessStartInfo.FileName; no shell or password argument is introduced. Prepared commands
+retain the resolved ODBC executable automatically.
+
+Before preparing a corrected packet, use a **new isolated checkout** of the full reviewed
+fix commit. From the existing repository root in Windows PowerShell 5.1:
 
 ```powershell
-& .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Prepare -ReviewedRevision $reviewedPackageCommit -EvidencePath 'C:\ShaleVerification\RetirementPacket-20261016-135011' -PacketPath 'C:\ShaleVerification\LegacyRetirement-Final'
+# $reviewedPackageCommit must be the full corrected commit from the fix PR, after review.
+git fetch origin codex/fix-retirement-odbc-arguments
+if ($LASTEXITCODE -ne 0) { throw 'Fetch failed; stop' }
+$newRoot = 'C:\ShaleVerification\RetirementOperator-ODBC-Fix-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')
+if (Test-Path -LiteralPath $newRoot) { throw 'New directory required' }
+$checkout = Join-Path $newRoot 'Checkout'
+git worktree add --detach $checkout $reviewedPackageCommit
+if ($LASTEXITCODE -ne 0) { throw 'Isolated checkout failed; stop' }
+Set-Location -LiteralPath $checkout
+$odbc = 'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\180\Tools\Binn\SQLCMD.EXE'
+powershell.exe -NoLogo -NoProfile -NonInteractive -File build/auth-verification/test_retirement_operator.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Offline Windows regression failed; stop' }
+powershell.exe -NoLogo -NoProfile -NonInteractive -File build/auth-verification/test_retirement_odbc.ps1 -SqlcmdPath $odbc
+if ($LASTEXITCODE -ne 0) { throw 'Real Windows ODBC help regression failed; stop before rehearsal' }
+& .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Prepare -ReviewedRevision $reviewedPackageCommit -SqlcmdPath $odbc -EvidencePath 'C:\ShaleVerification\RetirementOperator-1881\Packet' -PacketPath (Join-Path $newRoot 'Packet')
+if ($LASTEXITCODE -ne 0) { throw 'Preparation failed; preserve output and stop' }
+# ONE separately opted-in loopback rehearsal, <=15 minutes, with dedicated LOCAL credentials:
+& .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Rehearse -ReviewedRevision $reviewedPackageCommit -SqlcmdPath $odbc -LocalPort 14333 -PacketPath (Join-Path $newRoot 'LocalRehearsal-ODBC')
+if ($LASTEXITCODE -ne 0) { throw 'Rehearsal failed; preserve evidence/resource; no automatic retry or cleanup' }
 ```
+
+The existing `RetirementOperator-1881\Packet`, `LocalRehearsal` and `LocalRehearsal-ODBC`
+are preserved unchanged. Prepare reads only the original three capture files from that Packet;
+it regenerates all staged scripts/hashes in the NEW packet automatically. Do not copy/patch old
+scripts, manifests or seals. If those original capture files are unavailable, stop for review.
+The failed Go run may have left its nonce-owned database: this sequence never adopts, retries
+or cleans it. No wildcard cleanup, forced disconnect or production operation is authorized.
+
+Expected output: `PASS retirement operator offline behavior on Desktop 5.1...`, then
+`PASS real Windows ODBC quoted-switch reproduction and corrected help parsing on Desktop 5.1...`.
+Prepare prints `SQLCMD PREFLIGHT PASSED` and `PREPARED - NO CONNECTION - NOT AUTHORIZED`.
+Only a successful full rehearsal prints `LOCAL SQLCMD REHEARSAL COMPLETED` and retains
+`rehearsal-result.json` with `ExactSqlcmdChecks=PASSED_LOCAL_ONLY`; manual recovery and
+production decisions remain PENDING. Unsupported clients print `SQLCMD PREFLIGHT REFUSED`
+before credential prompts/resources. Child failure reports `ExitCode`, `DeadlineExceeded`
+and its output prefix; retain `.sqlcmd.txt`, `.stdout.bin`, `.stderr.bin`, `.result.json`
+and `local-owner.json`. Stop on any failure; never replay Apply or replace expected hashes.
 
 Prepare asks for the existing approved Shale SQL endpoint and Brian's SQL operator
 username. **It makes no connection and asks for no password.** It requires HEAD to equal
@@ -29,7 +73,7 @@ test resources; records SHA256, source revision, original BeforeHash and PENDING
 and stages apply/verification/rollback together in commands.ps1.txt. Use a new directory
 for a new packet. Never rebuild a packet to get new hashes after an apply attempt.
 
-Successful output begins `PREPARED - NO CONNECTION - NOT AUTHORIZED`, then prints private
+After the help-only preflight, successful output includes `PREPARED - NO CONNECTION - NOT AUTHORIZED`, then prints private
 packet path, exact source revision, packet SHA256, original BeforeHash and
 `Risk/package/window: PENDING`. Privately retain a second hash-verified copy, including
 packet.json, packet-seal.txt, BeforeHash.txt, commands, source and captures. Hashes detect
@@ -62,13 +106,8 @@ each already-known next due run with owner/date (or an explicit truthful no-know
 statement), and a dated reopened-risk remediation review. Support owns late-client incidents
 afterward; unknown laptop-return dates do not block closure or become tested findings.
 
-If exact SQLCMD recovery rehearsal is still missing, run this **once** in the reviewed
-checkout against the existing dedicated local disposable SQL instance. This is a bounded
-addition to the evidence already collected, not a new full suite/inventory cycle:
-
-```powershell
-& .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Rehearse -ReviewedRevision $reviewedPackageCommit -LocalPort 14333 -PacketPath 'C:\ShaleVerification\LocalSqlcmdRecovery-Final'
-```
+Run only the single Rehearse command above, once, on the existing dedicated local disposable
+instance. This adds the missing bounded evidence; it is not a full suite/inventory cycle.
 
 It accepts only tcp:127.0.0.1 and a dedicated unprivileged local port, asks explicit local
 opt-in and synthetic-only admin credentials, creates ONE new random database, checks a
