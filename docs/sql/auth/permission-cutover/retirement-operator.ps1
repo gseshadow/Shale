@@ -462,10 +462,13 @@ GO
 GRANT EXECUTE ON dbo.ResolveDesktopRememberCredential TO shale_app AS dbo;
 GO
 '@
+        # Terminate the here-string's final GO once. A blank line after later GOs
+        # becomes part of the next stored procedure definition through :r.
+        $setup += "`r`n"
         foreach ($name in @('sp_login_get_hash','sp_login_mark_failure','sp_login_mark_success')) {
             $body=[IO.File]::ReadAllText((Join-Path $script:SourceRoot ('shale-server/src/test/resources/auth/'+$name+'.sql'))).Replace("`r`n","`n").Replace("`n","`r`n")
             $bodyFile=Join-Path $root ($name+'.sql'); Write-NewText $bodyFile $body
-            $setup += "`r`n:r `"$bodyFile`"`r`nGO`r`nGRANT EXECUTE ON dbo.$name TO shale_app AS dbo;`r`nGO`r`n"
+            $setup += ":r `"$bodyFile`"`r`nGO`r`nGRANT EXECUTE ON dbo.$name TO shale_app AS dbo;`r`nGO`r`n"
         }
         $null=Local-Sql 'setup' $setup
         $baseOut=Local-Sql 'baseline' ':r docs/sql/auth/permission-cutover/legacy-retirement-baseline.sql' @("ExpectedDatabase=$database")

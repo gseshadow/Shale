@@ -34,6 +34,42 @@ try {
     if ($message -notmatch 'SQLCMD PREFLIGHT REFUSED' -or $message -notmatch 'explicit -SqlcmdPath') { throw "Wrong preflight refusal: $message" }
     if (Test-Path -LiteralPath $PacketPath) { throw 'Unsupported client created rehearsal evidence' }
     . $RunnerPath
+    # Capture the real rehearsal's generated setup, without a SQL connection. SQLCMD
+    # consumes :r directives and GO lines; every resulting CREATE batch must equal
+    # the entire canonical CRLF body, including its leading/trailing whitespace.
+    $PacketPath=Join-Path $testRoot 'assembly with spaces'
+    function Get-SourceRevision { return ('a'*40) }
+    function Assert-SupportedSqlcmd { return 'OFFLINE_ONLY' }
+    function Confirm-Exact { }
+    function Read-Host { param($Prompt,[switch]$AsSecureString)
+        if ($AsSecureString) { return (ConvertTo-SecureString 'OFFLINE_ONLY' -AsPlainText -Force) }
+        return 'OFFLINE_ONLY'
+    }
+    function Invoke-PacketSql {
+        param($Root,$Server,$Database,$User,$Password,$InputFile,$Variables,$Log,$Executable,$Deadline,[switch]$LocalOnly)
+        if ($InputFile -like '*-create.sql') { return 'OFFLINE_ONLY' }
+        if ($InputFile -notlike '*-setup.sql') { throw 'Unexpected offline assembly transport' }
+        $script:generatedSetup=[IO.File]::ReadAllText($InputFile)
+        throw 'OFFLINE_SETUP_CAPTURED'
+    }
+    $message=''
+    try { Invoke-LocalRehearsal } catch { $message=$_.Exception.Message }
+    Assert-Equal $message 'OFFLINE_SETUP_CAPTURED' 'Rehearsal setup capture failed'
+    $expanded=[regex]::Replace($script:generatedSetup, '(?m)^:r "([^"]+)"\r?\n', {
+        param($match)
+        [IO.File]::ReadAllText($match.Groups[1].Value)
+    })
+    $batches=[regex]::Split($expanded, '(?m)^GO\r?\n')
+    $expectedLengths=@(1252,1528,596); $index=0
+    foreach ($name in @('sp_login_get_hash','sp_login_mark_failure','sp_login_mark_success')) {
+        $canonical=[IO.File]::ReadAllText((Join-Path $script:SourceRoot ('shale-server/src/test/resources/auth/'+$name+'.sql'))).Replace("`r`n","`n").Replace("`n","`r`n")
+        $created=@($batches | Where-Object { $_ -match ('CREATE\s+PROC dbo\.'+$name+'\b') })
+        Assert-Equal $created.Count 1 "Missing/duplicate CREATE batch for $name"
+        Assert-Equal $created[0] $canonical "Generated $name batch differs from canonical body (possible leading CRLF after GO)"
+        Assert-Equal ([Text.Encoding]::Unicode.GetByteCount($created[0])) $expectedLengths[$index++] "Wrong UTF-16LE length for $name"
+    }
+    Remove-Item Function:Read-Host
+    . $RunnerPath
     $now=Get-Utc '2026-10-16T20:00:00Z'
     Assert-Window $now ($now.AddMinutes(30)) ($now.AddMinutes(20)) 600 ($now.AddMinutes(1))
     Expect-Failure { Get-Utc '2026-10-16T20:00:00' } 'UTC suffix required'
