@@ -206,6 +206,46 @@ Audit compatibility: no application sensitive read/domain mutation or audit sche
 The existing PHI/entity-action/session-security transactions remain authoritative. This security-catalog
 package and approvals use private operator change control; no raw captures or ad-hoc app audit events.
 
+### Preparation verification and execution boundary
+
+Pre-edit test-impact review covered every retirement/approval variable and include reference,
+AuthPermissionCutoverFixture's full existing legacy/Stage A/B roundtrip, neighboring auth/module/lifecycle
+and verification-support tests, observation/invocation Python contracts and selector ownership. Existing
+original-route rejection assertions remain; the fixture extends both routes with missing decisions,
+wrong explicit selection, invalid/expired/oversized windows, reserve refusal, drift, W-state/dependency
+refusal, atomic postcheck failure, equal deltas and exact recovery without original zero-proof decisions.
+It also checks recovery after expiry. **These new SQL fixture paths were compiled, not executed here.**
+Permission changes and resource deletion are outside this task's authorization, including running that
+mutating disposable fixture. The new SQL route remains runtime-UNVERIFIED pending separately authorized
+rehearsal; passing source tests does not close it. Native Windows and installed-artifact acceptance are
+not inferred from local tests or the attributed historical reports.
+
+| Check actually run for this preparation | Result |
+| --- | --- |
+| New controlled-route Python source contracts | 4 PASS. Explicit separate approvals, original meaning, deadline/recovery separation, exact nine statements and shared transaction/hash guards. |
+| Full auth Python suite | 34 PASS, 2 explicit native-Windows skips (36 total). Existing privacy/UNKNOWN/launcher contracts preserved. |
+| Focused auth/module/lifecycle/support Maven | 15 PASS; no failures/errors/skips. |
+| Committed-base selector affected security-data suite | 54 PASS; no failures/errors/skips; modified fixture compiled. Auth, tenant/session and neighboring transaction/audit tests cover the affected security tooling. No full-suite escalation. |
+| Critical reactor via selector, mvn test | 116 PASS; no failures/errors/skips. |
+| Shared body comparison against fetched base | Apply/rollback bodies byte-for-byte equal to original suffixes; original approval/context/baseline/fingerprint/effective/preflight/Stage A/B files unchanged. |
+| Changed-file/test mapping, variable search, Python compilation, runbook relative links/fences, SQL includes and git diff --check | PASS. Only the bounded contract/wrappers, extracted shared bodies, existing fixture, focused source tests and owning runbook change. |
+| SQL execution/rehearsal, native Windows and representative production checks | NOT RUN; mandatory before window approval/execution, not claimed as passing. |
+
+Exact commands from repository root; logs/plan/test-impact inventory are uncommitted under work/:
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_controlled_retirement.py' -v
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py' -v
+python3 -m py_compile build/auth-verification/test_controlled_retirement.py
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base bd189ee66e854b036e9a15c510b2d09a00d2cea7 --head HEAD --format markdown --plan-output work/selection.json --run
+# --run executes the selected affected suite, then mvn test.
+git diff --check bd189ee66e854b036e9a15c510b2d09a00d2cea7 HEAD
+```
+
+No Azure connection, SQL permission change, session termination, resource deletion, installation,
+release, merge or deployment was performed. No private captures, binaries or credentials are committed.
+
 ### Exact remaining facts and one approval decision
 
 Still required: named security/service owners and operator/verifier/incident/support contacts; reviewer
