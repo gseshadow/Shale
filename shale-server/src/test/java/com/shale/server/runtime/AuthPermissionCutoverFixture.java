@@ -214,29 +214,43 @@ final class AuthPermissionCutoverFixture {
         for(String key:List.of("LegacyCallersDrained","ExclusiveChangeWindow"))variables.put(key,"CONFIRMED");
         variables.put("RuntimeLegacyDisposition","DENY_THREE_MODULES");
         for(String key:List.of("CallerInventoryEvidence","CallerDrainEvidence","CompatibilityEvidence"))variables.put(key,"synthetic-fixture-evidence");
+        controlledApproval();
         var permissions=catalog("database_permissions");var members=catalog("database_role_members");var predicates=catalog("security_predicates");
+        // Original complete-inventory/drain decisions cannot satisfy the controlled route's own contract.
+        for(String key:List.of("LegacyAcceptanceRoute","CompletedPackageReview","ControlledWindowAuthorization",
+                "UnknownClientRisk","IrrecoverableEffectsRisk","ReopenedCapabilityRisk","RepresentativeChecks",
+                "RollbackRehearsal","SecurityOwner","ServiceOwner","RiskApprovalEvidence","PackageReviewEvidence",
+                "WindowAuthorizationEvidence","KnownArtifactEvidence","OperationalReadinessEvidence","RollbackRehearsalEvidence")) {
+            String value=variables.put(key,"");rejected("controlled-retire-legacy-login",58360);variables.put(key,value);
+            assertEquals(permissions,catalog("database_permissions"),"unapproved alternative must never mutate ACLs");
+        }
+        String route=variables.put("LegacyAcceptanceRoute","ZERO_INVOCATIONS");
+        rejected("controlled-retire-legacy-login",58360);variables.put("LegacyAcceptanceRoute",route);
+        controlledWindowRefusals(permissions);
         for(String key:List.of("LegacyRetirementApproval","LegacyCallersDrained","CallerInventoryEvidence","CompatibilityEvidence","RuntimeLegacyDisposition")) {
             String value=variables.put(key,"");rejected("retire-legacy-login",58343);variables.put(key,value);
             assertEquals(permissions,catalog("database_permissions"));
         }
         execute("GRANT VIEW DEFINITION ON dbo.Statuses TO shale_runtime AS dbo");
-        rejected("retire-legacy-login",58344);
+        for(String entry:List.of("retire-legacy-login","controlled-retire-legacy-login"))rejected(entry,58344);
         execute("REVOKE VIEW DEFINITION ON dbo.Statuses FROM shale_runtime AS dbo");
         // Wrong grantor/state cannot be adopted even if a new fingerprint is supplied.
         execute("GRANT EXECUTE ON dbo.sp_login_get_hash TO shale_app WITH GRANT OPTION AS dbo");
         script("legacy-retirement-baseline");String before=variables.put("LegacyBeforeHash",retirementStateHash);
-        rejected("retire-legacy-login",58345);
+        for(String entry:List.of("retire-legacy-login","controlled-retire-legacy-login"))rejected(entry,58345);
         execute("REVOKE EXECUTE ON dbo.sp_login_get_hash FROM shale_app CASCADE AS dbo; GRANT EXECUTE ON dbo.sp_login_get_hash TO shale_app AS dbo");
         variables.put("LegacyBeforeHash",before);
         execute("CREATE PROCEDURE dbo.LegacyWrapper AS EXEC dbo.sp_login_get_hash N'null-counter@test'");
         as("shale_runtime","EXEC dbo.LegacyWrapper");
-        rejected("retire-legacy-login",58342);
+        for(String entry:List.of("retire-legacy-login","controlled-retire-legacy-login"))rejected(entry,58342);
         execute("DROP PROCEDURE dbo.LegacyWrapper");
         // Force a post-mutation authority failure. All nine ACL edits must roll back together.
         execute("CREATE ROLE ShaleAdmins; ALTER ROLE ShaleAdmins ADD MEMBER shale_runtime");
         script("legacy-retirement-baseline");before=variables.put("LegacyBeforeHash",retirementStateHash);
         var injected=catalog("database_permissions");
-        rejected("retire-legacy-login",58347);assertEquals(injected,catalog("database_permissions"));
+        for(String entry:List.of("retire-legacy-login","controlled-retire-legacy-login")) {
+            rejected(entry,58347);assertEquals(injected,catalog("database_permissions"),"postcheck failure must roll back all nine edits on both routes");
+        }
         execute("ALTER ROLE ShaleAdmins DROP MEMBER shale_runtime; DROP ROLE ShaleAdmins");
         variables.put("LegacyBeforeHash",before);
         script("retire-legacy-login");variables.put("LegacyAfterHash",retirementStateHash);
@@ -251,7 +265,8 @@ final class AuthPermissionCutoverFixture {
         rejected("retire-legacy-login",58344);
         String after=variables.put("LegacyAfterHash","0x00");rejected("rollback-legacy-login",58344);variables.put("LegacyAfterHash",after);
         execute("GRANT SELECT ON dbo.AuthConfig TO shale_app AS dbo");
-        rejected("rollback-legacy-login",58344);execute("REVOKE SELECT ON dbo.AuthConfig FROM shale_app AS dbo");
+        for(String entry:List.of("rollback-legacy-login","controlled-rollback-legacy-login"))rejected(entry,58344);
+        execute("REVOKE SELECT ON dbo.AuthConfig FROM shale_app AS dbo");
         String rollbackApproval=variables.put("LegacyRollbackApproval","");
         rejected("rollback-legacy-login",58348);variables.put("LegacyRollbackApproval",rollbackApproval);
         String originalBefore=variables.put("LegacyBeforeHash","0x"+"00".repeat(32));
@@ -263,9 +278,50 @@ final class AuthPermissionCutoverFixture {
         assertEquals(members,catalog("database_role_members"));assertEquals(predicates,catalog("security_predicates"));
         as("shale_app","EXEC dbo.sp_login_mark_success N'legacy@test'");
         as("shale_runtime","EXEC dbo.sp_login_mark_success N'legacy@test'");
+        // Controlled acceptance never requires or asserts the original inventory/zero-invocation decisions.
+        var originalDecisions=new HashMap<String,String>();
+        for(String key:List.of("CallerInventoryApproved","LegacyCallersDrained","CallerInventoryEvidence","CallerDrainEvidence"))
+            originalDecisions.put(key,variables.put(key,""));
+        rejected("retire-legacy-login",58343);
+        script("controlled-retire-legacy-login");variables.put("LegacyAfterHash",retirementStateHash);
+        assertEquals(retired,catalog("database_permissions"),"both routes must have exactly the same delta");
+        String end=variables.put("WindowEndUtc","2000-01-01T00:00:00");
+        script("controlled-rollback-legacy-login"); // Recovery must remain possible after the window expires.
+        variables.put("WindowEndUtc",end);
+        assertEquals(permissions,catalog("database_permissions"),"controlled recovery must restore full original state");
+        assertEquals(members,catalog("database_role_members"));assertEquals(predicates,catalog("security_predicates"));
+        variables.putAll(originalDecisions);
         script("retire-legacy-login");assertEquals(retired,catalog("database_permissions"));
         // Keep the retired modules through the existing Stage A/B roundtrip. No lockout policy or body changes.
         execute("DELETE dbo.Users WHERE Id<0");
+    }
+    /** Synthetic decisions only; never reads or authorizes an operator packet. */
+    private void controlledApproval() {
+        variables.put("LegacyAcceptanceRoute","CONTROLLED_CHANGE");
+        variables.put("CompletedPackageReview","APPROVED");
+        variables.put("ControlledWindowAuthorization","AUTHORIZED");
+        variables.put("UnknownClientRisk","ACCEPTED_NOT_ZERO_PROOF");
+        for(String key:List.of("IrrecoverableEffectsRisk","ReopenedCapabilityRisk"))variables.put(key,"ACCEPTED");
+        for(String key:List.of("RepresentativeChecks","RollbackRehearsal"))variables.put(key,"PASSED");
+        for(String key:List.of("SecurityOwner","ServiceOwner","RiskApprovalEvidence","PackageReviewEvidence",
+                "WindowAuthorizationEvidence","KnownArtifactEvidence","OperationalReadinessEvidence","RollbackRehearsalEvidence"))
+            variables.put(key,"synthetic-fixture-only");
+        var now=java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).withNano(0);
+        variables.put("WindowStartUtc",now.minusMinutes(1).toString());
+        variables.put("WindowEndUtc",now.plusMinutes(28).toString());
+        variables.put("RollbackStartByUtc",now.plusMinutes(17).toString());
+    }
+    private void controlledWindowRefusals(Set<String> permissions)throws Exception {
+        var now=java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).withNano(0);
+        for(var pair:List.of(Map.entry("WindowStartUtc","invalid"),
+                Map.entry("WindowStartUtc",now.plusMinutes(1).toString()),
+                Map.entry("WindowEndUtc",now.plusMinutes(40).toString()),
+                Map.entry("RollbackStartByUtc",now.minusSeconds(1).toString()),
+                Map.entry("RollbackStartByUtc",now.plusMinutes(25).toString()))) {
+            String value=variables.put(pair.getKey(),pair.getValue());
+            rejected("controlled-retire-legacy-login",58361);variables.put(pair.getKey(),value);
+            assertEquals(permissions,catalog("database_permissions"),"invalid/deadline/reserve failures must precede mutation");
+        }
     }
     private String legacyHashRows(String email)throws SQLException {
         execute("EXECUTE AS USER=N'shale_app'");
