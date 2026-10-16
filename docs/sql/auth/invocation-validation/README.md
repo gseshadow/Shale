@@ -13,6 +13,23 @@ Even a passing experiment does not approve, configure or activate monitoring in 
 
 ## Decision and evidence
 
+**October 16 reassessment: STOP at discovery on the reported build.** The operator reports native
+Windows PowerShell 5.1 offline construction PASS/exit 0 with explicit `-HarnessPath`, then fresh
+Discover PASS/exit 0 against the dedicated blank synthetic Azure SQL Database (Basic). Full attached
+metadata contains module_end but no module_start; an independent all-package query also reportedly
+returned only sqlserver.module_end. Setup/Workload were never run and no experiment objects were
+created. The attachment was read here; Azure identity/build/facts/state and the independent query output
+were not supplied. No raw Azure event privacy/coverage result follows. Keep discovery evidence privately;
+do not edit state, run Setup/Workload, or run Stop/Cleanup for resources never created.
+
+The [owning reassessment](../../../testing/auth-module-permission-cutover.md#azure-entry-observation-reassessment--2026-10-16)
+records the complete metadata review/provenance, official mechanism analysis and concrete caller
+inventory/migration/drain proposal with exact remaining retirement blockers. No supported private entry
+replacement is established; module_end, RPC/batch/statement tracing and text-bearing Audit are not
+substitutes. The lifecycle below is retained as the original conditional procedure, **not a next action
+for this evidence set**. No new harness or further metadata query is needed for the present blocked
+decision. A future entry source needs a separate supported-mechanism review first.
+
 At 2026-10-15 22:29:04 UTC the operator reports #1875's sampler succeeded against Shale (exit 0):
 all three legacy procedures had `CachedPlanCount=0`, NULL execution counts/times and
 `INCOMPLETE_CACHE_OBSERVATION`. These are **unavailable cache observations**, not zero usage.
@@ -271,9 +288,13 @@ No execution-policy override or installation is supplied. The standalone test pa
 in 5.1 and evaluates only `Open-Connection`'s assignments through the closed `SqlConnection` constructor.
 It checks every setting and roundtrip escaping with reserved `.invalid` inputs, no authentication,
 facts/state/evidence file, `Open()`, Query, synthetic DDL or network connection. It refuses Core/pwsh and
-other versions; Python invokes it on Windows and explicitly skips it elsewhere. Python source checks
+other versions; Python invokes both default and explicit HarnessPath forms from an unrelated working
+directory on Windows and explicitly skips native execution elsewhere. Python source checks
 protect the canonical-key/accessor contract but **do not verify native PowerShell behavior**.
-This revision's execution results and remaining native gap are recorded in the owning runbook.
+The reported explicit-path pass does not certify the default launcher fix: PSScriptRoot was empty
+in the old parameter default. The optional path now resolves in the script body; explicit paths remain
+supported. The corrected default and the two-form regression need native Windows retesting. This task's
+execution results and native gap are recorded in the owning runbook.
 
 ## Acceptance limits and practical next steps
 
@@ -298,7 +319,9 @@ existing independently approved adequate telemetry; explicit caller migration an
 inventory plus drain evidence; separately reviewed application instrumentation emitting only allowlisted
 module identity/counts at a trusted seam (with deployed coverage proved); or a separately reviewed,
 privacy-verified exact-module **entry-only** design with three event_counter sessions and durable interval
-health/continuity records. No live candidate or Storage setup is supplied here. Aggregation, a different
+health/continuity records, **only if an exact supported entry source is first established**. No such
+source is established for the October 16 evidence; module_start is unavailable there. No live candidate
+or Storage setup is supplied here. Aggregation, a different
 viewer or a shorter observation window cannot cure an unsafe source or missing callers. Cache counters
 remain positive evidence only; Query Store AUTO absence remains insufficient. If coverage of required
 attempts/consumers cannot be established, the #1874 retirement gate stays BLOCKED.
