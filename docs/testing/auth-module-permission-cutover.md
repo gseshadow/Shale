@@ -1,6 +1,104 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest assessment:** see [post-#1874 evidence and bounded usage observation](#post-1874-evidence-and-bounded-usage-observation--2026-10-15). Retirement and installation remain blocked; cache sampling cannot certify nonuse.
+**Latest assessment:** see [synthetic Azure invocation validation](#synthetic-azure-invocation-validation-follow-up--2026-10-15). Production activation, retirement and installation remain blocked; cache sampling cannot certify nonuse.
+
+## Synthetic Azure invocation validation follow-up — 2026-10-15
+
+**Production monitoring, retirement and installation remain BLOCKED.** The separately isolated
+[executable operator package](../sql/auth/invocation-validation/README.md) tests raw module-entry/exit
+payload privacy and bounded coverage in a separately approved, empty synthetic Azure SQL Database.
+It supplies discovery, guarded setup, synthetic workload, full raw collection, offline assertions,
+stop and exact-owner cleanup. It provisions nothing and has not connected to Azure. No live candidate
+is supplied; synthetic diagnostic start/end sessions must never be activated against Shale or its copies.
+
+Operator evidence at **2026-10-15 22:29:04 UTC**: the #1875 sampler ran against Shale, exit 0;
+each of `dbo.sp_login_get_hash`, `dbo.sp_login_mark_failure`, `dbo.sp_login_mark_success` had
+`CachedPlanCount=0`, NULL execution counts/times and `INCOMPLETE_CACHE_OBSERVATION`.
+Record these as **unavailable cache evidence, not zero usage**. Query Store AUTO also retained no
+statements for them. These attributed reports do not establish nonuse; no original output was supplied
+or regenerated in this task. Preserve the original captures and #1874 retirement/rollback, unchanged
+preflight, Stage A/B, desktop compatibility and RLS prerequisites. The live-update tenant/user
+negotiate authorization concern remains separate and OPEN.
+
+Live base fetched: `be55d7187cddc2bc7bf2fbfbbfd00a19c4b614e4`; GitHub reports #1875 merged at
+2026-10-15 22:21:20 UTC, and local ancestry confirms its merge in the base. Task branch:
+`codex/azure-synthetic-invocation-validation-20261015`; a separate worktree preserves the prior checkout.
+Reviewed completely: AGENTS.md, architecture/codex-prompt-rules.md and this runbook; database-schema
+and tenancy-and-rls routing and the existing auth/module/lifecycle/permission fixture and launcher tests
+were inspected before edits. No application symbol, auth behavior, permission, preflight, historical
+capture, retirement/rollback, Stage A/B or RLS contract changes. Audit integration needs no application
+schema/event: synthetic DDL/security metadata and retention use private operator change control.
+
+Microsoft documentation and local supported metadata were inspected before choosing this bounded
+experiment. Local module_start/module_end expose intrinsic statement plus configurable collect_statement;
+setting it to zero emitted an empty statement field locally. That is **not Azure payload verification**.
+The package requires actual Azure metadata review before setup, rejects full-payload privacy violations,
+checks exact module/database predicates, counts and health, and deliberately demonstrates/rejects bounded
+target loss. Cross-database context, restart/failover and durable operational coverage remain explicit gaps.
+Even successful synthetic assertions always refuse production activation and cannot close #1874's drain gate.
+The package lists minimum actual resource facts, provenance, identity, experiment/review and retention
+approvals; none is invented or granted here. If privacy/coverage cannot be established, use the documented
+practical alternatives or keep retirement blocked without weakening any gate.
+
+### Verification of the synthetic validation package
+
+Pre-edit inventory searched legacy procedure names and existing observation, launcher, auth/module,
+lifecycle, permission fixture and selector contracts. Existing tests/production expectations remain
+unchanged; six new offline contracts cover forbidden intrinsic values and sentinels, unexpected raw
+actions/fields/causality/nested XML, exact identities, target overwrite despite zero session drops,
+complete evidence/stale/restarted/stopped capture and hidden final-snapshot leaks, concurrency overlap
+and evidence-preserving ownership cleanup. Changed-file review maps only this new package and tests
+to these contracts and the selector's security-data auth/session/audit/transaction smoke suite.
+
+| Executed check | Result / boundary |
+| --- | --- |
+| New offline assertions / full auth Python suite | 6 PASS / 28 PASS and one native-Windows skip (29 tests run). Includes adversarial synthetic XML and complete synthetic evidence fixtures; not Azure acceptance. |
+| Existing focused auth/module/lifecycle/support Maven | 15 PASS; no failures/errors/skips. |
+| Committed-base selector affected security-data suite / critical reactor | 54 PASS / 116 PASS; no failures/errors/skips, no full-suite escalation. |
+| Disposable SQL Server 2022 supported metadata and raw source payloads | PASS: inspected all module_start/module_end/target columns before selection; collect_statement=0 emits empty intrinsic statement; full raw payload allowlist/sentinel checks pass. |
+| Local synthetic SQL workload and predicates | PASS: per probe seven starts/seven ends, 42 total events; direct, nested, dynamic, overlapping concurrent, thrown failure, pre-entry conversion and entry-acknowledged SQLCMD timeout/cancellation trials. Same-schema unrelated/near-name and other-schema same-name calls excluded; wrong source-database-ID session receives zero events. |
+| Local target bounds/loss and ownership | PASS: eight-event target retains 8 of 2000 processed events, droppedCount=0 and truncated=0; loss is detectable by total/retained mismatch. Exact session config fingerprint stable across start/stop, module-catalog drift detected and explicit SQL object cleanup succeeds. |
+| Source scope, relative documentation links/fences, Python compilation and Git whitespace | PASS; no private/operator evidence, binaries, original captures or application changes committed. |
+
+Local SQL uses the previously recorded Microsoft image digest
+`sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`, a fresh task-labelled,
+network-isolated container with no published ports, random synthetic credentials/databases/schemas and
+only task-owned resources. Exact container ID and unique label are checked before container removal.
+Local XE uses **ON SERVER**, server catalogs and SQL Server health support; the Azure database-session
+catalog guard is not executable locally and was omitted only in scratch local orchestration. The shipped
+Azure guards remain intact. Azure's failed_buffer_count is documented but absent locally: no Azure
+health result or synthetic full Azure lifecycle pass is claimed. The Windows .NET runner was statically
+reviewed; it was not executed or parser-certified on native Windows. It remains runtime-unverified there.
+
+An initial 64 KB local session buffer was rejected with a minimum-size error; the bounded stress
+configuration now uses 1024 KB and passed. Scratch orchestration also required batch separation and
+handling SQLCMD's timeout output: local SQLCMD printed `Timeout expired` with exit 0, so that local
+cancellation was validated by entry acknowledgement, explicit timeout output and raw events, **not by
+exit status**. The shipped .NET workload uses explicit Cancel and requires a thrown SqlException. Failed
+scratch attempts were corrected/rerun and are not counted as passes. The first sandboxed Maven dependency
+fetch failed; its configured-proxy retry passed without dependency/build changes.
+
+Exact repository-root commands (existing configured Maven wrapper; work/ contains uncommitted synthetic
+scratch helpers/public documentation copies, not operator captures):
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p test_invocation_validation.py -v
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 -m py_compile docs/sql/auth/invocation-validation/assertions.py
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base be55d7187cddc2bc7bf2fbfbbfd00a19c4b614e4 --head HEAD --format markdown --plan-output work/invocation/selection.json --run
+# --run executes the selected affected Maven command, followed by mvn test.
+python3 work/invocation/validate-local.py
+python3 work/invocation/local.py stop
+# Final committed-file selection is checked again without repeating unchanged Maven suites.
+git diff --check be55d7187cddc2bc7bf2fbfbbfd00a19c4b614e4 HEAD
+```
+
+**Unrun:** Azure connections/provisioning/activation, Azure ON DATABASE lifecycle/authority/payloads,
+Azure target failure counters, native Windows .NET/PowerShell execution, cross-database context/colliding
+object-ID/replica trials, restart/failover, sustained-rate/durable multi-day coverage and installed desktop
+acceptance. None is inferred from local results. No permission change, production procedure call,
+installation, release, merge or deployment occurred. Production activation and retirement remain BLOCKED.
 
 ## Post-#1874 evidence and bounded usage observation — 2026-10-15
 
