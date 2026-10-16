@@ -43,12 +43,14 @@ function Query([string]$Sql, $Connection=$script:Connection) {
 function Open-Connection {
  $f=$script:State.Facts
  $builder=New-Object Data.SqlClient.SqlConnectionStringBuilder
- $builder.DataSource=$f.Endpoint; $builder.InitialCatalog=$f.Database
- $builder.Encrypt=$true; $builder.TrustServerCertificate=$false
- $builder.ConnectTimeout=30; $builder.Pooling=$false
+ # PowerShell adapts this IDictionary through connection-string keywords, not CLR property names.
+ $builder['Data Source']=$f.Endpoint; $builder['Initial Catalog']=$f.Database
+ $builder['Encrypt']=$true; $builder['TrustServerCertificate']=$false
+ $builder['Connect Timeout']=30; $builder['Pooling']=$false
  $builder['Asynchronous Processing']=$true
- $builder.ApplicationName='SyntheticInvocationValidation'
- $con=[Data.SqlClient.SqlConnection]::new($builder.ConnectionString)
+ $builder['Application Name']='SyntheticInvocationValidation'
+ # Explicit CLR accessor avoids dictionary adaptation on the related read as well.
+ $con=[Data.SqlClient.SqlConnection]::new($builder.get_ConnectionString())
  if ($AccessToken) { $con.AccessToken=$AccessToken }
  elseif ($Credential) {
   $securePassword=$Credential.Password.Copy();$securePassword.MakeReadOnly()
@@ -306,7 +308,7 @@ try {
  Write-Output ('Synthetic harness phase recorded: '+$Phase+'. Production activation remains REFUSED.')
 } catch {
  # Never print SqlException text, connection strings, credentials or workload inputs.
- Write-Error 'Harness refused or failed. Preserve state/evidence; run guarded Stop if ownership is intact. No production authorization.' -ErrorAction Continue
+ Write-Error 'Harness refused or failed. Preserve state/evidence; follow README recovery for the failed phase. No production authorization.' -ErrorAction Continue
  exit 1
 } finally { if($script:Connection) { $script:Connection.Dispose() } }
 

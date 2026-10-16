@@ -1,6 +1,86 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest assessment:** see [synthetic Azure invocation validation](#synthetic-azure-invocation-validation-follow-up--2026-10-15). Production activation, retirement and installation remain blocked; cache sampling cannot certify nonuse.
+**Latest assessment:** see [Windows PowerShell construction correction](#windows-powershell-construction-correction--2026-10-16) and [synthetic Azure invocation validation](#synthetic-azure-invocation-validation-follow-up--2026-10-15). Production activation, retirement and installation remain blocked; cache sampling cannot certify nonuse.
+
+## Windows PowerShell construction correction — 2026-10-16
+
+Live `codex/latest` fetched at `f2c7d47cc00a4804b3747d73bc635525ddd44652`; separate task branch
+`codex/fix-invocation-powershell51` and checkout preserve unrelated work. Initial sandboxed Git fetch
+could not reach the configured proxy. Connector reads imported and hash-verified the exact live commit,
+tree and blobs; the subsequent permitted shell fetch confirmed that base and supplied full history.
+
+Operator reports Windows PowerShell **5.1.26100.9549** Discover failed with `System.ArgumentException`
+at former harness line 46, before `SqlConnection.Open`. Offline `DataSource` and `InitialCatalog`
+assignments each returned `Keyword not supported`. State was saved as `Discovering`; evidence directory
+was empty; no harness instrumentation or synthetic procedures were created. This is attributed evidence,
+not an independently executed native run or Azure observation. It establishes no target/metadata result.
+
+PowerShell's `IDictionary` adaptation makes dot-property writes use connection-string keyword lookup.
+All eight builder settings now use canonical indexer keys; the related read explicitly calls the CLR
+`get_ConnectionString()` accessor. Encryption, certificate verification, timeout, disabled pooling,
+async support and application name are preserved. Authentication, endpoint/database/database ID/dbo,
+engine/transaction/version guards and every phase's SQL/ownership behavior remain unchanged.
+The generic failure message now routes to phase-specific README recovery.
+
+For this exact pre-Open failure, retain original facts/state/source/error/version evidence and the empty
+directory privately. Do not edit/reuse the failed state or run Stop/Cleanup for resources never created.
+The [package recovery instructions](../sql/auth/invocation-validation/README.md#recovery-from-the-pre-connection-windows-powershell-51-discover-failure)
+require a fresh nonexistent state path and new Discover run after the fix, with current independently
+approved source/facts. Retain original facts even if a separate reviewed facts file is needed.
+Uncertain failures or partial Setup still require exact manual ownership review; this is no approval
+of Azure retry, new credentials, synthetic DDL, permissions, retirement, merge or deployment.
+
+Pre-edit inventory searched the repository for `SqlConnectionStringBuilder`, builder property writes
+and reads, `Open-Connection` and invocation-validation references. Reviewed AGENTS/prompt rules and the
+package README completely, owning runbook, relevant database-schema sections and tenancy-and-rls.
+Existing six invocation payload/privacy/loss/ownership tests and neighboring observation/launcher tests
+have no obsolete builder expectations. Changed-file review maps the harness to the new offline builder
+test pair, README/recovery to operator instructions and this evidence record. The selector's security-data
+auth/session/audit/transaction smoke contracts preserve the surrounding security tooling boundary.
+
+The new standalone native test parses the real harness in PS 5.1 and evaluates only its construction
+assignments through a closed SqlConnection. It checks all eight settings after connection-string
+roundtrip, escaping, no embedded identity and async API availability with `.invalid` inputs; it never
+invokes Open, authentication, Query or the harness lifecycle. Python runs it on Windows and skips it
+elsewhere, with a separate source check for canonical keys/accessor. The source check rejects the live-base
+implementation. This does **not** constitute native runtime verification; no native powershell.exe,
+powershell or pwsh is available on this Linux host. The precise native command is:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -NonInteractive -File build/auth-verification/test_connection_builder.ps1
+```
+
+Local verification (Linux; Python 3.12.14, Maven 3.9.11 / JDK 21):
+
+| Check | Result / boundary |
+| --- | --- |
+| Focused builder Python | 1 source check PASS, 1 explicit native-Windows skip; source check rejects the original base. |
+| Full auth Python | 29 PASS, 2 explicit native-Windows skips (31 tests total). Existing six invocation assertions pass. |
+| Focused auth/module/lifecycle/support Maven | 15 PASS, no failures/errors/skips. Initial sandboxed dependency fetch was blocked; configured-proxy retry passed without build changes. |
+| Committed base-to-head selector affected security-data suite | 54 PASS, no failures/errors/skips; no full-suite escalation. |
+| Critical reactor `mvn test` through selector | 116 PASS, no failures/errors/skips. |
+| Source scope, relative documentation file links/fences, Python compilation, Git whitespace | PASS. Authentication/guards/lifecycle after construction byte-for-byte unchanged apart from the recovery message. No private evidence in the commit. |
+| Native Windows PowerShell 5.1 builder execution / Azure lifecycle | NOT RUN; not inferred from source checks or Maven. |
+
+Exact repository-root commands (existing Maven proxy/CA/JDK wrapper; logs/plan kept outside Git):
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_connection_builder.py' -v
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py' -v
+python3 -m py_compile build/auth-verification/test_connection_builder.py
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base f2c7d47cc00a4804b3747d73bc635525ddd44652 --head HEAD --format markdown --plan-output /workspace/work/ps51-selection.json --run
+# --run executes the selected affected command followed by mvn test.
+git diff --check f2c7d47cc00a4804b3747d73bc635525ddd44652 HEAD
+```
+
+Native Windows 5.1 construction remains
+**UNVERIFIED** until that command passes there. Source checks, Maven and any other runtime cannot certify it.
+No Azure connection, credentials, instrumentation, permission changes or private evidence are part of
+this patch. Audit compatibility needs no application event or migration: no domain/sensitive application
+read/mutation changes; existing PHI/entity-action/session-security seams remain intact and operator
+failure evidence/approval/retention belong in private change control. All prior retirement/rollback,
+preflight, Stage A/B, installed-client and RLS gates below remain authoritative.
 
 ## Synthetic Azure invocation validation follow-up — 2026-10-15
 

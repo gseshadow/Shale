@@ -167,7 +167,9 @@ outside Git and under exclusively controlled non-reparse-point folders (includin
    failed target buffers, session resets, stale collection or mismatched counts are UNKNOWN/failure.
    Stop verification is an empty live-target result, never inferred from successful polling.
 
-4. Always use Stop after an interrupted/failed run. It verifies catalog ownership/configuration,
+4. Use Stop after an interrupted/failed run that created owned resources (Setup/Workload).
+   The pre-connection Discover failure described below needs no Stop or Cleanup.
+   Stop verifies catalog ownership/configuration,
    captures any still-running task target and stops only the exact recorded sessions. Repeated Stop
    preserves previous snapshots with new unique names. It does not drop objects or evidence.
 
@@ -207,6 +209,71 @@ outside Git and under exclusively controlled non-reparse-point folders (includin
    dependencies or drift refuse cleanup. Session drops and object cleanup are separate operations; a
    partial failure needs exact manual review, not blind replay. Preserve all raw evidence and the original
    #1874 captures regardless of experiment outcome. Finally close the terminal/dispose in-memory secrets.
+
+## Recovery from the pre-connection Windows PowerShell 5.1 Discover failure
+
+Operator-reported on Windows PowerShell **5.1.26100.9549**: Discover raised
+`System.ArgumentException` at the former line 46 before `SqlConnection.Open`.
+Offline property assignments to `DataSource` and `InitialCatalog` each raised
+`Keyword not supported`. State remained `Discovering`, the evidence directory was empty,
+and no harness instrumentation or synthetic procedures were created. This is attributed operator
+evidence, not a Windows/Azure run performed by this patch's author. It establishes no discovery,
+target identity, metadata review or coverage result.
+
+`SqlConnectionStringBuilder` implements `IDictionary`. PowerShell's dictionary adaptation routes
+dot-property writes through keyword lookup; CLR names such as `DataSource`, `InitialCatalog`,
+`ConnectTimeout` and `ApplicationName` are not their supported connection-string keys. The harness
+now uses canonical indexer keys for **all eight** settings, preserving encryption, certificate
+verification, 30-second connect timeout, disabled pooling and asynchronous processing. The related
+connection-string read uses the explicit CLR `get_ConnectionString()` accessor. Endpoint/database,
+database ID, dbo identity, Azure engine, transaction and version guards remain unchanged.
+
+For **this exact pre-Open failure**, preserve the original facts file, state file, source revision,
+error/version record and empty evidence directory privately, including their existing contents and
+timestamps. Do not delete, overwrite, edit `Status`, transplant metadata or attempt Setup using that
+state. Do not run Stop or Cleanup: there are no created resources to stop/drop and their object-ownership
+guards cannot establish a completed Setup. Empty evidence or `Discovering` alone is not proof that a
+different failure happened before Open; uncertain/partial Setup requires exact manual ownership review.
+
+After reviewing the fix and running the offline native check below, any independently authorized
+Discover retry must use a **new, nonexistent state path** and a fresh run/token/evidence directory.
+Keep `$failedStatePath` pointing to the retained failed state; select `$freshStatePath` separately:
+
+```powershell
+# Local path checks only; these do not connect or grant experiment approval.
+$ErrorActionPreference = 'Stop'
+if (-not (Test-Path -LiteralPath $failedStatePath)) { throw 'Retain the original failed state first' }
+if ($freshStatePath -eq $failedStatePath -or (Test-Path -LiteralPath $freshStatePath)) {
+    throw 'Choose a separate, nonexistent state path; preserve the failed run'
+}
+# For a separately authorized retry, use $freshStatePath as -StatePath in step 1.
+# Discover creates a fresh token and evidence directory; do not reuse the failed directory.
+```
+
+Retain the original facts unchanged. If source-revision approval or other actual facts need updating,
+use a separate reviewed facts file derived from actual records; never invent approvals or overwrite
+the failed run's facts. Existing experiment/identity/provenance/metadata/retention approvals and
+every safety gate still apply. This fix authorizes no Azure retry, credentials, instrumentation,
+permission changes or production activation.
+
+## Offline connection construction regression
+
+From the repository root on **native Windows PowerShell 5.1 Desktop**, run:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -NonInteractive -File build/auth-verification/test_connection_builder.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Offline native connection construction remains unverified' }
+python -m unittest discover -s build/auth-verification -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) { throw 'Offline auth regression checks failed' }
+```
+
+No execution-policy override or installation is supplied. The standalone test parses the actual harness
+in 5.1 and evaluates only `Open-Connection`'s assignments through the closed `SqlConnection` constructor.
+It checks every setting and roundtrip escaping with reserved `.invalid` inputs, no authentication,
+facts/state/evidence file, `Open()`, Query, synthetic DDL or network connection. It refuses Core/pwsh and
+other versions; Python invokes it on Windows and explicitly skips it elsewhere. Python source checks
+protect the canonical-key/accessor contract but **do not verify native PowerShell behavior**.
+This revision's execution results and remaining native gap are recorded in the owning runbook.
 
 ## Acceptance limits and practical next steps
 
