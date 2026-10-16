@@ -4,6 +4,86 @@
 
 
 
+## Complete Windows ODBC variable quoting — 2026-10-16
+
+The operator reports Windows PowerShell 5.1.26100.9549 and ODBC SQLCMD 180,
+runner `2e4d0046c6e5ac7bacbf427f4bb5e43713256363`: offline/Prepare passed,
+creation/setup/baseline completed, but invocation 4 (missing-decision) exited 1
+before SQL output existed. Stderr contained `:58:55 WindowEndUtc=...` and
+`Invalid argument`. The prior whitespace-only serializer left all three ISO
+values unquoted. The fix emits `Name="value"` for EVERY `-v` assignment while
+keeping switches bare. Timestamp formats, expected hashes, SQL bodies, time guards,
+packet seals, approvals, password handling, deadlines and nonce ownership stay intact.
+
+Pre-edit test-impact inventory: AGENTS/prompt rules, database-schema/tenancy guidance,
+this owning runbook, OPERATOR/evidence-scope, the complete runner and offline tests,
+Python native/Core/process tests, real ODBC help tests and neighboring controlled
+retirement contracts. The existing real ODBC test now captures the actual complete
+rehearsal invocation-4 variables with test-only transport, builds production approvals
+through Get-ApprovalVariables, and parses rehearsal/apply/rollback/verify shapes with
+all three timestamps, before/after hashes, spaced owner names/evidence references,
+spaced file paths and trailing backslashes under both -C and -N. Help is last and
+no credentials/connection are supplied. Native Windows must also reproduce both
+quoted-switch and whitespace-only timestamp failures as negative controls. Test
+argument/result records are retained in its fresh reported directory. These parsing
+checks do not establish SQL execution or substitution roundtrip fidelity.
+
+Expected-refusal diagnostics now preserve the transport failure and report retained
+stderr/result/stdout/optional SQL output paths, including the client parser text
+when no SQL output exists. Acceptance needs a caught nonzero exit other than 1,
+no expired deadline, and the intended SQL Server `Msg ..., Level 16` header.
+Offline cases reject exit 1 even with an error header, deadline expiry, exit 0,
+wrong/bare error numbers and uncaught success. A real subprocess test exercises
+exit 1 with stderr and no SQL output. No refusal follows merely from exit 1.
+
+Native Windows PS5.1 / Windows ODBC full-list parsing and the complete local rehearsal
+remain **UNVERIFIED here**. Linux/Core evidence cannot certify Windows parsing.
+Use the [fresh-directory operator commands](../sql/auth/permission-cutover/OPERATOR.md)
+with the reviewed commit from this PR. No prior packet/log/nonce-owned database is
+modified, adopted or retried. Audit compatibility continues in private operator
+change control; no application audit schema/event or sensitive-read/mutation seam
+changes. Production/manual recovery and all approval decisions remain PENDING.
+
+Verification of code revision `e1bf0976799ac57b3f66e02c061267826dc90e94`:
+
+| Check | Result and boundary |
+| --- | --- |
+| Auth Python suite with Core 7.4.6 and real Linux ODBC 18.4.0001.1 | 38 PASS, four explicit skips (42 total); Windows/native and unavailable Go checks skipped. |
+| Complete real local rehearsal, same Core/ODBC with driver 18.5.1.1 | PASS, 17 retained invocations: twelve exit 0, five intended refusals exit 16 with SQL headers, no deadline expiry. |
+| Apply / postcheck / rollback / reverification | PASS; original complete catalog hash restored; SQL-only recovery/reverification 0.3419367 seconds. Manual recovery NOT measured. |
+| Selector affected security-data suite | 54 PASS, no failures/errors/skips. No full-suite escalation. |
+| Required local critical `mvn -B test` | 116 PASS, no failures/errors/skips. |
+| Final diff/scope review | Only runner, its three test files, OPERATOR and this runbook changed; SQL/canonical resources and security/approval controls unchanged. |
+
+The full rehearsal used ONE new dedicated loopback-only SQL Server 2022 Developer
+container at `127.0.0.1:14333`, image digest
+`sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`.
+A scratch prompt harness supplied only synthetic local credentials and explicit
+local confirmation; it replaced no SQL generation, guards, transport or execution.
+An independent read-only check confirmed all 17 results/errors and that only the
+new rehearsal database was absent after the runner's exact nonce cleanup. The new
+instance and all output remain retained under `/workspace/work/odbc-validation/`.
+No existing resource was cleaned up and no SQL operation was retried. Earlier
+operator evidence/databases are unavailable here and remain untouched.
+
+Exact commands (tool paths/configuration are task-local, not repository changes):
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 XDG_CACHE_HOME=/workspace/work/cache XDG_CONFIG_HOME=/workspace/work/config XDG_DATA_HOME=/workspace/work/data SHALE_OPERATOR_TEST_PWSH=/workspace/work/tools/pwsh/pwsh SHALE_OPERATOR_TEST_ODBC=/workspace/work/tools/odbc/opt/mssql-tools18/bin/sqlcmd python3 -m unittest discover -s build/auth-verification -p 'test_*.py' -v
+python3 /workspace/work/odbc-validation/run-rehearsal.py
+python3 /workspace/work/odbc-validation/verify-retained.py
+python3 build/test-selection/select_tests.py --base b6210c6d00c82ca10cacd794885af5e4f046309b --head HEAD --format markdown --plan-output /workspace/work/odbc-validation/selection.json
+/workspace/.tools/bin/mvn -B -pl shale-data,shale-server -am -Dtest=com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest -Dsurefire.failIfNoSpecifiedTests=false test
+/workspace/.tools/bin/mvn -B test
+git diff --check b6210c6d00c82ca10cacd794885af5e4f046309b HEAD
+```
+
+**Native Windows verification is still required**: run both native PowerShell scripts,
+then Prepare and ONE fresh full local ODBC rehearsal from the reviewed checkout,
+using the OPERATOR commands. Linux/Core success above is separate evidence and does
+not resolve the reported Windows defect by itself. No Azure/production action,
+packet edits, guard bypass, automatic retry or broad cleanup occurred.
+
 ## Local rehearsal batch assembly correction — 2026-10-16
 
 The operator's Windows PowerShell 5.1 / Microsoft ODBC SQLCMD 180 run of

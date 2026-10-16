@@ -44,6 +44,9 @@ assert os.environ.get('SQLCMDPASSWORD') == 'SYNTHETIC_ONLY_PASSWORD'
 assert 'SQLCMDINI' not in os.environ
 assert '-b' in args and '-u' in args and '-N' in args and '-C' not in args
 out = pathlib.Path(args[args.index('-o')+1])
+if 'parser' in out.name:
+    sys.stderr.write("Sqlcmd: ':58:55 WindowEndUtc=2026-10-16T22:27:55': Invalid argument.")
+    sys.exit(1)
 out.write_text('LegacyRetirementCommitted 0x'+'AB'*32+' 0x'+'CD'*32+'\\n', encoding='utf-16')
 sys.stdout.write('O'*131072); sys.stdout.flush()
 sys.stderr.write('E'*131072); sys.stderr.flush()
@@ -63,7 +66,7 @@ $c=Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json
 $password=ConvertTo-SecureString 'SYNTHETIC_ONLY_PASSWORD' -AsPlainText -Force
 $env:SQLCMDINI='MUST_NOT_REACH_CHILD'
 try {
- foreach ($name in @('success','failure','slow')) {
+ foreach ($name in @('success','failure','parser','slow')) {
   $log=Join-Path $c.root $name
   $deadline=$null
   if($name -eq 'slow'){$deadline=[datetime]::UtcNow.AddSeconds(1)}
@@ -72,6 +75,15 @@ try {
   catch { $caught=$true; if ($name -eq 'success') { throw } }
   if (($name -eq 'success') -eq $caught) { throw "Wrong process result: $name" }
   $r=Read-Json ($log+'.result.json')
+  if($name -eq 'parser') {
+   if(Test-Path -LiteralPath ($log+'.sqlcmd.txt')){throw 'Parser failure unexpectedly produced SQL output'}
+   $diagnostic=''
+   try {Assert-ExpectedSqlRefusal $log 58360 $caught 'real subprocess failed'} catch {$diagnostic=$_.Exception.Message}
+   foreach($expected in @('ExitCode=1','Invalid argument',($log+'.stderr.bin'),($log+'.result.json'))) {
+    if(-not $diagnostic.Contains($expected)){throw "Lost real parser diagnostic: $expected : $diagnostic"}
+   }
+   continue
+  }
   if($name -eq 'failure' -and $r.ExitCode -ne 16){throw 'Native nonzero exit lost'}
   if($name -eq 'slow' -and -not $r.DeadlineExceeded){throw 'Deadline did not interrupt'}
   if((Get-Item -LiteralPath ($log+'.stdout.bin')).Length -ne 131072 -or (Get-Item -LiteralPath ($log+'.stderr.bin')).Length -ne 131072){throw 'Full console output not retained'}
@@ -97,6 +109,7 @@ try {
         self.assertIn('PASS real', result.stdout)
         if NATIVE:
             self.assertIn('Windows ODBC quoted-switch reproduction', result.stdout)
+            self.assertIn('complete-variable timestamp reproduction/corrected help parsing', result.stdout)
             self.assertIn('Desktop 5.1.', result.stdout)
 
     @unittest.skipUnless(GO_SQLCMD and (NATIVE or CORE), 'Real Go SQLCMD executable/runtime not supplied')

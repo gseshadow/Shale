@@ -16,9 +16,33 @@ function Assert-Equal($Actual,$Expected,[string]$Message) { if ($Actual -cne $Ex
 $testRoot=Join-Path ([IO.Path]::GetTempPath()) ('retirement-offline-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 try {
-    Assert-Equal (ConvertTo-SqlcmdArguments @('-S','tcp:127.0.0.1,14333','-i','C:\SQL files\setup.sql','-v','SecurityOwner=Brian Downing','ExpectedDatabase=Shale')) '-S tcp:127.0.0.1,14333 -i "C:\SQL files\setup.sql" -v SecurityOwner="Brian Downing" ExpectedDatabase=Shale' 'ODBC switches/value quoting regressed'
+    Assert-Equal (ConvertTo-SqlcmdArguments @('-S','tcp:127.0.0.1,14333','-i','C:\SQL files\setup.sql','-v','SecurityOwner=Brian Downing','ExpectedDatabase=Shale')) '-S tcp:127.0.0.1,14333 -i "C:\SQL files\setup.sql" -v SecurityOwner="Brian Downing" ExpectedDatabase="Shale"' 'ODBC switches/value quoting regressed'
     Assert-Equal (ConvertTo-SqlcmdArguments @('-V','16','-v','Owner=Brian Downing')) '-V 16 -v Owner="Brian Downing"' 'Severity -V confused with variables -v'
     Assert-Equal (ConvertTo-SqlcmdArguments @('-i','C:\SQL files\')) '-i "C:\SQL files\\"' 'Trailing backslash lost'
+    Assert-Equal (ConvertTo-SqlcmdArguments @('-v','WindowStartUtc=2026-10-16T21:58:55','WindowEndUtc=2026-10-16T22:27:55','RollbackStartByUtc=2026-10-16T22:16:55','LegacyBeforeHash=0xAB','Evidence=C:\records\')) '-v WindowStartUtc="2026-10-16T21:58:55" WindowEndUtc="2026-10-16T22:27:55" RollbackStartByUtc="2026-10-16T22:16:55" LegacyBeforeHash="0xAB" Evidence="C:\records\\"' 'Every -v value must be quoted, including timestamps and trailing backslashes'
+    # An expected refusal needs actual SQL output; parser exit 1 must keep its
+    # original diagnostic even when SQLCMD never creates the -o file.
+    $log=Join-Path $testRoot 'parser-failure'
+    Write-NewJson ($log+'.result.json') @{ExitCode=1; DeadlineExceeded=$false}
+    [IO.File]::WriteAllText($log+'.stderr.bin', "Sqlcmd: ':58:55 WindowEndUtc=2026-10-16T22:27:55': Invalid argument.")
+    $message=''
+    try { Assert-ExpectedSqlRefusal $log 58360 $true 'SQLCMD failed' } catch { $message=$_.Exception.Message }
+    foreach ($expected in @('Invalid argument',($log+'.stderr.bin'),($log+'.result.json'),'NOT verified')) {
+        if (-not $message.Contains($expected)) { throw "Expected refusal lost diagnostic: $expected : $message" }
+    }
+    if ($message -match 'Cannot find path') { throw 'Missing SQL output masked parser failure' }
+    [IO.File]::WriteAllText($log+'.sqlcmd.txt', "Msg 58360, Level 16, State 1, Server LOCAL, Line 1`r`nSynthetic refusal",[Text.Encoding]::Unicode)
+    Expect-Failure { Assert-ExpectedSqlRefusal $log 58360 $true 'exit 1' } 'Exit 1 cannot establish SQL refusal, even with output'
+    foreach ($case in @(@{ExitCode=16; DeadlineExceeded=$true},@{ExitCode=0; DeadlineExceeded=$false})) {
+        $case | ConvertTo-Json | Set-Content -LiteralPath ($log+'.result.json')
+        Expect-Failure { Assert-ExpectedSqlRefusal $log 58360 $true 'wrong result' } 'deadline/success cannot establish refusal'
+    }
+    @{ExitCode=16; DeadlineExceeded=$false} | ConvertTo-Json | Set-Content -LiteralPath ($log+'.result.json')
+    Assert-ExpectedSqlRefusal $log 58360 $true 'expected SQL failure'
+    Expect-Failure { Assert-ExpectedSqlRefusal $log 58361 $true 'wrong SQL error' } 'must match intended SQL header'
+    Expect-Failure { Assert-ExpectedSqlRefusal $log 58360 $false '' } 'must have caught transport failure'
+    [IO.File]::WriteAllText($log+'.sqlcmd.txt', '58360 is just text, not a SQL Server error header')
+    Expect-Failure { Assert-ExpectedSqlRefusal $log 58360 $true 'client text' } 'bare error number is insufficient'
     foreach ($bad in @('bad"quote',"bad`rline","bad`nline","bad`0nul")) {
         Expect-Failure { ConvertTo-SqlcmdArguments @('-i',$bad) } 'unsafe process argument'
     }

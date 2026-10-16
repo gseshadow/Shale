@@ -19,7 +19,9 @@ scrubbed) before prompts in Prepare/Rehearse and before credentials in connected
 Only Microsoft ODBC 17/18 is accepted; Go SQLCMD, missing executables and unrecognized help
 are refused with an explicit `-SqlcmdPath` example. This is client identification, not a
 connection or SQL compatibility test. Switches are serialized bare, spaced file arguments
-are quoted, and variables use `SecurityOwner="Brian Downing"`. Executable paths stay in
+are quoted, and EVERY `-v` value is quoted, including ISO timestamps and hashes:
+`WindowStartUtc="2026-10-16T21:58:55" SecurityOwner="Brian Downing"`.
+Whitespace-only quoting is insufficient for Windows ODBC's raw parser. Executable paths stay in
 ProcessStartInfo.FileName; no shell or password argument is introduced. Prepared commands
 retain the resolved ODBC executable automatically.
 
@@ -34,9 +36,9 @@ fix commit. From the existing repository root in Windows PowerShell 5.1:
 
 ```powershell
 # $reviewedPackageCommit must be the full corrected commit from the fix PR, after review.
-git fetch origin codex/fix-retirement-rehearsal-batches
+git fetch origin codex/fix-retirement-odbc-values
 if ($LASTEXITCODE -ne 0) { throw 'Fetch failed; stop' }
-$newRoot = 'C:\ShaleVerification\RetirementOperator-Batch-Fix-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')
+$newRoot = 'C:\ShaleVerification\RetirementOperator-ODBC-Values-Fix-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')
 if (Test-Path -LiteralPath $newRoot) { throw 'New directory required' }
 $checkout = Join-Path $newRoot 'Checkout'
 git worktree add --detach $checkout $reviewedPackageCommit
@@ -46,11 +48,11 @@ $odbc = 'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\180\Tools\Binn\SQ
 powershell.exe -NoLogo -NoProfile -NonInteractive -File build/auth-verification/test_retirement_operator.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Offline Windows regression failed; stop' }
 powershell.exe -NoLogo -NoProfile -NonInteractive -File build/auth-verification/test_retirement_odbc.ps1 -SqlcmdPath $odbc
-if ($LASTEXITCODE -ne 0) { throw 'Real Windows ODBC help regression failed; stop before rehearsal' }
+if ($LASTEXITCODE -ne 0) { throw 'Real Windows ODBC complete-variable regression failed; stop before rehearsal' }
 & .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Prepare -ReviewedRevision $reviewedPackageCommit -SqlcmdPath $odbc -EvidencePath 'C:\ShaleVerification\RetirementOperator-1881\Packet' -PacketPath (Join-Path $newRoot 'Packet')
 if ($LASTEXITCODE -ne 0) { throw 'Preparation failed; preserve output and stop' }
 # ONE separately opted-in loopback rehearsal, <=15 minutes, with dedicated LOCAL credentials:
-& .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Rehearse -ReviewedRevision $reviewedPackageCommit -SqlcmdPath $odbc -LocalPort 14333 -PacketPath (Join-Path $newRoot 'LocalRehearsal-Batch-Fix')
+& .\docs\sql\auth\permission-cutover\retirement-operator.ps1 -Phase Rehearse -ReviewedRevision $reviewedPackageCommit -SqlcmdPath $odbc -LocalPort 14333 -PacketPath (Join-Path $newRoot 'LocalRehearsal-ODBC-Values-Fix')
 if ($LASTEXITCODE -ne 0) { throw 'Rehearsal failed; preserve evidence/resource; no automatic retry or cleanup' }
 ```
 
@@ -63,7 +65,12 @@ Earlier Go and ODBC runs may have left nonce-owned databases: this sequence neve
 retries or cleans them. No wildcard cleanup, forced disconnect or production operation is authorized.
 
 Expected output: `PASS retirement operator offline behavior on Desktop 5.1...`, then
-`PASS real Windows ODBC quoted-switch reproduction and corrected help parsing on Desktop 5.1...`.
+`PASS real Windows ODBC quoted-switch reproduction and complete-variable timestamp reproduction/corrected help parsing on Desktop 5.1...`.
+The real ODBC test parses complete rehearsal/apply/rollback/verify lists, all three
+timestamps, both hashes, owner names/evidence references with spaces, and trailing
+path backslashes. It retains raw argument/result evidence in the reported fresh
+help-only test directory and requires the old unquoted-timestamp parser failure on
+Windows. Help parsing does not certify executed SQL or value roundtrips.
 Prepare prints `SQLCMD PREFLIGHT PASSED` and `PREPARED - NO CONNECTION - NOT AUTHORIZED`.
 Only a successful full rehearsal prints `LOCAL SQLCMD REHEARSAL COMPLETED` and retains
 `rehearsal-result.json` with `ExactSqlcmdChecks=PASSED_LOCAL_ONLY`; manual recovery and
@@ -198,3 +205,10 @@ corrections through established audit seams. No fabricated accounting/history.
 Audit compatibility: security-catalog evidence stays in private change control. No application
 sensitive-read/domain-mutation/audit schema/event behavior changes. Stage A/B, full original
 route, RLS/Case/R4, broader audit permissions and live-update authorization remain separate gates.
+
+Expected-refusal checks require the intended SQL Server `Msg <number>, Level 16`
+header, a caught nonzero exit other than client exit 1, and no deadline expiry.
+Exit 1 never establishes the intended SQL refusal. A parser/client failure before
+SQL output exists reports the original transport failure, client stderr, and exact
+retained `.stderr.bin`, `.result.json`, `.stdout.bin` and optional `.sqlcmd.txt`
+paths. Preserve those records and the exact nonce-owned database; stop without retry.

@@ -102,7 +102,8 @@ function Get-SavedHashes([string]$Output, [string]$Kind, [string]$Before = '') {
 }
 function ConvertTo-SqlcmdArguments([string[]]$Arguments) {
     # Windows ODBC SQLCMD parses the raw command line itself: quoted switches are
-    # not options. Quote only values that need it; -v uses Name="value with spaces".
+    # not options. Always quote -v values: punctuation in unquoted ISO timestamps
+    # is also parsed as option syntax. Keep Name= outside the value quotes.
     $variables = $false
     $encoded = foreach ($argument in $Arguments) {
         if ($argument -match '["\r\n\x00]') { throw 'Unsafe process argument.' }
@@ -112,7 +113,7 @@ function ConvertTo-SqlcmdArguments([string[]]$Arguments) {
             if ($argument -notmatch '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { throw 'Invalid SQLCMD variable assignment.' }
             $prefix=$Matches[1]+'='; $value=$Matches[2]
         }
-        if ($value -eq '' -or $value -match '\s') {
+        if ($variables -or $value -eq '' -or $value -match '\s') {
             # Preserve trailing backslashes before a closing quote under Windows argv rules.
             $value='"'+[regex]::Replace($value, '(\\+)$', '$1$1')+'"'
         }
@@ -201,6 +202,20 @@ function Invoke-PacketSql([string]$Root, [string]$Server, [string]$Database, [st
         $outStream.Dispose(); $errStream.Dispose(); $process.Dispose()
     }
     return ($Log+'.sqlcmd.txt')
+}
+function Assert-ExpectedSqlRefusal([string]$Log, [int]$ExpectedError, [bool]$Caught, [string]$Failure) {
+    # Exit 1 can be a client/parser failure before SQL starts. Require the actual
+    # SQL Server error header, a non-client exit, and no deadline interruption.
+    $resultPath=$Log+'.result.json'; $outputPath=$Log+'.sqlcmd.txt'; $stderrPath=$Log+'.stderr.bin'
+    $result=$null; $text=''; $stderr=''
+    if (Test-Path -LiteralPath $resultPath) { $result=Read-Json $resultPath }
+    if (Test-Path -LiteralPath $outputPath) { $text=Get-Content -LiteralPath $outputPath -Raw }
+    if (Test-Path -LiteralPath $stderrPath) { $stderr=[Text.Encoding]::Default.GetString([IO.File]::ReadAllBytes($stderrPath)) }
+    if (-not $Caught -or -not $result -or $result.DeadlineExceeded -or $result.ExitCode -in @(0,1) -or
+        $text -notmatch ('(?m)^\s*Msg\s+'+$ExpectedError+',\s*Level\s+16\b')) {
+        $status=if ($result) { "ExitCode=$($result.ExitCode); DeadlineExceeded=$($result.DeadlineExceeded)" } else { 'No process result' }
+        throw "Local rehearsal expected SQL error $ExpectedError was NOT verified. $status. SQL output (may be absent): $outputPath; retained stderr: $stderrPath; retained result: $resultPath; retained stdout: $Log.stdout.bin. Transport failure: $Failure`nClient stderr: $stderr`nPreserve evidence and nonce-owned database; no automatic retry or cleanup."
+    }
 }
 function Read-Packet([string]$Path) {
     $root = Assert-PrivatePath $Path $script:SourceRoot
@@ -428,14 +443,12 @@ function Invoke-LocalRehearsal {
             if ($Db -eq $database) { $Sql=$localGuard+$Sql }
             Write-NewText $inputPath $Sql
             $log=Join-Path $root ($script:localSequence.ToString()+'-'+$Name)
-            $caught=$false
+            $caught=$false; $failure=''
             if ([datetime]::UtcNow -ge $script:localDeadline) { throw 'Local rehearsal 15-minute bound reached; preserve owned resource/evidence for exact review.' }
             try { $null=Invoke-PacketSql $script:SourceRoot $server $Db $user $password $inputPath $Vars $log $SqlcmdPath $script:localDeadline -LocalOnly }
-            catch { $caught=$true; if (-not $ExpectedError) { throw } }
+            catch { $caught=$true; $failure=$_.Exception.Message; if (-not $ExpectedError) { throw } }
             if ($ExpectedError) {
-                $result=Read-Json ($log+'.result.json')
-                $text=(Get-Content -LiteralPath ($log+'.sqlcmd.txt') -Raw)
-                if (-not $caught -or $result.ExitCode -eq 0 -or $text -notmatch ('\b'+$ExpectedError+'\b')) { throw 'Local rehearsal did not refuse at the intended SQLCMD guard.' }
+                Assert-ExpectedSqlRefusal $log $ExpectedError $caught $failure
             }
             return ($log+'.sqlcmd.txt')
         }
