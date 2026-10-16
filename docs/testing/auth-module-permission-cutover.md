@@ -1,7 +1,103 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest preparation: [controlled-change contract](#controlled-change-contract--prepared-not-authorized--2026-10-16).** Production execution remains BLOCKED pending completed-package review, named risk approval and explicit window authorization. The original inventory/zero-invocation route remains available. No suitable entry-observation replacement is established.
+**Latest preparation: [final operator runner](#final-operator-runner--prepared-not-authorized--2026-10-16).** Production execution remains BLOCKED pending completed-package review, named risk approval and explicit window authorization. The original inventory/zero-invocation route remains available. No suitable entry-observation replacement is established.
 
+
+
+## Final operator runner — PREPARED, NOT AUTHORIZED — 2026-10-16
+
+Use [Brian's operator instructions](../sql/auth/permission-cutover/OPERATOR.md) and the
+[Windows PowerShell 5.1-compatible runner](../sql/auth/permission-cutover/retirement-operator.ps1).
+It delivers Prepare, Apply, Verify, Rollback and one bounded Rehearse phase, using the
+unchanged guarded controlled entry points from merged
+[#1880](https://github.com/gseshadow/Shale/pull/1880). Live `origin/codex/latest` fetched at
+`0987b3f8e4afac5aa5a8b17a27a75743138512d1`; GitHub confirms that PR's merged state/commit
+and fetched ancestry agrees. Separate branch/worktree preserves the existing checkout.
+Reviewed AGENTS/prompt rules, the complete owning runbook, database-schema auth/Users/tenancy,
+tenancy-and-rls, invocation README and existing retirement/launcher/fixture tests before editing.
+
+**Brian Downing holds security owner, service/operations owner, SQL operator, verifier,
+incident lead and support roles. Independent human verification is ABSENT, by explicit
+operator choice. No additional person is required.** This supersedes earlier unspecified
+owner/independent-verifier staffing text for this operator packet only. Risk acceptance,
+completed-package approval and exact execution-window authorization remain **PENDING**;
+no earlier approval, tests or merge satisfies those decisions automatically.
+
+The [attributed evidence ledger](../sql/auth/permission-cutover/evidence-scope.md) preserves
+PC-000 observations, actual credential-session reports, original/repeated baseline, artifact
+digests and monitoring delivery/limits exactly within their reported scope. Private captures
+were unavailable here and were not inspected or committed. Prepare copies/hashes originals
+outside Git and makes no connection; it requires the reviewed package commit, clean relevant
+paths and the reported original baseline. Private readiness records start PENDING, including
+unperformed matrix cases. No fleet collection, employee interruption or telemetry project.
+Estimated 20–30 devices and about four inaccessible laptops remain incompletely inventoried;
+unknown-client and invocation risk needs explicit final acceptance, never invented compatibility.
+
+The existing Java fixture expands SQL and executes JDBC batches; its controlled-route
+missing-decision/window/drift/unsupported ACL/dependency, postcheck atomicity, equal-delta and
+expired-window exact-recovery cases were inspected. The reported three launcher PASS lines
+and `00:00:44.5663216` cover the **full automated suite**, not isolated SQLCMD recovery or
+manual recovery/reverification. One loopback-only Rehearse path creates a fresh nonce-owned
+synthetic database on an existing dedicated local instance, uses real SQLCMD controlled
+entry points, checks refusal/connection-close atomicity, full recovery/equality and timing,
+and removes only its exact database. Failures preserve evidence/resources for exact review.
+It runs no broad Maven cycle, Stage A/B or production call. Its SQL timing remains separate
+from the still-required measured manual checks and end-to-end recovery bound.
+
+Apply stages original authorizations and both command contracts before a durable one-attempt
+marker, then invokes only controlled-retire. Brian must explicitly approve the concrete
+packet SHA256, accept bounded risks and absence of independent human verification, and
+separately authorize exact UTC start/end/rollback cutoff with rollback preauthorization.
+Window <=30 minutes, reserve >=10 minutes or measured recovery if larger. No extension;
+rollback remains usable after expiry. Password prompting uses a SecureString and only the
+SQLCMD child environment; never command-line passwords, global credential changes or files.
+Full SQLCMD Unicode output, stdout/stderr, exit/deadline status and original BeforeHash are
+retained; AfterHash is persisted only from the unique original emitted commit record, even
+on nonzero exit. Missing output/uncertain commit stops; no apply replay or current hash adopted
+as an expected identity. The private packet includes the original guarded rollback throughout.
+
+Verify separates metadata/effective checks (no legacy invocation), actual safe representative
+application checks using existing settings, and unknown-client/monitoring gaps. The new
+read-only operator-postcheck pins saved AfterHash, six exact DENYs, auth/runtime denial and
+retained auth Users/old-resolver access through unchanged context/fingerprint/authority
+includes. Original actual-connection/server-token review remains required. Restore permissions
+only with original packet and exact controlled rollback; reconcile irrecoverable accounting,
+work/audits/external effects separately. Restored grants reopen vulnerable capabilities.
+Original route, every existing SQL guard/body, Stage A/B, Case/RLS/R4 and separate audit/
+live-update security gates are unchanged.
+
+Focused validation for this runner (Linux): PowerShell Core 7.4.6 parser and offline lifecycle
+checks, including clean-source/packet tamper/approval refusal, interrupted/nonzero commit output,
+one-attempt prevention, deadline and post-expiry recovery, plus an actual fake-process transport
+test of full output, nonzero exit, timeout and child-only password handling. Full auth Python:
+**37 PASS, three explicit native-Windows skips (40 total)**. Native Windows PowerShell 5.1 and
+actual SQLCMD SQL rehearsal for the new package were **NOT RUN** here; Core does not certify
+5.1/.NET/SQL behavior. Those boundaries remain unverified; no production gate is marked satisfied.
+The operator-reported older native builder PASS is preserved and does not certify this runner.
+
+Commands from the package checkout (test logs/inventory under uncommitted work/):
+
+```bash
+# Optional Core transport/lifecycle execution, never equivalent to native Windows:
+SHALE_OPERATOR_TEST_PWSH=/workspace/work/pwsh/pwsh python3 -m unittest discover -s build/auth-verification -p 'test_*.py' -v
+python3 build/test-selection/select_tests.py --base 0987b3f8e4afac5aa5a8b17a27a75743138512d1 --head HEAD --format markdown --plan-output work/operator-selection.json
+git diff --check
+```
+
+Native check before use, from the reviewed checkout (offline; no SQL):
+
+```powershell
+powershell.exe -NoLogo -NoProfile -NonInteractive -File build/auth-verification/test_retirement_operator.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Operator runner remains unverified on native Windows 5.1' }
+```
+
+No Maven/runtime Java/authentication change: the explicit task requests focused runner checks and
+avoids unnecessary full Maven reruns. Existing source contracts pass and guarded SQL stays identical. The selector maps these paths
+to security-data and emits JVM smoke/critical commands; those unchanged JVM suites were not
+rerun under the task's focused operator-check scope. No full-suite escalation was selected.
+Audit compatibility uses private operator change control; no application sensitive read/domain
+mutation, audit event/schema/migration or PHI transaction changes. No Azure connection, production
+mutation, credential change, installation, deployment or production authorization occurred.
 
 ## Controlled-change contract — PREPARED, NOT AUTHORIZED — 2026-10-16
 
