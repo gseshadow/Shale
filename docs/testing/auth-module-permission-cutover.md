@@ -1,8 +1,275 @@
 # Authentication module permission cutover — 2026-10-15
 
-**Latest proposal: [maintenance-window acceptance — NOT APPROVED](#proposed-maintenance-window-acceptance-policy--not-approved--2026-10-16).** Existing retirement policy remains in force; retirement, installation and production monitoring remain BLOCKED. The reported build lacks module_start; no suitable observation replacement is established.
+**Latest preparation: [controlled-change contract](#controlled-change-contract--prepared-not-authorized--2026-10-16).** Production execution remains BLOCKED pending completed-package review, named risk approval and explicit window authorization. The original inventory/zero-invocation route remains available. No suitable entry-observation replacement is established.
+
+
+## Controlled-change contract — PREPARED, NOT AUTHORIZED — 2026-10-16
+
+This section supersedes #1879's proposed collection checklist **for the explicitly selected controlled
+route only**. Stop fleet-wide collection: no staff interruption, device visits, reconciled device list,
+per-device hashes, recall of the approximately four unavailable laptops, or new monitoring harness is
+required. The estimated estate is 20–30 devices; its exact membership and older/different clients remain
+UNKNOWN. Their unresolved status is permitted by this contract **only with named security-owner risk
+approval and service/operations concurrence**. No complete inventory, complete drain or zero invocations
+is asserted. A quiet trial cannot establish them. Preparation is authorized; risk acceptance and
+production execution are not. Merging this package grants neither.
+
+Fetched live `codex/latest` at `bd189ee66e854b036e9a15c510b2d09a00d2cea7`; GitHub metadata confirms
+#1879 merged and local ancestry confirms that merge in this base. Branch
+`codex/controlled-legacy-login-retirement` uses a separate worktree preserving unrelated work.
+Reviewed AGENTS.md, architecture/codex-prompt-rules.md, this complete owning runbook, invocation-validation
+README, architecture/tenancy-and-rls.md and the database-schema auth/Users/tenancy sections. Historical
+assessments below retain their original evidence/authorization scope.
+
+### Bounded evidence and acceptance
+
+Keep a private packet keyed to this reviewed revision. Store only safe references in SQLCMD variables;
+never commit private captures, binaries or credentials. A named reviewer records source, date, scope,
+limits and acceptance for each attributed finding. Independent reinspection is optional if that reviewer
+explicitly accepts the attribution; do not describe an absent attachment as independently verified.
+
+| Evidence supplied in this conversation | Accepted scope / limit |
+| --- | --- |
+| PC-000 launcher and installed-version file select 1.0.136 | One representative installation; does not establish every device's installed version. |
+| Prior assistant inspected uploaded desktop and data JARs: direct Users lookup plus Java bcrypt for password; remembered restore calls API; no literal sp_login_* references found | Attributed static findings for those artifacts; no complete dynamic-call or fleet compatibility proof. |
+| Prior assistant inspected uploaded Azure server JAR and bundled libraries: reviewed password paths use direct Users/bcrypt; remembered lookup calls dbo.ResolveDesktopRememberCredential; no literal sp_login_* references found | Attributed artifact review; deployment parity and actual serving build still require an existing release/manifest reference or owner attestation. |
+| API usernames reported shale_app/shale_runtime; packaged desktop usernames match, no overrides in checked PowerShell Process/User/Machine scopes | Configuration evidence only. Does not establish live connection identities, all override sources or server/login authority. |
+| Desktop SHA-256 | `210ed09880529c230826e9796622cd49f03bef1d3718f4ef0af1107e8776c42a` |
+| Desktop data SHA-256 | `93fbe2fa77230771b06e669f1224e60885c3ee4f39def1428ae92508007a997b` |
+| Server SHA-256 | `12209f90f2462df09d50d8df825451018341236d4a5fc3e281274a0eb9468d78` |
+
+These are operator-supplied digests, not recomputed here; no attachments were supplied to this task.
+No additional device hashes are required. `KnownArtifactEvidence` identifies this ledger, the reviewer's
+acceptance and the PC-000/API build/configuration references, plus bounded review of **existing** job,
+integration and Function records already held by owners. Record unavailable records, unknown schedules,
+dormant/external/dynamic consumers and unavailable laptops as explicit exclusions for risk acceptance;
+do not require those gaps to be closed. Do not invent another inventory exercise. An identified active
+legacy procedure caller, known incompatible artifact or positive legacy-use evidence **does** block this
+route until separately reviewed migration/withdrawal; unknown clients must not be mislabeled compatible.
+The prior Function DLL finding remains attributed, and its separate negotiate authorization finding stays OPEN.
+
+For this route, legacy requirements 2 and 3 are replaced by bounded artifact review and representative
+acceptance with a controlled trial, detection and exact rollback. Requirements 1 and 4 retain actual
+identity/authority review and compatibility **for the reviewed representative desktop/API paths**;
+unresolved older/different clients are excluded explicitly, subject to the same named risk decision.
+Requirement 5's exclusive metadata control is unchanged. Review actual auth/runtime connections for
+these representative mappings using the existing SELECT-only identity/token handoff, under separately
+authorized read access: intended database, original/effective login, shale_app/shale_runtime separation,
+server/fixed/public/nested authority and configuration precedence. Unexpected privilege or a different
+mapping blocks the fixed-identity scripts. Packaged usernames alone cannot satisfy ReviewedIdentityMapping.
+No Azure connection is authorized by this preparation.
+
+`CompatibilityEvidence` records before/after results for one operator-controlled representative installed
+1.0.136 desktop and the reviewed serving API, using designated test accounts and existing permitted error
+summaries. No employee must stop work, supply credentials or run a test. Cover this compact matrix:
+
+| Path | Required observable result before and during trial |
+| --- | --- |
+| Desktop password | Correct password signs in through desktop and second API credential exchange; wrong password rejects safely. Reopen after ordinary close and restart the representative test machine. |
+| Desktop remembered | Checked startup restores through API; unchecked startup does not auto-restore. Rotation succeeds, replay/revoked/disabled credentials reject, and outage Retry recovers without fallback to legacy procedures. |
+| API password | Login success and rejection; /me, refresh/logout, user switching and tenant/actor isolation remain correct. |
+| API remembered | Existing remembered lookup/restore/rotation succeeds through old resolver, revoked/disabled/replayed credentials reject, and restored principal/session context is correct. |
+| Neighboring work | Existing approved User directory/detail and a representative job/integration/live-update reconnect complete with expected result and existing audit behavior. Record untested work as residual risk; an identified failure blocks resume. |
+
+Use existing disposable compatibility evidence for destructive/replay/revocation cases and repeat safe
+representative checks in the authorized window. Do not alter real staff credentials/accounts or call
+sp_login_* against Azure to manufacture evidence. Direct Users SELECT and the old resolver remain
+available for 1.0.136; this route does not authorize Stage B. The reviewed direct/bcrypt paths do not
+implement legacy failure/lock/last_login accounting. Accepting that bounded fact is not approval to
+silently discard an identified caller's accounting policy; any such caller needs separate disposition.
+
+### Explicit executable selection and preserved guards
+
+The original `retire-legacy-login.sql` and `rollback-legacy-login.sql` still use the unchanged
+`legacy-retirement-approval.sql`: CallerInventoryApproved, LegacyCallersDrained and their original evidence
+retain their complete-inventory/zero-invocation meanings. Existing invocations need no new variables.
+Never set LegacyCallersDrained=CONFIRMED to represent this alternative.
+
+The alternative entry points are `controlled-retire-legacy-login.sql` and
+`controlled-rollback-legacy-login.sql`. They require `LegacyAcceptanceRoute=CONTROLLED_CHANGE` and the
+separate `controlled-legacy-approval.sql` contract. There is no automatic fallback, default route or
+blanket approval from #1879. Missing SQLCMD substitutions fail before mutation; wrong/blank decisions
+throw 58360. The common apply/rollback bodies are extracted verbatim from the original scripts, so both
+routes execute the identical permission/hash/transaction logic. Body files are includes, not operator
+entry points. Original captures and all context/fingerprint/effective checks remain untouched.
+
+In the private packet, record real people for SecurityOwner and ServiceOwner (both capacities if one
+person serves both), SQL operator, independent verifier, incident lead and support/on-call contact.
+RiskApprovalEvidence must contain the security owner's explicit approval and service owner's concurrence
+for unknown/older/offline-client failures, incomplete invocation/drain knowledge, irrecoverable accounting
+and operations, the disruption bound and reopened rollback exposure. PackageReviewEvidence identifies
+completed implementation review; WindowAuthorizationEvidence identifies a separately signed exact window
+and pre-approved rollback. OperationalReadinessEvidence names detection channels, baseline, thresholds,
+known in-flight/retry handling, graceful stop/resume for affected known work, support escalation and
+reconciliation owners. It acknowledges that unknown sessions/work may be in flight; no fleet/session
+purge or proof of global quiescence is required. Identified required legacy work must be resolved first.
+RollbackRehearsalEvidence records a separately authorized disposable rehearsal of these exact entry points,
+missing acknowledgements/deadline refusal, drift/ACL refusal, postcheck-failure atomicity, exact equality
+and measured rollback/reverification time. Static checks and historical passes are not that rehearsal.
+
+All exact permission deltas remain: three auth EXECUTE REVOKEs AS dbo; six runtime/principal-role object
+EXECUTE DENYs AS dbo. Baseline/drift/SID/owner/module/SET/parameter/dependency/synonym/trigger checks,
+G AS dbo state/grantor restrictions, full expected delta, transaction atomicity and original BeforeHash /
+AfterHash rollback equality are unchanged. No CASCADE, grantor substitution or broad grant replay.
+Security preflight/58307, Stage A installation, Stage B full inventory/old-read drain, installed compatibility,
+Case/R4 and all RLS prerequisites remain separate unchanged gates. No new module authority or audit permission
+acceptance is granted. Actual username mappings and unrelated security findings remain open.
+
+### Short operator sequence — future authorized window only
+
+1. **Review the bounded packet.** Accept or reject the attributed artifacts; bind the representative
+   desktop/API build and actual identity evidence, pre-window matrix and existing known-work disposition.
+   Obtain named risk approval, completed-package review and separate window authorization. Do not call
+   employees or wait for offline laptops. First next action is packet review, not fleet collection.
+2. **Rehearse exact recovery.** Retain the unchanged original captures. In a separately authorized
+   disposable environment rehearse apply/rollback and refusals above. Require full catalog equality and
+   measure recovery including representative checks. Keep Stage A/B and unrelated DDL/security edits
+   excluded throughout the trial and its recovery commitment. No rehearsal or SQL mutation occurred here.
+3. **Set the bound and staff operators.** Maximum planned disruption is **30 minutes** from the first
+   admission pause, if any, or permission apply, whichever is earlier. Record exact UTC start/end and
+   RollbackStartByUtc, reserving the measured rollback/reverification duration, **at least 10 minutes**.
+   If rehearsal cannot fit, reject this window. This is an owner-approved budget, not a guarantee for
+   unknown callers or failed recovery. Use only operator/test accounts; no fleet-wide pause or session
+   termination. Known affected work is gracefully held/drained using existing controls where needed.
+4. **Baseline and go/no-go.** Under separately authorized access, serialize catalog control, run existing
+   `legacy-retirement-baseline.sql` with -b -V 16 -y 0 -Y 0 -u; independently retain BeforeHash and its
+   complete reviewed catalog evidence. Confirm actual identities, all approvals, healthy detection and
+   rollback artifacts. Stop for drift, known dependency, missing evidence or insufficient time reserve.
+5. **Explicit trial.** Invoke the alternative with the exact reviewed packet; retain complete private
+   output and independently save AfterHash. Check actual effective legacy EXECUTE=0 for auth/runtime
+   without invoking those modules; verify the exact nine-row delta and retained Users/old-resolver access.
+   Run the safe desktop/API password/remembered checks above. Nonzero SQLCMD means stop/close and verify
+   transaction rollback/catalog equality. Do not run installation or Stage A/B as part of this window.
+6. **Detect and decide.** Operator/verifier review existing approved login success/rejection, permission
+   error and availability summaries plus representative outcomes **each minute** during trial and the
+   first staffed hour after resume. Any unexpected login/remembered failure, SQL 229, missing/delayed
+   expected work, incorrect lock/accounting, tenant/audit anomaly, unknown-client complaint or lost
+   visibility triggers rollback immediately; otherwise start rollback by RollbackStartByUtc if acceptance
+   is incomplete. Incident lead holds affected admission/work with existing controls and directs the SQL
+   operator/verifier; no extra grants, retry loops, guard bypass or silent window extension.
+7. **Exact rollback or bounded follow-up.** Use controlled-rollback with original packet and separate
+   LegacyRollbackApproval/compatibility acknowledgement, saved BeforeHash/AfterHash. Remove only six DENYs,
+   restore only three original G AS dbo grants and require full original digest before commit. Repeat
+   representative checks. Expired window does not disable recovery. If drift prevents rollback, stop for
+   exact-state incident review and escalate to security/service owners; never replace expected hashes.
+   An overrun is an incident. If accepted, assign named daily review for **seven calendar days** plus
+   each already-known next due run (owner/date fixed before go); support/on-call remains the late-client
+   route afterward. Unknown offline-return dates do not block closure and are not declared tested.
+
+Future invocation shape (trusted fixed literals, safe IDs/names and ISO UTC times from the signed packet;
+no approved values or connection details are supplied here). Populate `$controlledApproval` with **all**:
+
+```text
+ExpectedDatabase, ReviewedIdentityMapping, LegacyRetirementApproval, RuntimeLegacyDisposition,
+ExclusiveChangeWindow, LegacyAcceptanceRoute, CompletedPackageReview, ControlledWindowAuthorization,
+UnknownClientRisk, IrrecoverableEffectsRisk, ReopenedCapabilityRisk, RepresentativeChecks,
+RollbackRehearsal, SecurityOwner, ServiceOwner, RiskApprovalEvidence, PackageReviewEvidence,
+WindowAuthorizationEvidence, KnownArtifactEvidence, CompatibilityEvidence,
+OperationalReadinessEvidence, RollbackRehearsalEvidence
+```
+
+The required literals are defined in controlled-legacy-approval.sql; set them only from real decisions.
+Use approved local paths and the existing approved SQLCMD connection array. UTC timestamps use
+`yyyy-MM-ddTHH:mm:ss` without suffix. The apply guard rejects invalid times, >30 minutes, <10-minute
+reserve or a start outside trial time (58361); operators must also enforce the measured larger reserve
+and the deadline throughout the operation. It is a pre-apply guard, not a timer interrupting SQL.
+
+```powershell
+$controlledApply = $controlledApproval + @("LegacyBeforeHash=$legacyBeforeHash", "WindowStartUtc=$windowStartUtc", "WindowEndUtc=$windowEndUtc", "RollbackStartByUtc=$rollbackStartByUtc")
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/controlled-retire-legacy-login.sql -v @controlledApply -o $privateControlledApplyOutput
+if ($LASTEXITCODE -ne 0) { throw 'Stop: verify transaction rollback and exact catalogs' }
+# Independently save AfterHash; no Stage A/B or unrelated catalog edits.
+$controlledRollback = $controlledApproval + @('LegacyRollbackApproval=APPROVED', 'RollbackCompatibilityReviewed=CONFIRMED', "LegacyBeforeHash=$legacyBeforeHash", "LegacyAfterHash=$legacyAfterHash")
+# Only on the separately approved incident/rollback decision:
+sqlcmd @approvedSqlcmdOptions -b -V 16 -y 0 -Y 0 -u -i docs/sql/auth/permission-cutover/controlled-rollback-legacy-login.sql -v @controlledRollback -o $privateControlledRollbackOutput
+if ($LASTEXITCODE -ne 0) { throw 'Stop: exact recovery refused; escalate, never replay grants manually' }
+```
+
+A returning older/unknown client failure is an incident even after the seven-day review. Support captures
+only approved timestamp/build reference, symptom and permitted error code, holds affected work and pages
+the named incident lead; no broad staff survey or per-device hash collection. Compare to the representative
+path, preserve existing business evidence and evaluate exact guarded rollback while still pre-Stage-A.
+If later Stage A/B or unrelated metadata exists, rollback may refuse: use the documented separately
+reviewed Stage B then Stage A rollback/drain order first; the 30-minute recovery budget does not carry
+forward automatically. Approve a new recovery commitment before any later stage. Never force an unknown
+client to use an unreviewed hash fallback or waive tenant isolation to recover service.
+
+Permissions are reversible within the exact supported state. **Missed failure increments, stale locks,
+last_login gaps, lost/duplicate work, partial external effects and missing audit events are not repaired
+by rollback.** The incident owner and consumer/accounting owner reconcile from existing approved business
+evidence, assess idempotency before retry and obtain separate approval for corrections using established
+audit seams; do not fabricate history. Restored access also reopens hash disclosure/offline attack,
+unauthenticated lock/success manipulation and inherited runtime capability. These risks need explicit
+approval, a dated remediation review and incident ownership even after service is restored.
+
+Audit compatibility: no application sensitive read/domain mutation or audit schema/event changes.
+The existing PHI/entity-action/session-security transactions remain authoritative. This security-catalog
+package and approvals use private operator change control; no raw captures or ad-hoc app audit events.
+
+### Preparation verification and execution boundary
+
+Pre-edit test-impact review covered every retirement/approval variable and include reference,
+AuthPermissionCutoverFixture's full existing legacy/Stage A/B roundtrip, neighboring auth/module/lifecycle
+and verification-support tests, observation/invocation Python contracts and selector ownership. Existing
+original-route rejection assertions remain; the fixture extends both routes with missing decisions,
+wrong explicit selection, invalid/expired/oversized windows, reserve refusal, drift, W-state/dependency
+refusal, atomic postcheck failure, equal deltas and exact recovery without original zero-proof decisions.
+It also checks recovery after expiry. **These new SQL fixture paths were compiled, not executed here.**
+Permission changes and resource deletion are outside this task's authorization, including running that
+mutating disposable fixture. The new SQL route remains runtime-UNVERIFIED pending separately authorized
+rehearsal; passing source tests does not close it. Native Windows and installed-artifact acceptance are
+not inferred from local tests or the attributed historical reports.
+
+| Check actually run for this preparation | Result |
+| --- | --- |
+| New controlled-route Python source contracts | 4 PASS. Explicit separate approvals, original meaning, deadline/recovery separation, exact nine statements and shared transaction/hash guards. |
+| Full auth Python suite | 34 PASS, 2 explicit native-Windows skips (36 total). Existing privacy/UNKNOWN/launcher contracts preserved. |
+| Focused auth/module/lifecycle/support Maven | 15 PASS; no failures/errors/skips. |
+| Committed-base selector affected security-data suite | 54 PASS; no failures/errors/skips; modified fixture compiled. Auth, tenant/session and neighboring transaction/audit tests cover the affected security tooling. No full-suite escalation. |
+| Critical reactor via selector, mvn test | 116 PASS; no failures/errors/skips. |
+| Shared body comparison against fetched base | Apply/rollback bodies byte-for-byte equal to original suffixes; original approval/context/baseline/fingerprint/effective/preflight/Stage A/B files unchanged. |
+| Changed-file/test mapping, variable search, Python compilation, runbook relative links/fences, SQL includes and git diff --check | PASS. Only the bounded contract/wrappers, extracted shared bodies, existing fixture, focused source tests and owning runbook change. |
+| SQL execution/rehearsal, native Windows and representative production checks | NOT RUN; mandatory before window approval/execution, not claimed as passing. |
+
+Exact commands from repository root; logs/plan/test-impact inventory are uncommitted under work/:
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_controlled_retirement.py' -v
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py' -v
+python3 -m py_compile build/auth-verification/test_controlled_retirement.py
+/workspace/.tools/bin/mvn -pl shale-data,shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/.tools/bin:$PATH python3 build/test-selection/select_tests.py --base bd189ee66e854b036e9a15c510b2d09a00d2cea7 --head HEAD --format markdown --plan-output work/selection.json --run
+# --run executes the selected affected suite, then mvn test.
+git diff --check bd189ee66e854b036e9a15c510b2d09a00d2cea7 HEAD
+```
+
+No Azure connection, SQL permission change, session termination, resource deletion, installation,
+release, merge or deployment was performed. No private captures, binaries or credentials are committed.
+
+### Exact remaining facts and one approval decision
+
+Still required: named security/service owners and operator/verifier/incident/support contacts; reviewer
+acceptance of the attributed artifact findings and representative deployed-build/configuration references;
+actual auth/runtime identity and authority evidence for representative desktop/API mappings; before/after
+matrix results; disposition of any identified active legacy caller; original complete captures and
+independently retained BeforeHash/AfterHash at the later window; measured exact rollback/refusal rehearsal;
+existing detection channels/baselines, known-work stop/resume/reconciliation owners; seven-day and known-due-run
+follow-up owners/dates; completed-package review and exact signed UTC window with reserve/rollback decision.
+No fleet reconciliation, unavailable laptop inspection or zero-invocation evidence is a remaining fact
+under this alternative. Unknown clients remain recorded risks, not accepted compatibility findings.
+
+**One concrete approval decision:** the named security owner, with named service/operations concurrence,
+approves or rejects this CONTROLLED_CHANGE contract for the reviewed artifacts and representative paths,
+explicitly accepting unresolved older/unknown/offline clients, incomplete invocation knowledge,
+irrecoverable effects, the 30-minute disruption budget and rollback's reopened capabilities. Approval
+must reference this completed package and private evidence; it is currently **PENDING**. Execution stays
+BLOCKED until package review and separate specific window authorization are also recorded. Rejecting or
+not granting it leaves the original gate in force. No production execution is requested by this PR.
 
 ## Proposed maintenance-window acceptance policy — NOT APPROVED — 2026-10-16
+
+Historical #1879 proposal. Its fleet-reconciliation checklist is superseded for the explicitly selected
+controlled route by the contract above; it is not an additional collection requirement for that route.
 
 **Proposal only. The existing retirement requirements remain in force.** This planning PR neither
 approves nor activates this alternative. Retirement, installation and production monitoring remain
