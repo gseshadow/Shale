@@ -1,5 +1,22 @@
 # Application Release and Session Management Architecture
 
+## Local recovery session UTC correction — 2026-10-19
+
+The pinned local recovery sandbox (59d83748) predates the current V2 resolver and UTC correction in
+`SqlRememberCredentialStore`. Its serving API/JDBC reproduction names `CK_UserSessions_Refresh`
+(23000/547): implicit Denver timestamp binding precedes SQL's UTC-default IssuedAt. Current rotation
+already binds/reads UTC; its V2 resolver, bounded validation, timeout and error sanitization are retained
+unchanged. Current `UserSessionDao` and session-list/since projections still use implicit local JDBC
+conversion; these now use explicit UTC binding/reading. SQL UTC defaults, expiry predicates,
+serializable rotation, revocation reasons, RLS and business-local dates remain unchanged. Existing
+shortened expiries are not repaired. Audit remains the existing lifecycle without new secret metadata.
+
+The separate additive compatibility source retains only the pin's old resolver and changes its UTC
+boundary; it is never installed as the current server source. Its new receipt preserves the pinned
+artifacts and startup overlay 62a12940. [Continuation and recovery](../testing/remembered-session-utc.md)
+documents pending-pair loss after 401/500, protected-state archival and supported password re-enrollment.
+Native Windows/DPAPI and existing-state update acceptance remain pending. No retirement acceptance is inferred.
+
 ## Auth permission evidence and cutover candidate — 2026-10-15
 
 The [owning permission cutover runbook](../testing/auth-module-permission-cutover.md) records the user's native Windows
