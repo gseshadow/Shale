@@ -53,7 +53,7 @@ Focused Maven command (with the disposable SQL password supplied **only in the p
 mvn -pl shale-server -am -Dtest=RememberedSessionSqlTest,UtcJdbcTimestampTest,SqlRememberCredentialStoreTest,UserSessionDaoContractTest,DesktopRememberCredentialMigrationContractTest,RememberedDesktopSessionTest,DurableSessionAuthTest,SessionManagementContractTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,AuthControllerTest -Duser.timezone=America/Denver -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-The initial focused command passed. Final expanded checks also run the relevant
+The initial focused command passed. Final expanded checks passed **39 tests** (7 data + 32 server) and also ran the relevant
 `SessionInvalidationPhase8AContractTest#boundValidationAlsoRequiresCurrentAccountEligibility+adminRevocationIsExactTenantSessionAuditedBeforeCommitAndPublishedAfterCommit`
 methods. The serving lifecycle covers enrollment → restore → old credential 401 → refresh → old JTI
 401 → logout → remembered restore 401, and asserts both issuance UTC and preserved absolute expiry.
@@ -80,8 +80,8 @@ Additional executed checks:
   — PASS. `SessionUpdateChecks <classes>` passes in UTC and America/Denver and verifies exact class origins.
 * Test-class `RememberedSessionSqlTest.main` supports `legacy` (expect serving restore 500) and `fixed`
   (full lifecycle). Run from shale-server with `target/test-classes`, pinned server classes and pinned
-  test/runtime dependency classpath; prepend additive classes for `fixed`. The equivalent focused
-  main harness reproduced the unmodified pin and verified the additive compatibility lifecycle.
+  test/runtime dependency classpath; prepend additive classes for `fixed`. The committed standalone entrypoint reproduced the unmodified pin in `legacy` mode and
+  passed the additive compatibility lifecycle in `fixed` mode. Both exited cleanly after server destruction.
 * `pwsh -NoLogo -NoProfile -File build/session-utc-update/test-update.ps1` — PASS under Core 7.4.6/Linux,
   with task-local XDG directories; no private export/state or SQL accessed by launcher tests.
 * Git diff whitespace checks — PASS. Source comparison verifies only the intended UTC changes in
@@ -109,3 +109,14 @@ compilation/linkage and API/JDBC behavior pass. The original Windows constraint 
 from a matching named reproduction, not claimed as observed in its sanitized trace. The continuation
 instructions stop on every mismatch and do not automatically retry, re-provision, delete credentials,
 rewrite timestamps, weaken constraints, connect to Azure, deploy or execute retirement.
+
+Selector review: `python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD
+--format markdown --plan-output work/session-test-selection.json` — PASS. It selects security-data,
+server and settings-team plus informational full escalation for unknown launcher/helper paths. Case,
+contact, entity-audit, lookup-RLS and Settings UI tests in that broad mapping do not exercise the
+changed timestamp boundary; those and root/full suites were excluded under the explicit no-unrelated-
+broad-suites instruction. Focused authentication, context and boundary tests cover the affected scope.
+
+Relevant selector follow-up: `mvn -pl shale-server -am
+-Dtest=AuthUserLifecycleSecurityTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest
+-Dsurefire.failIfNoSpecifiedTests=false test` — PASS, 12 tests (2 data + 10 server).
