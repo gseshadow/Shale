@@ -1,5 +1,21 @@
 # Brian's controlled retirement packet
 
+## Remaining acceptance — use this continuation first
+
+The operator reports all three Windows checks at reviewed revision
+`041fa1ed0b21d64cce3599a01eaa3344ecf57331` PASSED, including the complete local
+SQLCMD rehearsal. **Do not repeat Prepare, serialization regressions or Rehearse
+below.** They are retained as the earlier construction instructions, not today's
+next steps. Existing private packets remain untouched.
+
+Use [remaining-acceptance.md](remaining-acceptance.md) for the evidence-to-test map,
+the focused synthetic additions, one timed manual SQL **and application** recovery
+exercise, and the single final approval-copy/window sequence. Brian holds all roles
+and reports the estate uses desktop 1.0.136. No fleet inventory, employee interruption,
+independent reviewer or telemetry project is required. Unknown callers remain an
+explicit bounded risk. The reported `0.743829` seconds is SQL-only recovery;
+manual application recovery remains **NOT MEASURED** until the exercise is performed.
+
 Preparation only. Production risk acceptance, completed-package approval and window
 execution authorization remain **PENDING**. Use the controlled entry points from merged
 [#1880](https://github.com/gseshadow/Shale/pull/1880); original-route requirements keep
