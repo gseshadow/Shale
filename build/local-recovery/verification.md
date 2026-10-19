@@ -75,3 +75,37 @@ not an application business audit. The selected profile workflow uses the existi
 transactional USER/UPDATED EntityActionAuditLog with original tenant/actor context and
 allowlisted metadata. No new audit schema or event, sensitive values, timeline surrogate,
 production mutation or post-commit audit path was introduced.
+
+Final integration and scope review:
+
+* The complete `sandbox.ps1 -Phase New` entry point ran under PowerShell Core 7.4.6,
+  not merely the Java worker: fresh private state, isolated pinned worktree, Maven
+  build/dependency snapshots, javac, local certificate, manual-block extraction,
+  manifest and fresh SQL database/logins/seed/baseline — PASS.
+* `sandbox.ps1 -Phase Api`, `-Phase Relay`, `-Phase Verify` and `-Phase SelfTest` also
+  ran through the actual Core launcher — PASS at code revision
+  `2811f86f` (full revision retained in the private state). The synthetic prompt harness
+  supplied only test secrets; it replaced no SQL generation, provisioning, transport,
+  application code or verification assertions. No real protected-store result is inferred.
+  `Verify` additionally checks a nonempty other-tenant UserSessions fixture against
+  the preserved RLS policy and runs actual desktop local-relay clients.
+* Final late-TLS regression: the relay verifier now selects its dedicated trust context
+  explicitly, independent of a previously initialized SQL TLS context. The full combined
+  API/session/live verification then passed, including the actual Core launcher above.
+* Final relay-disconnect handling was compiled and tested with a synthetic broken-output
+  subscriber in `ContractChecks`; it removes that exact peer and keeps publish usable.
+  The same routing behavior passed the actual live-client integration. Final
+  `ContractChecks` and Core `test_launcher.ps1` both passed after this correction.
+* `python build/test-selection/select_tests.py --base 6a0cbd025445a6ee8d79755f54b54b72cf595b2f --head HEAD --format markdown --plan-output <private selection.json>`
+  — PASS. It selects security-data from the two acceptance-document links and treats
+  new tooling as an unknown area. Its broad/critical/full suggestions were not run:
+  the user's explicit scope excludes unrelated broad reruns, no application production
+  symbol or retirement SQL changed, and focused real SQL/desktop/API/tooling checks cover
+  the added contracts. This is not a claim that a broad suite passed.
+* Final `git diff <base> HEAD --check` — PASS. Changed-file review maps every new Java
+  tool to ContractChecks/RelayChecks/real provisioning and Verify; the PS wrapper to
+  test_launcher plus real Core entry-point execution; documentation to reviewed scope.
+  No changed retirement `.sql` file. Original `/workspace/Shale` checkout stayed clean.
+
+All successful and failed task-owned local resources/evidence remain retained privately.
+No timed manual Apply/Rollback exercise was started and no recovery number was emitted.

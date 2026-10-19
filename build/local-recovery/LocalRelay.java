@@ -25,11 +25,14 @@ public final class LocalRelay {
         http.createContext("/negotiate",exchange->reply(exchange,200,"{\"url\":\"wss://127.0.0.1:"+p.getProperty("wsPort")+"/local\"}"));
         http.createContext("/publish",exchange->{
             try{var data=JsonParser.parseString(new String(exchange.getRequestBody().readNBytes(65537),StandardCharsets.UTF_8)).getAsJsonObject();String group=data.has("shaleClientId")?"client-"+data.get("shaleClientId").getAsInt():null;
-                for(Client c:clients)if(group==null||c.groups.contains(group))c.send("{\"type\":\"message\",\"from\":\"group\",\"group\":\""+(group==null?"local":group)+"\",\"dataType\":\"json\",\"data\":"+data+"}");reply(exchange,200,"{}");
+                publish(group,data.toString());reply(exchange,200,"{}");
             }catch(Exception failure){reply(exchange,400,"{}");}
         });
         http.setExecutor(Executors.newVirtualThreadPerTaskExecutor());http.start();System.out.println("LOCAL LIVE SUBSTITUTE listening; no Azure/Function/integration acceptance implied");
         while(true){Socket s=sockets.accept();Thread.startVirtualThread(()->serve(s));}
+    }
+    static void publish(String group,String data){
+        for(Client c:clients)if(group==null||c.groups.contains(group))try{c.send("{\"type\":\"message\",\"from\":\"group\",\"group\":\""+(group==null?"local":group)+"\",\"dataType\":\"json\",\"data\":"+data+"}");}catch(IOException disconnected){clients.remove(c);try{c.socket.close();}catch(IOException ignored){}}
     }
     static void reply(HttpExchange e,int status,String body)throws IOException{byte[] b=body.getBytes(StandardCharsets.UTF_8);e.getResponseHeaders().set("Content-Type","application/json");e.sendResponseHeaders(status,b.length);try(var out=e.getResponseBody()){out.write(b);}e.close();}
     static void serve(Socket socket){Client client=null;try(socket){socket.setSoTimeout(30000);InputStream in=socket.getInputStream();OutputStream out=socket.getOutputStream();ByteArrayOutputStream head=new ByteArrayOutputStream();int previous=0,crlf=0;while(head.size()<8192){int b=in.read();if(b<0)return;head.write(b);if(b==10&&previous==13)crlf++;else if(b!=13)crlf=0;previous=b;if(crlf==2)break;}

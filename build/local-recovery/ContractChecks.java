@@ -40,6 +40,8 @@ public final class ContractChecks {
         Sandbox.require(!d.acceptsURL("jdbc:sqlserver://shale.database.windows.net;databaseName=Shale"),"TLS adapter must reject every other database URL");
         var update=new com.shale.desktop.update.DesktopUiUpdateLauncher();Sandbox.require(!update.checkForUpdate().updateAvailable()&&!update.automaticWindowsCapabilityAvailable(),"Sandbox updater must be disabled");
         boolean disabled=false;try{update.launchUpdater();}catch(UnsupportedOperationException e){disabled=true;}Sandbox.require(disabled,"Manual updater must be disabled");
+        LocalRelay.clients.add(new LocalRelay.Client(new java.net.Socket(),new java.io.OutputStream(){@Override public void write(int b)throws java.io.IOException{throw new java.io.IOException("synthetic disconnected peer");}},Set.of("client-11")));
+        LocalRelay.publish("client-11","{}");Sandbox.require(LocalRelay.clients.isEmpty(),"A disconnected relay subscriber must not break later publishes");
         Sandbox.selftest();System.out.println("PASS adaptation preservation, canonical captures, local identity exclusions, network/profile/process guard, TLS scope and updater substitute");
     }
 }
