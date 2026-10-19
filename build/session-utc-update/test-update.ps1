@@ -5,7 +5,7 @@ $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'session-update.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Launcher parse failed'}
 # Load pure helpers only: never evaluate launch, stage, state or credential prompts.
-foreach($name in @('Hash','ReadJson','Assert-Tree','Quote','Assert-SandboxProperties')){
+foreach($name in @('Hash','ReadJson','Assert-Tree','Quote','Assert-SandboxProperties','Assert-AuthorityReceipt')){
     $node=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true)
     if(-not $node){throw "Missing helper $name"}
     . ([scriptblock]::Create($node.Extent.Text))
@@ -32,6 +32,18 @@ Refuses {Assert-Tree $root $records @('classes','sources')}
 Remove-Item -LiteralPath (Join-Path $root 'sources/unexpected.java')
 [IO.File]::WriteAllText($file,'changed synthetic bytes')
 Refuses {Assert-Tree $root $records @()}
+# New ownership overlay binds all retained artifacts; a receipt cannot bless changed parents.
+[IO.File]::WriteAllText($file,'synthetic class bytes')
+$ReviewedRevision='a'*40; $state=$root
+$manifestHash='B'*64; $startupReceiptHash='C'*64; $sessionReceiptHash='D'*64
+$receipt=@{Schema=1;Revision=$ReviewedRevision;State=$state;OriginalManifestSha256=$manifestHash;StartupReceiptSha256=$startupReceiptHash;SessionReceiptSha256=$sessionReceiptHash;Files=$records}
+Assert-AuthorityReceipt $receipt $root
+foreach($field in @('Schema','Revision','State','OriginalManifestSha256','StartupReceiptSha256','SessionReceiptSha256')) {
+    $old=$receipt[$field];$receipt[$field]='changed'
+    Refuses {Assert-AuthorityReceipt $receipt $root}
+    $receipt[$field]=$old
+}
+Assert-AuthorityReceipt $receipt $root
 # Test the argument transport through a real child, including spaces, quotes and trailing backslashes.
 $echo=Join-Path $root 'echo.ps1'
 [IO.File]::WriteAllText($echo,'ConvertTo-Json -InputObject @($args) -Compress')
@@ -45,5 +57,5 @@ if($child.ExitCode){throw 'Argument transport child failed'}
 $actual=ConvertFrom-Json -InputObject $output
 if(@($actual).Count -ne $values.Count){throw 'Argument count changed'}
 for($i=0;$i -lt $values.Count;$i++){if($actual[$i] -cne $values[$i]){throw 'Argument value changed'}}
-Write-Host "PASS parse, manifest integrity/count/path refusal, argument transport. Retained synthetic evidence: $root"
+Write-Host "PASS parse, manifest integrity/count/path refusal, authority receipt parent bindings/tamper rejection, argument transport. Retained synthetic evidence: $root"
 Write-Host ('Native Windows PowerShell 5.1 coverage='+($env:OS -eq 'Windows_NT' -and $PSVersionTable.PSVersion.Major -eq 5))

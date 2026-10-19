@@ -75,8 +75,18 @@ public final class Sandbox {
     static void sql(Connection c,String text)throws SQLException{try(var q=c.createStatement()){q.setQueryTimeout(20);q.execute(text);}}
     static long scalar(Connection c,String text)throws SQLException{try(var q=c.createStatement()){q.setQueryTimeout(20);try(var r=q.executeQuery(text)){require(r.next(),"Expected scalar result");return r.getLong(1);}}}
     void owned(Connection c)throws Exception{
-        require(scalar(c,"SELECT COUNT(*) FROM sandbox.Ownership WHERE Nonce="+literal(p.getProperty("nonce")))==1,"Ownership mismatch");
-        require(p.getProperty("database").equals(c.getCatalog()),"Database mismatch");
+        checkOwnership(c,p.getProperty("database"),p.getProperty("nonce"));
+    }
+    static void checkOwnership(Connection c,String database,String nonce)throws Exception{
+        require(scalar(c,"SELECT COUNT(*) FROM sandbox.Ownership WHERE Nonce="+literal(nonce))==1,"Ownership mismatch");
+        require(database.equals(c.getCatalog()),"Database mismatch");
+    }
+    static void checkLaunchOwner(Connection c,String database,String nonce)throws Exception{
+        checkOwnership(c,database,nonce);
+        require(database.equals("ShaleRetirementExercise_"+nonce),"Database/nonce mismatch");
+        require(Set.of(2L,3L,4L).contains(scalar(c,"SELECT CONVERT(int,SERVERPROPERTY('EngineEdition'))")),"Local engine required");
+        require(scalar(c,"SELECT CASE WHEN USER_NAME()=N'dbo' AND @@TRANCOUNT=0 THEN 1 ELSE 0 END")==1,"Local dbo ownership verifier required");
+        require(scalar(c,"SELECT COUNT(*) FROM sandbox.Ownership")==1&&scalar(c,"SELECT COUNT(*) FROM sys.extended_properties WHERE class=0 AND name=N'ShaleRecoveryNonce' AND CONVERT(nvarchar(128),value)="+literal(nonce))==1,"Original ownership evidence changed");
     }
     static List<String> batches(String s){return Arrays.asList(GO.split(s,-1));}
     static String clean(String s){return s.replaceAll("(?s)/\\*.*?\\*/","").replaceAll("(?m)--[^\\r\\n]*","").strip();}
@@ -143,7 +153,7 @@ public final class Sandbox {
         try(var c=admin(db)){
             owned(c);
             sql(c,"CREATE USER shale_app FOR LOGIN "+identifier(app)+"; CREATE USER shale_runtime FOR LOGIN "+identifier(rt));
-            sql(c,"GRANT SELECT ON sandbox.Ownership TO shale_app; GRANT SELECT ON sandbox.Ownership TO shale_runtime");
+            sql(c,"GRANT SELECT ON sandbox.Ownership TO shale_runtime AS dbo");
             int i=0;for(String b:a.batches()){
                 try{sql(c,b);}catch(SQLException e){System.err.println("Adapted batch failed at preserved index "+i);throw e;}i++;
             }
@@ -164,7 +174,7 @@ public final class Sandbox {
             // The unchanged baseline is read-only, and is NOT another retirement rehearsal.
             runSqlcmdIncludes(c,state.resolve("reviewed/docs/sql/auth/permission-cutover/legacy-retirement-baseline.sql"),db);
         }
-        try(var c=connect(db,app,appPass)){owned(c);authority(c);}
+        try(var c=connect(db,app,appPass)){launchIdentity(c,db,"shale_app",app);}
         try(var c=connect(db,rt,rtPass)){owned(c);authority(c);}
         Files.writeString(state.resolve("provisioned"),Instant.now().toString(),StandardOpenOption.CREATE_NEW);
         System.out.println("PROVISIONED local synthetic database="+db+"; application source="+APP_REV+"; manual recovery NOT MEASURED");
@@ -185,6 +195,10 @@ public final class Sandbox {
     static void authority(Connection c)throws Exception{
         require(scalar(c,"SELECT CASE WHEN USER_NAME() IN('dbo','guest') OR IS_MEMBER('db_owner')=1 OR IS_MEMBER('ShaleAdmins')=1 OR HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','CONTROL')=1 OR IS_SRVROLEMEMBER('sysadmin')=1 THEN 1 ELSE 0 END")==0,"Application identity has bypass authority");
     }
+    static void launchIdentity(Connection c,String db,String user,String login)throws Exception {
+        require(db.equals(c.getCatalog()),"Database mismatch");authority(c);
+        require(scalar(c,"SELECT CASE WHEN USER_NAME()="+literal(user)+" AND ORIGINAL_LOGIN()="+literal(login)+" THEN 1 ELSE 0 END")==1,"Local login mapping changed");
+    }
     void runSqlcmdIncludes(Connection c,Path file,String db)throws Exception{
         StringBuilder all=new StringBuilder();expand(file.toAbsolutePath().normalize(),all,new HashSet<>());
         String s=all.toString().replace("$(ExpectedDatabase)",db);require(!s.contains("$("),"Unexpected SQLCMD variable");
@@ -203,8 +217,14 @@ public final class Sandbox {
     }
     void launch(String mode)throws Exception{
         ready();
+        // The unchanged guard forbids auth SELECT on the ownership table. Validate the
+        // original nonce as the dedicated local provisioner BEFORE either application launch.
+        // launch() removes every SHALE_* variable from the child, including this credential.
+        if(!mode.equals("relay"))try(var c=admin(p.getProperty("database"))){
+            checkLaunchOwner(c,p.getProperty("database"),p.getProperty("nonce"));
+        }
         if(!mode.equals("relay"))for(String role:List.of("app","runtime")){
-            try(var c=connect(p.getProperty("database"),p.getProperty(role.equals("app")?"appLogin":"runtimeLogin"),env(role.equals("app")?"SHALE_SANDBOX_APP_PASSWORD":"SHALE_SANDBOX_RUNTIME_PASSWORD"))){owned(c);authority(c);require(scalar(c,"SELECT CASE WHEN USER_NAME()="+literal(role.equals("app")?"shale_app":"shale_runtime")+" THEN 1 ELSE 0 END")==1,"Local login mapping changed");}
+            try(var c=connect(p.getProperty("database"),p.getProperty(role.equals("app")?"appLogin":"runtimeLogin"),env(role.equals("app")?"SHALE_SANDBOX_APP_PASSWORD":"SHALE_SANDBOX_RUNTIME_PASSWORD"))){if(role.equals("runtime"))owned(c);launchIdentity(c,p.getProperty("database"),role.equals("app")?"shale_app":"shale_runtime",p.getProperty(role.equals("app")?"appLogin":"runtimeLogin"));}
         }
         String module=mode.equals("api")?"shale-server":"shale-desktop";
         String toolClasses=System.getProperty("shale.local.toolClasses",state.resolve("tool-classes").toString());
@@ -212,7 +232,7 @@ public final class Sandbox {
         var args=new ArrayList<String>(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Djava.security.manager=allow","--add-opens=java.base/java.lang=ALL-UNNAMED","-Duser.home="+state.resolve("home"),"-Djava.util.prefs.userRoot="+state.resolve("prefs"),"-DSHALE_UPDATE_ATTEMPT_DIR="+state.resolve("updates"),"-DSHALE_UPDATE_EXECUTION_LOCK="+state.resolve("update.lock"),"-cp",cp,"LocalBootstrap",mode,state.toString()));
         args.addAll(1,StartupPaths.vmArgs(state));
         ProcessBuilder pb=new ProcessBuilder(args).directory(state.toFile()).inheritIO();Map<String,String> e=pb.environment();
-        e.keySet().removeIf(k->k.toUpperCase(Locale.ROOT).matches("(SHALE_.*|SPRING_.*|SQLCONNSTR_.*|SQLAZURECONNSTR_.*|FUNCTION_.*|LIVE_.*|NEGOTIATE_.*|WEBPUBSUB_.*|APP_.*|DB_.*|JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS|JAVA_OPTS|MAVEN_OPTS|HTTP_PROXY|HTTPS_PROXY|ALL_PROXY|NO_PROXY)"));
+        scrubChildEnvironment(e);
         for(String dir:List.of("home","tmp","local","roaming","machine","config","data","cache"))Files.createDirectories(state.resolve(dir));
         StartupPaths.environment(e,state);
         e.put("LOCALAPPDATA",state.resolve("local").toString());e.put("APPDATA",state.resolve("roaming").toString());e.put("ProgramData",state.resolve("machine").toString());e.put("PROGRAMDATA",state.resolve("machine").toString());
@@ -229,6 +249,9 @@ public final class Sandbox {
         // Stable across local API restarts, never written to disk or passed in arguments.
         if(mode.equals("api")){e.put("SHALE_AUTH_TOKEN_SECRET",env("SHALE_SANDBOX_TOKEN_SECRET"));e.put("SHALE_AUTH_SESSION_BINDING_CUTOVER_AT","2020-01-01T00:00:00Z");}
         int exit=pb.start().waitFor();require(exit==0,"Local child exited with failure");
+    }
+    static void scrubChildEnvironment(Map<String,String> e){
+        e.keySet().removeIf(k->k.toUpperCase(Locale.ROOT).matches("(SHALE_.*|SPRING_.*|SQLCONNSTR_.*|SQLAZURECONNSTR_.*|FUNCTION_.*|LIVE_.*|NEGOTIATE_.*|WEBPUBSUB_.*|APP_.*|DB_.*|JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS|JAVA_OPTS|MAVEN_OPTS|HTTP_PROXY|HTTPS_PROXY|ALL_PROXY|NO_PROXY)"));
     }
     void verify()throws Exception{
         ready();var report=new LinkedHashMap<String,Object>();String db=p.getProperty("database");
