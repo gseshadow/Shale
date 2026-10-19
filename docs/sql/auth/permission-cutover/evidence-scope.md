@@ -1,5 +1,34 @@
 # October 16 operator evidence — attributed, not production acceptance
 
+## Latest report and remaining acceptance
+
+This update supersedes the older Windows/rehearsal-pending statements below for
+their stated scope only. At reviewed revision
+`041fa1ed0b21d64cce3599a01eaa3344ecf57331`, Brian reports native Windows PowerShell
+5.1 offline runner regression, real Windows ODBC complete-variable/timestamp
+regression, and full local SQLCMD rehearsal **PASSED**, including guarded refusals,
+apply, rollback, catalog equality and cleanup. SQL-only recovery/reverification was
+`0.743829` seconds. Manual application recovery is **NOT MEASURED**.
+
+Current private packet:
+`C:\ShaleVerification\RetirementOperator-1881\ValuesFix-20261016-161952-926\Packet`.
+Local evidence:
+`C:\ShaleVerification\RetirementOperator-1881\ValuesFix-20261016-161952-926\LocalRehearsal`.
+These Windows files were unavailable to this implementation task and were not
+inspected, edited or used to create readiness entries. The results above are
+operator-attributed, not independently reproduced Windows observations.
+
+Brian reports everyone uses desktop 1.0.136 and holds every operational/security
+role. Accept this as his bounded estate/build attestation; no device inventory,
+staff interruption, independent reviewer or new telemetry is required. It does not
+prove dynamic/external invocation completeness. Identified incompatible callers
+still block; unknown callers stay an explicit risk.
+
+[Remaining acceptance](remaining-acceptance.md) maps exact test methods and limits
+to readiness rows and supplies the finite recovery/final-window sequence. Source
+coverage, old passing reports and new local test results are kept distinct. No
+unperformed application check or decision has been promoted to PASSED.
+
 Brian Downing is security owner, service/operations owner, SQL operator, verifier,
 incident lead and support contact. He explicitly selected a single-person process.
 **Independent human verification is absent.** No second person is required by this packet.

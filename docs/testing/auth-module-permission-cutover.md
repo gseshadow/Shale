@@ -1,5 +1,16 @@
 # Authentication module permission cutover — 2026-10-15
 
+## Remaining controlled-route acceptance — 2026-10-16
+
+Continue with [remaining-acceptance.md](../sql/auth/permission-cutover/remaining-acceptance.md)
+and the updated [operator entry point](../sql/auth/permission-cutover/OPERATOR.md).
+They map the disposable tests to each requirement, attribute the Windows passes
+at `041fa1ed0b21d64cce3599a01eaa3344ecf57331`, and give one finite timed manual
+SQL/application recovery exercise followed by a single final decision sequence.
+Manual recovery remains NOT MEASURED; `0.743829` seconds is SQL-only. The older
+construction/retest commands below are historical, not instructions to restart
+preparation. Controlled-route requirements and SQL guards are unchanged.
+
 **Latest preparation: [final operator runner](#final-operator-runner--prepared-not-authorized--2026-10-16).** Production execution remains BLOCKED pending completed-package review, named risk approval and explicit window authorization. The original inventory/zero-invocation route remains available. No suitable entry-observation replacement is established.
 
 

@@ -25,6 +25,36 @@ final class AuthPermissionCutoverFixture {
     private final List<AuthorityCheck> authorityChecks=new ArrayList<>();
     private final List<Map<String,String>> legacyEvidence=new ArrayList<>();
     private String retirementStateHash;
+    @FunctionalInterface interface CompatibilityCheck { void verify(boolean retired) throws Exception; }
+
+    /** Focused pre-Stage-A application boundary. No diagnostic sweep or Stage A/B installation. */
+    void controlledCompatibility(CompatibilityCheck check) throws Exception {
+        for (String name : List.of("sp_login_get_hash", "sp_login_mark_failure", "sp_login_mark_success")) {
+            execute(Files.readString(root.resolve("shale-server/src/test/resources/auth/" + name + ".sql"))
+                    .replace("\r\n", "\n").replace("\n", "\r\n"));
+            execute("GRANT EXECUTE ON dbo." + name + " TO shale_app AS dbo");
+        }
+        script("legacy-retirement-baseline");
+        String before = retirementStateHash;
+        variables.put("LegacyBeforeHash", before);
+        variables.put("LegacyRetirementApproval", "APPROVED");
+        variables.put("RuntimeLegacyDisposition", "DENY_THREE_MODULES");
+        variables.put("ExclusiveChangeWindow", "CONFIRMED");
+        variables.put("CompatibilityEvidence", "synthetic-compatibility-only");
+        controlledApproval();
+        var permissions = catalog("database_permissions");
+        check.verify(false);
+        script("controlled-retire-legacy-login");
+        variables.put("LegacyAfterHash", retirementStateHash);
+        check.verify(true);
+        variables.put("LegacyRollbackApproval", "APPROVED");
+        variables.put("RollbackCompatibilityReviewed", "CONFIRMED");
+        script("controlled-rollback-legacy-login");
+        script("legacy-retirement-baseline");
+        assertEquals(before, retirementStateHash, "compatibility exercise must restore the entire original catalog digest");
+        assertEquals(permissions, catalog("database_permissions"), "exact original ACL/grantors must survive application work");
+        check.verify(false);
+    }
     private void execute(String sql)throws SQLException {
         try(var q=connection.createStatement()) {
             q.setQueryTimeout(15);
