@@ -16,6 +16,10 @@ class SqlRememberCredentialStoreTest {
         var sql=new AtomicReference<String>();
         PreparedStatement statement=(PreparedStatement)Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[]{PreparedStatement.class},(proxy,method,args)->{
+                    if(method.getName().equals("setTimestamp")){
+                        assertEquals(3,args.length,"remembered expiry must bind explicit UTC");
+                        assertEquals("UTC",((Calendar)args[2]).getTimeZone().getID());
+                    }
                     if(method.getName().startsWith("set")){bindings.put((Integer)args[0],args[1]);return null;}
                     if(method.getName().equals("executeUpdate"))return 1;
                     if(method.getName().equals("close"))return null;

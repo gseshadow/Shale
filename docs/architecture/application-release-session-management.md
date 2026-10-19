@@ -5,6 +5,25 @@ release/session initiative remains in progress and logged-out updates remain `UN
 
 **Last reviewed:** 2026-10-06
 
+## Session UTC persistence correction — 2026-10-19
+
+The Windows local recovery sandbox reported successful protected save/read but restore HTTP 500,
+SQLState 23000 / error 547 in remembered rotation. An isolated non-UTC serving API/JDBC reproduction
+names `CK_UserSessions_Refresh`: JDBC's implicit JVM-zone timestamp binding writes Denver wall time
+before SQL's UTC-default `IssuedAt`. The exact Windows constraint name was not supplied and no
+Windows database was accessed here. UTC persistence now explicitly covers both binding and reading
+for remembered credentials, durable sessions and session-list/since projections, with a fresh UTC
+Calendar per call. SQL UTC defaults, expiry predicates, serializable atomic rotation, revocation
+reasons, RLS and business-local date semantics remain unchanged. Existing shortened expiries are
+not repaired. Audit remains the existing authentication/session lifecycle, without new secret metadata.
+
+The current-source correction is distinct from the additive classpath compatibility update for
+application pin `59d83748` plus retained startup overlay `62a12940`. The latter retains the original
+build inventory and creates a separately bound receipt; it is not a source rebase, MSI or production
+deployment. [Windows continuation and recovery](../testing/remembered-session-utc.md) describes the
+pending-record loss after 401/500, private evidence preservation, supported password re-enrollment,
+and native verification limits. No retirement/recovery-timer acceptance is inferred.
+
 ## Remembered-restore permission correction — 2026-10-06
 
 Production acceptance now confirms four important lifecycle steps: remembered issuance succeeds, Windows DPAPI save
