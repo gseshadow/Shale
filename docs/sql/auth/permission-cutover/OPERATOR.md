@@ -2,6 +2,11 @@
 
 ## Remaining acceptance — use this continuation first
 
+For the missing synthetic application sandbox, use the
+[local recovery provisioner and launchers](../../../../build/local-recovery/README.md).
+Their source-build scope and Windows/manual limits remain separate from installed
+acceptance; no passing preparation/rehearsal is repeated.
+
 The operator reports all three Windows checks at reviewed revision
 `041fa1ed0b21d64cce3599a01eaa3344ecf57331` PASSED, including the complete local
 SQLCMD rehearsal. **Do not repeat Prepare, serialization regressions or Rehearse

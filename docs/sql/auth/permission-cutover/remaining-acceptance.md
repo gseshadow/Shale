@@ -125,6 +125,14 @@ also passed.
 
 ## 3. One timed operator recovery exercise, including the application
 
+Runnable local provisioning and isolated source-build launchers are in
+[build/local-recovery](../../../../build/local-recovery/README.md). They consume the
+hash-verified private schema export and support the directory/profile-audit/session
+paths below. Their pinned source builds and local live/TLS/updater substitutes do not
+certify installed 1.0.136, serving production configuration, Windows DPAPI or reboot.
+They do not run this exercise, change readiness or authorize a window. Manual recovery
+remains NOT MEASURED. The unchanged timed block below is staged privately by provisioning.
+
 **Still unperformed.** Brian performs this once in an approved disposable application
 sandbox with **synthetic data only**, representative installed desktop 1.0.136 and
 the reviewed serving API build/configuration. Use an isolated Windows test profile,
