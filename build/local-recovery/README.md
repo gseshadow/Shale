@@ -45,6 +45,93 @@ launches. It overrides the HttpClient context-permission path too. This is a dev
 accident guard for trusted Shale code, not an OS security boundary against malicious native
 code. It fails closed on another JDK; do not remove it to make a launch work.
 
+## Resume the already provisioned Windows state after selector failure
+
+Do **not** rerun `New`, edit state files, replace classes in place, or regenerate
+`build-manifest.json`. Preserve the original checkout, failure output, database
+`ShaleRetirementExercise_3b484ef49823414f942e872efe21cf6c`, credentials, certificate,
+nonce, source, manifests, packets and all prior evidence. Stop any sandbox children
+normally before updating; do not kill/adopt a listener. Relay has exited and API/desktop
+have not been started in the reported state.
+
+From a **new isolated tooling checkout at this PR's full reviewed commit**, set
+`$reviewed` to that commit and run these Windows PowerShell 5.1 commands. The JDK
+path below is the reported Adoptium installation. The correction requires no Maven,
+SQL/admin credentials, database operation, export adaptation or application rebuild.
+
+```powershell
+$state='C:\ShaleVerification\RetirementOperator-1881\SandboxState-1887-B'
+$jdk='C:\Program Files\Eclipse Adoptium\jdk-21.0.8.9-hotspot'
+powershell.exe -NoLogo -NoProfile -File .\build\local-recovery\test_launcher.ps1; if($LASTEXITCODE){throw 'Launcher regression failed'}
+& .\build\local-recovery\sandbox.ps1 -Phase UpdateStartup -StatePath $state -JavaHome $jdk -ReviewedRevision $reviewed; if(-not $?){throw 'Update stopped; preserve evidence'}
+& .\build\local-recovery\sandbox.ps1 -Phase Relay -StatePath $state -JavaHome $jdk -ToolingUpdate $reviewed; if(-not $?){throw 'Relay stopped; preserve evidence'}
+```
+
+To create the isolated tooling checkout from an existing repository, after setting
+`$reviewed` to the reviewed fix commit (and leaving the old tooling checkout intact):
+
+```powershell
+git fetch origin codex/fix-windows-selector-recovery; if($LASTEXITCODE){throw 'Fetch failed'}; $checkout=Join-Path ([IO.Path]::GetDirectoryName($state)) ('SelectorFix-'+[guid]::NewGuid().ToString('N')); git worktree add --detach $checkout $reviewed; if($LASTEXITCODE){throw 'Worktree failed'}; Set-Location -LiteralPath $checkout
+```
+
+`UpdateStartup` first validates every original build-manifest record, the original
+private-export digest, completed-provisioning marker, clean reviewed tooling HEAD,
+and the two known original startup-source digests (LF or CRLF). It refuses unknown
+startup versions. Only then does it create
+`startup-updates/<reviewed-commit>/`, compile four startup sources against existing
+snapshotted dependencies, and run `StartupChecks`. It does not modify any original
+manifest entry or application artifact. A new `receipt.json` binds the additive
+sources/classes to the original manifest digest, state path and reviewed revision;
+it is an integrity inventory, not a signature. The original manifest is verified
+again after compilation/checks. A failed or existing update directory is retained
+and cannot be overwritten. Review its actual failure before any separately reviewed
+attempt; there is no automatic retry or cleanup.
+
+On native Windows, the checks reproduce the old rejection against a disposable
+scratch socket outside the **test guard's** root, report its exact pathname, and
+then require actual `socket_<number>` deletion **inside** the corrected root.
+No existing state or user-profile file is used for this reproduction. Selector
+open/wakeup/close, a real loopback HttpServer/HttpClient exchange and the existing
+isolation denials must pass before the receipt is created. Scratch evidence paths
+are printed and retained. A TCP fallback without AF_UNIX cleanup is not sufficient
+Windows acceptance of this regression. Save this output privately with the prior
+failure. Linux output explicitly says `native Windows coverage=false`.
+
+All later Relay/Api/Desktop/Verify/SelfTest invocations for this state must use
+`-ToolingUpdate $reviewed` from the corrected checkout. Each verifies the original
+manifest and the additive receipt before selecting the correction ahead of the
+original classes, including in the launched child. For API and desktop, use the
+existing separate-console commands below **with that extra parameter**. Their local
+identity/authority checks and secure credential prompts remain. Confirm Relay is
+listening first; no new API/desktop acceptance is implied by a selector check.
+The timed recovery exercise is still separate and has not been started.
+
+### Cause and limits
+
+In [JDK 21.0.8 Windows WEPollSelectorImpl](https://github.com/openjdk/jdk21u/blob/jdk-21.0.8-ga/src/java.base/windows/classes/sun/nio/ch/WEPollSelectorImpl.java),
+the wakeup PipeImpl prefers AF_UNIX. Its
+[LoopbackConnector finally block](https://github.com/openjdk/jdk21u/blob/jdk-21.0.8-ga/src/java.base/windows/classes/sun/nio/ch/PipeImpl.java)
+deletes the bound Unix-domain socket pathname, not an arbitrary temporary file.
+[Windows UnixDomainSocketsUtil](https://github.com/openjdk/jdk21u/blob/jdk-21.0.8-ga/src/java.base/windows/classes/sun/nio/ch/UnixDomainSocketsUtil.java)
+selects `jdk.net.unixdomain.tmpdir` (system property, then net.properties), `%TEMP%`,
+then `java.io.tmpdir`; the directory is cached during JDK class initialization.
+The old launcher set only `java.io.tmpdir`, so inherited `%TEMP%` could select an
+outside-state `socket_<number>`. The supplied stack establishes AF_UNIX cleanup;
+its exact rejected pathname was **not** supplied and is not invented here.
+
+Both parent worker and every child now receive the explicit socket property at JVM
+creation; child TEMP/TMP also point into owned `tmp`. LocalBootstrap checks those
+properties before application loading. The write/delete, network, process-launch,
+HTTP context and production-endpoint checks remain unchanged. No outside-state
+permission or stack-based exception was added. Reparse tmp paths and socket paths
+that would exceed Windows' AF_UNIX length limit fail closed.
+
+API startup uses NIO selectors and its live publisher uses HttpClient; desktop
+negotiate/WebSocket clients also use HttpClient selectors. All share the corrected
+child-launch path. Verify/RelayChecks initialize HttpClient in the parent worker,
+which receives the same explicit property. These paths were inspected; the new
+JDK-only test exercises their common primitives, not a full Windows API/JavaFX run.
+
 ## Private export and reviewed adaptation
 
 Input: unchanged UTF-16LE/BOM SSMS export, 779,706 bytes, SHA256
