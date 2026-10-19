@@ -20,6 +20,14 @@ These files were not available here. Brian reviews their actual records; no inve
 evidence IDs or automatic readiness changes. Do not rerun these passing checks,
 Prepare, the 44.57-second suite, Stage A/B, or unrelated broad suites.
 
+For the already-provisioned application sandbox, Brian additionally reports Stage,
+native launcher checks, API startup, checked password login, ordinary remembered
+reopen, explicit logout/no restore, and Phase Verify application/API/local-live PASS
+at `2a74cd122e87b15fb995722451e026faa212abb8`. These are source plus startup/session
+overlay observations; reuse them without another baseline run. They do not establish
+installed 1.0.136, production serving artifact acceptance, Windows reboot or the full
+manual interval. See the single-PC continuation in §3 for the remaining work.
+
 The map below distinguishes source coverage from a recorded execution. Existing
 Java methods are under `shale-server/src/test/java/com/shale/server/` unless noted.
 An old passing report can satisfy only assertions actually present at that revision.
@@ -125,39 +133,49 @@ also passed.
 
 ## 3. One timed operator recovery exercise, including the application
 
-Runnable local provisioning and isolated source-build launchers are in
-[build/local-recovery](../../../../build/local-recovery/README.md). They consume the
-hash-verified private schema export and support the directory/profile-audit/session
-paths below. Their pinned source builds and local live/TLS/updater substitutes do not
-certify installed 1.0.136, serving production configuration, Windows DPAPI or reboot.
-They do not run this exercise, change readiness or authorize a window. Manual recovery
-remains NOT MEASURED. The unchanged timed block below is staged privately by provisioning.
+The current continuation is the [single-PC sequence](../../../../build/local-recovery/single-pc-recovery.md).
+Use Brian's existing synthetic sandbox, not provisioning or the old staged
+`$state\manual-exercise.ps1`. Preserve that manifest-bound file unchanged as historical
+evidence. Extract the revised block below into a **new private file**, as that sequence
+specifies. Do not edit an old manifest to accept the replacement.
 
-**Still unperformed.** Brian performs this once in an approved disposable application
-sandbox with **synthetic data only**, representative installed desktop 1.0.136 and
-the reviewed serving API build/configuration. Use an isolated Windows test profile,
-designated synthetic accounts/tenants, working directory/detail and one ordinary
-audited workflow, existing live-update support and any already-known job selected
-for the exercise. The application sandbox must actually support these paths. The
-minimal SQL unit-test database and its HTTP fake cannot do that. If no representative
-sandbox is available, this is the specific manual-evidence blocker; do not secretly
-substitute production or mark recovery measured.
+**NOT MEASURED.** A Windows reboot on Brian's only PC stops its loopback SQL/API,
+Relay and operator console. An independent console on that same PC cannot survive
+it; another machine cannot serve these loopback endpoints. Therefore:
 
-Before the timer, verify the target is the dedicated loopback synthetic database,
-the desktop/API point ONLY there, the original captured legacy bodies/three grants
-and pre-Stage-A state match, and baseline safe application checks succeed. Privately
-record actual identities, build/config references and expected workflow/audit results.
-Use existing approved sandbox provisioning, not a production data copy. No staff
-account changes, production replay/revocation, telemetry or employee interruption.
-Review existing exact known-work pause/resume/retry controls. No guessed commands
-are supplied for unreported jobs.
+* Perform Windows reboot persistence acceptance **before Apply, untimed**, retaining
+  its own evidence: checked credential saved, ordinary X-close, Windows restart,
+  restart the same local services, then automatic restore using the same Windows
+  owner, isolated profile, identities, API signing secret and overlay receipts.
+  This accepts persistence after services return; it does not measure service uptime,
+  boot recovery speed, SQL rollback or operator recovery. A failure blocks the drill.
+* Perform **one uninterrupted timed SQL/application recovery** on that PC with no
+  Windows reboot, sleep or operator-console restart. Include incident decision,
+  pause/drain, finding saved records, password re-entry, guarded rollback, exact full
+  catalog reverification, application recovery, reconciliation and explicit resume.
+  Application close/reopen and a controlled local live reconnect remain required.
+  No timer pause, recovered console, SQL-only substitute or excluded manual delays.
 
-Use the unchanged runner's transport helpers for this local drill; this avoids
-hand-written ODBC quoting and never uses/edits the Windows production packet.
-From the reviewed repository root in Windows PS5.1, save this block as a new private
-exercise command file, supply only the stated local selectors, then run it once.
-The selected database must already be the functioning synthetic app sandbox; this
-block does not create an incomplete replacement application database.
+The source-built sandbox is eligible for **local synthetic recovery evidence only**.
+It is application source `59d8374858764788c621f6f8d986773b58ab79c4` with the retained
+startup and session overlays, local TLS/SQL/live/updater substitutes and their stated
+limits. It is not installed 1.0.136 or production artifact acceptance. A successful
+local drill may supply the measured local interval; representative installed desktop /
+serving API binding and acceptance remain separate production-readiness requirements.
+Do not turn a local result into a production PASSED row automatically.
+
+Before starting, complete the single-PC sequence's **whole prerequisite gate** and
+review actual prior baseline results once. Reported Stage, native launcher, API,
+checked password login, ordinary remembered reopen, explicit logout/no restore, and
+Phase Verify application/API/local-live checks at `2a74cd122e87b15fb995722451e026faa212abb8`
+are accepted at that source/overlay scope; do not repeat them as preparation.
+Fresh checked login to establish the reboot fixture and checks **during the new
+retirement state / after rollback** are distinct remaining observations.
+
+The following script is the revised local exercise payload. Run it only through the
+single-PC continuation after the reboot evidence and consolidated gate are complete.
+The controlled entry points, approvals and exact SQL guards are unchanged. Its
+synthetic acknowledgement values cannot authorize a production connection/window.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -167,12 +185,16 @@ $odbc = Assert-SupportedSqlcmd 'C:\Program Files\Microsoft SQL Server\Client SDK
 $port = [int](Read-Host 'Dedicated LOCAL sandbox port, 1024..65535')
 if ($port -lt 1024 -or $port -gt 65535) { throw 'Local port refused' }
 $server = 'tcp:127.0.0.1,'+$port
-$db = Read-Host 'Dedicated synthetic app database name (not Shale)'
-if ($db -notmatch '^ShaleRetirementExercise_[A-Za-z0-9]+$') { throw 'Dedicated exercise database required' }
+$db = Read-Host 'Existing database: ShaleRetirementExercise_3b484ef49823414f942e872efe21cf6c'
+if ($port -ne 14333 -or $db -cne 'ShaleRetirementExercise_3b484ef49823414f942e872efe21cf6c') { throw 'Existing exact single-PC sandbox required' }
 $user = Read-Host 'Dedicated LOCAL sandbox SQL admin'
 $out = 'C:\ShaleVerification\ManualRecovery-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff')
 if (Test-Path -LiteralPath $out) { throw 'New evidence directory required' }
 $null = New-Item -ItemType Directory -Path $out
+$gateEvidence = Read-Host 'Private prerequisite gate and reboot PASS evidence record ID (all blockers resolved)'
+Assert-SafeValue $gateEvidence
+Write-NewText (Join-Path $out 'PrerequisitesEvidence.txt') $gateEvidence
+Confirm-Exact 'Review the whole prerequisite gate and authorize only this ONE local synthetic Apply and guarded recovery; no production approval.' 'LOCAL SYNTHETIC EXERCISE AUTHORIZED'
 $password = Read-Host 'Dedicated LOCAL sandbox password' -AsSecureString
 $common = @("ExpectedDatabase=$db",'LegacyAcceptanceRoute=CONTROLLED_CHANGE',
  'ReviewedIdentityMapping=CONFIRMED','LegacyRetirementApproval=APPROVED',
@@ -195,13 +217,17 @@ try {
     $baseline = Local-Step 'before' ':r docs/sql/auth/permission-cutover/legacy-retirement-baseline.sql' @("ExpectedDatabase=$db") ([datetime]::UtcNow.AddMinutes(1))
     $before = Get-SavedHashes $baseline 'Baseline'
     Write-NewText (Join-Path $out 'BeforeHash.txt') $before
+    Write-NewJson (Join-Path $out 'recovery-context.json') @{Repo=$repo;Server=$server;Database=$db;User=$user;BeforeHash=$before;Common=$common}
     $now = [datetime]::UtcNow
     $applyVars = $common + @("LegacyBeforeHash=$before","WindowStartUtc=$($now.AddMinutes(-1).ToString('s'))",
         "WindowEndUtc=$($now.AddMinutes(28).ToString('s'))","RollbackStartByUtc=$($now.AddMinutes(17).ToString('s'))")
+    Write-NewJson (Join-Path $out 'apply-attempt.json') @{Status='UNCERTAIN_UNTIL_OUTPUT_REVIEW';Utc=[datetime]::UtcNow.ToString('o')}
     # ONE local apply. Nonzero/ambiguous outcome stops; never replay or replace hashes.
     $applied = Local-Step 'apply' ':r docs/sql/auth/permission-cutover/controlled-retire-legacy-login.sql' $applyVars ($now.AddMinutes(17))
     $after = Get-SavedHashes $applied 'Apply' $before
     Write-NewText (Join-Path $out 'AfterHash.txt') $after
+    $trialOutcome = Read-Host 'Record DURING-RETIREMENT checks now: PASSED, FAILED or INCOMPLETE; any failure/uncertainty requires recovery below'
+    Write-NewText (Join-Path $out 'DuringRetirement.txt') $trialOutcome
     # Start BEFORE incident acknowledgement, work pause, locating recovery records or password re-entry.
     $t0 = [datetime]::UtcNow
     Write-NewText (Join-Path $out 'StartedUtc.txt') $t0.ToString('o')
@@ -216,47 +242,69 @@ try {
     $verified = Local-Step 'reverify' ':r docs/sql/auth/permission-cutover/legacy-retirement-baseline.sql' @("ExpectedDatabase=$db") $limit
     if ((Get-SavedHashes $verified 'Baseline') -ine $before) { throw 'Full catalog reverification failed' }
     Write-NewText (Join-Path $out 'SqlVerifiedUtc.txt') ([datetime]::UtcNow.ToString('o'))
-    # Keep this timer running on a separate operator console while restarting the test machine.
-    # An interrupted operator console is an incomplete exercise; preserve all evidence, no SQL replay.
+    # Same PC, same uninterrupted operator console. NO Windows reboot or sleep here.
+    # Post-rollback application close/reopen is required; API/SQL stay available.
+
     Confirm-Exact 'Perform ALL application/reconciliation checks listed immediately below and retain actual outcomes privately.' 'ALL LOCAL APPLICATION AND RECONCILIATION CHECKS PASSED'
     $appEvidence = Read-Host 'Actual private application/reconciliation evidence record ID'
     Assert-SafeValue $appEvidence
     $end = [datetime]::UtcNow
+    if ($trialOutcome -cne 'PASSED') { throw 'Retirement compatibility failed/incomplete; recovered SQL does not make acceptance pass' }
     if ($end -ge $limit) { throw '20-minute exercise bound exceeded; retain elapsed evidence as FAILED, no window approval' }
-    Write-NewJson (Join-Path $out 'manual-result.json') @{Status='PASSED_LOCAL_EXERCISE_ONLY';StartedUtc=$t0.ToString('o');FinishedUtc=$end.ToString('o');MeasuredRecoverySeconds=($end-$t0).TotalSeconds;ApplicationEvidence=$appEvidence}
+    Write-NewJson (Join-Path $out 'manual-result.json') @{Status='PASSED_LOCAL_EXERCISE_ONLY';StartedUtc=$t0.ToString('o');FinishedUtc=$end.ToString('o');MeasuredRecoverySeconds=($end-$t0).TotalSeconds;ApplicationEvidence=$appEvidence;PrerequisitesEvidence=$gateEvidence;Scope='PINNED_SOURCE_PLUS_STARTUP_AND_SESSION_OVERLAYS_LOCAL_ONLY';RebootIncluded=$false}
 } catch {
     Write-NewText (Join-Path $out 'FAILED.txt') ('STOPPED '+[datetime]::UtcNow.ToString('o')+'; preserve outputs and local resource; no automatic retry')
     throw
 } finally { $password.Dispose() }
 ```
 
-During the final prompt, Brian performs and records these actual checks in order:
+**During retirement**, before the incident prompt, retain actual desktop password /
+second API exchange, remembered restore, API login /me/refresh/logout and designated
+user-switch results under the retired permissions. Also check User directory/detail,
+one synthetic self-profile save and its existing USER/UPDATED audit. Budget at most
+five minutes for these observations: if they fail, are incomplete or take longer,
+record FAILED/INCOMPLETE and proceed promptly to guarded recovery. Do not wait for
+a pass or replay Apply. Preserve the unique emitted BeforeHash and AfterHash in the
+new evidence directory and independently with the private operator records.
 
-1. Desktop correct password and second API exchange succeed; incorrect password
-   rejects. API login, /me, refresh and logout give the expected current identity.
-2. Checked remembered login, ordinary close/reopen and Windows test-machine restart
-   restore correctly. Unchecked login leaves no startup restore. Confirm a safe
-   switch between designated synthetic users changes displayed tenant/actor and
-   leaves no prior user's session. Use the separately mapped disposable evidence
-   for destructive replay/revocation/disabled cases; do not damage real accounts.
-3. User directory/detail and one approved ordinary synthetic workflow produce the
-   expected result and existing audit entries. Reconnect the existing live-update
-   client and verify its expected result. Check any already-known selected job's
-   result through its existing control; otherwise record explicitly no known due
-   job for this drill. Do not treat an unrun job as PASSED.
-4. Check the existing error/support channel and expected baseline. Identify the
-   simulated affected work, compare actual completion/audit/accounting records,
-   decide retry/idempotency from those records, and resume only reconciled local
-   test work. No blind replay, fabricated history or guessed accounting correction.
-   Record that grants reopen the original vulnerable capabilities and cannot repair
-   lost failure counters, locks, last_login, audits or external effects.
+**During the final timed prompt**, Brian records all of these post-rollback results:
 
-Target schedule: minutes 0–2 incident/pause/records, 2–4 password/guarded rollback/full
-catalog verification, 4–12 desktop/API/restart, 12–17 ordinary work/audit/reconnect,
-17–20 reconciliation/resume/record. These are budgets, not results. Missing/failed
-checks stop acceptance; preserve timings/outputs and the exact sandbox for review.
-Do not rerun a successful drill to improve its time. A failed/overrun drill remains
-failed until its specific problem is resolved, without extending this timer.
+1. Desktop correct password and second API exchange succeed; wrong password rejects.
+   API login, /me, refresh/logout have the expected identity. Checked remembered
+   close/reopen restores; unchecked login has no restore. Safely switch synthetic1
+   (tenant 11) and synthetic3 (tenant 22), observing displayed tenant/actor and no
+   previous user's session. No Windows reboot here. Reuse the attributed disposable
+   evidence for destructive replay/revocation/disabled cases; no staff changes.
+2. User directory/detail and self-profile edit produce the expected persisted value
+   and transactional USER/UPDATED audit for the actual selected tenant/actor. Inspect
+   through the existing dedicated local admin connection; do not grant audit SELECT.
+   Use Team → signed-in synthetic user → First Name pencil → one synthetic edit/save.
+   Retain before/after value and audit evidence privately. A selected workflow failure
+   blocks resume. Record what happened under retirement and after exact restoration.
+3. Reconnect the existing live client: stop only the owned Relay normally in its own
+   console and restart it with the same startup-overlay command, while keeping SQL,
+   API and operator timer running. Observe desktop disconnect/reconnect and correct
+   local routing; record local substitute scope, never Azure acceptance. No unknown
+   listener killing/adoption. Record no known due job **for this sandbox** unless an
+   already-known selected job exists; that job then needs its real result/control.
+4. Review existing application/API error output and the private baseline/audit records;
+   record the simulated affected work, actual completion, retry/idempotency decision,
+   reconciliation and explicit local resume. No blind replay or fabricated accounting.
+   Restored grants reopen vulnerable capabilities and cannot repair lost counters,
+   locks, last_login, audits or external effects. Record Brian as operator, verifier,
+   incident lead and support; independent verification remains absent.
+
+Target recovery budgets: minutes 0–2 incident/pause/records, 2–4 password/guarded
+rollback/full catalog verification, 4–12 desktop/API/session recovery, 12–17 ordinary
+work/audit/reconnect, 17–20 reconciliation/resume/record. They are budgets, not results.
+Failure/overrun/interrupted console leaves acceptance FAILED/INCOMPLETE. Preserve
+all evidence; no timer extension or rerun to improve time. SQL rollback remains
+available after the exercise deadline: if a deadline/refusal stops the script, stop
+admission and use the unchanged controlled rollback entry point with the **saved**
+BeforeHash/AfterHash and same approvals, with no expired Apply deadline supplied.
+This is incident recovery, not a new acceptance attempt. Missing/ambiguous AfterHash
+requires exact-state review, never a current hash substituted as expected. Do not let
+a throw or failed prompt stand in for necessary guarded incident recovery.
 
 Only the observed full interval, including manual delays, supports
 MeasuredRecoverySeconds. The result file is an operator assertion requiring the

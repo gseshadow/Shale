@@ -5,6 +5,14 @@ This implements the missing application sandbox for
 It does not run retirement Apply/Rollback, Prepare, Rehearse, change readiness, or
 approve a production window. Manual recovery remains **NOT MEASURED**.
 
+For Brian's already-provisioned Windows state, use the **[current single-PC
+continuation](single-pc-recovery.md)**. Stage, native launcher checks, API startup,
+checked password login, ordinary remembered reopen, explicit logout/no restore and
+Phase Verify were reported successful at update `2a74cd122e87b15fb995722451e026faa212abb8`.
+The setup and failure-recovery sections below describe earlier construction/history;
+they are not instructions to replay New, UpdateStartup, Stage or those passing checks.
+Untimed reboot persistence and full manual recovery are still outstanding.
+
 ## Bound builds and substitutions
 
 Tooling is built from the full reviewed commit containing this directory. Application
@@ -45,7 +53,7 @@ launches. It overrides the HttpClient context-permission path too. This is a dev
 accident guard for trusted Shale code, not an OS security boundary against malicious native
 code. It fails closed on another JDK; do not remove it to make a launch work.
 
-## Resume the already provisioned Windows state after selector failure
+## Historical selector-failure continuation (superseded for the current state)
 
 Do **not** rerun `New`, edit state files, replace classes in place, or regenerate
 `build-manifest.json`. Preserve the original checkout, failure output, database
@@ -268,47 +276,18 @@ Offline helper/guard/adaptation checks, optional if already covered by accepted 
 
 ## Exact continuation into the existing exercise
 
-Only after baseline GUI/password/remembered checks succeed, continue directly with
-[remaining-acceptance §3](../../docs/sql/auth/permission-cutover/remaining-acceptance.md#3-one-timed-operator-recovery-exercise-including-the-application),
-using its **unchanged** private exercise block from the reviewed tooling checkout.
-`New` stages that exact block in `$state\manual-exercise.ps1` and includes it in the
-build manifest; it never executes it. The explicit continuation, once all its
-prerequisites hold, is:
+Use the [single-PC continuation](single-pc-recovery.md) for Brian's existing
+`SandboxState-1887-B`, including the completed Windows results and the exact retained
+startup/session overlay selectors. It separates untimed reboot persistence from one
+uninterrupted SQL/application recovery interval and collects remaining blockers before
+Apply. It does not repeat New, Stage, Verify or completed baseline checks.
 
-```powershell
-powershell.exe -NoLogo -NoProfile -File (Join-Path $state 'manual-exercise.ps1'); if($LASTEXITCODE){throw 'Manual recovery stopped; preserve evidence and exact resources; no replay'}
-```
-
-When prompted, select the `database` and `sqlPort` from `$state\sandbox.properties`,
-and the dedicated LOCAL SQL admin. Do not select `Shale`, an earlier rehearsal DB,
-or any Windows production evidence packet. The runner's exact guards still decide
-whether the sandbox is suitable; never substitute new expected hashes on refusal.
-
-Before the timer, record the source revision, `build-manifest.json` digest, database,
-actual login mappings and limits. Keep the original Windows passes at `041fa1ed...`
-and private packets unchanged; do not run Prepare/Rehearse again. The exercise's
-baseline is read-only; its controlled Apply/Rollback remain separate operator actions.
-
-For its ordinary audited workflow use Team → double-click the signed-in synthetic
-user → pencil beside First Name → save one synthetic change. Check the resulting
-USER/UPDATED `EntityActionAuditLog` row with actor/tenant 1/11 using the dedicated
-local admin, without granting runtime audit SELECT. Use the existing real application
-error output plus saved baseline/audit records for reconciliation; no blanket replay.
-For user switch use synthetic1 and synthetic3 and inspect identity/tenant visibility.
-Reconnect the local relay only with its own console and verify the desktop reconnects;
-record this as **local substitute coverage**, never Azure acceptance. There is no
-known due job supplied for this sandbox; record that fact rather than invent a job pass.
-
-For Windows restart, keep the independent operator timer/API/relay console running on
-another test machine as §3 requires. These default loopback endpoints cannot span
-machines. A single-machine reboot interrupts all three services and the timer: that
-is an **incomplete exercise**, not a measured pass. Do not run the timed block until
-Brian has chosen a restart arrangement that preserves its independent timer and local
-services (or obtained a separately reviewed adjustment to that exercise). This launcher
-does not silently relax §3, substitute automated timing, or claim the source build is
-the installed 1.0.136 artifact. Windows DPAPI/reboot and representative installed/serving
-acceptance remain explicit operator gaps. Final approval-copy/window steps in §4 are
-unchanged and remain separate decisions.
+The original `$state\manual-exercise.ps1` is manifest-bound historical evidence;
+**do not execute it or rewrite it**. It contains the superseded independent-machine
+reboot instruction. The continuation extracts the revised remaining-acceptance §3
+payload into a new private file outside state, without changing the original manifest.
+Existing pinned application, receipts, ciphertext archive, packets and failed outputs
+remain retained. Source plus overlays is not installed 1.0.136 or production acceptance.
 
 ## Executed evidence and limits
 
