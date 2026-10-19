@@ -109,3 +109,50 @@ Final integration and scope review:
 
 All successful and failed task-owned local resources/evidence remain retained privately.
 No timed manual Apply/Rollback exercise was started and no recovery number was emitted.
+
+
+## PowerShell 5.1 manifest-array correction
+
+Fix base: `d0bb63966934c451f24b6172f436dd461aa244e7` (current `origin/codex/latest`,
+merged #1886). Brian's native Windows 5.1 failure at reviewed commit
+`0f15b9a1217620e1734054e8ab303ccdd132bfac` is operator-provided evidence:
+a captured `ConvertFrom-Json` result is `System.Object[]` with seven records, while
+`@(Get-Content ... | ConvertFrom-Json)` contains one pipeline object.
+
+`Assert-BuildManifest` now captures `Read-Json` before array materialization. Its
+inventory count, per-record path access and exact SHA256 comparison are unchanged.
+No existing manifest is rewritten or generated to accept an inventory mismatch.
+The test loads the real shared JSON helpers by AST, without executing the operator
+or launcher phases. It uses one immutable seven-record manifest and checks both
+the host reader and an explicitly non-enumerated array result. Valid inventory
+passes; added/deleted files fail the count check; same-count path replacement and
+modification of every fixture artifact/config/tooling file are rejected. The
+manifest digest is unchanged after all cases. Existing private-directory refusal
+and child-only secure prompt checks remain.
+
+Consumer/test-impact review: repository-wide searches for `build-manifest`,
+`Assert-BuildManifest`, `Read-Json` and `ConvertFrom-Json` found this sole top-level
+build-inventory array consumer. Retirement-operator packet/authorization/readiness
+and invocation-validation retained-manifest readers consume object documents;
+they do not use the defective pipeline-array wrapping. Those resources and their
+SQL contracts are unchanged. Changed-file mapping: `sandbox.ps1` is covered by
+`test_launcher.ps1`; README and this evidence note document commands and limits.
+No application business mutation or audit seam changed; no audit migration needed.
+
+Executed on Linux with PowerShell Core 7.4.6:
+
+* `pwsh -NoLogo -NoProfile -File build/local-recovery/test_launcher.ps1` — PASS,
+  using task-local XDG cache/config/data directories because the host home is read-only.
+* The updated test against a scratch copy of the old launcher expression — expected
+  FAIL, `Build inventory changed; stop`, at the simulated PS5.1 valid inventory.
+* `python build/test-selection/select_tests.py --base d0bb63966934c451f24b6172f436dd461aa244e7 --head HEAD --format markdown --plan-output <task-work>/manifest-test-selection.json`
+  — PASS. No affected Maven module/test contract was selected; the new tooling paths
+  trigger unknown-area escalation. Suggested critical/full Maven runs were excluded
+  by the user's explicit prohibition on unrelated broad reruns.
+* `git diff --check` — PASS.
+
+Native Windows PowerShell 5.1 remains **UNVERIFIED by this fix's execution**; run the
+README's explicit `powershell.exe` offline command from the pinned fix checkout.
+No Windows provisioning has been attempted. Prior Windows checkout/failure evidence,
+private export, packets and SQL resources were not accessed or changed. No Azure
+operation, provisioning, sandbox phase or broad application suite was run for this fix.
