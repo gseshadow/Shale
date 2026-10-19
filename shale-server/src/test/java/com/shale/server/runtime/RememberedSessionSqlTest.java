@@ -136,11 +136,11 @@ class RememberedSessionSqlTest {
         String initial=enrolled.get("rememberCredential").asText(), replacement=secret();
         Instant expected=Instant.parse(enrolled.get("rememberExpiresAt").asText());
         assertInstant(expected,durable.find(owner,sid).orElseThrow().expiresAt());
-        try(var c=connections.openConnection(owner);var q=c.createStatement();var r=q.executeQuery("SELECT IssuedAt,SYSUTCDATETIME() FROM dbo.UserSessions")){
-            assertTrue(r.next());assertTrue(Duration.between(r.getObject(1,java.time.LocalDateTime.class).toInstant(ZoneOffset.UTC),r.getObject(2,java.time.LocalDateTime.class).toInstant(ZoneOffset.UTC)).abs().compareTo(Duration.ofSeconds(10))<0,"IssuedAt must remain database UTC");
-        }
         call("/api/auth/desktop-session/restore",restore(UUID.randomUUID(),initial,secret()),null,401);
         var restored=call("/api/auth/desktop-session/restore",restore(installation,initial,replacement),null,200);
+        try(var c=connections.openConnection(owner);var q=c.createStatement();var r=q.executeQuery("SELECT IssuedAt,SYSUTCDATETIME(),ExpiresAt FROM dbo.UserSessions")){
+            assertTrue(r.next());assertInstant(expected,r.getObject(3,LocalDateTime.class).toInstant(ZoneOffset.UTC));assertTrue(Duration.between(r.getObject(1,java.time.LocalDateTime.class).toInstant(ZoneOffset.UTC),r.getObject(2,java.time.LocalDateTime.class).toInstant(ZoneOffset.UTC)).abs().compareTo(Duration.ofSeconds(10))<0,"IssuedAt must remain database UTC");
+        }
         assertInstant(expected,Instant.parse(restored.get("rememberExpiresAt").asText()));
         call("/api/auth/desktop-session/restore",restore(installation,initial,secret()),null,401);
         String token=restored.get("accessToken").asText();

@@ -2,10 +2,14 @@
 
 ## Finding and scope
 
-Base: fetched `origin/codex/latest` = `e5c6229fd94cc8a7275c9ba10e881442997013d5`.
+Base: explicitly refreshed `origin/codex/latest` = `684ab9d638e326ec52451a834fb85158def10197`.
 Application compatibility pin: `59d8374858764788c621f6f8d986773b58ab79c4`.
 Retained startup overlay: `62a12940aeb5d6994016432cd8985ec66cd98bf7`.
-The three modified persistence classes are identical between the base and application pin before this fix.
+Current `SqlRememberCredentialStore` already uses explicit UTC and the bounded V2 resolver; it is
+unchanged by this fix. The remaining current defects are in `UserSessionDao` and
+`SessionManagementService`, whose pre-fix code matches the application pin. The sandbox's old remembered
+store is retained as a separate compatibility source with UTC conversion added; it is never substituted
+into the current application build.
 
 The supplied Windows 547/23000 report establishes a constraint violation but does not name it.
 The isolated SQL Server reproduction establishes **CK_UserSessions_Refresh**, from the SQLException
@@ -27,8 +31,9 @@ Reading is equally important: `getTimestamp()` interprets zone-less SQL UTC fiel
 zone, moving October `IssuedAt` six hours into the future. An expiry written and read with the
 same local zone may appear to round-trip while SQL expiry comparisons remain wrong. Changing
 JVM zones across launches changes that accidental behavior. UTC calendars are now explicit for
-all Instant writes and reads in `SqlRememberCredentialStore`, `UserSessionDao`, and session-list /
-admin-since projections in `SessionManagementService`. A fresh mutable Calendar is used each call.
+the remaining Instant writes and reads in current `UserSessionDao` and session-list/admin-since
+projections in `SessionManagementService`, plus the pin-only compatibility remembered store. Current
+remembered-store UTC handling, V2 lookup, input/cardinality validation, timeout and sanitization remain unchanged. A fresh mutable Calendar is used each call.
 The SQL UTC defaults and refresh/revocation expressions remain authoritative. Business-local
 case/task/calendar dates, application-wide timezone and user-facing date formatting are unchanged.
 Existing shortened expiries remain shortened; this change never repairs or extends their values.
@@ -41,7 +46,8 @@ audit schema/event or secret/hash payload is introduced.
 
 1. **Application fix:** ordinary source changes on current `codex/latest`, with focused tests.
 2. **Pinned sandbox compatibility update:** `build/session-utc-update/session-update.ps1` compiles
-   only those three classes, the new UTC boundary helper and an offline linkage check against the
+   the two corrected current classes, `compatibility/SqlRememberCredentialStore.java` (old resolver
+   with UTC conversion only), the new UTC helper and an offline linkage check against the
    existing snapshotted dependencies. It creates `session-updates/<reviewed SHA>/` and a new receipt.
    It does not rebuild the pinned application or update its source/classes/JARs/manifests in place.
 

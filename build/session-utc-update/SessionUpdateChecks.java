@@ -11,7 +11,7 @@ public final class SessionUpdateChecks {
         if(Runtime.version().feature()!=21 || args.length!=1)throw new IllegalArgumentException("Explicit JDK 21 classes path required");
         Path expected=Path.of(args[0]).toRealPath();
         for(String name:new String[]{"com.shale.data.util.UtcJdbcTimestamp","com.shale.data.dao.UserSessionDao","com.shale.server.runtime.SqlRememberCredentialStore","com.shale.server.runtime.SessionManagementService"}){
-            Class<?> type=Class.forName(name);
+            Class<?> type=Class.forName(name,false,SessionUpdateChecks.class.getClassLoader());
             Path actual=Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
             if(!actual.equals(expected))throw new AssertionError("Compatibility class precedence mismatch: "+name);
         }
