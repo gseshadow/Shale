@@ -55,6 +55,8 @@ public final class Sandbox {
         } catch(Exception failure) {
             // SQLException text can contain SQL/password material. Never print arbitrary exceptions.
             System.err.println("STOP local sandbox: "+failure.getClass().getSimpleName()+". Preserve the exact state; no retry/cleanup.");
+            Throwable cause=failure;for(int depth=0;depth<8&&cause.getCause()!=null;depth++)cause=cause.getCause();
+            System.err.println("Failure category="+cause.getClass().getSimpleName());
             if(failure instanceof SQLException q)System.err.println("SQL error number="+q.getErrorCode()+" state="+q.getSQLState());
             else if(failure instanceof IllegalArgumentException)System.err.println(failure.getMessage());
             System.exit(1);

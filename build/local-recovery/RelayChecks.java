@@ -21,7 +21,10 @@ public final class RelayChecks {
     }
     public static void main(String[] args)throws Exception{
         var root=Path.of(args[0]);var p=new Properties();try(var in=Files.newInputStream(root.resolve("sandbox.properties"))){p.load(in);}
-        System.setProperty("javax.net.ssl.trustStore",root.resolve("relay.p12").toString());System.setProperty("javax.net.ssl.trustStorePassword",Files.readString(root.resolve("relay-key-password")).strip());
+        var keys=java.security.KeyStore.getInstance("PKCS12");char[] password=Files.readString(root.resolve("relay-key-password")).strip().toCharArray();
+        try(var in=Files.newInputStream(root.resolve("relay.p12"))){keys.load(in,password);}Arrays.fill(password,'\0');
+        var trust=javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());trust.init(keys);
+        var tls=javax.net.ssl.SSLContext.getInstance("TLS");tls.init(null,trust.getTrustManagers(),null);javax.net.ssl.SSLContext.setDefault(tls);
         var a=new Receiver(11);var b=new Receiver(22);var one=new LiveBusClient(a);var two=new LiveBusClient(b);
         String origin="http://127.0.0.1:"+p.getProperty("livePort");
         try{
