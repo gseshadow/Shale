@@ -6,7 +6,7 @@ import java.util.*;
 /** Only the sandbox launches through this class. The production artifacts are unchanged. */
 @SuppressWarnings("removal")
 public final class LocalBootstrap {
-    static final class LoopbackGuard extends SecurityManager {
+    static class LoopbackGuard extends SecurityManager {
         final Set<Integer> ports;final Path root;
         LoopbackGuard(Path root,Set<Integer> ports){this.root=root.toAbsolutePath().normalize();this.ports=Set.copyOf(ports);}
         static boolean local(String host){return Set.of("127.0.0.1","localhost","::1","0:0:0:0:0:0:0:1").contains(host);}
@@ -27,6 +27,7 @@ public final class LocalBootstrap {
     public static void main(String[] args)throws Exception{
         if(Runtime.version().feature()!=21||args.length!=2)throw new IllegalArgumentException("JDK 21 sandbox selector required");
         Path root=Path.of(args[1]).toRealPath();var p=new Properties();try(var in=Files.newInputStream(root.resolve("sandbox.properties"))){p.load(in);}
+        StartupPaths.verify(root);
         Set<Integer> ports=new HashSet<>();for(String key:List.of("sqlPort","apiPort","livePort","wsPort"))ports.add(Integer.parseInt(p.getProperty(key)));
         System.setProperty("javax.net.ssl.trustStore",root.resolve("relay.p12").toString());
         System.setProperty("javax.net.ssl.trustStorePassword",Files.readString(root.resolve("relay-key-password")).strip());

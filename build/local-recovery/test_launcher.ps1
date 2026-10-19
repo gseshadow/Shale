@@ -68,6 +68,42 @@ foreach($arrayMode in @('HostJsonReader','PS51PipelineShape')) {
     if((Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash -cne $manifestHash){throw 'Test must not rewrite the manifest to accept changed inventory'}
 }
 Set-Item Function:Read-Json $readJson
+# Startup correction is additive and bound to the original immutable manifest.
+$ToolingUpdate='a'*40
+$update=Get-StartupUpdatePath
+$null=New-Item -ItemType Directory -Path (Join-Path $update 'classes') -Force
+$null=New-Item -ItemType Directory -Path (Join-Path $update 'sources')
+foreach($file in @('classes/LocalBootstrap.class','sources/LocalBootstrap.java')){[IO.File]::WriteAllText((Join-Path $update $file),'synthetic update')}
+$updateFiles=@(Get-UpdateFiles $update | ForEach-Object {@{Path=$_.FullName.Substring($update.Length+1);Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}})
+$receiptPath=Join-Path $update 'receipt.json'
+$receipt=@{Schema=1;Revision=$ToolingUpdate;State=$state;OriginalManifestSha256=$manifestHash;Files=$updateFiles}
+Write-NewJson $receiptPath $receipt
+Assert-StartupUpdate $update
+Assert-BuildManifest
+$receiptBytes=[IO.File]::ReadAllBytes($receiptPath)
+foreach($field in @('Revision','State','OriginalManifestSha256')) {
+    $receipt[$field]='changed'
+    Remove-Item -LiteralPath $receiptPath
+    Write-NewJson $receiptPath $receipt
+    Must-Refuse {Assert-StartupUpdate $update}
+    [IO.File]::WriteAllBytes($receiptPath,$receiptBytes)
+    $receipt=Read-Json $receiptPath
+    # Restore the mutable map for the next negative case.
+    $receipt=@{Schema=1;Revision=$ToolingUpdate;State=$state;OriginalManifestSha256=$manifestHash;Files=$updateFiles}
+}
+foreach($file in $updateFiles) {
+    $path=Join-Path $update $file.Path
+    [IO.File]::WriteAllText($path,'tampered update')
+    Must-Refuse {Assert-StartupUpdate $update} 'Startup update artifact changed'
+    [IO.File]::WriteAllText($path,'synthetic update')
+}
+$added=Join-Path $update 'classes/Unexpected.class'
+[IO.File]::WriteAllText($added,'added')
+Must-Refuse {Assert-StartupUpdate $update} 'Startup update inventory changed'
+Remove-Item -LiteralPath $added
+Assert-StartupUpdate $update
+Assert-BuildManifest
+if((Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash -cne $manifestHash){throw 'Startup correction changed original manifest'}
 function Read-Host {param([string]$Prompt,[switch]$AsSecureString) ConvertTo-SecureString 'synthetic-only-test-secret' -AsPlainText -Force}
 $info=New-Object Diagnostics.ProcessStartInfo
 $info.UseShellExecute=$false
@@ -77,4 +113,4 @@ if([Environment]::GetEnvironmentVariable('SHALE_SANDBOX_TEST_SECRET')){throw 'Se
 $info.EnvironmentVariables.Remove('SHALE_SANDBOX_TEST_SECRET')
 # Exact test directory only; never remove a database or exercise resource.
 Remove-Item -LiteralPath $root -Recurse -Force
-Write-Host ('PASS launcher private-directory refusal, host JSON reader/simulated PS5.1 manifest arrays, valid inventory, added/deleted/replaced/modified-file rejection and child-only secure prompt on '+$PSVersionTable.PSEdition+' '+$PSVersionTable.PSVersion)
+Write-Host ('PASS launcher private-directory refusal, host JSON reader/simulated PS5.1 manifest arrays, valid inventory, added/deleted/replaced/modified-file rejection, startup receipt binding/tamper refusal, unchanged original manifest and child-only secure prompt on '+$PSVersionTable.PSEdition+' '+$PSVersionTable.PSVersion)

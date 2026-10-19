@@ -156,3 +156,89 @@ README's explicit `powershell.exe` offline command from the pinned fix checkout.
 No Windows provisioning has been attempted. Prior Windows checkout/failure evidence,
 private export, packets and SQL resources were not accessed or changed. No Azure
 operation, provisioning, sandbox phase or broad application suite was run for this fix.
+
+## Windows JDK 21 selector startup correction
+
+Fix base: `987d91a9e01725c5743a49313d148c101b2c3dc6`, current `codex/latest`
+at investigation. Brian reports PS5.1 launcher regression PASS at
+`80353a0263dd35640d82388daa4e4211c1e95f5a` and provisioning success for
+`SandboxState-1887-B` / `ShaleRetirementExercise_3b484ef49823414f942e872efe21cf6c`.
+The reported relay stack reaches Windows PipeImpl AF_UNIX socket deletion. It
+contains no rejected pathname; no exact production-profile path is asserted.
+The README links the inspected JDK 21.0.8 sources and explains property precedence.
+
+Documentation reviewed: AGENTS, complete codex-prompt-rules, system-overview,
+tenancy-and-rls, local-recovery README/verification, owning auth permission-cutover
+runbook, OPERATOR and remaining-acceptance. Pre-edit test-impact search covered
+LocalBootstrap/LoopbackGuard, Sandbox.launch, java.io.tmpdir, tool-classes,
+build-manifest/Assert-BuildManifest, ContractChecks, RelayChecks and test_launcher.
+API live HttpInvalidationPublisher and desktop NegotiateClient/LiveBusClient use
+HttpClient selectors; API NIO startup shares the same child-launch configuration.
+No application production symbol, SQL resource, business mutation, sensitive read,
+or audit seam changes. Existing application audit schema remains unchanged; tooling
+integrity receipts are private developer evidence, not business audit rows.
+
+Changed-file/test mapping:
+
+* Sandbox / StartupPaths: explicit JVM socket directory and child TEMP/TMP for every
+  launch; StartupChecks exercises selector/wakeup/close plus actual loopback
+  HttpServer and HttpClient. LocalBootstrap validates the configuration before
+  loading the application. LoopbackGuard permission checks are unchanged (the
+  class allows a recording subclass solely for focused path observation).
+* sandbox.ps1: additive UpdateStartup and explicitly selected receipt-bound overlay;
+  test_launcher retains prior PS5.1-array and tamper tests and adds receipt
+  state/revision/original-manifest binding, class/source tampering and inventory
+  rejection. Original manifest bytes must remain unchanged.
+* StartupChecks: native Windows additionally reproduces the legacy rejection only
+  against disposable scratch sockets, prints the actual rejected path and requires
+  corrected AF_UNIX cleanup under owned tmp. Linux does not simulate Windows
+  acceptance. API/JavaFX/DPAPI/Windows restart are not launched by these checks.
+
+Executed in this change, Linux / Temurin JDK 21.0.12.1 / PowerShell Core 7.4.6:
+
+* Pinned application checkout `59d8374858764788c621f6f8d986773b58ab79c4`:
+  `JAVA_HOME=/workspace/.tools/jdk-21 /workspace/.tools/bin/mvn -B -pl shale-desktop,shale-server -am -Dmaven.test.skip=true compile`
+  — PASS, compilation only; no application test suite.
+* `javac -proc:none -cp <pinned application classes and dependencies> -d <scratch classes> build/local-recovery/*.java build/local-recovery/substitutes/*.java`
+  — PASS. Initial compilation against stale cached application targets failed;
+  those targets were not treated as validation of the pinned revision. An offline
+  current-tree Maven compile lacked ICU/phone dependencies; the isolated pinned
+  compile above supersedes it for this tooling's actual application contract.
+* `java -Djava.security.manager=allow -cp <scratch classes and dependencies> StartupChecks`
+  — PASS on Linux: actual EPollSelectorImpl, guarded HTTP exchange and isolation
+  denials. Initial restricted execution could not bind loopback sockets; the
+  authorized focused rerun with socket access passed. `native Windows coverage=false`.
+* `pwsh -NoLogo -NoProfile -File build/local-recovery/test_launcher.ps1`
+  with task-local XDG directories — PASS on Core 7.4.6, including simulated PS5.1
+  array shape. This does not certify native Windows PowerShell execution.
+
+Native Adoptium Windows 21.0.8.9 execution and the actual provisioned-state update /
+Relay restart remain **UNVERIFIED here**. UpdateStartup requires the native checks
+to pass on Brian's Windows host before producing a usable receipt. Preserve any
+refusal/evidence; do not rewrite manifests, remove the guard or replay New.
+No supplied Windows state, database, credential, manifest or failure evidence was
+accessed or changed. No Azure operation, retirement execution, provisioning or
+unrelated broad suite ran. Manual recovery remains NOT MEASURED.
+
+Final focused integration/review:
+
+* A disposable synthetic fixture used the real original startup sources/classes,
+  a new synthetic manifest and the pinned application dependencies. AST-loaded
+  launcher helpers ran the real reviewed clean-HEAD check, original inventory
+  verification, compiler, StartupChecks subprocesses, receipt creation and receipt
+  verification — PASS under Core/Linux. Original manifest digest remained equal;
+  a repeated attempt and then tampered original tooling were refused. No SQL or
+  private export was used. The AST harness explicitly bound PSScriptRoot to the
+  actual launcher directory; an initial harness-only missing script-directory
+  failure was retained in a separate fixture and not reused. This helper exercise
+  is not a claim of native PS5.1 or full provisioned-state launcher execution.
+* `python build/test-selection/select_tests.py --base 987d91a9e01725c5743a49313d148c101b2c3dc6 --head HEAD --format markdown --plan-output <scratch>/startup-selection.json`
+  — PASS; no affected Maven modules/test classes. Unknown tooling paths suggested
+  critical/full suites, excluded by the user's explicit scope. Focused compilation,
+  Java runtime checks, launcher/receipt checks and update-helper integration cover
+  the actual changed contracts. No unrelated suite result is implied.
+* `git diff 987d91a9e01725c5743a49313d148c101b2c3dc6 HEAD --check` — PASS.
+  Final reference search found the only shared child launcher updated, both
+  new-source compilation lists present, explicit overlay selection in parent and
+  child, and no outside-state guard exemption. Old application artifacts and
+  original manifest entries are never overwritten by UpdateStartup.

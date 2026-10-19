@@ -207,11 +207,14 @@ public final class Sandbox {
             try(var c=connect(p.getProperty("database"),p.getProperty(role.equals("app")?"appLogin":"runtimeLogin"),env(role.equals("app")?"SHALE_SANDBOX_APP_PASSWORD":"SHALE_SANDBOX_RUNTIME_PASSWORD"))){owned(c);authority(c);require(scalar(c,"SELECT CASE WHEN USER_NAME()="+literal(role.equals("app")?"shale_app":"shale_runtime")+" THEN 1 ELSE 0 END")==1,"Local login mapping changed");}
         }
         String module=mode.equals("api")?"shale-server":"shale-desktop";
-        String cp=state.resolve("tool-classes")+File.pathSeparator+String.join(File.pathSeparator,classpath(module));
-        var args=new ArrayList<String>(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Djava.security.manager=allow","--add-opens=java.base/java.lang=ALL-UNNAMED","-Duser.home="+state.resolve("home"),"-Djava.io.tmpdir="+state.resolve("tmp"),"-Djava.util.prefs.userRoot="+state.resolve("prefs"),"-DSHALE_UPDATE_ATTEMPT_DIR="+state.resolve("updates"),"-DSHALE_UPDATE_EXECUTION_LOCK="+state.resolve("update.lock"),"-cp",cp,"LocalBootstrap",mode,state.toString()));
+        String toolClasses=System.getProperty("shale.local.toolClasses",state.resolve("tool-classes").toString());
+        String cp=toolClasses+File.pathSeparator+state.resolve("tool-classes")+File.pathSeparator+String.join(File.pathSeparator,classpath(module));
+        var args=new ArrayList<String>(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Djava.security.manager=allow","--add-opens=java.base/java.lang=ALL-UNNAMED","-Duser.home="+state.resolve("home"),"-Djava.util.prefs.userRoot="+state.resolve("prefs"),"-DSHALE_UPDATE_ATTEMPT_DIR="+state.resolve("updates"),"-DSHALE_UPDATE_EXECUTION_LOCK="+state.resolve("update.lock"),"-cp",cp,"LocalBootstrap",mode,state.toString()));
+        args.addAll(1,StartupPaths.vmArgs(state));
         ProcessBuilder pb=new ProcessBuilder(args).directory(state.toFile()).inheritIO();Map<String,String> e=pb.environment();
         e.keySet().removeIf(k->k.toUpperCase(Locale.ROOT).matches("(SHALE_.*|SPRING_.*|SQLCONNSTR_.*|SQLAZURECONNSTR_.*|FUNCTION_.*|LIVE_.*|NEGOTIATE_.*|WEBPUBSUB_.*|APP_.*|DB_.*|JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS|JAVA_OPTS|MAVEN_OPTS|HTTP_PROXY|HTTPS_PROXY|ALL_PROXY|NO_PROXY)"));
         for(String dir:List.of("home","tmp","local","roaming","machine","config","data","cache"))Files.createDirectories(state.resolve(dir));
+        StartupPaths.environment(e,state);
         e.put("LOCALAPPDATA",state.resolve("local").toString());e.put("APPDATA",state.resolve("roaming").toString());e.put("ProgramData",state.resolve("machine").toString());e.put("PROGRAMDATA",state.resolve("machine").toString());
         e.put("XDG_CONFIG_HOME",state.resolve("config").toString());e.put("XDG_DATA_HOME",state.resolve("data").toString());e.put("XDG_CACHE_HOME",state.resolve("cache").toString());
         e.put("APP_ENV","local");e.put("APP_VERSION","0.0.0");e.put("SHALE_SERVER_API_BASE_URL","http://127.0.0.1:"+p.getProperty("apiPort"));

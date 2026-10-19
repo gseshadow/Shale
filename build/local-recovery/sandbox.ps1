@@ -1,10 +1,11 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$true)][ValidateSet('New','Api','Desktop','Relay','Verify','SelfTest')][string]$Phase,
+    [Parameter(Mandatory=$true)][ValidateSet('New','Api','Desktop','Relay','Verify','SelfTest','UpdateStartup')][string]$Phase,
     [Parameter(Mandatory=$true)][string]$StatePath,
     [string]$ExportPath,
     [string]$ReviewedRevision,
+    [string]$ToolingUpdate,
     [string]$JavaHome = $env:JAVA_HOME,
     [string]$Maven = 'mvn.cmd',
     [ValidateRange(1024,65535)][int]$SqlPort = 14333,
@@ -73,6 +74,73 @@ function Assert-BuildManifest {
         if ((Get-FileHash -LiteralPath (Join-Path $state $record.Path) -Algorithm SHA256).Hash -cne $record.Sha256) { throw 'Built artifact or tooling changed; stop' }
     }
 }
+function Assert-ReviewedTooling {
+    if ($ReviewedRevision -notmatch '^[0-9a-f]{40}$') { throw 'Full reviewed tooling commit required' }
+    $head = (& git -C $repo rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $head -cne $ReviewedRevision) { throw 'Tooling HEAD must equal reviewed commit' }
+    $dirty = & git -C $repo status --porcelain -- build/local-recovery docs/sql/auth/permission-cutover/retirement-operator.ps1
+    if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Reviewed tooling must be clean' }
+}
+function Get-StartupUpdatePath {
+    if ($ToolingUpdate -notmatch '^[0-9a-f]{40}$') { throw 'Full startup update revision required' }
+    Join-Path $state ('startup-updates/'+$ToolingUpdate)
+}
+function Get-UpdateFiles([string]$Path) {
+    Get-ChildItem -LiteralPath (Join-Path $Path 'classes') -Recurse -File
+    Get-ChildItem -LiteralPath (Join-Path $Path 'sources') -Recurse -File
+}
+function Assert-StartupUpdate([string]$Path) {
+    $receipt = Read-Json (Join-Path $Path 'receipt.json')
+    if ($receipt.Schema -ne 1 -or $receipt.Revision -cne $ToolingUpdate -or $receipt.State -cne $state) { throw 'Startup update binding changed' }
+    if ($receipt.OriginalManifestSha256 -cne (Get-FileHash -LiteralPath (Join-Path $state 'build-manifest.json') -Algorithm SHA256).Hash) { throw 'Original manifest binding changed' }
+    $records=@($receipt.Files)
+    $files=@(Get-UpdateFiles $Path)
+    if ($files.Count -ne $records.Count) { throw 'Startup update inventory changed' }
+    $seen=@{}
+    foreach ($record in $records) {
+        if ($record.Path -notmatch '^(classes|sources)[/\\][A-Za-z0-9_$./\\-]+$' -or $record.Path -match '(^|[/\\])\.\.([/\\]|$)' -or $seen.ContainsKey($record.Path)) { throw 'Invalid startup update inventory path' }
+        $seen[$record.Path]=$true
+        if ((Get-FileHash -LiteralPath (Join-Path $Path $record.Path) -Algorithm SHA256).Hash -cne $record.Sha256) { throw 'Startup update artifact changed' }
+    }
+}
+function Install-StartupUpdate([string]$CompileClasspath) {
+    Assert-ReviewedTooling
+    Assert-BuildManifest
+    # Bind this one correction to the known original sources, accepting checkout LF or CRLF.
+    $originals=@{
+        'Sandbox.java'=@('2967cfdd289d6784ffe845937155e93000eaca991bf6c5e81fac63a73e0743a7','72c054f53cd6f9e5849e3a77f3f583236177b28e1c17e8b79b7f8ea38a949264')
+        'LocalBootstrap.java'=@('6fc2c25effa373e72742c40aec0c394d781fcbbaa737f08643fa9895ae9add9b','e0bea3757f148ff5fcb10eff55f80902eadd4ec799510114c7bf774a84715781')
+    }
+    foreach ($name in $originals.Keys) {
+        if ((Get-FileHash -LiteralPath (Join-Path $state ('tooling/'+$name)) -Algorithm SHA256).Hash.ToLowerInvariant() -cnotin $originals[$name]) { throw 'Unsupported original startup tooling; preserve state' }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $state 'provisioned') -PathType Leaf)) { throw 'Existing completed provisioning required' }
+    $ToolingUpdate=$ReviewedRevision
+    $path=Get-StartupUpdatePath
+    $null=Assert-PrivatePath $path $repo
+    if (Test-Path -LiteralPath $path) { throw 'Startup update already attempted; preserve evidence; do not overwrite' }
+    $manifestHash=(Get-FileHash -LiteralPath (Join-Path $state 'build-manifest.json') -Algorithm SHA256).Hash
+    $null=New-Item -ItemType Directory -Path $path
+    $null=New-Item -ItemType Directory -Path (Join-Path $path 'classes')
+    $null=New-Item -ItemType Directory -Path (Join-Path $path 'sources')
+    $names=@('Sandbox.java','LocalBootstrap.java','StartupPaths.java','StartupChecks.java')
+    $sources=@()
+    foreach ($name in $names) {
+        $destination=Join-Path $path ('sources/'+$name)
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $destination
+        $sources+=$destination
+    }
+    Run-Native $javac (@('-proc:none','-implicit:none','-sourcepath',(Join-Path $path 'sources'),'-cp',$CompileClasspath,'-d',(Join-Path $path 'classes'))+$sources)
+    # No database connection or application launch: test only guard/selector/HttpServer/HttpClient.
+    $testCp=(Join-Path $path 'classes')+[IO.Path]::PathSeparator+$CompileClasspath
+    Run-Native $java @('-Djava.security.manager=allow','-cp',$testCp,'StartupChecks')
+    Assert-BuildManifest
+    if ((Get-FileHash -LiteralPath (Join-Path $state 'build-manifest.json') -Algorithm SHA256).Hash -cne $manifestHash) { throw 'Original manifest changed during startup update' }
+    $records=@(Get-UpdateFiles $path | Sort-Object FullName | ForEach-Object { @{Path=$_.FullName.Substring($path.Length+1);Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash} })
+    Write-NewJson (Join-Path $path 'receipt.json') @{Schema=1;Revision=$ReviewedRevision;State=$state;OriginalManifestSha256=$manifestHash;Files=$records}
+    Assert-StartupUpdate $path
+    Write-Host "Startup correction staged and verified. Original state/manifest retained. Select with -ToolingUpdate $ReviewedRevision"
+}
 if ([string]::IsNullOrWhiteSpace($JavaHome)) { throw 'Explicit JDK 21 JavaHome required' }
 $java = Join-Path $JavaHome 'bin/java.exe'
 $javac = Join-Path $JavaHome 'bin/javac.exe'
@@ -81,6 +149,7 @@ if ($env:OS -ne 'Windows_NT') { $java=Join-Path $JavaHome 'bin/java';$javac=Join
 foreach ($key in @('JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_ARGS','MAVEN_OPTS')) {
     if (-not [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($key))) { throw "Inherited JVM/Maven injection refused: $key" }
 }
+if ($Phase -eq 'New' -and $ToolingUpdate) { throw 'Startup update requires existing state' }
 if ($Phase -eq 'New') {
     if ($ReviewedRevision -notmatch '^[0-9a-f]{40}$') { throw 'Full reviewed tooling commit required' }
     $head = (& git -C $repo rev-parse HEAD).Trim()
@@ -110,7 +179,7 @@ if ($Phase -eq 'New') {
     }
     $cp = (Join-Path $state 'source/shale-desktop/target/classes')+[IO.Path]::PathSeparator+(Get-Content -LiteralPath (Join-Path $state 'shale-desktop.cp') -Raw)+[IO.Path]::PathSeparator+(Join-Path $state 'source/shale-server/target/classes')+[IO.Path]::PathSeparator+(Get-Content -LiteralPath (Join-Path $state 'shale-server.cp') -Raw)
     $null=New-Item -ItemType Directory -Path (Join-Path $state 'tool-classes')
-    Run-Native $javac @('-cp',$cp,'-d',(Join-Path $state 'tool-classes'),(Join-Path $state 'tooling/Sandbox.java'),(Join-Path $state 'tooling/LocalBootstrap.java'),(Join-Path $state 'tooling/LocalRelay.java'),(Join-Path $state 'tooling/LocalSqlDriver.java'),(Join-Path $state 'tooling/substitutes/DesktopUiUpdateLauncher.java'),(Join-Path $state 'tooling/ContractChecks.java'),(Join-Path $state 'tooling/RelayChecks.java'))
+    Run-Native $javac @('-cp',$cp,'-d',(Join-Path $state 'tool-classes'),(Join-Path $state 'tooling/Sandbox.java'),(Join-Path $state 'tooling/LocalBootstrap.java'),(Join-Path $state 'tooling/LocalRelay.java'),(Join-Path $state 'tooling/LocalSqlDriver.java'),(Join-Path $state 'tooling/substitutes/DesktopUiUpdateLauncher.java'),(Join-Path $state 'tooling/ContractChecks.java'),(Join-Path $state 'tooling/RelayChecks.java'),(Join-Path $state 'tooling/StartupPaths.java'),(Join-Path $state 'tooling/StartupChecks.java'))
     $nonce = [guid]::NewGuid().ToString('N')
     $props = "database=ShaleRetirementExercise_$nonce`nnonce=$nonce`nappLogin=ShaleRecoveryApp_$nonce`nruntimeLogin=ShaleRecoveryRuntime_$nonce`nsqlPort=$SqlPort`napiPort=$ApiPort`nlivePort=$LivePort`nwsPort=$WsPort`napplicationRevision=$appRevision`ntoolingRevision=$head`n"
     [IO.File]::WriteAllText((Join-Path $state 'sandbox.properties'),$props,(New-Object Text.UTF8Encoding($false)))
@@ -140,13 +209,28 @@ if ((Get-FileHash -LiteralPath (Join-Path $state 'private-input.txt') -Algorithm
 $desktopCp = (Get-Content -LiteralPath (Join-Path $state 'shale-desktop.cp') -Raw).Trim()
 $serverCp = (Get-Content -LiteralPath (Join-Path $state 'shale-server.cp') -Raw).Trim()
 $cp = @((Join-Path $state 'tool-classes'),(Join-Path $state 'source/shale-desktop/target/classes'),$desktopCp,(Join-Path $state 'source/shale-server/target/classes'),$serverCp) -join [IO.Path]::PathSeparator
+if ($Phase -eq 'UpdateStartup') { Install-StartupUpdate $cp; return }
+$jvmOptions=@(('-Djava.io.tmpdir='+(Join-Path $state 'tmp')),('-Djdk.net.unixdomain.tmpdir='+(Join-Path $state 'tmp')))
+$null=Assert-PrivatePath (Join-Path $state 'tmp') $repo
+# Applied before any selector is initialized, including the unguarded verification worker.
+$null=New-Item -ItemType Directory -Path (Join-Path $state 'tmp') -Force
+if ($ToolingUpdate) {
+    $update=Get-StartupUpdatePath
+    $null=Assert-PrivatePath $update $repo
+    Assert-StartupUpdate $update
+    $classes=Join-Path $update 'classes'
+    $cp=$classes+[IO.Path]::PathSeparator+$cp
+    $jvmOptions+=('-Dshale.local.toolClasses='+$classes)
+}
 $mode = $Phase.ToLowerInvariant();if($Phase -eq 'New'){$mode='provision'}
 $info = New-Object Diagnostics.ProcessStartInfo
 $info.FileName=$java;$info.UseShellExecute=$false;$info.WorkingDirectory=$state
-$info.Arguments=ConvertTo-SqlcmdArguments @('-cp',$cp,'Sandbox',$mode,$state,$PSScriptRoot)
+$info.Arguments=ConvertTo-SqlcmdArguments ($jvmOptions+@('-cp',$cp,'Sandbox',$mode,$state,$PSScriptRoot))
 foreach ($name in @($info.EnvironmentVariables.Keys)) {
     if ($name -match '^(SHALE_|SPRING_|SQLCONNSTR_|SQLAZURECONNSTR_|FUNCTION_|LIVE_|NEGOTIATE_|WEBPUBSUB_|APP_|DB_)') { $info.EnvironmentVariables.Remove($name) }
 }
+$info.EnvironmentVariables['TEMP']=Join-Path $state 'tmp'
+$info.EnvironmentVariables['TMP']=Join-Path $state 'tmp'
 try {
     if ($Phase -in @('New','Verify')) {
         $info.EnvironmentVariables['SHALE_SANDBOX_ADMIN_USER']=Read-Host 'Dedicated LOCAL SQL admin username (never Azure)'
