@@ -242,3 +242,71 @@ Final focused integration/review:
   new-source compilation lists present, explicit overlay selection in parent and
   child, and no outside-state guard exemption. Old application artifacts and
   original manifest entries are never overwritten by UpdateStartup.
+
+## Single-PC continuation and reported Windows results — 2026-10-19
+
+This update supersedes the earlier independent-timer/second-machine restart
+prerequisite above. The [single-PC sequence](single-pc-recovery.md) separates untimed
+Windows persistence after service restart from uninterrupted timed SQL/application
+recovery. The old manifest-bound manual-exercise.ps1 is retained unchanged and is
+not the payload to execute. The revised remaining-acceptance §3 block is extracted
+into a new private evidence file. SQL guards and runner transport remain unchanged.
+
+Brian reports at `2a74cd122e87b15fb995722451e026faa212abb8`: Stage and native
+PowerShell launcher PASS; API started; checked synthetic password login PASS;
+ordinary close/reopen automatic restore PASS; explicit logout then close/reopen
+remained at login with no restore attempt PASS; Phase Verify application/API and
+local-live routing PASS. These observations supersede earlier pending statements
+for those specific source/overlay Windows paths. They were not rerun here. They do
+not establish Windows reboot persistence, full manual recovery, installed 1.0.136
+or production serving artifact acceptance. Full manual recovery: **NOT MEASURED**.
+
+Scope/test-impact review: documentation and its embedded exercise payload only.
+Reviewed existing controlled-retirement Python contracts, operator helper/ODBC
+contracts, sandbox launcher/receipt checks and session-update launcher/receipt
+selection. No Java, PowerShell launcher, retirement SQL, schema, permission body,
+application audit seam or readiness file changed. The revised payload still uses
+the existing helpers, secure prompts, controlled Apply/Rollback and saved full hashes;
+it adds an explicit local-only decision/evidence gate, exact existing DB/port binding,
+a retained Apply-attempt marker, retired-state outcome and local scope in its result.
+An unsuccessful retired-state observation does not become a passed recovery result.
+Audit compatibility uses the existing transactional USER/UPDATED profile workflow;
+private operator records are not application audit events. No audit migration.
+
+Executed for this documentation change on Linux:
+
+* `python3 -m unittest discover -s build/auth-verification -p 'test_controlled_retirement.py'`
+  — 4 PASS; static controlled-route/approval/window/nine-row/exact-rollback contracts.
+  No SQL connection, rehearsal or completed Windows check was repeated.
+* `work/single-pc/pwsh/pwsh -NoLogo -NoProfile -File work/single-pc/check.ps1`
+  under task-local XDG directories — PASS: PowerShell Core 7.4.6 parses all 31
+  command/payload blocks in the continuation and related instructions, and every
+  single-PC operator block contains one command line. A private synthetic harness
+  exercised the extracted payload with real saved-marker/hash helpers and mocked
+  prompts/SQL: success, failed trial still reaching guarded recovery, wrong rollback
+  hash, ambiguous Apply marker and wrong target refusal all PASS. The harness only
+  localizes the Windows output root and loads helpers before installing its mocks;
+  it is not actual SQL, Windows, DPAPI or manual timing acceptance. Its first attempt
+  reloaded helpers over the mocks and stopped at missing Windows SQLCMD help; that
+  harness error was corrected before the counted synthetic runs.
+* `python3 work/single-pc/check_docs.py` — PASS: relative links/fences, revised payload
+  extraction, timer-before-acknowledgement, single Apply/Rollback and saved-hash guards,
+  plus unchanged SQL/launcher files. Its first link scan matched a PowerShell cast as
+  a Markdown link; excluding fenced code fixed that checker-only false positive.
+* `git diff --check` — PASS. Broad Maven suites, provisioning, native launcher checks,
+  Phase Verify and all reported completed application checks were not repeated.
+
+These are documentation/payload validation results only. The explicit manual incident
+command uses retained local context, original markers and independent saved hashes;
+no deadline can disable guarded rollback. A failed drill never becomes a success by
+running that incident command. Actual native Windows exercise execution remains
+outstanding, and manual recovery remains **NOT MEASURED**.
+
+`python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown --plan-output work/single-pc/selection.json`
+— PASS after committing the changes, base `3dd1131e`. It selects security-data from
+the documentation path and flags the local tooling Markdown paths as unknown.
+Its suggested broad/critical/full Maven suites were not run: this change modifies
+only instructions and their payload, with no application/security-data implementation
+change, and the task explicitly excludes repeating completed checks or unrelated
+preparation. Focused SQL contract, syntax, extraction and synthetic orchestration
+checks above verify the changed surface. No Maven-suite pass is claimed.

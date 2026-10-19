@@ -149,7 +149,18 @@ This task does not rewrite that client protocol or fabricate the missing secret 
 Manual recovery timing / retirement acceptance is still **NOT MEASURED**. No installed MSI or
 production serving artifact acceptance is inferred from this source compatibility build.
 
+## Reported Windows continuation — 2026-10-19
+
+At `2a74cd122e87b15fb995722451e026faa212abb8`, Brian reports Stage/native launcher
+checks PASS, API started, checked synthetic password login PASS, ordinary reopen
+restored automatically, explicit logout/reopen stayed at login without restore,
+and Phase Verify application/API/local-live PASS. These supersede the earlier
+pending statements for those source/overlay observations only. Do not repeat them.
+Follow the [single-PC recovery sequence](../../build/local-recovery/single-pc-recovery.md)
+for the remaining untimed reboot and uninterrupted timed retirement recovery.
+Manual recovery remains **NOT MEASURED**; installed/production acceptance is separate.
+
 ## Verification record
 
 See `remembered-session-utc-results.md` for executed commands, results, test-impact inventory and
-limits. Full provisioned-state Stage/Api/Desktop and native DPAPI remain pending on Windows.
+limits. Earlier Windows-pending entries are historical; the reported continuation above supplies only its stated scope.

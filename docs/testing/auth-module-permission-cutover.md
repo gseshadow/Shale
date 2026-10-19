@@ -7,6 +7,10 @@ and the updated [operator entry point](../sql/auth/permission-cutover/OPERATOR.m
 They map the disposable tests to each requirement, attribute the Windows passes
 at `041fa1ed0b21d64cce3599a01eaa3344ecf57331`, and give one finite timed manual
 SQL/application recovery exercise followed by a single final decision sequence.
+For Brian's existing Windows sandbox, use the [single-PC continuation](../../build/local-recovery/single-pc-recovery.md):
+untimed reboot persistence before Apply, then uninterrupted timed SQL/application
+recovery without reboot. The reported update-2a74 Windows passes are retained at their
+source/overlay scope; they are not installed 1.0.136 or production artifact acceptance.
 Manual recovery remains NOT MEASURED; `0.743829` seconds is SQL-only. The older
 construction/retest commands below are historical, not instructions to restart
 preparation. Controlled-route requirements and SQL guards are unchanged.
