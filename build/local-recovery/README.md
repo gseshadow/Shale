@@ -157,6 +157,22 @@ running. It does not touch retirement permissions or mark any readiness row pass
 & .\build\local-recovery\sandbox.ps1 -Phase Verify -StatePath $state -JavaHome 'C:\Program Files\Eclipse Adoptium\jdk-21.0.8.9-hotspot'; if(-not $?){throw 'Application baseline failed; manual exercise must not start'}
 ```
 
+Offline launcher regression only (no JDK, existing state, export, SQL or provisioning
+required): from a fresh tooling checkout pinned to the fix PR's full reviewed commit,
+run native Windows PowerShell explicitly. This uses disposable synthetic files in a
+new temporary directory, never an existing sandbox or retained failure directory.
+It covers the host JSON reader and a simulated PS5.1 single-array pipeline output;
+a Core pass alone does not certify native Windows 5.1.
+
+```powershell
+powershell.exe -NoLogo -NoProfile -File .\build\local-recovery\test_launcher.ps1; if($LASTEXITCODE -ne 0){throw 'Native Windows launcher regression failed; preserve failure evidence'}
+```
+
+Keep the prior checkout, temporary failure evidence, export, packets and SQL resources.
+Do not run `New` or regenerate an existing state's manifest to resolve a mismatch.
+The separate `SelfTest` command below requires an already provisioned state; it is
+not needed for this offline regression.
+
 Offline helper/guard/adaptation checks, optional if already covered by accepted evidence:
 
 ```powershell

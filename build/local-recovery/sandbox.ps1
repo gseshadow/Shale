@@ -64,7 +64,10 @@ function Write-BuildManifest {
     Write-NewJson (Join-Path $state 'build-manifest.json') $records
 }
 function Assert-BuildManifest {
-    $records = @(Read-Json (Join-Path $state 'build-manifest.json'))
+    # PS5.1 emits a JSON array as one pipeline object. Capture it first so @()
+    # enumerates the records, rather than wrapping that pipeline object in an array.
+    $records = Read-Json (Join-Path $state 'build-manifest.json')
+    $records = @($records)
     if (@(Get-BuildFiles).Count -ne $records.Count) { throw 'Build inventory changed; stop' }
     foreach ($record in $records) {
         if ((Get-FileHash -LiteralPath (Join-Path $state $record.Path) -Algorithm SHA256).Hash -cne $record.Sha256) { throw 'Built artifact or tooling changed; stop' }
