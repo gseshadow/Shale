@@ -79,11 +79,26 @@ public final class ColorUtil {
 
 	public static String readableTextColor(Color color) {
 		Color resolved = color == null ? Color.WHITE : color;
-		double luminance = 0.2126 * linearized(resolved.getRed())
-				+ 0.7152 * linearized(resolved.getGreen())
-				+ 0.0722 * linearized(resolved.getBlue());
+		double luminance = luminance(resolved);
 		return luminance > 0.48 ? "#172033" : "white";
 	}
+
+    /** Select the supplied foreground with the greater contrast against a stored lookup color. */
+    public static String readableTextColor(String storedColor, String lightCss, String darkCss) {
+        double background = luminance(toFxColor(storedColor));
+        double light = luminance(Color.web(lightCss));
+        double dark = luminance(Color.web(darkCss));
+        return contrast(background, dark) >= contrast(background, light) ? darkCss : lightCss;
+    }
+
+    private static double luminance(Color color) {
+        return 0.2126 * linearized(color.getRed()) + 0.7152 * linearized(color.getGreen())
+                + 0.0722 * linearized(color.getBlue());
+    }
+
+    private static double contrast(double first, double second) {
+        return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    }
 
 	private static double linearized(double channel) {
 		return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);

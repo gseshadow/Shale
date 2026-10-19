@@ -796,6 +796,10 @@ public final class TaskDao {
 
 
     public List<GlobalSearchTaskRow> searchTasks(int shaleClientId, String query) {
+        return searchTasks(shaleClientId, query, null);
+    }
+
+    public List<GlobalSearchTaskRow> searchTasks(int shaleClientId, String query, SuggestionBounds bounds) {
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
@@ -826,10 +830,11 @@ public final class TaskDao {
                   AND (t.Title LIKE ? OR t.Description LIKE ?)
                 ORDER BY CASE WHEN t.CompletedAt IS NULL THEN 0 ELSE 1 END, t.DueAt ASC, t.UpdatedAt DESC, t.Id DESC;
                 """;
-        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(bounds == null ? sql : bounds.sql(sql, "Title", "Id", List.of("Title", "Description"), List.of()))) {
             ps.setInt(1, shaleClientId);
             ps.setString(2, like);
             ps.setString(3, like);
+            if (bounds != null) bounds.bind(ps, 4, query, List.of("Title", "Description"), List.of());
             try (ResultSet rs = ps.executeQuery()) {
                 List<GlobalSearchTaskRow> out = new ArrayList<>();
                 while (rs.next()) {

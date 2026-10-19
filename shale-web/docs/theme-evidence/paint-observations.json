@@ -1,0 +1,407 @@
+{
+  "browser": "151.0.7922.173",
+  "records": [
+    {
+      "name": "my-shale",
+      "theme": "light",
+      "checked": 24,
+      "failures": [],
+      "skippedActions": 4,
+      "nonActionGradients": []
+    },
+    {
+      "name": "tasks",
+      "theme": "light",
+      "checked": 17,
+      "failures": [],
+      "skippedActions": 4,
+      "nonActionGradients": []
+    },
+    {
+      "name": "task-detail",
+      "theme": "light",
+      "checked": 24,
+      "failures": [],
+      "skippedActions": 1,
+      "nonActionGradients": []
+    },
+    {
+      "name": "cases",
+      "theme": "light",
+      "checked": 15,
+      "failures": [],
+      "skippedActions": 3,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-detail",
+      "theme": "light",
+      "checked": 62,
+      "failures": [],
+      "skippedActions": 8,
+      "nonActionGradients": []
+    },
+    {
+      "name": "workspace",
+      "theme": "light",
+      "checked": 5,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "overview",
+      "theme": "light",
+      "checked": 22,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "contacts",
+      "theme": "light",
+      "checked": 8,
+      "failures": [],
+      "skippedActions": 3,
+      "nonActionGradients": []
+    },
+    {
+      "name": "contact-detail",
+      "theme": "light",
+      "checked": 24,
+      "failures": [],
+      "skippedActions": 1,
+      "nonActionGradients": []
+    },
+    {
+      "name": "organizations",
+      "theme": "light",
+      "checked": 14,
+      "failures": [],
+      "skippedActions": 3,
+      "nonActionGradients": []
+    },
+    {
+      "name": "organization-detail",
+      "theme": "light",
+      "checked": 28,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "team",
+      "theme": "light",
+      "checked": 11,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "member-detail",
+      "theme": "light",
+      "checked": 22,
+      "failures": [],
+      "skippedActions": 0,
+      "nonActionGradients": []
+    },
+    {
+      "name": "settings",
+      "theme": "light",
+      "checked": 50,
+      "failures": [],
+      "skippedActions": 0,
+      "nonActionGradients": []
+    },
+    {
+      "name": "new-case",
+      "theme": "light",
+      "checked": 15,
+      "failures": [],
+      "skippedActions": 4,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-core",
+      "theme": "light",
+      "checked": 70,
+      "failures": [],
+      "skippedActions": 9,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-assignment",
+      "theme": "light",
+      "checked": 64,
+      "failures": [],
+      "skippedActions": 9,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-status",
+      "theme": "light",
+      "checked": 65,
+      "failures": [],
+      "skippedActions": 9,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-task",
+      "theme": "light",
+      "checked": 65,
+      "failures": [],
+      "skippedActions": 8,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-update",
+      "theme": "light",
+      "checked": 63,
+      "failures": [],
+      "skippedActions": 8,
+      "nonActionGradients": []
+    },
+    {
+      "name": "task-editor",
+      "theme": "light",
+      "checked": 15,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "new-contact",
+      "theme": "light",
+      "checked": 15,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "contact-editor",
+      "theme": "light",
+      "checked": 39,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "new-organization",
+      "theme": "light",
+      "checked": 20,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "organization-editor",
+      "theme": "light",
+      "checked": 48,
+      "failures": [],
+      "skippedActions": 3,
+      "nonActionGradients": []
+    },
+    {
+      "name": "my-shale",
+      "theme": "dark",
+      "checked": 24,
+      "failures": [],
+      "skippedActions": 4,
+      "nonActionGradients": []
+    },
+    {
+      "name": "tasks",
+      "theme": "dark",
+      "checked": 17,
+      "failures": [],
+      "skippedActions": 4,
+      "nonActionGradients": []
+    },
+    {
+      "name": "task-detail",
+      "theme": "dark",
+      "checked": 24,
+      "failures": [],
+      "skippedActions": 1,
+      "nonActionGradients": []
+    },
+    {
+      "name": "cases",
+      "theme": "dark",
+      "checked": 15,
+      "failures": [],
+      "skippedActions": 3,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-detail",
+      "theme": "dark",
+      "checked": 62,
+      "failures": [],
+      "skippedActions": 8,
+      "nonActionGradients": []
+    },
+    {
+      "name": "workspace",
+      "theme": "dark",
+      "checked": 5,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "overview",
+      "theme": "dark",
+      "checked": 22,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "contacts",
+      "theme": "dark",
+      "checked": 8,
+      "failures": [],
+      "skippedActions": 3,
+      "nonActionGradients": []
+    },
+    {
+      "name": "contact-detail",
+      "theme": "dark",
+      "checked": 24,
+      "failures": [],
+      "skippedActions": 1,
+      "nonActionGradients": []
+    },
+    {
+      "name": "organizations",
+      "theme": "dark",
+      "checked": 14,
+      "failures": [],
+      "skippedActions": 3,
+      "nonActionGradients": []
+    },
+    {
+      "name": "organization-detail",
+      "theme": "dark",
+      "checked": 28,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "team",
+      "theme": "dark",
+      "checked": 11,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "member-detail",
+      "theme": "dark",
+      "checked": 22,
+      "failures": [],
+      "skippedActions": 0,
+      "nonActionGradients": []
+    },
+    {
+      "name": "settings",
+      "theme": "dark",
+      "checked": 50,
+      "failures": [],
+      "skippedActions": 0,
+      "nonActionGradients": []
+    },
+    {
+      "name": "new-case",
+      "theme": "dark",
+      "checked": 15,
+      "failures": [],
+      "skippedActions": 4,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-core",
+      "theme": "dark",
+      "checked": 70,
+      "failures": [],
+      "skippedActions": 9,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-assignment",
+      "theme": "dark",
+      "checked": 64,
+      "failures": [],
+      "skippedActions": 9,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-status",
+      "theme": "dark",
+      "checked": 65,
+      "failures": [],
+      "skippedActions": 9,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-task",
+      "theme": "dark",
+      "checked": 65,
+      "failures": [],
+      "skippedActions": 8,
+      "nonActionGradients": []
+    },
+    {
+      "name": "case-update",
+      "theme": "dark",
+      "checked": 63,
+      "failures": [],
+      "skippedActions": 8,
+      "nonActionGradients": []
+    },
+    {
+      "name": "task-editor",
+      "theme": "dark",
+      "checked": 15,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "new-contact",
+      "theme": "dark",
+      "checked": 15,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "contact-editor",
+      "theme": "dark",
+      "checked": 39,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "new-organization",
+      "theme": "dark",
+      "checked": 20,
+      "failures": [],
+      "skippedActions": 2,
+      "nonActionGradients": []
+    },
+    {
+      "name": "organization-editor",
+      "theme": "dark",
+      "checked": 48,
+      "failures": [],
+      "skippedActions": 3,
+      "nonActionGradients": []
+    }
+  ],
+  "syntheticOnly": true,
+  "limits": "Computed solid text/ancestor backgrounds; shared action pseudo-planes and gradients checked separately with token pairs."
+}

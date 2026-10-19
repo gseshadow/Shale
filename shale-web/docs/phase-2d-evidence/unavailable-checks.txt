@@ -1,0 +1,101 @@
+Firefox packaged version 157.0 / Playwright build 1555; runtime version unverified.
+browserType.launch: Failed to launch the browser process.
+Browser logs:
+
+<launching> /workspace/Shale/work/browsers/firefox-1555/firefox/firefox -no-remote -headless -profile /tmp/playwright_firefoxdev_profile-afEaj9 -juggler-pipe -silent
+<launched> pid=5200
+[pid=5200][err] *** You are running in headless mode.
+[pid=5200][err] Could not find profile folder.
+[pid=5200] <process did exit: exitCode=1, signal=null>
+[pid=5200] starting temporary directories cleanup
+Call log:
+[2m  - <launching> /workspace/Shale/work/browsers/firefox-1555/firefox/firefox -no-remote -headless -profile /tmp/playwright_firefoxdev_profile-afEaj9 -juggler-pipe -silent[22m
+[2m  - <launched> pid=5200[22m
+[2m  - [pid=5200][err] *** You are running in headless mode.[22m
+[2m  - [pid=5200][err] Could not find profile folder.[22m
+[2m  - [pid=5200] <process did exit: exitCode=1, signal=null>[22m
+[2m  - [pid=5200] starting temporary directories cleanup[22m
+[2m  - [pid=5200] <gracefully close start>[22m
+[2m  - [pid=5200] <kill>[22m
+[2m  - [pid=5200] <skipped force kill spawnedProcess.killed=false processClosed=true>[22m
+[2m  - [pid=5200] finished temporary directories cleanup[22m
+[2m  - [pid=5200] <gracefully close end>[22m
+
+    at /workspace/Shale/shale-web/docs/phase-2d-evidence/browser-review.cjs:22:38
+    at Object.<anonymous> (/workspace/Shale/shale-web/docs/phase-2d-evidence/browser-review.cjs:172:3) {
+  log: [
+    '  - <launching> /workspace/Shale/work/browsers/firefox-1555/firefox/firefox -no-remote -headless -profile /tmp/playwright_firefoxdev_profile-afEaj9 -juggler-pipe -silent',
+    '  - <launched> pid=5200',
+    '  - [pid=5200][err] *** You are running in headless mode.',
+    '  - [pid=5200][err] Could not find profile folder.',
+    '  - [pid=5200] <process did exit: exitCode=1, signal=null>',
+    '  - [pid=5200] starting temporary directories cleanup',
+    '  - [pid=5200] <gracefully close start>',
+    '  - [pid=5200] <kill>',
+    '  - [pid=5200] <skipped force kill spawnedProcess.killed=false processClosed=true>',
+    '  - [pid=5200] finished temporary directories cleanup',
+    '  - [pid=5200] <gracefully close end>'
+  ],
+  name: 'Error'
+}
+
+Targeted TMPDIR retry:
+browserType.launch: Failed to launch the browser process.
+Browser logs:
+
+<launching> /workspace/Shale/work/browsers/firefox-1555/firefox/firefox -no-remote -headless -profile /workspace/Shale/work/tmp/playwright_firefoxdev_profile-wWJ915 -juggler-pipe -silent
+<launched> pid=5829
+[pid=5829][err] *** You are running in headless mode.
+[pid=5829][err] Could not find profile folder.
+[pid=5829] <process did exit: exitCode=1, signal=null>
+[pid=5829] starting temporary directories cleanup
+Call log:
+[2m  - <launching> /workspace/Shale/work/browsers/firefox-1555/firefox/firefox -no-remote -headless -profile /workspace/Shale/work/tmp/playwright_firefoxdev_profile-wWJ915 -juggler-pipe -silent[22m
+[2m  - <launched> pid=5829[22m
+[2m  - [pid=5829][err] *** You are running in headless mode.[22m
+[2m  - [pid=5829][err] Could not find profile folder.[22m
+[2m  - [pid=5829] <process did exit: exitCode=1, signal=null>[22m
+[2m  - [pid=5829] starting temporary directories cleanup[22m
+[2m  - [pid=5829] <gracefully close start>[22m
+[2m  - [pid=5829] <kill>[22m
+[2m  - [pid=5829] <skipped force kill spawnedProcess.killed=false processClosed=true>[22m
+[2m  - [pid=5829] finished temporary directories cleanup[22m
+[2m  - [pid=5829] <gracefully close end>[22m
+
+    at /workspace/Shale/shale-web/docs/phase-2d-evidence/browser-review.cjs:22:38
+    at Object.<anonymous> (/workspace/Shale/shale-web/docs/phase-2d-evidence/browser-review.cjs:172:3) {
+  log: [
+    '  - <launching> /workspace/Shale/work/browsers/firefox-1555/firefox/firefox -no-remote -headless -profile /workspace/Shale/work/tmp/playwright_firefoxdev_profile-wWJ915 -juggler-pipe -silent',
+    '  - <launched> pid=5829',
+    '  - [pid=5829][err] *** You are running in headless mode.',
+    '  - [pid=5829][err] Could not find profile folder.',
+    '  - [pid=5829] <process did exit: exitCode=1, signal=null>',
+    '  - [pid=5829] starting temporary directories cleanup',
+    '  - [pid=5829] <gracefully close start>',
+    '  - [pid=5829] <kill>',
+    '  - [pid=5829] <skipped force kill spawnedProcess.killed=false processClosed=true>',
+    '  - [pid=5829] finished temporary directories cleanup',
+    '  - [pid=5829] <gracefully close end>'
+  ],
+  name: 'Error'
+}
+
+WebKit packaged version 27.2 / Playwright build 2370; runtime version unverified.
+browserType.launch:
+╔══════════════════════════════════════════════════════╗
+║ Host system is missing dependencies to run browsers. ║
+║ Missing libraries:                                   ║
+║     libgtk-4.so.1                                    ║
+║     libgraphene-1.0.so.0                             ║
+║     libharfbuzz-icu.so.0                             ║
+║     libmanette-0.2.so.0                              ║
+║     libhyphen.so.0                                   ║
+║     libGLESv2.so.2                                   ║
+╚══════════════════════════════════════════════════════╝
+    at /workspace/Shale/shale-web/docs/phase-2d-evidence/browser-review.cjs:22:38
+    at Object.<anonymous> (/workspace/Shale/shale-web/docs/phase-2d-evidence/browser-review.cjs:172:3) {
+  log: [],
+  name: 'Error'
+}
+
+No orca or Xvfb executable found; no physical device attached. No screen-reader/physical acceptance claimed.

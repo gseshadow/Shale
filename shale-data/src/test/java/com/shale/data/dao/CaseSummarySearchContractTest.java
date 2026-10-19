@@ -31,7 +31,7 @@ final class CaseSummarySearchContractTest {
 	}
 
 	@Test void searchUsesTheAuthoritativeTenantActiveAndOneRowBoundary() throws Exception {
-		String method = method(source(), "public List<SearchCaseRow> searchActiveByName");
+		String method = method(source(), "public List<SearchCaseRow> searchActiveByName(int requestedTenantId, String query, SuggestionBounds bounds)");
 		assertTrue(method.contains("verifyTenant(con, requestedTenantId)"));
 		assertTrue(method.contains("c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0"));
 		assertTrue(method.contains("LOWER(COALESCE(c.Name,'')) LIKE ?"));

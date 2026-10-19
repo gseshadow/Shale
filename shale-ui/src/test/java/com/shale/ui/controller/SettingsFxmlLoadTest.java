@@ -75,7 +75,10 @@ final class SettingsFxmlLoadTest {
             loader.setControllerFactory(type -> {
                 Object controller = assertDoesNotThrow(() -> type.getDeclaredConstructor().newInstance());
                 if (controller instanceof SettingsController settingsController) {
-                    settingsController.init(notificationPreferences(), nonAdminState(), () -> auditOpened.set(true),
+                    AppState user = nonAdminState();
+                    user.setShaleClientId(7);
+                    user.setUserId(11);
+                    settingsController.init(notificationPreferences(), user, () -> auditOpened.set(true),
                             noDatabaseCaseService(), noDatabaseMaterialRequestService(), noDatabaseUserDao(), null);
                 }
                 return controller;
@@ -84,7 +87,8 @@ final class SettingsFxmlLoadTest {
             Parent root = assertDoesNotThrow((org.junit.jupiter.api.function.ThrowingSupplier<Parent>) loader::load);
             SettingsController controller = loader.getController();
             assertNotNull(controller);
-            javafx.scene.control.ScrollPane settingsScroll = (javafx.scene.control.ScrollPane) loader.getNamespace().get("settingsScroll");
+            javafx.scene.control.ScrollPane settingsScroll = org.junit.jupiter.api.Assertions.assertInstanceOf(
+                    javafx.scene.control.ScrollPane.class, root, "Settings must retain its scroll owner");
             assertTrue(settingsScroll.getStyleClass().containsAll(List.of("surface-scroll", "settings-scroll")),
                     "FXMLLoader must create separate runtime classes for the Settings scroll owner.");
             SettingsManagementRow customDictionaryRow =

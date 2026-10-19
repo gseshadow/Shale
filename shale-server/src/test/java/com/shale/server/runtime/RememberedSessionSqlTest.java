@@ -26,7 +26,7 @@ class RememberedSessionSqlTest {
     public static void main(String[] args)throws Exception{
         if(args.length!=1 || !Set.of("legacy","fixed").contains(args[0]) || System.getenv("SHALE_SESSION_TEST_SQL_PASSWORD")==null)
             throw new IllegalArgumentException("Explicit legacy/fixed mode and isolated SQL test password required");
-        var test=new RememberedSessionSqlTest();test.provision();
+        var test=new RememberedSessionSqlTest();test.pinnedCompatibility=true;test.provision();
         if(args[0].equals("fixed")){test.servingLoopbackApiExecutesTheSameJdbcLifecycle();return;}
         try{test.servingLoopbackApiExecutesTheSameJdbcLifecycle();throw new AssertionError("Legacy build unexpectedly passed");}
         catch(org.opentest4j.AssertionFailedError failure){
@@ -36,6 +36,7 @@ class RememberedSessionSqlTest {
     }
     private final ObjectMapper json=new ObjectMapper().findAndRegisterModules().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final ServerPrincipal owner=new ServerPrincipal(1,11,"synthetic@example.invalid");
+    private boolean pinnedCompatibility;
     private DataSource admin,auth,runtime;
     private RuntimeConnectionProvider connections;
     private SqlDurableSessionStore durable;
@@ -67,12 +68,17 @@ class RememberedSessionSqlTest {
         try(var c=admin.getConnection()){
             sql(c,"CREATE LOGIN "+appLogin+" WITH PASSWORD='"+localSecret+"'; CREATE LOGIN "+rtLogin+" WITH PASSWORD='"+localSecret+"'; CREATE USER shale_app FOR LOGIN "+appLogin+"; CREATE USER shale_runtime FOR LOGIN "+rtLogin);
             sql(c,"CREATE TABLE dbo.ShaleClients(Id int PRIMARY KEY); INSERT dbo.ShaleClients VALUES(11),(22); CREATE TABLE dbo.Users(Id int PRIMARY KEY,ShaleClientId int NOT NULL,Email nvarchar(510),is_deleted bit,IsRemoved bit,is_admin bit,is_attorney bit,name_first nvarchar(100),name_last nvarchar(100)); CREATE UNIQUE INDEX UX_Users_ShaleClientId_Id ON dbo.Users(ShaleClientId,Id); INSERT dbo.Users VALUES(1,11,'synthetic@example.invalid',0,0,0,0,'Synthetic','Owner'),(2,22,'other@example.invalid',0,0,0,0,'Other','Owner'); CREATE TABLE dbo.ApplicationInstances(Id bigint PRIMARY KEY,ShaleClientId int NOT NULL,UserId int NOT NULL)");
+            sql(c,"CREATE ROLE ShaleAdmins; ALTER TABLE dbo.Users ADD password_hash nvarchar(510),color nvarchar(100),default_organization nvarchar(200),organization_id int,initials nvarchar(20)");
             sql(c,"CREATE SCHEMA sec");
-            sql(c,"CREATE FUNCTION sec.fn_FilterByTenant(@Tenant int) RETURNS TABLE WITH SCHEMABINDING AS RETURN SELECT 1 Allowed WHERE @Tenant=CAST(SESSION_CONTEXT(N'ShaleClientId') AS int)");
+            sql(c,"CREATE FUNCTION sec.fn_FilterByTenant(@Tenant int) RETURNS TABLE WITH SCHEMABINDING AS RETURN SELECT 1 Allowed WHERE USER_NAME()=N'dbo' OR IS_MEMBER(N'ShaleAdmins')=1 OR @Tenant=TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))");
             sql(c,"CREATE SECURITY POLICY sec.TenantFilter ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.ApplicationInstances WITH(STATE=ON)");
             migration(c,"2026-09-29_user_sessions_foundation_phase7a.sql");
             migration(c,"2026-10-05_desktop_remember_credentials.sql");
             migration(c,"2026-10-06_desktop_remember_credentials_permissions.sql");
+            if(!pinnedCompatibility){
+                migration(c,"2026-10-14_pretenant_authentication_modules.sql");
+                sql(c,"GRANT EXECUTE ON dbo.ResolveDesktopRememberCredentialV2 TO shale_app; DENY EXECUTE ON dbo.ResolveDesktopRememberCredentialV2 TO shale_runtime; DENY EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO shale_runtime");
+            }
             sql(c,"GRANT SELECT ON dbo.Users TO shale_runtime; GRANT SELECT ON dbo.ApplicationInstances TO shale_runtime; GRANT SELECT,INSERT,UPDATE ON dbo.UserSessions TO shale_runtime");
         }
         auth=source(database,appLogin,localSecret);runtime=source(database,rtLogin,localSecret);

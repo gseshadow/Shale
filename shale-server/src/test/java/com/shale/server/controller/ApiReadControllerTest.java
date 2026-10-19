@@ -83,6 +83,29 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(17,port.createdCommand.caseDates().get(1).caseDateTypeId());
     }
 
+    @Test void versionedContactPatchDistinguishesRetainSetClearAndRejectsStaleOpeningToken()throws Exception{
+        final ContactServicePort.UpdateContactCommand[] captured={null};
+        String token="2026-10-06T00:00:00Z";
+        ContactServicePort port=(ContactServicePort)Proxy.newProxyInstance(ContactServicePort.class.getClassLoader(),new Class<?>[]{ContactServicePort.class},(proxy,method,args)->switch(method.getName()){
+            case "getContactDetail" -> Optional.of(new ContactServicePort.ContactDetail(7,41,"Person","First","Last",null,"legacy","0",null,null,null,null,false,false,token,"001"));
+            case "updateContact" -> {captured[0]=(ContactServicePort.UpdateContactCommand)args[0];yield true;}
+            default -> throw new AssertionError(method.getName());
+        });
+        MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),port,unusedPort(NotificationServicePort.class));
+        for(String operation:List.of(""," ,\"phone\":{\"action\":\"SET\",\"value\":\"3035550123\",\"extension\":\"002\"}"," ,\"phone\":{\"action\":\"CLEAR\"}")){
+            mvc.perform(patch("/api/v2/contacts/7").header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").contentType(MediaType.APPLICATION_JSON).content("{\"expectedUpdatedAt\":\""+token+"\""+operation+"}")).andExpect(status().isOk());
+            assertEquals(41,captured[0].shaleClientId());assertEquals(31,captured[0].actorUserId());assertEquals(com.shale.core.validation.ValueUpdate.Action.valueOf(operation.isEmpty()?"RETAIN":operation.contains("SET")?"SET":"CLEAR"),captured[0].phoneUpdate().action());
+            assertEquals(com.shale.core.validation.ValueUpdate.Action.RETAIN,captured[0].emailUpdate().action());
+        }
+        mvc.perform(patch("/api/v2/contacts/7").header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").contentType(MediaType.APPLICATION_JSON).content("{\"expectedUpdatedAt\":\"2026-10-05T00:00:00Z\"}")).andExpect(status().isConflict());
+        mvc.perform(patch("/api/v2/contacts/7").header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
+    }
+
+    @Test void malformedPatchOperationsReturnSafeBadRequestWithoutEnteringPersistence()throws Exception{
+        MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),unusedPort(ContactServicePort.class),unusedPort(NotificationServicePort.class));
+        for(String operation:List.of("{\"action\":\"BOGUS\"}","{\"action\":\"RETAIN\",\"value\":\"0\"}","{\"action\":\"CLEAR\",\"value\":\"0\"}"))mvc.perform(patch("/api/v2/contacts/7").contentType(MediaType.APPLICATION_JSON).content("{\"phone\":"+operation+"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Invalid request."));
+    }
+
     @BeforeEach
     void setUp() {
         ApiReadController apiReadController = new ApiReadController(
@@ -691,7 +714,7 @@ class ApiReadControllerTest {
                           "firstName":" Ada ",
                           "lastName":" Lovelace ",
                           "email":" ada@example.test ",
-                          "phone":" 555-0100 ",
+                          "phone":" 303-555-0123 ",
                           "address":" 123 Main ",
                           "dateOfBirth":"1980-01-02",
                           "condition":" Notes ",
@@ -709,7 +732,7 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("Ada", contactServicePort.createdCommand.firstName());
         org.junit.jupiter.api.Assertions.assertEquals("Lovelace", contactServicePort.createdCommand.lastName());
         org.junit.jupiter.api.Assertions.assertEquals("ada@example.test", contactServicePort.createdCommand.email());
-        org.junit.jupiter.api.Assertions.assertEquals("555-0100", contactServicePort.createdCommand.phone());
+        org.junit.jupiter.api.Assertions.assertEquals("(303) 555-0123", contactServicePort.createdCommand.phone());
         org.junit.jupiter.api.Assertions.assertEquals("123 Main", contactServicePort.createdCommand.address());
         org.junit.jupiter.api.Assertions.assertEquals("1980-01-02", contactServicePort.createdCommand.dateOfBirth());
         org.junit.jupiter.api.Assertions.assertEquals("Notes", contactServicePort.createdCommand.condition());
@@ -732,7 +755,7 @@ class ApiReadControllerTest {
                 .andExpect(jsonPath("$.shaleClientId").value(41))
                 .andExpect(jsonPath("$.displayName").value("Ada Lovelace"))
                 .andExpect(jsonPath("$.email").value("ada@example.test"))
-                .andExpect(jsonPath("$.phone").value("555-0100"));
+                .andExpect(jsonPath("$.phone").value("303-555-0123"));
 
         org.junit.jupiter.api.Assertions.assertEquals(801, contactServicePort.contactId);
         org.junit.jupiter.api.Assertions.assertEquals(41, contactServicePort.detailShaleClientId);
@@ -816,6 +839,7 @@ class ApiReadControllerTest {
     @Test
     void caseSearchPageReturnsPageContractWithDevelopmentHeaders() throws Exception {
         RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        caseServicePort.pageItems = List.of(RecordingCaseServicePort.secondCaseOverview());
         MockMvc devMockMvc = developmentMockMvc(
                 caseServicePort,
                 unusedPort(TaskServicePort.class),
@@ -837,7 +861,85 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
         org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.searchActorUserId);
-        org.junit.jupiter.api.Assertions.assertEquals(2, caseServicePort.searchLimit);
+        org.junit.jupiter.api.Assertions.assertEquals(1, caseServicePort.searchLimit);
+        assertEquals(1, caseServicePort.searchOffset);
+    }
+
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"0,25,0", "1,25,25", "100,100,10000"})
+    void caseSearchPageDelegatesExactOffsetAndSize(int page, int size, int offset) throws Exception {
+        RecordingCaseServicePort port = new RecordingCaseServicePort();
+        port.pageItems = List.of(RecordingCaseServicePort.caseOverview());
+        MockMvc mvc = developmentMockMvc(port, unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/cases/search-page").param("query", "  Élan_%[  ")
+                .param("page", Integer.toString(page)).param("size", Integer.toString(size))
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].caseId").value(501))
+                .andExpect(jsonPath("$.page").value(page))
+                .andExpect(jsonPath("$.size").value(size))
+                .andExpect(content().string(containsString("\"total\":null")))
+                .andExpect(jsonPath("$.hasMore").doesNotExist());
+        assertEquals("Élan_%[", port.searchQuery, "Controller must trim without changing literal search semantics");
+        assertEquals(41, port.searchShaleClientId);
+        assertEquals(31, port.searchActorUserId);
+        assertEquals(offset, port.searchOffset, "Pass row offset, never a prefix fetch size");
+        assertEquals(size, port.searchLimit);
+    }
+
+    @Test
+    void caseSearchPageDefaultsAndEmptyFinalPageKeepLegacyShape() throws Exception {
+        RecordingCaseServicePort port = new RecordingCaseServicePort();
+        MockMvc mvc = developmentMockMvc(port, unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/cases/search-page")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25));
+        assertEquals(0, port.searchOffset);
+        assertEquals(25, port.searchLimit);
+        assertEquals("", port.searchQuery);
+        port.pageItems = List.of();
+        mvc.perform(get("/api/cases/search-page").param("query", "x").param("page", "100")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk()).andExpect(content().json(
+                        "{\"items\":[],\"page\":100,\"size\":25,\"total\":null}", true));
+        assertEquals(2500, port.searchOffset);
+        assertEquals(25, port.searchLimit);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"-1,25", "101,25", "2147483647,100", "0,0", "0,101", "0,-1"})
+    void invalidCasePageBoundsFailBeforeService(int page, int size) throws Exception {
+        MockMvc mvc = developmentMockMvc(unusedPort(CaseServicePort.class), unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/cases/search-page").param("page", Integer.toString(page))
+                .param("size", Integer.toString(size))
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void casePageQueryLengthAndAuthenticationGuardsRemain() throws Exception {
+        mockMvc.perform(get("/api/cases/search-page").param("query", "x".repeat(101)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/cases/search-page").param("query", "x"))
+                .andExpect(status().isUnauthorized());
+        RecordingCaseServicePort port = new RecordingCaseServicePort();
+        MockMvc mvc = developmentMockMvc(port, unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/cases/search-page").param("query", "  " + "x".repeat(100) + "  ")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk());
+        assertEquals("x".repeat(100), port.searchQuery);
     }
 
     @Test
@@ -922,6 +1024,8 @@ class ApiReadControllerTest {
         private int searchShaleClientId;
         private int searchActorUserId;
         private int searchLimit;
+        private int searchOffset;
+        private List<CaseOverviewDto> pageItems = List.of(caseOverview(), secondCaseOverview());
         private long detailCaseId;
         private int detailShaleClientId;
         private int assignedUserId;
@@ -985,6 +1089,16 @@ class ApiReadControllerTest {
             this.searchActorUserId = actorUserId;
             this.searchLimit = limit;
             return List.of(caseOverview(), secondCaseOverview());
+        }
+
+        @Override
+        public List<CaseOverviewDto> searchCasesPage(String query, int shaleClientId, int actorUserId, int offset, int size) {
+            this.searchQuery = query;
+            this.searchShaleClientId = shaleClientId;
+            this.searchActorUserId = actorUserId;
+            this.searchOffset = offset;
+            this.searchLimit = size;
+            return pageItems;
         }
 
         @Override
@@ -1371,7 +1485,7 @@ class ApiReadControllerTest {
             this.shaleClientId = shaleClientId;
             this.query = query;
             this.limit = limit;
-            return List.of(new ContactSummary(801, "Ada Lovelace", "ada@example.test", "555-0100"));
+            return List.of(new ContactSummary(801, "Ada Lovelace", "ada@example.test", "303-555-0123"));
         }
 
         @Override
@@ -1387,7 +1501,7 @@ class ApiReadControllerTest {
                 return Optional.empty();
             }
             return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada Lovelace", "Ada", "Lovelace",
-                    "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", null, false, true));
+                    "Ada Lovelace", "ada@example.test", "303-555-0123", "123 Main", "1980-01-02", "Notes", null, false, true));
         }
 
 		@Override public List<Definition> getEffectiveContactTypes(int shaleClientId) { return List.of(); }

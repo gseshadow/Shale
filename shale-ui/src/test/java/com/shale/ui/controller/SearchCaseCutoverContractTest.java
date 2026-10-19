@@ -27,9 +27,9 @@ final class SearchCaseCutoverContractTest {
 		assertTrue(controller.contains("generation == loadGeneration"));
 		assertTrue(controller.contains("Objects.equals(tenantId, appState.getShaleClientId())"));
 		assertTrue(controller.contains("Objects.equals(userId, appState.getUserId())"));
-		assertTrue(controller.contains("caseCardFactory.create(toCaseCardModel(row), CaseCardFactory.Variant.COMPACT)"));
+		assertTrue(controller.contains("caseCardFactory.create(toCaseCardModel(row, dates.getOrDefault(row.summary().caseId(), List.of())), CaseCardFactory.Variant.COMPACT)"));
 		assertTrue(controller.contains("restoreCase(row.summary().caseId(), tenantId, row.rowVer())"));
-		assertTrue(controller.contains("if (!isCurrent(restoreGeneration, tenantId, userId)) return;"));
+		assertTrue(java.util.regex.Pattern.compile("if \\(\\s*!isCurrent\\(restoreGeneration, tenantId, userId\\)\\s*\\)\\s*return;", java.util.regex.Pattern.DOTALL).matcher(controller).find());
 	}
 
 	@Test void mapsTheRealProjectionStatusApiAndPreservesNoStatus() {

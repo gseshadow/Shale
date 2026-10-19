@@ -1,0 +1,35 @@
+{
+  "version": "1.0.136",
+  "title": "What's New in Shale 1.0.136",
+  "releaseDate": "2026-10-07",
+  "summary": "Draft generated from commit messages since Shale 1.0.135. Review and edit before publishing.",
+  "groups": {
+    "New": [
+      "Added task due date policy (none, warn, require)",
+      "Added Stay Logged In feature to login screen",
+      "Added phone and email format requirements",
+      "Added universal search suggestions and scoped recent history"
+    ],
+    "Improvements": [
+      "Allow all users to configure automatic updates",
+      "Place case date confirmation below value",
+      "Show selected Case Date type card",
+      "Optimize user management loading and dark theme contrast",
+      "Complete audited task policy administration",
+      "Redesign desktop login experience",
+      "Validate phone and email values across intake, profiles and APIs"
+      ],
+    "Fixes": [
+      "Fix case date confirmation row layout",
+      "Fix Case Calendar dark theme cards",
+      "Fix case content pane horizontal growth",
+      "Fix Case Date card text contrast",
+      "Corrected sql calls",
+      "Fix login FXML preferred sizing constants",
+      "Fix remembered sign-in lifecycle diagnostics",
+      "Fix remembered session SQL context and diagnostics",
+      "Fix intake phone feedback and layout; accept explicit US local numbers",
+      "Fix SQL Server suggestion pattern declarations and Unicode bindings"
+    ]
+  }
+}

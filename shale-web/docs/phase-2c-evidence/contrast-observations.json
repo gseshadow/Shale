@@ -1,0 +1,405 @@
+{
+  "source": "Shared ui/tokens.css pairs used by My Shale; manual computation complements axe incomplete paint checks",
+  "observations": [
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "text",
+      "background": "plane",
+      "ratio": 15.500083981527592,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "secondary-text",
+      "background": "plane",
+      "ratio": 7.196548755782518,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "muted",
+      "background": "plane",
+      "ratio": 5.80774225063699,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "text",
+      "background": "section",
+      "ratio": 14.083295458179744,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "text",
+      "background": "card",
+      "ratio": 15.500083981527592,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "text",
+      "background": "card-hover",
+      "ratio": 14.798348146321658,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "secondary-text",
+      "background": "card",
+      "ratio": 7.196548755782518,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "muted",
+      "background": "card",
+      "ratio": 5.80774225063699,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "muted",
+      "background": "card-hover",
+      "ratio": 5.544808135972285,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "info-text",
+      "background": "info",
+      "ratio": 6.691559311671224,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "warning-text",
+      "background": "warning",
+      "ratio": 6.714849434669602,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "success-text",
+      "background": "success",
+      "ratio": 5.89832464246527,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "success-text",
+      "background": "card",
+      "ratio": 6.294854821574051,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "danger-text",
+      "background": "danger",
+      "ratio": 6.742488066784756,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "neutral-text",
+      "background": "neutral",
+      "ratio": 6.6825644806819815,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "action-text",
+      "background": "secondary",
+      "ratio": 9.78355604862232,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "action-text",
+      "background": "secondary-hover",
+      "ratio": 8.878305238929336,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "on-dark",
+      "background": "navigation",
+      "ratio": 14.10277452169009,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "on-dark",
+      "background": "navigation-hover",
+      "ratio": 11.161708309892063,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "on-dark",
+      "background": "primary-start",
+      "ratio": 5.167796754504919,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "text",
+      "foreground": "on-dark",
+      "background": "primary-end",
+      "ratio": 5.377313091421646,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "kind": "boundary",
+      "foreground": "focus",
+      "background": "card",
+      "ratio": 5.7900242017124945,
+      "minimum": 3
+    },
+    {
+      "theme": "light",
+      "kind": "boundary",
+      "foreground": "focus",
+      "background": "card-hover",
+      "ratio": 5.527892236886143,
+      "minimum": 3
+    },
+    {
+      "theme": "light",
+      "kind": "boundary",
+      "foreground": "control-border",
+      "background": "card",
+      "ratio": 3.4211947037100043,
+      "minimum": 3
+    },
+    {
+      "theme": "light",
+      "kind": "boundary",
+      "foreground": "control-border",
+      "background": "secondary",
+      "ratio": 3.2019152467802607,
+      "minimum": 3
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "text",
+      "background": "plane",
+      "ratio": 14.26920262483561,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "secondary-text",
+      "background": "plane",
+      "ratio": 10.198137805585256,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "muted",
+      "background": "plane",
+      "ratio": 6.856932386592844,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "text",
+      "background": "section",
+      "ratio": 12.905482666613976,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "text",
+      "background": "card",
+      "ratio": 11.879360263474236,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "text",
+      "background": "card-hover",
+      "ratio": 9.9631952535643,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "secondary-text",
+      "background": "card",
+      "ratio": 8.490127738339515,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "muted",
+      "background": "card",
+      "ratio": 5.708515904094467,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "muted",
+      "background": "card-hover",
+      "ratio": 4.787720659962258,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "info-text",
+      "background": "info",
+      "ratio": 7.110198189791986,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "warning-text",
+      "background": "warning",
+      "ratio": 7.372996816950334,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "success-text",
+      "background": "success",
+      "ratio": 7.30379851775952,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "success-text",
+      "background": "card",
+      "ratio": 8.313676083826717,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "danger-text",
+      "background": "danger",
+      "ratio": 7.474904943472495,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "neutral-text",
+      "background": "neutral",
+      "ratio": 7.929309634548724,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "action-text",
+      "background": "secondary",
+      "ratio": 9.12567930018314,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "action-text",
+      "background": "secondary-hover",
+      "ratio": 7.252791557169739,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "on-dark",
+      "background": "navigation",
+      "ratio": 14.10277452169009,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "on-dark",
+      "background": "navigation-hover",
+      "ratio": 11.161708309892063,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "on-dark",
+      "background": "primary-start",
+      "ratio": 5.129990135377216,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "text",
+      "foreground": "on-dark",
+      "background": "primary-end",
+      "ratio": 5.976508527558449,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "kind": "boundary",
+      "foreground": "focus",
+      "background": "card",
+      "ratio": 5.709218750542598,
+      "minimum": 3
+    },
+    {
+      "theme": "dark",
+      "kind": "boundary",
+      "foreground": "focus",
+      "background": "card-hover",
+      "ratio": 4.788310135846539,
+      "minimum": 3
+    },
+    {
+      "theme": "dark",
+      "kind": "boundary",
+      "foreground": "control-border",
+      "background": "card",
+      "ratio": 4.143836752729284,
+      "minimum": 3
+    },
+    {
+      "theme": "dark",
+      "kind": "boundary",
+      "foreground": "control-border",
+      "background": "secondary",
+      "ratio": 3.3785196001190183,
+      "minimum": 3
+    }
+  ]
+}

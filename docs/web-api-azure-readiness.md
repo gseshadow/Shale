@@ -1,5 +1,73 @@
 # Shale Server Azure App Service Readiness
 
+## Auth permission evidence and cutover candidate — 2026-10-15
+
+The [owning permission cutover runbook](testing/auth-module-permission-cutover.md) records the user's native Windows
+auth SQL PASS for credential_identity, remembered_rotation and runtime_isolation, exit 0, and the
+user-run Azure collation/principal/effective-permission evidence. These supersede earlier pending
+Windows retest/unknown catalog statements for those reported observations only. Actual deployed
+server/desktop credential configuration and compatible installed fleet remain UNCONFIRMED.
+
+Existing runtime database/schema EXECUTE would expose new dbo owner-executed modules. The candidate
+installs both modules with runtime principal/role object DENY fences atomically, grants auth only object
+EXECUTE, and separately gates additive auth-table/runtime-hash read fences on approved caller inventory
+and old-client drain. Existing User projections and password-management writes are preserved. Original
+grants/grantors/states are captured and never rewritten; exact staged postchecks and rollback are owned
+there. Broader runtime audit SELECT/INSERT/UPDATE/DELETE remediation remains OPEN: deployed history must
+not be described as database-enforced append-only. No three FILTERs, existing predicates, original export,
+Case harness or R4 accepted reports change. CASE SQL NOT RUN; security acceptance OPEN; deployment BLOCKED.
+No Azure connection/live grant/migration, client release, configuration change, merge or deployment here.
+
+
+## Pre-tenant auth candidate — 2026-10-14
+
+Shared password and remembered callers now target the bounded versioned modules described in the
+[owning prerequisite implementation](testing/case-read-local-security-verification.md#pre-tenant-authentication-prerequisite-implementation--2026-10-14).
+Deployment is BLOCKED: actual identities/owners/grants, security-owner approval of the internal hash
+projection/ambiguity policy, opt-in auth SQL and compatible installed desktop/fleet drain remain required.
+SQL must precede rebuilt server and desktop; there is no direct-SELECT fallback. No three-table FILTER
+is attached here. Follow the exact module/permission/client rollback there; preserve durable sessions,
+accepted R4 reports and every open security/deployment gate. Synthetic checks do not establish Azure parity.
+
+## Case-read RLS prerequisite — 2026-10-14
+
+Security acceptance remains **OPEN**. The authoritative offline SSMS export and user-run Shale catalog
+query confirm no predicates on Users/auditLog/Statuses; local SQL integration is **NOT RUN**. This is
+a confirmed RLS coverage gap, not proof of an API leak. Minimized Case queries retain explicit tenant/
+join/context checks and required committed Overview audit. Current auth and remembered-sign-in lookup
+run before tenant initialization, so strict Users coverage needs a compatible bounded auth-module
+prerequisite and installed desktop drain first. Ownership chaining alone does not bypass RLS.
+Do not weaken #1865's harness, fabricate snapshot predicates or grant shared identities SQL admin bypass.
+
+The [owning remediation assessment and next implementation prompt](testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+define schema/source evidence, desktop/session/audit impact, unknown grants with read-only catalog queries,
+targeted three-FILTER repair, separate write/admin controls, verification, rollout and scoped rollback.
+No production code/migration/configuration/live fault/deployment change is part of this assessment.
+All [R4 accepted reports](../shale-web/docs/r4-desktop-acceptance.md) remain attributed and accepted;
+two-tenant/non-dbo, audit failure/commit uncertainty, session/host/privacy/device/AT gates remain open.
+
+For the responsive client replacement, see [Shale Web V2 architecture and roadmap](architecture/shale-web-v2-architecture-roadmap.md). Its verified inventory distinguishes current browser mutations and durable sessions from historical beta descriptions below.
+
+## Ordinary web-client readiness and separate AI gates — 2026-10-08
+
+The web rebuild uses the existing bearer login/me/refresh/logout contract, SQL-backed bound WEB sessions,
+server-derived tenant/user context, and shared application operations documented in
+[the REST/MCP architecture roadmap, section 3.1](architecture/ai-integration-and-mcp.md).
+The later session implementation records in
+[the release/session roadmap](architecture/application-release-session-management.md) supersede earlier
+skeleton and in-memory-only descriptions below.
+
+Web readiness requires verification of each delivered operation's user/entity/field authorization,
+tenant isolation and explicit predicates, validation/bounds, mutation concurrency and required Shale audit,
+plus its REST/OpenAPI contract and browser configuration. Reuse existing routes and service/DAO workers;
+address gaps per use case without waiting for unrelated AI decisions.
+
+MCP transport, AI OAuth, tenant AI opt-in, integration registration/scopes, delegation grants and AI-specific
+access audit attribution are separate integration activation requirements. They do not gate ordinary web
+login, authenticated REST reads or authorized REST mutations. Ordinary requests need no fabricated AI
+client/tool identity; integration credentials must never fall back to ordinary user authority to evade
+those additional controls. This distinction does not weaken existing authorization, tenant/RLS or audit.
+
 This document covers Step 4A deployment/configuration readiness for `shale-server`.
 
 ## Profiles

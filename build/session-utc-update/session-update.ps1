@@ -15,7 +15,7 @@ $pinned='59d8374858764788c621f6f8d986773b58ab79c4'
 if($ReviewedRevision -notmatch '^[0-9a-f]{40}$'){throw 'Full reviewed revision required'}
 $head=(& git -C $repo rev-parse HEAD).Trim()
 if($LASTEXITCODE -or $head -cne $ReviewedRevision){throw 'Use the isolated checkout at the reviewed commit'}
-$dirty=& git -C $repo status --porcelain -- build/session-utc-update shale-data/src/main/java/com/shale/data/util/UtcJdbcTimestamp.java shale-data/src/main/java/com/shale/data/dao/UserSessionDao.java shale-server/src/main/java/com/shale/server/runtime/SqlRememberCredentialStore.java shale-server/src/main/java/com/shale/server/runtime/SessionManagementService.java
+$dirty=& git -C $repo status --porcelain -- build/session-utc-update shale-data/src/main/java/com/shale/data/util/UtcJdbcTimestamp.java shale-data/src/main/java/com/shale/data/dao/UserSessionDao.java build/session-utc-update/compatibility/SqlRememberCredentialStore.java shale-server/src/main/java/com/shale/server/runtime/SessionManagementService.java
 if($LASTEXITCODE -or $dirty){throw 'Reviewed update sources must be clean'}
 foreach($key in @('JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_ARGS','MAVEN_OPTS')){
     if([Environment]::GetEnvironmentVariable($key)){throw "Inherited JVM injection refused: $key"}
@@ -81,7 +81,7 @@ if($Phase -eq 'Stage'){
     $null=New-Item -ItemType Directory -Path (Join-Path $update 'sources')
     $null=New-Item -ItemType Directory -Path (Join-Path $update 'empty-sourcepath')
     $sources=@()
-    foreach($relative in @('shale-data/src/main/java/com/shale/data/util/UtcJdbcTimestamp.java','shale-data/src/main/java/com/shale/data/dao/UserSessionDao.java','shale-server/src/main/java/com/shale/server/runtime/SqlRememberCredentialStore.java','shale-server/src/main/java/com/shale/server/runtime/SessionManagementService.java','build/session-utc-update/SessionUpdateChecks.java')){
+    foreach($relative in @('shale-data/src/main/java/com/shale/data/util/UtcJdbcTimestamp.java','shale-data/src/main/java/com/shale/data/dao/UserSessionDao.java','build/session-utc-update/compatibility/SqlRememberCredentialStore.java','shale-server/src/main/java/com/shale/server/runtime/SessionManagementService.java','build/session-utc-update/SessionUpdateChecks.java')){
         $destination=Join-Path $update ('sources/'+[IO.Path]::GetFileName($relative))
         Copy-Item -LiteralPath (Join-Path $repo $relative) -Destination $destination
         $sources+=$destination

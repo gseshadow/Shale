@@ -1,0 +1,47 @@
+/* Opt-in web A.2 ownership. No beta/root/global paint selectors. Theme paint once,
+   geometry once. Source mapping and accessible adaptations: README Phase 2A. */
+.shale-foundation, .shale-authenticated {
+  --shale-canvas: #edf4fd; --shale-chrome: #102746; --shale-navigation: #102746;
+  --shale-navigation-hover: #18385f; --shale-plane: #f9fbfe; --shale-section: #e8f1fb;
+  --shale-card: #f9fbfe; --shale-card-hover: #f1f6fd; --shale-input: #fbfdff;
+  --shale-text: #10213d; --shale-secondary-text: #425674; --shale-muted: #52647f;
+  --shale-on-dark: #f5f8ff; --shale-link: #075fca; --shale-border: #9fb5cc;
+  --shale-control-border: #748aa5; --shale-focus: #075fca; --shale-selected: #edf4fd;
+  --shale-primary-start: #0f65d3; --shale-primary-end: #7b3fe4;
+  --shale-primary-hover-start: #0b58be; --shale-primary-hover-end: #692dcc;
+  --shale-primary-pressed: #1158b7; --shale-on-primary: #fff;
+  --shale-secondary: #edf4fd; --shale-secondary-hover: #dceafb; --shale-action-text: #173d70;
+  --shale-danger: #fff1f3; --shale-danger-hover: #ffe1e6; --shale-danger-text: #a51e35;
+  --shale-success: #e8f7ef; --shale-success-text: #176b42;
+  --shale-info: #eaf3ff; --shale-info-text: #185695;
+  --shale-warning: #fff7df; --shale-warning-text: #76500a;
+  --shale-neutral: #eef3f8; --shale-neutral-text: #425674;
+  --shale-shadow: 0 3px 12px rgba(11,35,77,.14);
+  --shale-space-1: .25rem; --shale-space-2: .5rem; --shale-space-3: .75rem;
+  --shale-space-4: 1rem; --shale-space-6: 1.5rem;
+  --shale-radius-card: .875rem; --shale-radius-control: .625rem;
+  --shale-type-page: 1.5rem; --shale-type-section: 1.125rem;
+  --shale-type-body: .875rem; --shale-type-meta: .75rem;
+  --shale-density-padding: var(--shale-space-4); --shale-density-gap: var(--shale-space-3);
+  color: var(--shale-text); background: var(--shale-canvas); color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: var(--shale-type-body); line-height: 1.5; min-height: 100vh; min-height: 100dvh;
+}
+.shale-foundation[data-theme="dark"], .shale-authenticated[data-theme="dark"] {
+  --shale-canvas: #0d1728; --shale-chrome: #07152e; --shale-navigation: #102746;
+  --shale-plane: #162438; --shale-section: #1b2c42; --shale-card: #203249;
+  --shale-card-hover: #293e58; --shale-input: #17283d;
+  --shale-text: #f0f5fc; --shale-secondary-text: #c5d2e3; --shale-muted: #9fadc0;
+  --shale-link: #82baff; --shale-border: #58718e; --shale-control-border: #7794b5;
+  --shale-focus: #72aeff; --shale-selected: #263d58;
+  --shale-primary-start: #1768c8; --shale-primary-end: #7540c6;
+  --shale-primary-hover-start: #1a6bd1; --shale-primary-hover-end: #7c43d0;
+  --shale-primary-pressed: #1e69c4; --shale-secondary: #2a405a;
+  --shale-secondary-hover: #354f6d; --shale-action-text: #e4effd;
+  --shale-danger: #482631; --shale-danger-hover: #5b2b3b; --shale-danger-text: #ffadba;
+  --shale-success: #1d4035; --shale-success-text: #9addb9;
+  --shale-info: #203d5d; --shale-info-text: #acd2ff;
+  --shale-warning: #493d21; --shale-warning-text: #f0d582;
+  --shale-neutral: #2b3d52; --shale-neutral-text: #d0dbea;
+  --shale-shadow: 0 3px 12px rgba(0,0,0,.32); color-scheme: dark;
+}

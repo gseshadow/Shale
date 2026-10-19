@@ -1,11 +1,16 @@
 package com.shale.ui.controller;
 
+import com.shale.data.validation.ContactValues;
+import com.shale.core.validation.PhoneUnavailableReason;
+import com.shale.core.validation.FieldValidationException;
 import com.google.gson.Gson;
 import com.shale.core.platform.AppPaths;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.EnhancedTextArea;
+import com.shale.ui.component.PracticeAreaSelector;
+import com.shale.ui.component.CaseStatusSelector;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
@@ -31,7 +36,6 @@ import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -84,7 +88,13 @@ public final class NewIntakeController {
 	private static final long PRACTICE_AREA_PREFLIGHT_TIMEOUT_SECONDS = 5;
 	private static final String INVALID_DATE_PROPERTY = "shale.newIntake.invalidDate";
 
+    @FXML private TextField clientPhoneExtensionField,callerPhoneExtensionField;
+    @FXML private CheckBox clientPhoneUnavailableCheckBox,callerPhoneUnavailableCheckBox;
+    @FXML private javafx.scene.control.ComboBox<PhoneUnavailableReason> clientPhoneUnavailableReasonBox,callerPhoneUnavailableReasonBox;
+
 	@FXML private Label validationLabel;
+    @FXML private Label clientPhoneFeedbackLabel, callerPhoneFeedbackLabel;
+    private List<String> contactValidationErrors = List.of();
 	@FXML private GridPane intakeWorkspace;
 	@FXML private ColumnConstraints leftWorkspaceColumn;
 	@FXML private ColumnConstraints rightWorkspaceColumn;
@@ -244,6 +254,12 @@ public final class NewIntakeController {
 
 	@FXML
 	private void initialize() {
+        for(var box:List.of(clientPhoneUnavailableReasonBox,callerPhoneUnavailableReasonBox)){box.getItems().setAll(PhoneUnavailableReason.values());ControlStyles.formControl(box);}
+        ControlStyles.formControl(clientPhoneExtensionField);ControlStyles.formControl(callerPhoneExtensionField);
+        clientPhoneUnavailableReasonBox.disableProperty().bind(clientPhoneUnavailableCheckBox.selectedProperty().not());
+        callerPhoneUnavailableReasonBox.disableProperty().bind(callerPhoneUnavailableCheckBox.selectedProperty().not());
+        configureContactValidation();
+
 		intakeWorkspace.widthProperty().addListener((observable, oldWidth, newWidth) ->
 				configureResponsiveWorkspace(newWidth.doubleValue()));
 		Platform.runLater(() -> configureResponsiveWorkspace(intakeWorkspace.getWidth()));
@@ -272,7 +288,7 @@ public final class NewIntakeController {
 				copyCallerFieldsToClientIfEmpty();
 			}
 			applyCallerMode(Boolean.TRUE.equals(newVal));
-			hideValidation();
+            revalidateContactFields(false);
 		});
 		applyCallerMode(false);
 
@@ -692,6 +708,8 @@ public final class NewIntakeController {
 		copyFieldIfSourcePresentAndTargetEmpty(callerFirstNameField, clientFirstNameField);
 		copyFieldIfSourcePresentAndTargetEmpty(callerLastNameField, clientLastNameField);
 		copyFieldIfSourcePresentAndTargetEmpty(callerPhoneField, clientPhoneField);
+        copyFieldIfSourcePresentAndTargetEmpty(callerPhoneExtensionField,clientPhoneExtensionField);
+        if(clientPhoneField.getText().isBlank()&&callerPhoneUnavailableCheckBox.isSelected()){clientPhoneUnavailableCheckBox.setSelected(true);clientPhoneUnavailableReasonBox.setValue(callerPhoneUnavailableReasonBox.getValue());}
 		copyFieldIfSourcePresentAndTargetEmpty(callerAddressField, clientAddressField);
 		copyFieldIfSourcePresentAndTargetEmpty(callerEmailField, clientEmailField);
 	}
@@ -712,110 +730,70 @@ public final class NewIntakeController {
 				return;
 			}
 
-			Map<String, CaseDao.PracticeAreaRow> labelToRow = new LinkedHashMap<>();
-			for (CaseDao.PracticeAreaRow area : areas) {
-				String label = area.name() == null || area.name().isBlank() ? "Practice Area #" + area.id() : area.name();
-				labelToRow.put(label, area);
-			}
-
-			String preselect = selectedPracticeArea == null ? labelToRow.keySet().iterator().next() : safeTrim(selectedPracticeArea.name());
-			Optional<String> picked = showSecondaryChoiceDialog(
-					"Change Practice Area",
-					"Practice Area:",
-					preselect,
-					labelToRow.keySet());
-			if (picked.isPresent()) {
-				selectedPracticeArea = labelToRow.get(picked.get());
-				renderPracticeAreaMini(selectedPracticeArea.id(), selectedPracticeArea.name(), selectedPracticeArea.color());
-				hideValidation();
-			}
+			Optional<CaseDao.PracticeAreaRow> picked = PracticeAreaSelector.showPicker(
+                    selectPracticeAreaButton.getScene().getWindow(), areas, selectedPracticeArea,
+                    CaseDao.PracticeAreaRow::id, CaseDao.PracticeAreaRow::name, CaseDao.PracticeAreaRow::color);
+            picked.ifPresent(this::applyPracticeAreaSelection);
 		} catch (RuntimeException ex) {
 			showValidation("Unable to load practice areas.");
 		}
 	}
 
-	private void onSelectStatus() {
-		try {
-			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(requireClientId());
-			if (statuses.isEmpty()) {
-				showValidation("No statuses are available for this tenant.");
-				return;
-			}
+    void applyPracticeAreaSelection(CaseDao.PracticeAreaRow selected) {
+        selectedPracticeArea = selected;
+        renderPracticeAreaMini(selected.id(), selected.name(), selected.color());
+        hideValidation();
+    }
 
-			Map<String, CaseDao.StatusRow> labelToRow = new LinkedHashMap<>();
-			for (CaseDao.StatusRow status : statuses) {
-				String label = status.name() == null || status.name().isBlank() ? "Status #" + status.id() : status.name();
-				labelToRow.put(label, status);
-			}
+    private void onSelectStatus() {
+        try {
+            selectStatusFromCandidates(caseDao.listStatusesForTenant(requireClientId()));
+        } catch (RuntimeException ex) {
+            showValidation("Unable to load statuses.");
+        }
+    }
 
-			String preselect = selectedStatus == null ? labelToRow.keySet().iterator().next() : safeTrim(selectedStatus.name());
-			Optional<String> picked = showSecondaryChoiceDialog(
-					"Change Status",
-					"Status:",
-					preselect,
-					labelToRow.keySet());
-			if (picked.isPresent()) {
-				selectedStatus = labelToRow.get(picked.get());
-				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
-				hideValidation();
-			}
-		} catch (RuntimeException ex) {
-			showValidation("Unable to load statuses.");
-		}
-	}
+    void selectStatusFromCandidates(List<CaseDao.StatusRow> statuses) {
+        if (statuses.isEmpty()) {
+            showValidation("No statuses are available for this tenant.");
+            return;
+        }
+        CaseStatusSelector.showPicker(selectStatusButton.getScene().getWindow(), statuses, selectedStatus,
+                CaseDao.StatusRow::id, CaseDao.StatusRow::name, CaseDao.StatusRow::color)
+                .ifPresent(this::applyStatusSelection);
+    }
 
-	private Optional<String> showSecondaryChoiceDialog(
-			String title,
-			String content,
-			String preselect,
-			java.util.Collection<String> options) {
-		ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, options);
-		dialog.setTitle(title);
-		dialog.setHeaderText(null);
-		dialog.setContentText(content);
-		AppDialogs.applySecondaryDialogShell(dialog, title);
-		Window owner = stage == null ? null : stage;
-		if (owner != null) {
-			dialog.initOwner(owner);
-		}
-		applyToolbarClassesToDialogButton(dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.OK), "app-toolbar-button-primary");
-		applyToolbarClassesToDialogButton(dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.CANCEL), "app-toolbar-button-neutral");
-		return dialog.showAndWait();
-	}
+    void applyStatusSelection(CaseDao.StatusRow selected) {
+        selectedStatus = selected;
+        renderStatusMini(selected.id(), selected.name(), selected.color());
+        hideValidation();
+    }
 
-	private void applyToolbarClassesToDialogButton(Node node, String variantClass) {
-		if (!(node instanceof Button button)) {
-			return;
-		}
-		if (!button.getStyleClass().contains("app-toolbar-button")) {
-			button.getStyleClass().add("app-toolbar-button");
-		}
-		if (!button.getStyleClass().contains(variantClass)) {
-			button.getStyleClass().add(variantClass);
-		}
-	}
+    private void preselectDefaultStatusIfAvailable() {
+        if (selectedStatus != null || caseDao == null || appState == null) {
+            return;
+        }
+        try {
+            applyDefaultStatusIfAvailable(caseDao.listStatusesForTenant(requireClientId()));
+        } catch (RuntimeException ignored) {
+            // If statuses cannot be loaded at initialization time, keep existing fallback (unselected).
+        }
+    }
 
-	private void preselectDefaultStatusIfAvailable() {
-		if (selectedStatus != null || caseDao == null || appState == null) {
-			return;
-		}
-		try {
-			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(requireClientId());
-			Optional<CaseDao.StatusRow> defaultOpenStatus = statuses.stream()
-					.filter(Objects::nonNull)
-					.filter(status -> !CaseDao.isTerminalStatus(status))
-					.findFirst();
-			if (defaultOpenStatus.isPresent()) {
-				selectedStatus = defaultOpenStatus.get();
-				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
-				if (!hasUnsavedChanges()) {
-					captureInitialSnapshot();
-				}
-			}
-		} catch (RuntimeException ignored) {
-			// If statuses cannot be loaded at initialization time, keep existing fallback (unselected).
-		}
-	}
+    void applyDefaultStatusIfAvailable(List<CaseDao.StatusRow> statuses) {
+        if (selectedStatus != null) return;
+        Optional<CaseDao.StatusRow> defaultOpenStatus = statuses.stream()
+                .filter(Objects::nonNull)
+                .filter(status -> !CaseDao.isTerminalStatus(status))
+                .findFirst();
+        if (defaultOpenStatus.isPresent()) {
+            selectedStatus = defaultOpenStatus.get();
+            renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
+            if (!hasUnsavedChanges()) {
+                captureInitialSnapshot();
+            }
+        }
+    }
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorCss) {
 		if (practiceAreaHost == null)
@@ -829,7 +807,9 @@ public final class NewIntakeController {
 				(name == null || name.isBlank()) ? "—" : name,
 				colorCss
 		);
-		practiceAreaHost.getChildren().setAll(practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI));
+		var card = practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI);
+        if (practiceAreaId != null) card.getStyleClass().add("shale-card-selected");
+        practiceAreaHost.getChildren().setAll(card);
 	}
 
 	private void renderStatusMini(Integer statusId, String statusName, String statusColorCss) {
@@ -845,7 +825,9 @@ public final class NewIntakeController {
 				null,
 				statusColorCss
 		);
-		statusHost.getChildren().setAll(statusCardFactory.create(model, StatusCardFactory.Variant.MINI));
+		var card = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
+        if (statusId != null) card.getStyleClass().add("shale-card-selected");
+        statusHost.getChildren().setAll(card);
 	}
 
 	private int requireClientId() {
@@ -876,6 +858,7 @@ public final class NewIntakeController {
 			return;
 		}
 
+        hideValidation();
 		boolean shouldBlockForOffline = shouldBlockCreateForOfflinePreflight();
 		if (shouldBlockForOffline) {
 			System.out.println("[NewIntakeController] create blocked by offline preflight.");
@@ -969,7 +952,7 @@ public final class NewIntakeController {
 
 	private void logPracticeAreaPreflightFailure(int tenantId, RuntimeException ex) {
 		System.err.println("[NewIntakeController] practice area preflight failed " + saveContext(tenantId));
-		ex.printStackTrace(System.err);
+		System.err.println("Intake operation failed; exceptionClass="+ex.getClass().getName());
 	}
 
 	private void handlePracticeAreaPreflightFailure(RuntimeException ex) {
@@ -1033,7 +1016,10 @@ public final class NewIntakeController {
 				configurationId,
 				configurationRowVer == null ? null : configurationRowVer.clone(),
 				configuredDateInputs.values().stream().map(input -> new CaseDao.ConfiguredDateValue(
-						input.fieldKey(), input.caseDateTypeId(), input.required(), input.value())).toList()
+						input.fieldKey(), input.caseDateTypeId(), input.required(), input.value())).toList(),
+                clientPhoneUnavailableCheckBox.isSelected()?clientPhoneUnavailableReasonBox.getValue():null,
+                callerPhoneUnavailableCheckBox.isSelected()?callerPhoneUnavailableReasonBox.getValue():null,
+                clientPhoneExtensionField.getText(),callerPhoneExtensionField.getText()
 		);
 	}
 
@@ -1062,7 +1048,7 @@ public final class NewIntakeController {
 		if (configurationFailure) datesReloadRequired = true;
 		String message = isConnectivityFailure(ex)
 				? "Shale could not connect to the database. Your intake was not saved. You can save a local backup and retry later."
-				: configurationFailure ? ex.getMessage()
+				: ex instanceof FieldValidationException ? ex.getMessage() : configurationFailure ? ex.getMessage()
 				: "Unable to save intake. Your information has not been discarded. Please try again.";
 		showValidation(message);
 		setSaving(false);
@@ -1101,7 +1087,7 @@ public final class NewIntakeController {
 			System.out.println("[NewIntakeController] fresh connectivity check result=" + result);
 			return result;
 		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] fresh connectivity check failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] fresh connectivity check failed: " + ex.getClass().getName());
 			return Optional.empty();
 		}
 	}
@@ -1173,7 +1159,7 @@ public final class NewIntakeController {
 				deleteDraftFile(draftPath);
 			}
 		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] draft restore prompt failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] draft restore prompt failed: " + ex.getClass().getName());
 		}
 	}
 
@@ -1186,8 +1172,8 @@ public final class NewIntakeController {
 			showSuccess("Local backup saved. You can restore it next time New Intake is opened.");
 			System.out.println("[NewIntakeController] local draft saved path=" + draftPath);
 		} catch (Exception ex) {
-			System.err.println("[NewIntakeController] local draft save failed: " + ex.getMessage());
-			ex.printStackTrace(System.err);
+			System.err.println("[NewIntakeController] local draft save failed: " + ex.getClass().getName());
+			System.err.println("Intake operation failed; exceptionClass="+ex.getClass().getName());
 			showValidation("Unable to save a local backup right now. Your form is still open. Use Copy Intake Text to keep an emergency copy.");
 			copyIntakeTextToClipboard();
 		}
@@ -1205,7 +1191,7 @@ public final class NewIntakeController {
 			showSuccess("Local draft restored.");
 			System.out.println("[NewIntakeController] local draft restored path=" + draftPath);
 		} catch (Exception ex) {
-			System.err.println("[NewIntakeController] local draft restore failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] local draft restore failed: " + ex.getClass().getName());
 			showValidation("Unable to restore the local draft.");
 		}
 	}
@@ -1219,6 +1205,8 @@ public final class NewIntakeController {
 		clientLastNameField.setText(snapshot.clientLastName());
 		clientAddressField.setText(snapshot.clientAddress());
 		clientPhoneField.setText(snapshot.clientPhone());
+        clientPhoneExtensionField.setText(snapshot.clientPhoneExtension());
+        clientPhoneUnavailableCheckBox.setSelected(snapshot.clientPhoneUnavailable());clientPhoneUnavailableReasonBox.setValue(snapshot.clientPhoneUnavailableReason());
 		clientEmailField.setText(snapshot.clientEmail());
 		clientDateOfBirthPicker.setValue(snapshot.clientDateOfBirth());
 		clientDeceasedCheckBox.setSelected(snapshot.clientDeceased());
@@ -1228,6 +1216,8 @@ public final class NewIntakeController {
 		callerFirstNameField.setText(snapshot.callerFirstName());
 		callerLastNameField.setText(snapshot.callerLastName());
 		callerPhoneField.setText(snapshot.callerPhone());
+        callerPhoneExtensionField.setText(snapshot.callerPhoneExtension());
+        callerPhoneUnavailableCheckBox.setSelected(snapshot.callerPhoneUnavailable());callerPhoneUnavailableReasonBox.setValue(snapshot.callerPhoneUnavailableReason());
 		callerAddressField.setText(snapshot.callerAddress());
 		callerEmailField.setText(snapshot.callerEmail());
 		descriptionArea.setText(snapshot.description());
@@ -1297,8 +1287,8 @@ public final class NewIntakeController {
 			Clipboard.getSystemClipboard().setContent(content);
 			showSuccess("Intake text copied to the clipboard.");
 		} catch (Exception ex) {
-			System.err.println("[NewIntakeController] copy intake text failed: " + ex.getMessage());
-			ex.printStackTrace(System.err);
+			System.err.println("[NewIntakeController] copy intake text failed: " + ex.getClass().getName());
+			System.err.println("Intake operation failed; exceptionClass="+ex.getClass().getName());
 			showValidation("Unable to copy intake text automatically. Your form is still open; please keep editing or copy fields manually.");
 		}
 	}
@@ -1320,8 +1310,8 @@ public final class NewIntakeController {
 	}
 
 	private void logCreateFailure(int tenantId, RuntimeException ex) {
-		System.err.println("[NewIntakeController] DAO create failed " + saveContext(tenantId) + " connectivity=" + isConnectivityFailure(ex) + " error=" + ex.getMessage());
-		ex.printStackTrace(System.err);
+		System.err.println("[NewIntakeController] DAO create failed " + saveContext(tenantId) + " connectivity=" + isConnectivityFailure(ex) + " error=" + ex.getClass().getName());
+		System.err.println("Intake operation failed; exceptionClass="+ex.getClass().getName());
 	}
 
 	private String saveContext(int tenantId) {
@@ -1343,7 +1333,7 @@ public final class NewIntakeController {
 		try {
 			deleteDraftFile(resolveDraftPath());
 		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] local draft delete failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] local draft delete failed: " + ex.getClass().getName());
 		}
 	}
 
@@ -1352,7 +1342,7 @@ public final class NewIntakeController {
 		try {
 			Files.deleteIfExists(draftPath);
 		} catch (Exception ex) {
-			System.err.println("[NewIntakeController] local draft delete failed path=" + draftPath + " error=" + ex.getMessage());
+			System.err.println("[NewIntakeController] local draft delete failed path=" + draftPath + " error=" + ex.getClass().getName());
 		}
 	}
 
@@ -1427,7 +1417,7 @@ public final class NewIntakeController {
 				dateOfInjuryPicker == null ? null : dateOfInjuryPicker.getValue(),
 				statuteOfLimitationsPicker == null ? null : statuteOfLimitationsPicker.getValue(),
 				tortClaimsNoticePicker == null ? null : tortClaimsNoticePicker.getValue(),
-				pendingParties == null ? List.of() : new ArrayList<>(pendingParties));
+				pendingParties == null ? List.of() : new ArrayList<>(pendingParties),clientPhoneUnavailableCheckBox!=null&&clientPhoneUnavailableCheckBox.isSelected(),clientPhoneUnavailableReasonBox==null?null:clientPhoneUnavailableReasonBox.getValue(),callerPhoneUnavailableCheckBox!=null&&callerPhoneUnavailableCheckBox.isSelected(),callerPhoneUnavailableReasonBox==null?null:callerPhoneUnavailableReasonBox.getValue(),clientPhoneExtensionField==null?null:clientPhoneExtensionField.getText(),callerPhoneExtensionField==null?null:callerPhoneExtensionField.getText());
 	}
 
 	private void setSaving(boolean saving) {
@@ -1473,12 +1463,13 @@ public final class NewIntakeController {
 				validateIntakeTime(),
 				required(clientFirstNameField.getText(), "Client First Name is required."),
 				required(clientLastNameField.getText(), "Client Last Name is required."),
-				required(clientPhoneField.getText(), "Client Phone Number is required."),
+
 				selectedStatus == null ? "Status is required." : null,
 				callerRequiredWhenNotClient(callerFirstNameField.getText(), "Caller First Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked."),
-				callerRequiredWhenNotClient(callerPhoneField.getText(), "Caller Phone Number is required when Caller is Client is unchecked.")
+				null
 		).filter(s -> s != null && !s.isBlank()).toList());
+        errors.addAll(revalidateContactFields(true));
 		configuredDateInputs.values().stream().filter(input -> input.required() && input.value() == null)
 				.forEach(input -> {
 					ControlStyles.setInvalid(input.input(), true);
@@ -1490,6 +1481,87 @@ public final class NewIntakeController {
 		});
 		return List.copyOf(errors);
 	}
+
+    private void configureContactValidation() {
+        for (var field : List.of(clientPhoneField, callerPhoneField, clientEmailField, callerEmailField,
+                clientPhoneExtensionField, callerPhoneExtensionField, clientPhoneUnavailableCheckBox,
+                callerPhoneUnavailableCheckBox, clientPhoneUnavailableReasonBox, callerPhoneUnavailableReasonBox)) {
+            field.focusedProperty().addListener((o, wasFocused, focused) -> {
+                if (!focused) revalidateContactFields(false, field);
+            });
+        }
+    }
+
+    private List<String> revalidateContactFields(boolean focus) { return revalidateContactFields(focus, null); }
+
+    private List<String> revalidateContactFields(boolean focus, Node blurred) {
+        List<String> errors = validateContactFields(focus, blurred);
+        List<String> summary = new ArrayList<>();
+        if (validationLabel.getStyleClass().contains("shale-error-message")) {
+            validationLabel.getText().lines().filter(line -> !contactValidationErrors.contains(line))
+                    .filter(line -> !line.isBlank()).forEach(summary::add);
+        }
+        contactValidationErrors = List.copyOf(errors);
+        summary.addAll(errors);
+        if (!summary.isEmpty()) showValidation(String.join("\n", summary));
+        else if (validationLabel.getStyleClass().contains("shale-error-message")) hideValidation();
+        return errors;
+    }
+
+    private List<String> validateContactFields(boolean focus, Node blurred) {
+        List<String> errors = new ArrayList<>();
+        Node first = null;
+        for (boolean client : List.of(true, false)) {
+            TextField phone = client ? clientPhoneField : callerPhoneField;
+            TextField extension = client ? clientPhoneExtensionField : callerPhoneExtensionField;
+            TextField email = client ? clientEmailField : callerEmailField;
+            CheckBox unavailable = client ? clientPhoneUnavailableCheckBox : callerPhoneUnavailableCheckBox;
+            var reason = client ? clientPhoneUnavailableReasonBox : callerPhoneUnavailableReasonBox;
+            Label feedback = client ? clientPhoneFeedbackLabel : callerPhoneFeedbackLabel;
+            String prefix = client ? "Client" : "Caller";
+            for (var field : List.of(phone, extension, email, reason)) ControlStyles.setInvalid(field, false);
+            List<String> phoneErrors = new ArrayList<>();
+            String preview = "";
+            if (client || !callerIsClientCheckBox.isSelected()) {
+                if (unavailable.isSelected() && reason.getValue() == null) {
+                    phoneErrors.add("Choose an unavailable reason.");
+                    ControlStyles.setInvalid(reason, true);
+                    if (first == null) first = reason;
+                }
+                try {
+                    var value = ContactValues.INSTANCE.phone(phone.getText(), extension.getText(),
+                            !unavailable.isSelected(), client ? "clientPhone" : "callerPhone");
+                    if (value != null) {
+                        preview = value.preview();
+                        if (focus || blurred == phone || blurred == extension) {
+                            phone.setText(value.displayInput());
+                            extension.setText(Objects.toString(value.extension(), ""));
+                        }
+                    }
+                } catch (FieldValidationException invalid) {
+                    phoneErrors.add(invalid.getMessage());
+                    javafx.scene.control.Control field = invalid.errors().getFirst().field().endsWith(".extension") ? extension : phone;
+                    ControlStyles.setInvalid(field, true);
+                    if (first == null) first = field;
+                }
+                try {
+                    ContactValues.INSTANCE.email(email.getText(), false, client ? "clientEmail" : "callerEmail");
+                } catch (FieldValidationException invalid) {
+                    errors.add(prefix + " Email: " + invalid.getMessage());
+                    ControlStyles.setInvalid(email, true);
+                    if (first == null) first = email;
+                }
+            }
+            errors.addAll(phoneErrors.stream().map(message -> prefix + " Phone: " + message).toList());
+            feedback.setText(phoneErrors.isEmpty() ? preview : String.join("\n", phoneErrors));
+            feedback.getStyleClass().remove("shale-error-message");
+            if (!phoneErrors.isEmpty()) feedback.getStyleClass().add("shale-error-message");
+            feedback.setVisible(!feedback.getText().isBlank());
+            feedback.setManaged(feedback.isVisible());
+        }
+        if (focus && first != null) first.requestFocus();
+        return errors;
+    }
 
 	private List<DatePicker> allIntakeDatePickers() {
 		List<DatePicker> pickers = new ArrayList<>(List.of(clientDateOfBirthPicker,
@@ -1563,7 +1635,7 @@ public final class NewIntakeController {
 		} catch (RuntimeException ex) {
 			if (isConnectivityFailure(ex)) {
 				System.err.println("[NewIntakeController] practice area validation connectivity failure " + saveContext(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId()));
-				ex.printStackTrace(System.err);
+				System.err.println("Intake operation failed; exceptionClass="+ex.getClass().getName());
 				knownOnlineState = Boolean.FALSE;
 				return new PracticeAreaValidationResult(List.of(), true);
 			}
@@ -1616,6 +1688,7 @@ public final class NewIntakeController {
 	}
 
 	private void hideValidation() {
+        validationLabel.setText("");
 		validationLabel.setVisible(false);
 		validationLabel.setManaged(false);
 	}
@@ -1660,7 +1733,67 @@ public final class NewIntakeController {
 			LocalDate injuryDate,
 			LocalDate statuteOfLimitationsDate,
 			LocalDate tortClaimsNoticeDate,
-			List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties) {
+			List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties, boolean clientPhoneUnavailable, PhoneUnavailableReason clientPhoneUnavailableReason, boolean callerPhoneUnavailable, PhoneUnavailableReason callerPhoneUnavailableReason,String clientPhoneExtension,String callerPhoneExtension) {
+        public IntakeFormSnapshot(
+			String caseName,
+			LocalDate dateOfIntake,
+			String timeOfIntake,
+			boolean estateCase,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			LocalDate clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			String callerAddress,
+			String callerEmail,
+			Integer practiceAreaId,
+			Integer statusId,
+			String description,
+			String summary,
+			LocalDate medicalNegligenceDate,
+			LocalDate medicalNegligenceDiscoveredDate,
+			LocalDate injuryDate,
+			LocalDate statuteOfLimitationsDate,
+			LocalDate tortClaimsNoticeDate,
+			List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties, boolean clientPhoneUnavailable, PhoneUnavailableReason clientPhoneUnavailableReason, boolean callerPhoneUnavailable, PhoneUnavailableReason callerPhoneUnavailableReason){this(caseName,dateOfIntake,timeOfIntake,estateCase,clientFirstName,clientLastName,clientAddress,clientPhone,clientEmail,clientDateOfBirth,clientDeceased,clientCondition,callerIsClient,callerFirstName,callerLastName,callerPhone,callerAddress,callerEmail,practiceAreaId,statusId,description,summary,medicalNegligenceDate,medicalNegligenceDiscoveredDate,injuryDate,statuteOfLimitationsDate,tortClaimsNoticeDate,pendingParties,clientPhoneUnavailable,clientPhoneUnavailableReason,callerPhoneUnavailable,callerPhoneUnavailableReason,null,null);}
+
+        IntakeFormSnapshot(
+			String caseName,
+			LocalDate dateOfIntake,
+			String timeOfIntake,
+			boolean estateCase,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			LocalDate clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			String callerAddress,
+			String callerEmail,
+			Integer practiceAreaId,
+			Integer statusId,
+			String description,
+			String summary,
+			LocalDate medicalNegligenceDate,
+			LocalDate medicalNegligenceDiscoveredDate,
+			LocalDate injuryDate,
+			LocalDate statuteOfLimitationsDate,
+			LocalDate tortClaimsNoticeDate,
+			List<PartyAddWorkflowDialog.AddPartyDraft> pendingParties){this(caseName,dateOfIntake,timeOfIntake,estateCase,clientFirstName,clientLastName,clientAddress,clientPhone,clientEmail,clientDateOfBirth,clientDeceased,clientCondition,callerIsClient,callerFirstName,callerLastName,callerPhone,callerAddress,callerEmail,practiceAreaId,statusId,description,summary,medicalNegligenceDate,medicalNegligenceDiscoveredDate,injuryDate,statuteOfLimitationsDate,tortClaimsNoticeDate,pendingParties,false,null,false,null);}
+
 	}
 
 	static LocalDraftPayload toLocalDraftPayload(IntakeFormSnapshot snapshot) {
@@ -1707,7 +1840,7 @@ public final class NewIntakeController {
 				isoDate(snapshot.injuryDate()),
 				isoDate(snapshot.statuteOfLimitationsDate()),
 				isoDate(snapshot.tortClaimsNoticeDate()),
-				parties));
+				parties,snapshot.clientPhoneUnavailable(),snapshot.clientPhoneUnavailableReason(),snapshot.callerPhoneUnavailable(),snapshot.callerPhoneUnavailableReason(),snapshot.clientPhoneExtension(),snapshot.callerPhoneExtension()));
 	}
 
 	static IntakeFormSnapshot fromLocalDraftPayload(LocalDraftPayload payload) {
@@ -1733,7 +1866,7 @@ public final class NewIntakeController {
 				s.callerFirstName(), s.callerLastName(), s.callerPhone(), s.callerAddress(), s.callerEmail(),
 				parseIntOrNull(s.practiceAreaId()), parseIntOrNull(s.statusId()), s.description(), s.summary(),
 				parseDateOrNull(s.medicalNegligenceDate()), parseDateOrNull(s.medicalNegligenceDiscoveredDate()),
-				parseDateOrNull(s.injuryDate()), parseDateOrNull(s.statuteOfLimitationsDate()), parseDateOrNull(s.tortClaimsNoticeDate()), parties);
+				parseDateOrNull(s.injuryDate()), parseDateOrNull(s.statuteOfLimitationsDate()), parseDateOrNull(s.tortClaimsNoticeDate()), parties,s.clientPhoneUnavailable(),s.clientPhoneUnavailableReason(),s.callerPhoneUnavailable(),s.callerPhoneUnavailableReason(),s.clientPhoneExtension(),s.callerPhoneExtension());
 	}
 
 	static String toReadableIntakeText(IntakeFormSnapshot snapshot) {
@@ -1744,6 +1877,8 @@ public final class NewIntakeController {
 		appendLine(text, "Estate case", yesNo(snapshot.estateCase()));
 		appendLine(text, "Client", (safeString(snapshot.clientFirstName()) + " " + safeString(snapshot.clientLastName())).trim());
 		appendLine(text, "Client phone", snapshot.clientPhone());
+        appendLine(text,"Client extension",snapshot.clientPhoneExtension());
+        appendLine(text,"Client phone unavailable",snapshot.clientPhoneUnavailable()?Objects.toString(snapshot.clientPhoneUnavailableReason(),null):null);
 		appendLine(text, "Client email", snapshot.clientEmail());
 		appendLine(text, "Client address", snapshot.clientAddress());
 		appendLine(text, "Client date of birth", isoDate(snapshot.clientDateOfBirth()));
@@ -1751,6 +1886,8 @@ public final class NewIntakeController {
 		appendLine(text, "Caller is client", yesNo(snapshot.callerIsClient()));
 		appendLine(text, "Caller", (safeString(snapshot.callerFirstName()) + " " + safeString(snapshot.callerLastName())).trim());
 		appendLine(text, "Caller phone", snapshot.callerPhone());
+        appendLine(text,"Caller extension",snapshot.callerPhoneExtension());
+        appendLine(text,"Caller phone unavailable",snapshot.callerPhoneUnavailable()?Objects.toString(snapshot.callerPhoneUnavailableReason(),null):null);
 		appendLine(text, "Caller email", snapshot.callerEmail());
 		appendLine(text, "Description", snapshot.description());
 		appendLine(text, "Summary", snapshot.summary());
@@ -1859,7 +1996,67 @@ public final class NewIntakeController {
 			String injuryDate,
 			String statuteOfLimitationsDate,
 			String tortClaimsNoticeDate,
-			List<LocalDraftParty> pendingParties) {
+			List<LocalDraftParty> pendingParties, boolean clientPhoneUnavailable, PhoneUnavailableReason clientPhoneUnavailableReason, boolean callerPhoneUnavailable, PhoneUnavailableReason callerPhoneUnavailableReason,String clientPhoneExtension,String callerPhoneExtension) {
+        public LocalDraftSnapshot(
+			String caseName,
+			String dateOfIntake,
+			String timeOfIntake,
+			boolean estateCase,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			String clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			String callerAddress,
+			String callerEmail,
+			String practiceAreaId,
+			String statusId,
+			String description,
+			String summary,
+			String medicalNegligenceDate,
+			String medicalNegligenceDiscoveredDate,
+			String injuryDate,
+			String statuteOfLimitationsDate,
+			String tortClaimsNoticeDate,
+			List<LocalDraftParty> pendingParties, boolean clientPhoneUnavailable, PhoneUnavailableReason clientPhoneUnavailableReason, boolean callerPhoneUnavailable, PhoneUnavailableReason callerPhoneUnavailableReason){this(caseName,dateOfIntake,timeOfIntake,estateCase,clientFirstName,clientLastName,clientAddress,clientPhone,clientEmail,clientDateOfBirth,clientDeceased,clientCondition,callerIsClient,callerFirstName,callerLastName,callerPhone,callerAddress,callerEmail,practiceAreaId,statusId,description,summary,medicalNegligenceDate,medicalNegligenceDiscoveredDate,injuryDate,statuteOfLimitationsDate,tortClaimsNoticeDate,pendingParties,clientPhoneUnavailable,clientPhoneUnavailableReason,callerPhoneUnavailable,callerPhoneUnavailableReason,null,null);}
+
+        LocalDraftSnapshot(
+			String caseName,
+			String dateOfIntake,
+			String timeOfIntake,
+			boolean estateCase,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			String clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			String callerAddress,
+			String callerEmail,
+			String practiceAreaId,
+			String statusId,
+			String description,
+			String summary,
+			String medicalNegligenceDate,
+			String medicalNegligenceDiscoveredDate,
+			String injuryDate,
+			String statuteOfLimitationsDate,
+			String tortClaimsNoticeDate,
+			List<LocalDraftParty> pendingParties){this(caseName,dateOfIntake,timeOfIntake,estateCase,clientFirstName,clientLastName,clientAddress,clientPhone,clientEmail,clientDateOfBirth,clientDeceased,clientCondition,callerIsClient,callerFirstName,callerLastName,callerPhone,callerAddress,callerEmail,practiceAreaId,statusId,description,summary,medicalNegligenceDate,medicalNegligenceDiscoveredDate,injuryDate,statuteOfLimitationsDate,tortClaimsNoticeDate,pendingParties,false,null,false,null);}
+
 	}
 
 	record LocalDraftParty(

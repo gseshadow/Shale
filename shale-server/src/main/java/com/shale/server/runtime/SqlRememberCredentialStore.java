@@ -1,9 +1,10 @@
 package com.shale.server.runtime;
 
 import java.sql.*;
-import com.shale.data.util.UtcJdbcTimestamp;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Calendar;
+import java.util.TimeZone;
 import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
@@ -22,7 +23,7 @@ public final class SqlRememberCredentialStore implements RememberCredentialStore
         try(Connection c=openRuntime(principal);PreparedStatement q=c.prepareStatement(
                 "INSERT dbo.DesktopRememberCredentials(ShaleClientId,UserId,SessionId,InstallationId,CredentialHash,AbsoluteExpiresAt) VALUES(?,?,?,?,?,?)")){
             q.setInt(1,principal.shaleClientId());q.setInt(2,principal.userId());q.setObject(3,session);
-            q.setObject(4,installation);q.setBytes(5,hash);UtcJdbcTimestamp.set(q,6,expires);q.executeUpdate();
+            q.setObject(4,installation);q.setBytes(5,hash);q.setTimestamp(6,Timestamp.from(expires),utc());q.executeUpdate();
         }catch(SQLException e){throw new IllegalStateException("Failed to create remembered sign-in",e);}
     }
 
@@ -35,19 +36,19 @@ public final class SqlRememberCredentialStore implements RememberCredentialStore
             try(PreparedStatement q=c.prepareStatement("SELECT r.AbsoluteExpiresAt,u.Email,COALESCE(u.is_admin,0),COALESCE(u.is_attorney,0),s.CurrentAccessJti FROM dbo.DesktopRememberCredentials r WITH(UPDLOCK,HOLDLOCK) JOIN dbo.UserSessions s WITH(UPDLOCK,HOLDLOCK) ON s.SessionId=r.SessionId AND s.ShaleClientId=r.ShaleClientId AND s.UserId=r.UserId JOIN dbo.Users u ON u.Id=r.UserId AND u.ShaleClientId=r.ShaleClientId WHERE r.CredentialHash=? AND r.InstallationId=? AND r.ShaleClientId=? AND r.UserId=? AND r.SessionId=? AND r.ConsumedAt IS NULL AND r.AbsoluteExpiresAt>? AND s.RevokedAt IS NULL AND s.ExpiresAt>? AND COALESCE(u.is_deleted,0)=0 AND COALESCE(u.IsRemoved,0)=0")){
                 q.setBytes(1,oldHash);q.setObject(2,installation);q.setInt(3,found.principal().shaleClientId());
                 q.setInt(4,found.principal().userId());q.setObject(5,found.sessionId());
-                UtcJdbcTimestamp.set(q,6,now);UtcJdbcTimestamp.set(q,7,now);
+                q.setTimestamp(6,Timestamp.from(now),utc());q.setTimestamp(7,Timestamp.from(now),utc());
                 try(ResultSet rs=q.executeQuery()){
                     if(!rs.next()){c.rollback();return Optional.empty();}
-                    Instant deadline=UtcJdbcTimestamp.get(rs,1).toInstant();String email=rs.getString(2);
+                    Instant deadline=rs.getTimestamp(1,utc()).toInstant();String email=rs.getString(2);
                     UUID expectedJti=UUID.fromString(rs.getString(5));
                     try(PreparedStatement s=c.prepareStatement("UPDATE dbo.UserSessions SET CurrentAccessJti=?,LastRefreshedAt=?,UpdatedAt=? WHERE SessionId=? AND ShaleClientId=? AND UserId=? AND CurrentAccessJti=? AND RevokedAt IS NULL AND ExpiresAt>?")){
-                        s.setObject(1,replacementJti);UtcJdbcTimestamp.set(s,2,now);UtcJdbcTimestamp.set(s,3,now);
+                        s.setObject(1,replacementJti);s.setTimestamp(2,Timestamp.from(now),utc());s.setTimestamp(3,Timestamp.from(now),utc());
                         s.setObject(4,found.sessionId());s.setInt(5,found.principal().shaleClientId());s.setInt(6,found.principal().userId());
-                        s.setObject(7,expectedJti);UtcJdbcTimestamp.set(s,8,now);
+                        s.setObject(7,expectedJti);s.setTimestamp(8,Timestamp.from(now),utc());
                         if(s.executeUpdate()!=1){c.rollback();return Optional.empty();}
                     }
                     try(PreparedStatement u=c.prepareStatement("UPDATE dbo.DesktopRememberCredentials SET CredentialHash=?,RotatedAt=?,UpdatedAt=? WHERE CredentialHash=? AND InstallationId=? AND ShaleClientId=? AND UserId=? AND SessionId=? AND ConsumedAt IS NULL")){
-                        u.setBytes(1,replacement);UtcJdbcTimestamp.set(u,2,now);UtcJdbcTimestamp.set(u,3,now);
+                        u.setBytes(1,replacement);u.setTimestamp(2,Timestamp.from(now),utc());u.setTimestamp(3,Timestamp.from(now),utc());
                         u.setBytes(4,oldHash);u.setObject(5,installation);u.setInt(6,found.principal().shaleClientId());
                         u.setInt(7,found.principal().userId());u.setObject(8,found.sessionId());
                         if(u.executeUpdate()!=1){c.rollback();return Optional.empty();}
@@ -68,16 +69,27 @@ public final class SqlRememberCredentialStore implements RememberCredentialStore
     }
 
     private Optional<Lookup> lookup(byte[] hash,UUID installation,Instant now){
+        if(hash==null || hash.length!=32 || installation==null || now==null)return Optional.empty();
         try(Connection c=identityLookup.getConnection();CallableStatement q=c.prepareCall(
-                "{call dbo.ResolveDesktopRememberCredential(?,?,?)}")){
-            q.setBytes(1,hash);q.setObject(2,installation);UtcJdbcTimestamp.set(q,3,now);
+                "{call dbo.ResolveDesktopRememberCredentialV2(?,?,?)}")){
+            q.setQueryTimeout(5);
+            q.setBytes(1,hash);q.setObject(2,installation);q.setTimestamp(3,Timestamp.from(now),utc());
             try(ResultSet rs=q.executeQuery()){
                 if(!rs.next())return Optional.empty();
-                var principal=new ServerPrincipal(rs.getInt(2),rs.getInt(1),rs.getString(4));
-                return Optional.of(new Lookup(principal,UUID.fromString(rs.getString(3))));
+                int tenant=rs.getInt(1);boolean nullTenant=rs.wasNull();
+                int user=rs.getInt(2);boolean nullUser=rs.wasNull();
+                String session=rs.getString(3),email=rs.getString(4);
+                if(nullTenant || tenant<=0 || nullUser || user<=0 || session==null || rs.next())return Optional.empty();
+                UUID sid;
+                try{sid=UUID.fromString(session);}catch(IllegalArgumentException invalid){return Optional.empty();}
+                return Optional.of(new Lookup(new ServerPrincipal(user,tenant,email),sid));
             }
-        }catch(SQLException e){throw new IllegalStateException("Failed to locate remembered sign-in",e);}
+        }catch(SQLException e){throw new IllegalStateException("Failed to locate remembered sign-in");}
     }
+
+    // datetime2 carries no zone; these columns and the resolver's database clock are UTC.
+    // Calendar is mutable, so give each JDBC operation a fresh instance.
+    private static Calendar utc(){return Calendar.getInstance(TimeZone.getTimeZone("UTC"));}
 
     private Connection openRuntime(ServerPrincipal principal)throws SQLException{
         return runtimeConnections.openConnection(principal);

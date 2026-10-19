@@ -76,15 +76,15 @@ final class ApplicationShellStyleContractTest {
 	void shellCorrectionPreservesCasesAndCaseOverviewScrollOwnership() throws Exception {
 		String cases = Files.readString(RESOURCES.resolve("fxml/cases.fxml"));
 		String caseOverview = Files.readString(RESOURCES.resolve("fxml/case.fxml"));
-		String myShale = Files.readString(RESOURCES.resolve("fxml/my-shale.fxml"));
 		String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MainController.java"));
 
-		assertTrue(Pattern.compile("<BorderPane[^>]*styleClass=\\\"app-shell, shell-route-page\\\"", Pattern.DOTALL)
-				.matcher(cases).find(), "Cases must retain its routed page root");
-		assertTrue(myShale.contains("styleClass=\"app-shell, shell-route-page\""),
-				"My Shale must opt into the transparent routed-page root contract");
-		assertTrue(caseOverview.contains("styleClass=\"app-shell, shell-route-page\""),
-				"Case Overview must opt into the transparent routed-page root contract");
+        for (String page : new String[]{"cases.fxml", "my-shale.fxml", "case.fxml"}) {
+            var document = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                    .parse(RESOURCES.resolve("fxml/" + page).toFile());
+            var classes = java.util.Arrays.asList(document.getDocumentElement().getAttribute("styleClass").split(",\\s*"));
+            assertTrue(classes.contains("app-shell") && classes.contains("shell-route-page"),
+                    page + " must retain its shared routed-page root, alongside any feature classes");
+        }
 		assertTrue(cases.contains("fx:id=\"casesScroll\""),
 				"Cases must retain its existing card-grid scrolling boundary");
 		assertTrue(caseOverview.contains("fx:id=\"overviewScrollPane\""),

@@ -53,8 +53,8 @@ final class CaseDeadlineIdentityCutoverContractTest {
         String sql = source("CaseSummaryDao.java");
         for (String signature : new String[] {
                 "private List<RelatedCaseRow> listActiveRelated",
-                "public List<SearchCaseRow> searchActiveByName",
-                "public List<DeletedCaseRow> searchDeletedByName",
+                "public List<SearchCaseRow> searchActiveByName(int requestedTenantId, String query, SuggestionBounds bounds)",
+                "public List<DeletedCaseRow> searchDeletedByName(int requestedTenantId, String query, SuggestionBounds bounds)",
                 "public List<CaseBoardRow> listActiveAssignedBoard",
                 "public List<CaseGridRow> listActiveAssignedForUserDetail",
                 "private static String gridSql"
@@ -70,8 +70,9 @@ final class CaseDeadlineIdentityCutoverContractTest {
                 () -> assertTrue(sql.contains("LOWER(LTRIM(RTRIM(family_type.SystemKey)))='tort_notice_deadline'")),
                 () -> assertFalse(sql.contains("effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS'")),
                 () -> assertFalse(sql.contains("effective.SemanticRoleKey='TORT_NOTICE_DEADLINE'")),
-                () -> assertFalse(sql.contains("CaseDatePresentationSelections")),
-                () -> assertFalse(sql.contains("CASE_CARD")));
+                () -> assertFalse(method(sql, "public List<SearchCaseRow> searchActiveByName(int requestedTenantId, String query, SuggestionBounds bounds)")
+                        .contains("CaseDatePresentationSelections"), "Search summary dates must remain independent of card presentation selections"),
+                () -> assertFalse(method(sql, "public List<SearchCaseRow> searchActiveByName(int requestedTenantId, String query, SuggestionBounds bounds)").contains("CASE_CARD")));
     }
 
     @Test void effectiveOverlayMasksInactiveAndMissingFamiliesWhileHistoricalOccurrencesRemainReadable() throws Exception {

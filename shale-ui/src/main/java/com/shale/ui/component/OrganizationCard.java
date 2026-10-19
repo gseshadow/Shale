@@ -80,19 +80,19 @@ public class OrganizationCard extends HBox {
 	}
 
 	public void setPhone(String phone) {
-		phoneLabel.setText("Phone: " + fallback(phone));
+		phoneLabel.setText("Phone: " + (com.shale.data.validation.ContactValues.INSTANCE.usablePhone(phone,null)?com.shale.data.validation.ContactValues.INSTANCE.phone(phone,null,true,"phone").preview():fallback(phone)+(phone==null||phone.isBlank()?"":" · Needs review; calling unavailable")));
 	}
 	public void setStructuredPhone(String display,String normalized,String extension){
 		String value=display;
 		if(value!=null&&extension!=null&&!extension.isBlank()&&!value.toLowerCase().matches(".*(?:ext\\.?|x)\\s*"+java.util.regex.Pattern.quote(extension.trim())+".*"))
 			value=value+" ext. "+extension.trim();
 		setPhone(value);
-		phoneAction=null;if(normalized!=null)try{var target=ContactExternalActions.telephone(normalized,extension);phoneAction=()->externalActions.open(target);}catch(IllegalArgumentException ignored){}
+		phoneAction=null;if(display!=null)try{var target=ContactExternalActions.telephone(display,extension);phoneAction=()->externalActions.open(target);}catch(IllegalArgumentException ignored){}
 	}
 
 	public void setEmail(String email) {
-		emailLabel.setText("Email: " + fallback(email));
-		emailAction=email!=null&&email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")?()->externalActions.open(ContactExternalActions.email(email)):null;
+		emailLabel.setText("Email: " + fallback(email)+(email==null||email.isBlank()||com.shale.data.validation.ContactValues.INSTANCE.usableEmail(email)?"":" · Needs review; emailing unavailable"));
+        emailAction=null;try{var target=ContactExternalActions.email(email);emailAction=()->externalActions.open(target);}catch(IllegalArgumentException ignored){}
 	}
 
 	public void setWebsite(String website) {

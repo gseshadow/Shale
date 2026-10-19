@@ -3393,3 +3393,14 @@
 .choice-box .menu-item:focused > .label {
     -fx-text-fill: -shale-color-text-primary;
 }
+
+/* Shared typed MINI editors follow theme tokens without migrating unrelated editors. */
+.dialog-pane.mini-card-field-edit-dialog .field-edit-dialog-body {
+    -fx-background-color: -shale-color-dialog-surface;
+}
+.dialog-pane.mini-card-field-edit-dialog .field-edit-dialog-body .label {
+    -fx-text-fill: -shale-color-text-primary;
+}
+.dialog-pane.mini-card-field-edit-dialog .field-edit-current-value {
+    -fx-background-color: -shale-color-card-embedded-surface;
+}

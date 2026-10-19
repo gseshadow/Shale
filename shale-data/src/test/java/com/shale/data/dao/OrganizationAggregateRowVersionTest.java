@@ -68,7 +68,7 @@ final class OrganizationAggregateRowVersionTest {
 			assertEquals(1, db.organizationUpdates, edit);
 			assertEquals("phone".equals(edit) ? 1 : 0, db.structuredUpdates,
 					"unchanged Phase 3A rows, including nullable CreatedByUserId provenance, must not be rewritten");
-			assertEquals("phone".equals(edit) ? "505 765 4321" : "505 123 4567", db.phone, edit);
+			assertEquals("phone".equals(edit) ? "(505) 765-4321" : "505 123 4567", db.phone, edit);
 			assertTrue(db.events.contains("commit"), edit);
 		}
 	}

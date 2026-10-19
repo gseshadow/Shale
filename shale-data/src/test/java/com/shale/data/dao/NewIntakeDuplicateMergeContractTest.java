@@ -38,9 +38,9 @@ final class NewIntakeDuplicateMergeContractTest {
         assertTrue(s.contains("THEN ? ELSE Description END"));
         assertTrue(s.contains("THEN ? ELSE Summary END"));
         assertTrue(s.contains("COALESCE(NULLIF(LTRIM(RTRIM(FirstName)),''),?)"));
-        assertTrue(s.contains("hasContactPoint(con,\"ContactPhoneNumbers\""));
-        assertTrue(s.contains("hasContactPoint(con,\"ContactEmailAddresses\""));
-        assertTrue(s.contains("hasContactPoint(con,\"ContactAddresses\""));
+        assertTrue(s.contains("hasContactPoint(con,r.shaleClientId(),\"ContactPhoneNumbers\""));
+        assertTrue(s.contains("hasContactPoint(con,r.shaleClientId(),\"ContactEmailAddresses\""));
+        assertTrue(s.contains("hasContactPoint(con,r.shaleClientId(),\"ContactAddresses\""));
         assertTrue(s.contains("if(!hasActiveCaseDate"));
         assertTrue(s.contains("if(ids.size()==1)"),"only an unambiguous role Contact may be reused");
         assertTrue(s.contains("else{id=insertContact"),"ambiguous or absent role identity must not be merged arbitrarily");

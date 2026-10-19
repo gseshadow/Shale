@@ -1,0 +1,68 @@
+{
+  "synthetic": true,
+  "browser": "151.0.7922.173",
+  "observations": [
+    {
+      "width": 320,
+      "scenario": "read",
+      "previewApiCalls": 0,
+      "previewStorageCalls": 0,
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "store",
+      "previewApiCalls": 0,
+      "previewStorageCalls": 0,
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "clear",
+      "previewApiCalls": 0,
+      "previewStorageCalls": 0,
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "rejection",
+      "previewApiCalls": 0,
+      "previewStorageCalls": 0,
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "read",
+      "previewApiCalls": 0,
+      "previewStorageCalls": 0,
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "store",
+      "previewApiCalls": 0,
+      "previewStorageCalls": 0,
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "clear",
+      "previewApiCalls": 0,
+      "previewStorageCalls": 0,
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "rejection",
+      "previewApiCalls": 0,
+      "previewStorageCalls": 0,
+      "passed": true
+    },
+    {
+      "scenario": "actual Chromium adapter key/opaque/read/write/clear/getter denial",
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "unexpectedDestinations": []
+}

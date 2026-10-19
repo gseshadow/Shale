@@ -1,5 +1,24 @@
 # Shale Database Schema Reference
 
+## Auth permission evidence and cutover candidate — 2026-10-15
+
+The [owning permission cutover runbook](../docs/testing/auth-module-permission-cutover.md) records the user's native Windows
+auth SQL PASS for credential_identity, remembered_rotation and runtime_isolation, exit 0, and the
+user-run Azure collation/principal/effective-permission evidence. These supersede earlier pending
+Windows retest/unknown catalog statements for those reported observations only. Actual deployed
+server/desktop credential configuration and compatible installed fleet remain UNCONFIRMED.
+
+Existing runtime database/schema EXECUTE would expose new dbo owner-executed modules. The candidate
+installs both modules with runtime principal/role object DENY fences atomically, grants auth only object
+EXECUTE, and separately gates additive auth-table/runtime-hash read fences on approved caller inventory
+and old-client drain. Existing User projections and password-management writes are preserved. Original
+grants/grantors/states are captured and never rewritten; exact staged postchecks and rollback are owned
+there. Broader runtime audit SELECT/INSERT/UPDATE/DELETE remediation remains OPEN: deployed history must
+not be described as database-enforced append-only. No three FILTERs, existing predicates, original export,
+Case harness or R4 accepted reports change. CASE SQL NOT RUN; security acceptance OPEN; deployment BLOCKED.
+No Azure connection/live grant/migration, client release, configuration change, merge or deployment here.
+
+
 > **Organizations Phase 2B (2026-09-09):** Definition and assignment mutations use the Phase 1A
 > lifecycle, tenant, actor, ordering, and `RowVer` columns transactionally. Aggregate Organization
 > create/edit reconciles the complete ordered assignment profile; primary changes synchronize
@@ -14,6 +33,19 @@ This document is the working schema reference for Codex and Shale development pr
 Source of truth for this version: live schema output from the Shale database.
 
 **Important:** Before adding or changing SQL, verify column names against the live database or existing DAO/query code. Do not introduce new column names based on memory or naming guesses.
+
+**October 14, 2026 scoped evidence correction:** the authoritative attached schema-only SSMS export
+has nullable Users.ShaleClientId, non-null `dbo.auditLog.ShaleClientId` and nullable Statuses.ShaleClientId.
+Users email/password_hash are nvarchar(255), first/last names nvarchar(50), and email_norm is a persisted
+lower(email) expression with a nonunique exported index. Statuses Name/Color/LifecycleKey/SystemKey are
+nvarchar(50)/(10)/(32)/(64). Audit entryDate is varchar(50), stringValue varchar(max), fieldCode int.
+These scoped actual definitions supersede differing legacy table notes below for this assessment;
+do not infer missing migrations were applied. The supplied enabled sec policy has no predicates on
+these three tables, corroborated by the user-run catalog result. See the
+[owning assessment](../docs/testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+for evidence hash, runtime/auth compatibility, catalog handoff and planned repair. The export contains
+no rows/grants/principal or auth-procedure inventory and stays uncommitted. No live connection or local
+SQL integration run occurred; security acceptance remains OPEN.
 
 ---
 

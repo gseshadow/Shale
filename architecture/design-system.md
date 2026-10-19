@@ -679,3 +679,38 @@ excluded.
 ## Application update policy notice
 
 Phase 11A uses one shell-level wrapping notice above working content. Recommended state uses a quiet surface and may be dismissed for its policy revision/target; required state strengthens the border, and deadline-reached state uses the danger border without modal focus or disabled application controls. Text always carries state and deadline meaning. Update is a semantic primary small action and dismissal is a semantic ghost small action. The notice supports both themes, narrow widths, keyboard activation, and background refresh without focus stealing.
+
+### Practice Area and Case Status mini-card selection
+
+`MiniCardSelector<T>` is the shared presentation-only owner of ID-based card selection, selected
+borders, native keyboard-focusable activation buttons, scrolling and typed picker cancellation.
+`PracticeAreaSelector<T>` and `CaseStatusSelector<T>` supply their existing MINI card factories;
+Practice Areas preserve the configured color dot, and Case Status preserves the colored status pill
+and readable foreground. Both use `shale-card-selected` without changing text paint. Missing or
+invalid status colors use the themed neutral card surface and primary text.
+
+These are intentional rich-selector exceptions to the ordinary dropdown API. Controllers retain
+loading, required-field validation, default status initialization, tenant scope, and persistence.
+Both Case Overview editors retain Current/New fields, Change, and staged Save/Cancel behavior.
+The shared `mini-card-field-edit-dialog` style owns their body surface and typography in both themes;
+status-pill foreground remains supplied by its existing factory rather than a dialog text color.
+
+Audit compatibility: selecting a card only stages local form state and adds no domain mutation or
+sensitive read. Existing intake creation, status history/timeline, and Case Practice Area save/audit
+seams remain authoritative. This presentation change adds no audit event, SQL migration, API change,
+or server deployment.
+
+The Case Overview Practice Area and Case Status rows show only their assigned-value presentation and
+existing edit affordance. Their editors place Manage Practice Areas / Manage Case Statuses below the
+selection field as matching Small Secondary administrative actions, leaving Save/Cancel in the normal
+footer. The semantic button stylesheet keeps Small actions on their canonical padding inside the
+secondary dialog shell so legacy dialog padding cannot clip their labels. The shared management launchers remain authoritative, use the editor as owner, and retain
+administrator, service, tenant, actor (Case Status), dirty-case, and navigation guards. Committed
+definition changes invalidate the existing caches and refresh editor candidates off the FX thread,
+preserving the staged selection by ID. New Intake continues to use the shared selectors without new
+management actions.
+
+Audit compatibility for this relocation: opening these existing definition windows and staging a
+selection adds no new sensitive access or mutation. Case assignment saves and definition mutations
+continue through their existing service/DAO and audit seams; the UI does not construct audit records.
+No audit schema, database migration, API, or server change is introduced.

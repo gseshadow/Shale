@@ -67,7 +67,7 @@ class ContactServiceAdapterTest {
 		Optional<ContactDetail> detail = adapter.getContactDetail(1, 42);
 
 		assertTrue(detail.isPresent());
-		assertEquals(new ContactDetail(1, 42, "Ada Lovelace", "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555", "123 Main", "1815-12-10", "", null, false, true),
+		assertEquals(new ContactDetail(1, 42, "Ada Lovelace", "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555", "123 Main", "1815-12-10", "", null, false, true, detail.orElseThrow().updatedAt(), null),
 				detail.orElseThrow());
 		assertEquals(1, gateway.lastDetailContactId);
 		assertEquals(42, gateway.lastDetailShaleClientId);

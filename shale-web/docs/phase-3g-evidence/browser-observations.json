@@ -1,0 +1,48 @@
+{
+  "browser": "151.0.7922.173",
+  "synthetic": true,
+  "observations": [
+    {
+      "width": 320,
+      "scenario": "navigation",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "pending-discard",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "rejection",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "logout",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "navigation",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "pending-discard",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "rejection",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "logout",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "unexpected": []
+}

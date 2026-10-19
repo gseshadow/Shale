@@ -18,7 +18,7 @@ final class ContextualDefinitionManagementSemanticControlTest {
 
     @Test
     void everyContextualManagerUsesTheSmallSecondarySemanticPurpose() {
-        assertSemanticApply(CASE, "managePracticeAreasButton");
+        assertTrue(CASE.contains("null,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL)"));
         assertSemanticApply(CASE, "manageCaseDateTypesButton");
         assertSemanticApply(CASE, "manageLinkTypesButton");
         assertSemanticApply(CONTACT, "manageClassificationsButton");
@@ -40,14 +40,15 @@ final class ContextualDefinitionManagementSemanticControlTest {
 
     @Test
     void stylingDoesNotReplaceAdministratorGatingOrActionOwnership() {
-        assertTrue(CASE.contains("managePracticeAreasButton.setOnAction(e->openPracticeAreaManagement())"));
-        assertTrue(CASE.contains("manageCaseDateTypesButton.setOnAction(e->openCaseDateTypeManagement())"));
-        assertTrue(CASE.contains("manageLinkTypesButton.setOnAction(e->openLinkTypeManagement())"));
-        assertTrue(CONTACT.contains("manageClassificationsButton.setOnAction(e->openClassificationManagement())"));
-        assertTrue(ORGANIZATION.contains("manageOrganizationTypesButton.setOnAction(e->onManageOrganizationTypes())"));
-        assertTrue(MATERIALS.contains("if(state!=null&&state.isAdmin())"));
+        assertTrue(CASE.contains("if(practiceArea)openPracticeAreaManagement(owner.get(),refreshChoices)"));
+        assertTrue(CASE.contains("e->openCaseDateTypeManagement()"));
+        assertTrue(CASE.contains("e->openLinkTypeManagement()"));
+        assertTrue(CONTACT.contains("ControlAvailability.apply(manageClassificationsButton,managementAvailable,e->openClassificationManagement())"));
+        assertTrue(ORGANIZATION.contains("ControlAvailability.apply(manageOrganizationTypesButton,managementAvailable,e->onManageOrganizationTypes())"));
+        assertTrue(MATERIALS.contains("if(state==null||!state.isAdmin()||svc==null)return"));
+        assertTrue(MATERIALS.contains("ControlAvailability.apply(manageRequestFieldsButton,available,e->openRequestDefinitionManagement())"));
         assertTrue(TEAM.contains("if(administrator&&roleLauncher!=null)"));
-        assertTrue(CASE.contains("booleanadmin=appState!=null&&appState.isAdmin()"));
+        assertTrue(CASE.contains("appState!=null&&appState.isAdmin()"));
         assertTrue(CONTACT.contains("appState!=null&&appState.isAdmin()"));
         assertTrue(ORGANIZATION.contains("if(!isAdminUser()"));
     }

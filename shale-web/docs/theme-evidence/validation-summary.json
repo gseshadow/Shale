@@ -1,0 +1,42 @@
+{
+  "base": "d0d43655765b74e0c1e83ecefe59451307e7b749",
+  "branch": "codex/authenticated-theme-consistency",
+  "syntheticOnly": true,
+  "mainRoutes": 14,
+  "editors": 11,
+  "widths": [
+    320,
+    360,
+    768,
+    1280
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "fullPageImages": 448,
+  "webTests": 642,
+  "webTestFiles": 18,
+  "modifiedEditorWorkspaceTests": 136,
+  "feedbackFocusedTests": 127,
+  "appRegistryPrimitivesTests": 123,
+  "typecheck": "PASS",
+  "build": "PASS",
+  "selectorUnitTests": 24,
+  "selectedAuthTests": 10,
+  "criticalMavenTests": 116,
+  "npmAuditVulnerabilities": 0,
+  "productionAuditVulnerabilities": 0,
+  "actualTextContrastChecks": 1610,
+  "tokenContrastPairs": 84,
+  "nativeZoomScenarios": 100,
+  "liveKeyboardAcceptance": "not reported",
+  "physicalDevices": "unavailable",
+  "realScreenReader": "unavailable",
+  "otherEngines": "not performed",
+  "phases": {
+    "phase2": "acceptance OPEN",
+    "phase3": "IN PROGRESS",
+    "phase4": "INCOMPLETE"
+  }
+}

@@ -54,9 +54,9 @@ public class PracticeAreaCard extends HBox {
 
 		Circle c = new Circle(5.5);
 		// Border helps “white” show up.
+		c.getStyleClass().add("practice-area-card-dot");
 		c.setStyle(("""
 				-fx-fill: %s;
-				-fx-stroke: rgba(0,0,0,0.18);
 				-fx-stroke-width: 1;
 				""").formatted(fill));
 
@@ -101,6 +101,8 @@ public class PracticeAreaCard extends HBox {
 	}
 
 	private void buildUiMiniDefaults() {
+        getStyleClass().addAll("shale-card-surface", "practice-area-card");
+        nameLabel.getStyleClass().add("practice-area-card-name");
 		setCursor(Cursor.HAND);
 		// Default dot so it doesn't render empty before setDotCssColor is called
 		setDotCssColor("rgba(0,0,0,0.25)");

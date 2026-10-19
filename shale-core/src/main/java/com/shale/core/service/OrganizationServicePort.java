@@ -95,7 +95,45 @@ public interface OrganizationServicePort {
 			String postalCode,
 			String country,
 			String notes,
-			List<RelatedCaseSummary> relatedCases) {
+			List<RelatedCaseSummary> relatedCases,String rowVer,String phoneExtension,String faxExtension) {
+        public OrganizationDetail(
+			int id,
+			int shaleClientId,
+			Integer organizationTypeId,
+			String organizationTypeName,
+			String name,
+			String phone,
+			String fax,
+			String email,
+			String website,
+			String address1,
+			String address2,
+			String city,
+			String state,
+			String postalCode,
+			String country,
+			String notes,
+			List<RelatedCaseSummary> relatedCases,String rowVer){this(id,shaleClientId,organizationTypeId,organizationTypeName,name,phone,fax,email,website,address1,address2,city,state,postalCode,country,notes,relatedCases,rowVer,null,null);}
+
+        public OrganizationDetail(
+			int id,
+			int shaleClientId,
+			Integer organizationTypeId,
+			String organizationTypeName,
+			String name,
+			String phone,
+			String fax,
+			String email,
+			String website,
+			String address1,
+			String address2,
+			String city,
+			String state,
+			String postalCode,
+			String country,
+			String notes,
+			List<RelatedCaseSummary> relatedCases){this(id,shaleClientId,organizationTypeId,organizationTypeName,name,phone,fax,email,website,address1,address2,city,state,postalCode,country,notes,relatedCases,null);}
+
 	}
 
 	enum OrganizationTypeOrigin { GLOBAL, TENANT }
@@ -221,7 +259,7 @@ public interface OrganizationServicePort {
 
 	/** Explicit contact participation; legacy callers can never accidentally submit an empty exact set. */
 	sealed interface OrganizationContactMutation permits LegacyContactMutation, StructuredContactMutation { }
-	record LegacyContactMutation() implements OrganizationContactMutation { }
+	record LegacyContactMutation(com.shale.core.validation.ValueUpdate phone,com.shale.core.validation.ValueUpdate fax,com.shale.core.validation.ValueUpdate email) implements OrganizationContactMutation {public LegacyContactMutation(){this(null,null,null);}}
 	record StructuredContactMutation(OwnedContactCollection<StagedOrganizationPhone> phones,
 			OwnedContactCollection<StagedOrganizationEmail> emails,
 			OwnedContactCollection<StagedOrganizationAddress> addresses,
@@ -397,7 +435,26 @@ public interface OrganizationServicePort {
 			String country,
 			String notes,
 			Integer organizationTypeId,
-			byte[] expectedOrganizationRowVer) {
+			byte[] expectedOrganizationRowVer,com.shale.core.validation.ValueUpdate phoneUpdate,com.shale.core.validation.ValueUpdate faxUpdate,com.shale.core.validation.ValueUpdate emailUpdate) {
+        public UpdateOrganizationCommand(
+			int organizationId,
+			int shaleClientId,
+			int actorUserId,
+			String name,
+			String phone,
+			String fax,
+			String email,
+			String website,
+			String address1,
+			String address2,
+			String city,
+			String state,
+			String postalCode,
+			String country,
+			String notes,
+			Integer organizationTypeId,
+			byte[] expectedOrganizationRowVer){this(organizationId,shaleClientId,actorUserId,name,phone,fax,email,website,address1,address2,city,state,postalCode,country,notes,organizationTypeId,expectedOrganizationRowVer,null,null,null);}
+
 		public UpdateOrganizationCommand { expectedOrganizationRowVer=copyRowVer(expectedOrganizationRowVer); }
 		@Override public byte[] expectedOrganizationRowVer(){return copyRowVer(expectedOrganizationRowVer);}
 		public UpdateOrganizationCommand(int id,int tenant,int actor,String name,String phone,String fax,String email,String website,String address1,String address2,String city,String state,String postal,String country,String notes){this(id,tenant,actor,name,phone,fax,email,website,address1,address2,city,state,postal,country,notes,null,null);}
