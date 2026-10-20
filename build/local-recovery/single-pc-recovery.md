@@ -1,3 +1,8 @@
+> Superseded for the reported `ed2a137f` SQL 58307 failure by
+> [authority-recovery.md](authority-recovery.md). Preserve that failed attempt and
+> its original baseline. Brian's completed reboot/password/session checks are not
+> repeated; follow the new existing-state correction and finite continuation.
+
 # Brian's remaining single-PC retirement recovery
 
 Full manual recovery: **NOT MEASURED**. This is the finite continuation for the

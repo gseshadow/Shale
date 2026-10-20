@@ -1,3 +1,7 @@
+> Existing Windows state after SQL 58307: use [authority-recovery.md](authority-recovery.md).
+> It preserves the failed attempt, provides the reviewed one-row local correction and
+> an additive launcher overlay, then one finite continuation without repeating completed checks.
+
 # Local recovery application sandbox
 
 This implements the missing application sandbox for
@@ -164,7 +168,7 @@ The reviewed adaptation is:
 | Application schema | Preserve all 96 tables, constraints/indexes, six functions, eight triggers, view, old remembered resolver, and enabled RLS policy/predicates in export order. Preserve legacy unprotected Users/auditLog/Statuses state required by the exercise; application tenant checks remain essential. |
 | SET options | Explicit JDBC ANSI/index-compatible session options. Replace exported ANSI_PADDING OFF batches with ON for local filtered-index creation. SQL Server 2022 stores new columns with ANSI padding on. |
 | Three legacy login procedures | Verify semantic text equals the repository's captured body after only SSMS identifier bracket removal; execute exact canonical CRLF resources with their original hashes. No trimming of the stored body, new expected hashes or guard changes. |
-| Local ownership | Add `sandbox.Ownership` (one nonce, SELECT only for the app users) and database extended property. This avoids granting VIEW DEFINITION solely to perform ownership checks. |
+| Local ownership | Retain `sandbox.Ownership` and database extended property. Only runtime reads the nonce row; the local parent checks both as the dedicated provisioner before application launch. Auth has no ownership-table SELECT or new metadata authority. |
 
 The export contains no production records. Synthetic seed: tenants 11 and 22, users
 1/2 in 11 and 3 in 22 (`synthetic1/2/3@example.invalid`), auth policy and WARN task policy.

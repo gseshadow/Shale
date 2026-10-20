@@ -1,5 +1,19 @@
 # Authentication module permission cutover — 2026-10-15
 
+## Existing local sandbox authority correction — 2026-10-19
+
+The [authority continuation](../../build/local-recovery/authority-recovery.md) owns
+Brian's existing-state correction after the failed `ed2a137f` Apply. It retains the
+reported full original catalog equality and failed evidence, removes only auth's
+local ownership SELECT after complete diagnostic/baseline review, and validates the
+original nonces through a dedicated local parent connection before launch. Production
+SQL, module hashes, guards and approvals are unchanged. The new local baseline is an
+explicit one-row ACL transition; later retirement rollback restores that corrected
+baseline. Completed Windows password/remembered/logout/reboot checks are not repeated.
+Focused Linux SQL/launcher results and limitations are recorded in
+[verification](../../build/local-recovery/authority-verification.md). Manual recovery
+remains NOT MEASURED; no Windows run or production authorization is claimed here.
+
 ## Remaining controlled-route acceptance — 2026-10-16
 
 Continue with [remaining-acceptance.md](../sql/auth/permission-cutover/remaining-acceptance.md)

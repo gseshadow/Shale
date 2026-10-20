@@ -232,10 +232,10 @@ foreach ($name in @($info.EnvironmentVariables.Keys)) {
 $info.EnvironmentVariables['TEMP']=Join-Path $state 'tmp'
 $info.EnvironmentVariables['TMP']=Join-Path $state 'tmp'
 try {
-    if ($Phase -in @('New','Verify')) {
+    if ($Phase -in @('New','Verify','Api','Desktop')) {
         $info.EnvironmentVariables['SHALE_SANDBOX_ADMIN_USER']=Read-Host 'Dedicated LOCAL SQL admin username (never Azure)'
         Read-SecretForChild $info 'SHALE_SANDBOX_ADMIN_PASSWORD' 'Dedicated LOCAL SQL admin password'
-        Read-SecretForChild $info 'SHALE_SANDBOX_USER_PASSWORD' 'Synthetic users application password (same value for New/Verify)'
+        if ($Phase -in @('New','Verify')) { Read-SecretForChild $info 'SHALE_SANDBOX_USER_PASSWORD' 'Synthetic users application password (same value for New/Verify)' }
     }
     if ($Phase -in @('New','Api','Desktop','Verify')) {
         Read-SecretForChild $info 'SHALE_SANDBOX_APP_PASSWORD' 'Dedicated LOCAL auth-login password (>=16 chars; retain privately)'
