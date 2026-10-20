@@ -38,7 +38,7 @@ final class CaseOverviewPhase6SupportingComponentsTest {
             assertTrue(CONTROLLER.contains(style), "Production should use shared state class " + style);
             assertTrue(COMPONENTS.contains("." + style), "Foundation should own state class " + style);
         }
-        assertTrue(CONTROLLER.contains("Updates could not be loaded. Try refreshing the case."));
+        assertTrue(CONTROLLER.contains("Updates could not be loaded. Use View All Updates to refresh."));
         assertFalse(CONTROLLER.contains("Updates could not be loaded. \" +"),
                 "User-visible failure copy must not append internal exception details");
     }

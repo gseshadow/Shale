@@ -30,6 +30,9 @@ import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseSelectionOptionDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
+import com.shale.core.dto.CaseUpdateQuery;
+import com.shale.core.dto.CaseUpdatePage;
+import com.shale.core.dto.CaseUpdateAuthorDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.CasePartyEntityOptionDto;
@@ -2741,6 +2744,156 @@ public final class CaseDao {
 		}
 	}
 
+    /** Keyset paging: fetch one look-ahead row, never hydrate an entire history. */
+    public CaseUpdatePage searchCaseUpdates(CaseUpdateQuery query) {
+        Objects.requireNonNull(query, "query");
+        try (Connection con = db.requireConnection()) {
+            validateCaseUpdateReader(con, query.caseId(), query.shaleClientId(), query.actorUserId(), query.visibility());
+            String deletedColumn = resolveUsersDeletedColumn(con);
+            String authorActive = deletedColumn == null || deletedColumn.isBlank() ? "" : " AND " + activeFilter(deletedColumn, "u");
+            String orderAt = query.sort() == CaseUpdateQuery.Sort.EDITED
+                    ? "COALESCE(caseUpdate.UpdatedAt, caseUpdate.CreatedAt, CAST('00010101' AS datetime2))"
+                    : "COALESCE(caseUpdate.CreatedAt, CAST('00010101' AS datetime2))";
+            boolean ascending = query.sort() == CaseUpdateQuery.Sort.OLDEST;
+            String direction = ascending ? " ASC" : " DESC";
+            String comparison = ascending ? " > ?" : " < ?";
+            StringBuilder sql = new StringBuilder("""
+                    SELECT TOP (?) caseUpdate.Id, caseUpdate.CaseId, caseUpdate.NoteText,
+                        caseUpdate.CreatedAt, caseUpdate.UpdatedAt, caseUpdate.CreatedByUserId,
+                        caseUpdate.RowVersion, ISNULL(caseUpdate.IsDeleted, 0) AS IsDeleted,
+                        LTRIM(RTRIM(CONCAT(u.name_first, ' ', u.name_last))) AS CreatedByDisplayName,
+                    """);
+            sql.append(orderAt).append(" AS SortAt FROM dbo.CaseUpdates caseUpdate ")
+                    .append("JOIN dbo.Cases c ON c.Id = caseUpdate.CaseId AND c.ShaleClientId = caseUpdate.ShaleClientId ")
+                    .append("LEFT JOIN dbo.Users u ON u.Id = caseUpdate.CreatedByUserId AND u.ShaleClientId = caseUpdate.ShaleClientId")
+                    .append(authorActive)
+                    .append(" WHERE caseUpdate.CaseId = ? AND caseUpdate.ShaleClientId = ? AND c.ShaleClientId = ?")
+                    .append(" AND NULLIF(LTRIM(RTRIM(caseUpdate.NoteText)), '') IS NOT NULL");
+            List<Object> values = new ArrayList<>(List.of(query.pageSize() + 1, query.caseId(), query.shaleClientId(), query.shaleClientId()));
+            if (query.visibility() != CaseUpdateQuery.Visibility.ALL) {
+                sql.append(" AND ISNULL(caseUpdate.IsDeleted, 0) = ?");
+                values.add(query.visibility() == CaseUpdateQuery.Visibility.DELETED ? 1 : 0);
+            }
+            if (!query.text().isBlank()) {
+                sql.append(" AND LOWER(caseUpdate.NoteText) LIKE ?");
+                // SQL Server bracket escaping treats user wildcards as literal text.
+                values.add("%" + query.text().toLowerCase(Locale.ROOT).replace("[", "[[]").replace("%", "[%]").replace("_", "[_]") + "%");
+            }
+            if (query.from() != null) { sql.append(" AND caseUpdate.CreatedAt >= ?"); values.add(Timestamp.valueOf(query.fromUtc())); }
+            if (query.through() != null) { sql.append(" AND caseUpdate.CreatedAt < ?"); values.add(Timestamp.valueOf(query.throughExclusiveUtc())); }
+            if (query.authorUserId() != null) { sql.append(" AND caseUpdate.CreatedByUserId = ?"); values.add(query.authorUserId()); }
+            if (query.after() != null) {
+                sql.append(" AND (").append(orderAt).append(comparison).append(" OR (").append(orderAt)
+                        .append(" = ? AND caseUpdate.Id").append(comparison).append("))");
+                values.add(Timestamp.valueOf(query.after().at()));
+                values.add(Timestamp.valueOf(query.after().at()));
+                values.add(query.after().id());
+            }
+            sql.append(" ORDER BY ").append(orderAt).append(direction).append(", caseUpdate.Id").append(direction);
+            try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+                int i = 1;
+                for (Object value : values) ps.setObject(i++, value);
+                List<CaseUpdateDto> rows = new ArrayList<>();
+                CaseUpdateQuery.Cursor last = null;
+                boolean more = false;
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        if (rows.size() == query.pageSize()) { more = true; break; }
+                        Integer author = getNullableInt(rs, "CreatedByUserId");
+                        rows.add(new CaseUpdateDto(rs.getLong("Id"), rs.getLong("CaseId"), rs.getString("NoteText"),
+                                toLocalDateTime(rs.getTimestamp("CreatedAt")), toLocalDateTime(rs.getTimestamp("UpdatedAt")),
+                                author, safeUserDisplayName(rs.getString("CreatedByDisplayName"), author),
+                                rs.getBytes("RowVersion"), rs.getBoolean("IsDeleted")));
+                        last = new CaseUpdateQuery.Cursor(rs.getTimestamp("SortAt").toLocalDateTime(), rs.getLong("Id"));
+                    }
+                }
+                return new CaseUpdatePage(rows, more ? last : null);
+            }
+        } catch (SQLException ex) { throw new RuntimeException("Unable to search Case Updates.", ex); }
+    }
+
+    public List<CaseUpdateAuthorDto> listCaseUpdateAuthors(long caseId, int tenant, int actor) {
+        if (caseId <= 0 || tenant <= 0 || actor <= 0) throw new IllegalArgumentException("Case, tenant and actor are required.");
+        try (Connection con = db.requireConnection()) {
+            validateCaseUpdateReader(con, caseId, tenant, actor, CaseUpdateQuery.Visibility.ACTIVE);
+            String deletedColumn = resolveUsersDeletedColumn(con);
+            String authorActive = deletedColumn == null || deletedColumn.isBlank() ? "" : " AND " + activeFilter(deletedColumn, "u");
+            // Metadata only; authors of deleted notes are included only for administrators.
+            String sql = """
+                    SELECT DISTINCT caseUpdate.CreatedByUserId,
+                        LTRIM(RTRIM(CONCAT(u.name_first, ' ', u.name_last))) AS CreatedByDisplayName, u.color
+                    FROM dbo.CaseUpdates caseUpdate
+                    LEFT JOIN dbo.Users u ON u.Id = caseUpdate.CreatedByUserId AND u.ShaleClientId = caseUpdate.ShaleClientId
+                    """ + authorActive + """
+                     WHERE caseUpdate.CaseId = ? AND caseUpdate.ShaleClientId = ? AND caseUpdate.CreatedByUserId IS NOT NULL
+                       AND (ISNULL(caseUpdate.IsDeleted, 0) = 0 OR EXISTS (
+                         SELECT 1 FROM dbo.Users actor WHERE actor.id = ? AND actor.ShaleClientId = ?
+                           AND actor.is_admin = 1 AND actor.is_deleted = 0))
+                     ORDER BY CreatedByDisplayName, caseUpdate.CreatedByUserId
+                    """;
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setLong(1, caseId); ps.setInt(2, tenant); ps.setInt(3, actor); ps.setInt(4, tenant);
+                List<CaseUpdateAuthorDto> authors = new ArrayList<>();
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        int id = rs.getInt("CreatedByUserId");
+                        authors.add(new CaseUpdateAuthorDto(id, safeUserDisplayName(rs.getString("CreatedByDisplayName"), id), rs.getString("color")));
+                    }
+                }
+                return List.copyOf(authors);
+            }
+        } catch (SQLException ex) { throw new RuntimeException("Unable to list Case Update authors.", ex); }
+    }
+
+    private void validateCaseUpdateReader(Connection con, long caseId, int tenant, int actor,
+            CaseUpdateQuery.Visibility visibility) throws SQLException {
+        if (requireCurrentShaleClientId(con) != tenant) throw new SecurityException("Requested tenant does not match session context.");
+        if (visibility == CaseUpdateQuery.Visibility.ACTIVE) validateActorForTenant(con, tenant, actor);
+        else validateAdminActorForTenant(con, tenant, actor);
+        // Existing Case View can display a soft-deleted Case; only identity/tenant is checked here.
+        try (PreparedStatement ps = con.prepareStatement("SELECT 1 FROM dbo.Cases WHERE Id = ? AND ShaleClientId = ?")) {
+            ps.setLong(1, caseId); ps.setInt(2, tenant);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new IllegalArgumentException("Case is unavailable.");
+            }
+        }
+    }
+
+    /** Creator-only compare-and-swap using the existing SQL Server RowVersion. */
+    public boolean updateCaseNote(CaseServicePort.UpdateCaseNoteCommand command) {
+        Objects.requireNonNull(command, "command");
+        try (Connection con = db.requireConnection()) {
+            con.setAutoCommit(false);
+            try {
+                validateCaseUpdateReader(con, command.caseId(), command.shaleClientId(), command.actorUserId(), CaseUpdateQuery.Visibility.ACTIVE);
+                String oldText;
+                String predicate = " WHERE Id = ? AND CaseId = ? AND ShaleClientId = ? AND CreatedByUserId = ? AND ISNULL(IsDeleted, 0) = 0 AND RowVersion = ?";
+                try (PreparedStatement ps = con.prepareStatement("SELECT NoteText FROM dbo.CaseUpdates WITH (UPDLOCK, HOLDLOCK)" + predicate)) {
+                    bindCaseUpdateIdentity(ps, 1, command);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) { con.rollback(); return false; }
+                        oldText = rs.getString("NoteText");
+                    }
+                }
+                try (PreparedStatement ps = con.prepareStatement("UPDATE dbo.CaseUpdates SET NoteText = ?, UpdatedAt = SYSDATETIME(), EditedByUserId = ?" + predicate)) {
+                    ps.setString(1, command.text()); ps.setInt(2, command.actorUserId());
+                    bindCaseUpdateIdentity(ps, 3, command);
+                    if (ps.executeUpdate() != 1) { con.rollback(); return false; }
+                }
+                touchCaseUpdatedAt(con, command.caseId(), command.shaleClientId());
+                phiAuditService.auditUpdate(con, command.actorUserId(), "CaseUpdates", "NoteText", command.id(), oldText, command.text());
+                con.commit();
+                return true;
+            } catch (SQLException | RuntimeException ex) { con.rollback(); throw ex; }
+            finally { con.setAutoCommit(true); }
+        } catch (SQLException ex) { throw new RuntimeException("Unable to save Case Update.", ex); }
+    }
+
+    private static void bindCaseUpdateIdentity(PreparedStatement ps, int start, CaseServicePort.UpdateCaseNoteCommand c) throws SQLException {
+        ps.setLong(start++, c.id()); ps.setLong(start++, c.caseId()); ps.setInt(start++, c.shaleClientId());
+        ps.setInt(start++, c.actorUserId()); ps.setBytes(start, c.expectedRowVersion());
+    }
+
 	public List<CaseUpdateDto> listCaseUpdates(long caseId) {
 		return listCaseUpdatesInternal(caseId, null);
 	}
@@ -3013,10 +3166,10 @@ public final class CaseDao {
 					throw new RuntimeException("Unexpected update row count when touching case UpdatedAt (caseId=" + caseId + "): " + rows);
 				}
 			}
-			phiAuditService.auditCreate(createdByUserId, "CaseUpdates", "NoteText", caseUpdateId, trimmedText);
+			phiAuditService.auditCreate(con, createdByUserId, "CaseUpdates", "NoteText", caseUpdateId, trimmedText);
 
 			con.commit();
-		} catch (SQLException e) {
+		} catch (SQLException | RuntimeException e) {
 			if (con != null) {
 				try {
 					con.rollback();

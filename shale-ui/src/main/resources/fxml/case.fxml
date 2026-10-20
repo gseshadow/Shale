@@ -1033,7 +1033,11 @@
 						maxHeight="1.7976931348623157E308" />
 				</VBox>
 
-				<!-- LINKS TAB PANE (center) -->
+				<!-- Full-width Case Updates workspace; the quick rail is retained on sibling sections. -->
+                <VBox fx:id="caseUpdatesTabPane" minWidth="0" minHeight="0"
+                    maxWidth="Infinity" maxHeight="Infinity" visible="false" managed="false" />
+
+                <!-- LINKS TAB PANE (center) -->
 				<VBox fx:id="caseLinksTabPane" spacing="8"
 					maxWidth="1.7976931348623157E308"
 					maxHeight="1.7976931348623157E308" visible="false" managed="false">
@@ -1142,6 +1146,8 @@
 			BorderPane.alignment="TOP_LEFT">
 			<HBox alignment="CENTER_LEFT" styleClass="shale-update-heading">
 				<Label text="Updates" styleClass="shale-section-title" />
+                <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="viewAllCaseUpdatesButton" text="View All Updates" />
 			</HBox>
 
 			<VBox spacing="8" styleClass="shale-update-composer">

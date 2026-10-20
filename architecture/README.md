@@ -11,6 +11,7 @@ Supporting documents:
 - system-overview.md
 - live-update-architecture.md
 - case-summary-projection-inventory.md
+- [Case Updates workspace](case-updates.md)
 
 Optional local test execution and selection:
 - `docs/testing/change-aware-test-selection.md`

@@ -26,9 +26,21 @@ class CaseOverviewPhase2CDesignContractTest {
         String primarySection = fxml.substring(primaryLink, fxml.indexOf("fx:id=\"ovPartiesBox\"", primaryLink));
         assertTrue(primarySection.contains("shale-section-card") && primarySection.contains("primary-link-section"),
                 "Phase 2D migrates Primary Link without changing the completed Case Details contract");
-        String laterSections = fxml.substring(fxml.indexOf("fx:id=\"ovPartiesBox\"", primaryLink));
-        assertTrue(laterSections.contains("case-overview-section-region-parties"),
-                "subsequent deferred Overview sections retain their existing presentation");
+        var document = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new org.xml.sax.InputSource(new java.io.StringReader(fxml)));
+        var nodes = document.getElementsByTagName("VBox");
+        org.w3c.dom.Element parties = null;
+        for (int i = 0; i < nodes.getLength(); i++) {
+            var element = (org.w3c.dom.Element) nodes.item(i);
+            if ("ovPartiesBox".equals(element.getAttribute("fx:id"))) parties = element;
+        }
+        assertNotNull(parties, "Overview retains its Parties content host");
+        var owner = (org.w3c.dom.Element) parties.getParentNode();
+        var styles = owner.getElementsByTagName("String");
+        boolean ownsPartiesStyle = false;
+        for (int i = 0; i < styles.getLength(); i++)
+            ownsPartiesStyle |= "case-overview-section-region-parties".equals(((org.w3c.dom.Element) styles.item(i)).getAttribute("fx:value"));
+        assertTrue(ownsPartiesStyle, "The Parties section owner retains its presentation class");
     }
 
     @Test
@@ -40,7 +52,9 @@ class CaseOverviewPhase2CDesignContractTest {
         assertTrue(source.contains("PracticeAreaIndicatorFactory.createPracticeAreaPill"));
         assertTrue(source.contains("StatusIndicatorFactory.createStatusPill"));
         assertTrue(source.contains("overviewDateConfiguration.visibleDateTypes()"));
-        assertTrue(source.contains("shale-property-row-compact"));
+        assertTrue(source.contains("CaseOverviewDateRow.create"), "Configured dates must reuse the shared row component");
+        String dateRow = Files.readString(Path.of("src/main/java/com/shale/ui/component/CaseOverviewDateRow.java"));
+        assertTrue(dateRow.contains("shale-property-row-compact"), "The shared row owns compact presentation");
         assertTrue(source.contains("createOverviewPersonRow(displayName, userColorCss, \"Not assigned\")"));
     }
 

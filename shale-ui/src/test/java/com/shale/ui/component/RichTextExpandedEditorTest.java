@@ -11,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class RichTextExpandedEditorTest {
+    @org.junit.jupiter.api.BeforeAll static void startToolkit() { com.shale.ui.testutil.JavaFxTestSupport.ensureToolkitStarted(); }
+
     @Test void resolvesOnlyTheMisspelledWordAtThePointerCharacter() {
         LocalSpellChecker checker = new LocalSpellChecker(List.of("this", "bad", "works"));
         var plain = checker.misspellingRanges("This patint works");

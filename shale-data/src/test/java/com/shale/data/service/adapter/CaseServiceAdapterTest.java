@@ -43,6 +43,9 @@ class CaseServiceAdapterTest {
             CaseServicePort.class.getClassLoader(), new Class<?>[] {CaseServicePort.class},
             (proxy, method, args) -> java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args));
         for (CaseServicePort subject : List.of(port, new CaseServiceAdapter(new FakeCaseGateway(List.of())))) {
+            assertThrows(UnsupportedOperationException.class, () -> subject.searchCaseUpdates(com.shale.core.dto.CaseUpdateQuery.newest(1,41,31,"",50)));
+            assertThrows(UnsupportedOperationException.class, () -> subject.listCaseUpdateAuthors(1,41,31));
+            assertThrows(UnsupportedOperationException.class, () -> subject.updateCaseNote(new CaseServicePort.UpdateCaseNoteCommand(1,1,41,31,"draft",new byte[8])));
             assertThrows(UnsupportedOperationException.class, () -> subject.searchMinimizedCases("x",41,31,0,25));
             assertThrows(UnsupportedOperationException.class, () -> subject.listMinimizedAssignedCases(41,31,0,25));
             assertThrows(UnsupportedOperationException.class, () -> subject.readMinimizedCaseOverview(1,41,31));

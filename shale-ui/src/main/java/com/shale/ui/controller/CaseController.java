@@ -1,6 +1,10 @@
 package com.shale.ui.controller;
 
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
+import com.shale.ui.controller.support.CaseUpdatesWorkspaceController;
+import com.shale.core.dto.CaseUpdateQuery;
+import com.shale.core.dto.CaseUpdatePage;
+import java.util.concurrent.CompletableFuture;
 
 import com.shale.ui.component.EnhancedTextArea;
 
@@ -519,6 +523,15 @@ public class CaseController {
 	private Button clearCaseUpdatesSearchButton;
 	@FXML
 	private VBox caseUpdatesPane;
+    @FXML private VBox caseUpdatesTabPane;
+    @FXML private Button viewAllCaseUpdatesButton;
+    private CaseUpdatesWorkspaceController updatesWorkspace;
+    private volatile int updatesLoadGeneration;
+    private final javafx.animation.PauseTransition updateSearchDelay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(350));
+    private static final ExecutorService CASE_UPDATE_EXECUTOR = Executors.newFixedThreadPool(2, task -> {
+        Thread thread = new Thread(task, "case-updates-worker"); thread.setDaemon(true); return thread;
+    });
+    private final ExecutorService caseUpdateExecutor = CASE_UPDATE_EXECUTOR;
 	@FXML
 	private ScrollPane caseUpdatesScrollPane;
 	@FXML
@@ -674,6 +687,7 @@ public class CaseController {
 	private static final List<String> SECTIONS = List.of(
 			"Overview",
 			"Details",
+			"Case Updates",
 			"Parties",
 			"Tasks",
 			"Calendar",
@@ -848,7 +862,6 @@ public class CaseController {
 	private VBox caseTaskActivityFeedBox;
 	@FXML
 	private Label caseTaskActivityEmptyLabel;
-	private boolean savingCaseUpdateEdit = false;
 
 	private final Map<String, Button> sectionTabs = new LinkedHashMap<>();
 	private String activeSectionName = "Overview";
@@ -910,6 +923,7 @@ public class CaseController {
 		remoteCaseDatesRefreshDeferred = false;
 		compatibilityDates.invalidate();
 		compatibilityDatesGeneration++;
+		resetCaseUpdatesWorkspace();
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
 		this.caseTasksLoadedOnce = false;
@@ -936,6 +950,7 @@ public class CaseController {
 		remoteCaseDatesRefreshDeferred = false;
 		compatibilityDates.invalidate();
 		compatibilityDatesGeneration++;
+		resetCaseUpdatesWorkspace();
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
 		this.caseTasksLoadedOnce = false;
@@ -1106,12 +1121,18 @@ public class CaseController {
 			submitCaseUpdateButton.getStyleClass().add("shale-composer-action");
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
 		}
+        if (viewAllCaseUpdatesButton != null) {
+            ControlStyles.apply(viewAllCaseUpdatesButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
+            viewAllCaseUpdatesButton.setOnAction(event -> onSectionSelected("Case Updates", true));
+        }
+        updateSearchDelay.setOnFinished(event -> { caseUpdatesStale = true; loadCaseUpdatesAsync(); });
 		if (caseUpdatesSearchField != null) {
 			ControlStyles.formControl(caseUpdatesSearchField);
 			caseUpdatesSearchField.setAccessibleText("Search case updates");
 			caseUpdatesSearchField.textProperty().addListener((obs, oldText, newText) -> {
 				setVisibleManaged(clearCaseUpdatesSearchButton, newText != null && !newText.isBlank());
-				applyCaseUpdateFilter();
+				updatesLoadGeneration++;
+                updateSearchDelay.playFromStart();
 			});
 		}
 		if (clearCaseUpdatesSearchButton != null) {
@@ -1217,8 +1238,13 @@ public class CaseController {
 		{
 			if (newScene == null) {
 				unsubscribeLiveCaseUpdates();
+                updatesLoadGeneration++;
+                updateSearchDelay.stop();
+                if (updatesWorkspace != null) updatesWorkspace.deactivate();
 			} else {
 				subscribeLiveCaseUpdates();
+                if (isSectionActive("Case Updates") && updatesWorkspace != null) updatesWorkspace.activate();
+                else { caseUpdatesStale = true; loadCaseUpdatesAsync(); }
 			}
 		});
 		subscribeLiveCaseUpdates();
@@ -1677,6 +1703,10 @@ public class CaseController {
 	private void onSectionSelected(String sectionName, boolean userInitiated) {
 		String selectedSection = resolveAvailableSection(sectionName);
 
+        if (!"Case Updates".equals(selectedSection)) {
+            setPaneVisible(caseUpdatesTabPane, false);
+            if (updatesWorkspace != null) updatesWorkspace.deactivate();
+        }
 		activeSectionName = selectedSection;
 		setActiveSectionButton(selectedSection);
 		switch (selectedSection) {
@@ -1689,6 +1719,7 @@ public class CaseController {
 		case "Links" -> showLinksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
+        case "Case Updates" -> showCaseUpdatesTab();
 		default -> showOverview();
 		}
 
@@ -1713,6 +1744,7 @@ public class CaseController {
 		case "Links" -> "LINKS";
 		case "Timeline" -> "TIMELINE";
 		case "Details" -> "DETAILS";
+        case "Case Updates" -> "CASE_UPDATES";
 		case "Parties" -> "PARTIES";
 		default -> sectionName.toUpperCase(Locale.ROOT);
 		};
@@ -1731,6 +1763,7 @@ public class CaseController {
 		case "LINKS" -> "Links";
 		case "TIMELINE" -> "Timeline";
 		case "DETAILS" -> "Details";
+        case "CASE_UPDATES" -> "Case Updates";
 		case "PARTIES" -> "Parties";
 		case "REQUESTS" -> "Requests";
 		default -> null;
@@ -2469,6 +2502,58 @@ public class CaseController {
 	}
 
 	private Window caseRequestsOwner() { return caseRequestsTabPane != null && caseRequestsTabPane.getScene() != null ? caseRequestsTabPane.getScene().getWindow() : taskDialogOwner(); }
+
+    private void resetCaseUpdatesWorkspace() {
+        updatesLoadGeneration++;
+        updateSearchDelay.stop();
+        if (updatesWorkspace != null) updatesWorkspace.deactivate();
+        updatesWorkspace = null;
+        if (caseUpdatesTabPane != null) caseUpdatesTabPane.getChildren().clear();
+    }
+
+    private void showCaseUpdatesTab() {
+        attachCaseUpdatesPane(CaseUpdatesPlacement.HIDDEN);
+        activateCaseSectionRoot(caseUpdatesTabPane);
+        setPaneVisible(tasksPanel, false);
+        if (caseService == null || appState == null || caseId == null || caseUpdatesTabPane == null) return;
+        if (updatesWorkspace == null || updatesWorkspace.caseId() != caseId.longValue() || !updatesWorkspace.isCurrentSession()) {
+            if (updatesWorkspace != null) updatesWorkspace.deactivate();
+            updatesWorkspace = new CaseUpdatesWorkspaceController(caseId, caseService, appState, caseUpdateExecutor,
+                    this::createCaseUpdateCard, () -> openNewCaseUpdate(caseUpdatesTabPane));
+            caseUpdatesTabPane.getChildren().setAll(updatesWorkspace.view());
+            VBox.setVgrow(updatesWorkspace.view(), Priority.ALWAYS);
+        }
+        updatesWorkspace.activate();
+        if (phiReadAuditService != null) {
+            final long snapshotCase = caseId.longValue();
+            final long revision = appState.sessionRevision();
+            caseUpdateExecutor.execute(() -> {
+                if (appState.sessionRevision() == revision)
+                    phiReadAuditService.auditRead("Case.Updates.Read", "Case.Updates", "Case", snapshotCase);
+            });
+        }
+    }
+
+    private void openNewCaseUpdate(Node owner) {
+        if (caseId == null || appState == null) return;
+        final int expectedCase = caseId;
+        final long revision = appState.sessionRevision();
+        EnhancedTextArea.openSavingEditor(owner == null || owner.getScene() == null ? null : owner.getScene().getWindow(),
+                "New Case Update", "", value -> {
+                    if (caseId == null || caseId != expectedCase || appState.sessionRevision() != revision)
+                        return CompletableFuture.completedFuture("This case or session has changed. Reopen the editor.");
+                    return persistCaseUpdate(null, value);
+                });
+    }
+
+    private void onCaseUpdatesChanged() {
+        caseUpdatesStale = true;
+        updatesLoadGeneration++;
+        if (updatesWorkspace != null) {
+            updatesWorkspace.dataChanged();
+        }
+        loadCaseUpdatesAsync();
+    }
 
 	private void showLinksTab() {
 		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
@@ -4452,13 +4537,9 @@ public class CaseController {
 		return Objects.equals(activeSectionName, sectionName);
 	}
 
-	private boolean isCaseUpdatesSectionActive() {
-		return isSectionActive("Overview")
-				|| isSectionActive("Details")
-				|| isSectionActive("Parties")
-				|| isSectionActive("Tasks")
-				|| isSectionActive("Timeline");
-	}
+    private boolean isCaseUpdatesSectionActive() {
+        return !isSectionActive("Case Updates");
+    }
 
 	private void onAddRelatedEntity() {
 		if (isSectionActive("Parties")) {
@@ -6839,54 +6920,46 @@ public class CaseController {
 	// Case updates
 	// ----------------------------
 
-	private void loadCaseUpdatesAsync() {
-		if (!isCaseUpdatesSectionActive()) {
-			caseUpdatesStale = true;
-			return;
-		}
-		if (caseUpdatesLoading) {
-			return;
-		}
-		if (caseUpdatesLoadedOnce && !caseUpdatesStale) {
-			return;
-		}
-		caseUpdatesLoading = true;
-		updatesPanelController.loadCaseUpdatesAsync();
-	}
+    private void loadCaseUpdatesAsync() {
+        if (!isCaseUpdatesSectionActive()) { caseUpdatesStale = true; return; }
+        if (caseUpdatesLoadedOnce && !caseUpdatesStale) return;
+        caseUpdatesLoading = true;
+        updatesPanelController.loadCaseUpdatesAsync();
+    }
 
-	private void loadCaseUpdatesAsyncInternal() {
-		if (caseDao == null || caseId == null)
-			return;
-		final long activeCaseId = caseId.longValue();
-		showCaseUpdatesState("Loading updates…", "shale-loading-message");
-
-		new Thread(() ->
-		{
-			try {
-				long updatesLoadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=listCaseUpdates page=case_view caseId=" + activeCaseId);
-				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
-				PerfLog.logDone("DAO", "method=listCaseUpdates page=case_view caseId=" + activeCaseId + " rows=" + (updates == null ? 0 : updates.size()), updatesLoadStartNanos);
-				runOnFx(() ->
-				{
-					caseUpdatesLoading = false;
-					if (caseId == null || caseId.longValue() != activeCaseId)
-						return;
-					caseUpdatesLoadedOnce = true;
-					caseUpdatesStale = false;
-					renderCaseUpdates(updates);
-				});
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					caseUpdatesLoading = false;
-					caseUpdatesStale = true;
-					LOG.error("Case Updates load failed caseId={}", activeCaseId, ex);
-					showCaseUpdatesState("Updates could not be loaded. Try refreshing the case.", "shale-error-message");
-				});
-			}
-		}, "case-updates-load-" + activeCaseId).start();
-	}
+    private void loadCaseUpdatesAsyncInternal() {
+        if (caseService == null || caseId == null || appState == null
+                || appState.getShaleClientId() == null || appState.getUserId() == null) { caseUpdatesLoading = false; return; }
+        final long activeCaseId = caseId.longValue();
+        final long revision = appState.sessionRevision();
+        final int request = ++updatesLoadGeneration;
+        final CaseUpdateQuery query;
+        try { query = CaseUpdateQuery.newest(activeCaseId, appState.getShaleClientId(), appState.getUserId(),
+                caseUpdatesSearchField == null ? "" : caseUpdatesSearchField.getText(), 25); }
+        catch (IllegalArgumentException ex) { showCaseUpdatesState("Search must be at most 1000 characters.", "shale-error-message"); return; }
+        showCaseUpdatesState("Loading updates…", "shale-loading-message");
+        caseUpdateExecutor.execute(() -> {
+            if (appState.sessionRevision() != revision || request != updatesLoadGeneration) return;
+            try {
+                CaseUpdatePage page = caseService.searchCaseUpdates(query);
+                runOnFx(() -> {
+                    if (request != updatesLoadGeneration || appState.sessionRevision() != revision
+                            || caseId == null || caseId.longValue() != activeCaseId) return;
+                    caseUpdatesLoading = false; caseUpdatesLoadedOnce = true; caseUpdatesStale = false;
+                    renderCaseUpdates(page.items());
+                    if (page.next() != null && caseUpdatesFeedBox != null)
+                        caseUpdatesFeedBox.getChildren().add(new Label("Showing 25 updates. View All Updates for more."));
+                });
+            } catch (RuntimeException ex) {
+                runOnFx(() -> {
+                    if (request != updatesLoadGeneration || appState.sessionRevision() != revision) return;
+                    caseUpdatesLoading = false; caseUpdatesStale = true;
+                    LOG.error("Case Updates load failed caseId={}", activeCaseId, ex);
+                    showCaseUpdatesState("Updates could not be loaded. Use View All Updates to refresh.", "shale-error-message");
+                });
+            }
+        });
+    }
 
 	private void renderCaseUpdates(List<CaseUpdateDto> updates) {
 		updatesPanelController.renderCaseUpdates(updates);
@@ -6912,10 +6985,7 @@ public class CaseController {
 		String searchQuery = safeText(caseUpdatesSearchField == null ? null : caseUpdatesSearchField.getText())
 				.trim()
 				.toLowerCase(java.util.Locale.ROOT);
-		List<CaseUpdateDto> visibleUpdates = caseUpdates == null ? List.of()
-				: caseUpdates.stream()
-						.filter(dto -> caseUpdateMatchesSearch(dto, searchQuery))
-						.toList();
+		List<CaseUpdateDto> visibleUpdates = caseUpdates == null ? List.of() : caseUpdates;
 
 		if (visibleUpdates.isEmpty()) {
 			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates match the current search.");
@@ -6948,24 +7018,6 @@ public class CaseController {
 		caseUpdatesFeedBox.getChildren().setAll(state);
 	}
 
-	private boolean caseUpdateMatchesSearch(CaseUpdateDto dto, String searchQuery) {
-		if (dto == null) {
-			return false;
-		}
-		if (searchQuery == null || searchQuery.isBlank()) {
-			return true;
-		}
-		String noteText = safeText(dto.getNoteText()).toLowerCase(java.util.Locale.ROOT);
-		if (noteText.contains(searchQuery)) {
-			return true;
-		}
-		String authorText = safeAuthorName(dto).toLowerCase(java.util.Locale.ROOT);
-		if (authorText.contains(searchQuery)) {
-			return true;
-		}
-		String metadataText = safeText(buildCaseUpdateMetadata(dto)).toLowerCase(java.util.Locale.ROOT);
-		return metadataText.contains(searchQuery);
-	}
 
 	private void onSubmitCaseUpdate() {
 		updatesPanelController.onSubmitCaseUpdate();
@@ -6990,77 +7042,72 @@ public class CaseController {
 		saveNewCaseUpdate(caseUpdatesComposerArea.getText());
 	}
 
-	private void saveNewCaseUpdate(String noteText) {
-		if (caseDao == null || appState == null || caseId == null || submitCaseUpdateButton == null) {
-			showError("Case updates are unavailable.");
-			return;
-		}
-		Integer shaleClientId = appState.getShaleClientId();
-		if (shaleClientId == null || shaleClientId <= 0) {
-			showError("No tenant is selected.");
-			return;
-		}
-		String trimmedText = safeText(noteText).trim();
-		if (trimmedText.isBlank()) {
-			showError("Update text is required.");
-			return;
-		}
-		if (!caseUpdateSubmissionInFlight.compareAndSet(false, true)) {
-			return;
-		}
+    private void saveNewCaseUpdate(String noteText) {
+        if (caseId == null || appState == null || submitCaseUpdateButton == null) return;
+        final int expectedCase = caseId;
+        final long revision = appState.sessionRevision();
+        submitCaseUpdateButton.setDisable(true);
+        if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.setDisable(true);
+        persistCaseUpdate(null, noteText).thenAccept(message -> {
+            if (caseId == null || caseId != expectedCase || appState.sessionRevision() != revision) return;
+            submitCaseUpdateButton.setDisable(false);
+            if (caseUpdatesComposerArea != null) {
+                caseUpdatesComposerArea.setDisable(false);
+                if (message == null) caseUpdatesComposerArea.setText("");
+                caseUpdatesComposerArea.requestFocus();
+            }
+            if (message != null) showError(message);
+        });
+    }
 
-		final long activeCaseId = caseId.longValue();
-		final int activeClientId = shaleClientId;
-		final Integer createdByUserId = appState.getUserId();
-
-		submitCaseUpdateButton.setDisable(true);
-		if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.setDisable(true);
-		clearError();
-
-		new Thread(() ->
-		{
-			try {
-				caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId);
-				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now(ZoneOffset.UTC)));
-				publishCaseUpdateAdded(activeCaseId);
-				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
-				runOnFx(() ->
-				{
-					caseUpdateSubmissionInFlight.set(false);
-					if (caseId == null || caseId.longValue() != activeCaseId) {
-						if (submitCaseUpdateButton != null) submitCaseUpdateButton.setDisable(false);
-						if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.setDisable(false);
-						return;
-					}
-					if (caseUpdatesComposerArea != null) {
-						caseUpdatesComposerArea.setText("");
-						caseUpdatesComposerArea.setDisable(false);
-					}
-					caseUpdatesLoadedOnce = true;
-					caseUpdatesStale = false;
-					renderCaseUpdates(updates);
-					refreshLastUpdatedLabelAsync();
-					if (submitCaseUpdateButton != null)
-						submitCaseUpdateButton.setDisable(false);
-					if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.requestFocus();
-					handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(activeCaseId, activeClientId, trimmedText);
-				});
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					caseUpdateSubmissionInFlight.set(false);
-					LOG.error("Case Update create failed caseId={}", activeCaseId, ex);
-					showError("The update could not be saved. Check your connection and try again.");
-					if (submitCaseUpdateButton != null)
-						submitCaseUpdateButton.setDisable(false);
-					if (caseUpdatesComposerArea != null) {
-						caseUpdatesComposerArea.setDisable(false);
-						caseUpdatesComposerArea.requestFocus();
-					}
-				});
-			}
-		}, "case-updates-submit-" + activeCaseId).start();
-	}
+    private CompletableFuture<String> persistCaseUpdate(CaseUpdateDto dto, String noteText) {
+        String trimmedText = safeText(noteText).trim();
+        if (trimmedText.isBlank()) return CompletableFuture.completedFuture("Update text is required.");
+        if (caseService == null || caseId == null || appState == null || appState.getShaleClientId() == null
+                || appState.getUserId() == null) return CompletableFuture.completedFuture("Case updates are unavailable.");
+        if (!caseUpdateSubmissionInFlight.compareAndSet(false, true))
+            return CompletableFuture.completedFuture("Another update is being saved. Please wait.");
+        final long activeCaseId = caseId.longValue();
+        final int activeClientId = appState.getShaleClientId();
+        final int createdByUserId = appState.getUserId();
+        final long revision = appState.sessionRevision();
+        CompletableFuture<String> completion = new CompletableFuture<>();
+        caseUpdateExecutor.execute(() -> {
+            String result = null;
+            boolean saved = false;
+            try {
+                if (appState.sessionRevision() != revision) throw new IllegalStateException("Session changed");
+                if (dto == null) {
+                    caseService.addCaseNote(new CaseServicePort.AddCaseNoteCommand(activeCaseId, activeClientId, createdByUserId, trimmedText));
+                    saved = true;
+                } else if (dto.getCaseId() == activeCaseId) {
+                    saved = caseService.updateCaseNote(new CaseServicePort.UpdateCaseNoteCommand(dto.getId(), activeCaseId,
+                            activeClientId, createdByUserId, trimmedText, dto.rowVersion()));
+                    if (!saved) result = "This update changed, was deleted, or is no longer editable. Copy your draft and reopen the latest update.";
+                } else result = "This case has changed. Reopen the editor.";
+            } catch (RuntimeException ex) {
+                LOG.error("Case Update save failed caseId={}", activeCaseId, ex);
+                result = "The update could not be saved. Check your connection and try again.";
+            }
+            final boolean committed = saved;
+            final String message = result;
+            runOnFx(() -> {
+                caseUpdateSubmissionInFlight.set(false);
+                if (caseId == null || caseId.longValue() != activeCaseId || appState.sessionRevision() != revision) {
+                    completion.complete(committed ? null : "This case or session has changed. Reopen the editor."); return;
+                }
+                if (committed) {
+                    clearError();
+                    publishCaseUpdateAdded(activeCaseId);
+                    onCaseUpdatesChanged();
+                    refreshLastUpdatedLabelAsync();
+                    if (dto == null) handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(activeCaseId, activeClientId, trimmedText);
+                } else if (dto != null) onCaseUpdatesChanged();
+                completion.complete(message);
+            });
+        });
+        return completion;
+    }
 
 	private void handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(long activeCaseId, int activeClientId, String savedNoteText) {
 		if (caseDao == null || caseId == null || caseId.longValue() != activeCaseId) {
@@ -7107,13 +7154,16 @@ public class CaseController {
 		VBox bodyBox;
 		HBox rightActions = new HBox();
 		rightActions.setAlignment(Pos.CENTER_RIGHT);
+        Button view = ActionButtonFactory.semantic("View", event -> viewCaseUpdate(dto),
+                ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
+        rightActions.getChildren().add(view);
 		if (canEditCaseUpdate(dto)) {
 			Button editButton = ActionButtonFactory.semantic("✎", null,
 					ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 			editButton.getStyleClass().add("shale-update-edit-action");
 			editButton.setAccessibleText("Edit update");
 			editButton.setTooltip(new Tooltip("Edit update"));
-			editButton.setDisable(savingCaseUpdateEdit);
+			editButton.setDisable(caseUpdateSubmissionInFlight.get());
 			editButton.setOnAction(e -> startEditingCaseUpdate(dto, editButton));
 			rightActions.getChildren().add(editButton);
 		}
@@ -7129,7 +7179,8 @@ public class CaseController {
 		metadataLabel.setWrapText(true);
 		metadataLabel.getStyleClass().add("shale-update-timestamp");
 
-		Label noteLabel = new Label(NarrativeMarkdownCodec.plainText(safeText(dto.getNoteText())));
+		String preview = NarrativeMarkdownCodec.plainText(safeText(dto.getNoteText()));
+        Label noteLabel = new Label(preview.length() > 1000 ? preview.substring(0, 1000) + "…" : preview);
 		noteLabel.setWrapText(true);
 		noteLabel.setMaxWidth(Double.MAX_VALUE);
 		noteLabel.getStyleClass().add("shale-update-body");
@@ -7150,7 +7201,7 @@ public class CaseController {
 	private String buildCaseUpdateMetadata(CaseUpdateDto dto) {
 		if (dto == null)
 			return "";
-		String createdText = "Created " + formatDateTime(dto.getCreatedAt());
+		String createdText = (dto.deleted() ? "Deleted • " : "") + "Created " + formatDateTime(dto.getCreatedAt());
 		if (!isMeaningfullyEdited(dto)) {
 			return createdText;
 		}
@@ -7166,82 +7217,46 @@ public class CaseController {
 	}
 
 	private boolean canEditCaseUpdate(CaseUpdateDto dto) {
-		if (dto == null || appState == null)
+		if (dto == null || dto.deleted() || dto.rowVersion() == null || appState == null)
 			return false;
 		Integer actorUserId = appState.getUserId();
 		Integer createdByUserId = dto.getCreatedByUserId();
 		return actorUserId != null && createdByUserId != null && actorUserId.intValue() == createdByUserId.intValue();
 	}
 
-	private void startEditingCaseUpdate(CaseUpdateDto dto, Button ownerButton) {
-		if (dto == null || !canEditCaseUpdate(dto))
-			return;
-		EnhancedTextArea.openEditor(dialogOwner(ownerButton), "Edit Case Update", safeText(dto.getNoteText()),
-				value -> saveEditedCaseUpdate(dto, value));
-	}
+    private void startEditingCaseUpdate(CaseUpdateDto dto, Button ownerButton) {
+        if (dto == null || !canEditCaseUpdate(dto)) return;
+        final long revision = appState.sessionRevision();
+        EnhancedTextArea.openSavingEditor(dialogOwner(ownerButton), "Edit Case Update", safeText(dto.getNoteText()), value -> {
+            if (caseId == null || caseId.longValue() != dto.getCaseId() || appState.sessionRevision() != revision)
+                return CompletableFuture.completedFuture("This case or session has changed. Reopen the editor.");
+            return persistCaseUpdate(dto, value);
+        });
+    }
 
-	private void saveEditedCaseUpdate(CaseUpdateDto dto, String noteText) {
-		if (dto == null || caseDao == null || appState == null || caseId == null)
-			return;
-
-		Integer shaleClientId = appState.getShaleClientId();
-		Integer actorUserId = appState.getUserId();
-		if (shaleClientId == null || shaleClientId <= 0 || actorUserId == null || actorUserId <= 0) {
-			showError("Unable to save note edit.");
-			return;
-		}
-
-		String trimmedText = safeText(noteText).trim();
-		if (trimmedText.isBlank()) {
-			showError("Update text is required.");
-			return;
-		}
-
-		final long activeCaseId = caseId.longValue();
-		final long caseUpdateId = dto.getId();
-		final int activeClientId = shaleClientId;
-		final int activeActorUserId = actorUserId;
-		savingCaseUpdateEdit = true;
-		clearError();
-		renderCaseUpdates(caseUpdates);
-
-		new Thread(() ->
-		{
-			try {
-				boolean updated = caseDao.updateCaseNote(caseUpdateId, activeCaseId, activeClientId, activeActorUserId, trimmedText);
-				if (!updated) {
-					runOnFx(() ->
-					{
-						savingCaseUpdateEdit = false;
-						showError("Only the note creator can edit this update.");
-						renderCaseUpdates(caseUpdates);
-					});
-					return;
-				}
-				runOnFx(() -> applyLastUpdatedLabel(LocalDateTime.now(ZoneOffset.UTC)));
-				publishCaseUpdateAdded(activeCaseId);
-				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
-				runOnFx(() ->
-				{
-					if (caseId == null || caseId.longValue() != activeCaseId)
-						return;
-					savingCaseUpdateEdit = false;
-					caseUpdatesLoadedOnce = true;
-					caseUpdatesStale = false;
-					renderCaseUpdates(updates);
-					refreshLastUpdatedLabelAsync();
-				});
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					savingCaseUpdateEdit = false;
-					LOG.error("Case Update edit failed caseId={} updateId={}", activeCaseId, caseUpdateId, ex);
-					showError("The update changes could not be saved. Check your connection and try again.");
-					renderCaseUpdates(caseUpdates);
-				});
-			}
-		}, "case-updates-edit-" + activeCaseId + "-" + caseUpdateId).start();
-	}
+    private void viewCaseUpdate(CaseUpdateDto dto) {
+        if (dto == null) return;
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.initOwner(caseOverviewOwner());
+        AppDialogs.applySecondaryDialogShell(dialog, "Case Update");
+        dialog.setResizable(true);
+        TextArea text = new TextArea(NarrativeMarkdownCodec.plainText(dto.getNoteText()));
+        text.setEditable(false); text.setWrapText(true); ControlStyles.formControl(text);
+        VBox.setVgrow(text, Priority.ALWAYS);
+        Label metadata = new Label(safeAuthorName(dto) + " • " + buildCaseUpdateMetadata(dto)); metadata.setWrapText(true);
+        dialog.getDialogPane().setContent(new VBox(8, metadata, text));
+        dialog.getDialogPane().setPrefSize(900, 650);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        ControlStyles.apply((Button) dialog.getDialogPane().lookupButton(ButtonType.CLOSE), ControlStyles.Purpose.SECONDARY);
+        dialog.setOnShown(event -> {
+            var stage = (javafx.stage.Stage) dialog.getDialogPane().getScene().getWindow();
+            AppDialogs.installSecondaryWindowResizeHandlers(stage, dialog.getDialogPane());
+            com.shale.ui.util.WindowSizingUtil.sizeModalStage(stage, caseOverviewOwner(), 900, 650, 480, 320);
+            dialog.getDialogPane().addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED,
+                    mouse -> com.shale.ui.util.WindowSizingUtil.constrainToVisualBounds(stage, caseOverviewOwner()));
+        });
+        dialog.showAndWait();
+    }
 
 	private static String safeAuthorName(CaseUpdateDto dto) {
 		if (dto == null)
@@ -7602,7 +7617,7 @@ public class CaseController {
 		if (!Platform.isFxApplicationThread())
 			throw new IllegalStateException("Case sections must be activated on the JavaFX application thread.");
 		for (Node root : new Node[] {overviewScrollPane, detailsSectionPane, tasksTabPane, caseCalendarTabPane,
-				caseDatesTabPane, caseRequestsTabPane, caseLinksTabPane, genericPane}) {
+				caseDatesTabPane, caseRequestsTabPane, caseLinksTabPane, genericPane, caseUpdatesTabPane}) {
 			if (root != null) setPaneVisible(root, root == activeRoot);
 		}
 		if (activeRoot != caseRequestsTabPane) caseMaterialRequestsTabController.deactivate();
@@ -9059,7 +9074,10 @@ public class CaseController {
 		}
 
 		private void handleConnectivityEvent(UiRuntimeBridge.ConnectivityEvent event) {
-			if (event != null && event.online() && caseId != null) queueRemoteCaseDatesRefresh();
+			if (event != null && event.online() && caseId != null) {
+                queueRemoteCaseDatesRefresh();
+                runOnFx(CaseController.this::onCaseUpdatesChanged);
+            }
 		}
 
 		private void handleEntityEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -9232,8 +9250,7 @@ public class CaseController {
 			runOnFx(() ->
 			{
 				// Keep ownership explicit: case updates and tasks refresh are separate.
-				caseUpdatesStale = true;
-				loadCaseUpdatesAsync();
+				onCaseUpdatesChanged();
 				loadCaseTasksAsync();
 				refreshLastUpdatedLabelAsync();
 			});

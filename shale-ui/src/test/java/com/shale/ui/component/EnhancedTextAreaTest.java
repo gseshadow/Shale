@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EnhancedTextAreaTest {
+    @org.junit.jupiter.api.BeforeAll static void startToolkit() { com.shale.ui.testutil.JavaFxTestSupport.ensureToolkitStarted(); }
+
     @Test void preservesPlainStringPropertyAndTextAreaCompatibility() {
         EnhancedTextArea area = new EnhancedTextArea();
         SimpleStringProperty model = new SimpleStringProperty("initial");
