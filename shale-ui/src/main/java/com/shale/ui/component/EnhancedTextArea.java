@@ -31,7 +31,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Window;
 
-import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -153,37 +152,107 @@ public class EnhancedTextArea extends VBox {
     }
 
     static void openEditor(Window owner, String title, String currentValue, boolean spellCheck, Consumer<String> onApply) {
+        Dialog<String> dialog = createEditorDialog(owner, title, currentValue, spellCheck, null);
+        dialog.showAndWait().ifPresent(onApply);
+    }
+
+    /** Shared Case Update editor: persistence completes before close; a safe error retains the draft. */
+    public static void openSavingEditor(Window owner, String title, String currentValue,
+            java.util.function.Function<String, java.util.concurrent.CompletionStage<String>> save) {
+        createEditorDialog(owner, title, currentValue, true, java.util.Objects.requireNonNull(save)).showAndWait();
+    }
+
+    // Package-visible so tests exercise the actual button/close/result contract without nested modal loops.
+    static Dialog<String> createEditorDialog(Window owner, String title, String currentValue, boolean spellCheck,
+            java.util.function.Function<String, java.util.concurrent.CompletionStage<String>> save) {
         Dialog<String> dialog = new Dialog<>();
         if (owner != null) dialog.initOwner(owner);
         String resolvedTitle = title == null || title.isBlank() ? "Edit text" : title;
         dialog.setTitle(resolvedTitle);
+        dialog.setResizable(true);
         AppDialogs.applySecondaryDialogShell(dialog, resolvedTitle);
         dialog.getDialogPane().getStyleClass().addAll("utility-dialog-root", "enhanced-text-dialog-root");
         dialog.getDialogPane().setAccessibleText(resolvedTitle + ". Expanded multiline text editor.");
         RichTextExpandedEditor expanded = new RichTextExpandedEditor(currentValue, UserDictionarySession.current().checker(), spellCheck);
-        expanded.setPrefSize(760, 440);
-        Label shortcutHint = new Label("Ctrl+Enter to Apply");
+        expanded.setMinSize(0, 0);
+        expanded.setPrefSize(860, 500);
+        String baseline = expanded.markdown();
+        ButtonType affirmative = save == null ? APPLY : new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        Label shortcutHint = new Label("Ctrl+Enter to " + affirmative.getText());
         shortcutHint.getStyleClass().add("enhanced-text-area-dialog-hint");
-        shortcutHint.setMaxWidth(Double.MAX_VALUE);
+        Label error = new Label();
+        error.setWrapText(true);
+        error.getStyleClass().add("shale-error-message");
+        error.setVisible(false); error.setManaged(false);
         VBox.setVgrow(expanded, Priority.ALWAYS);
-        VBox content = new VBox(8, expanded, shortcutHint);
+        VBox content = new VBox(8, expanded, shortcutHint, error);
+        content.setMinSize(0, 0);
         content.getStyleClass().add("enhanced-text-area-dialog-content");
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().addAll(APPLY, ButtonType.CANCEL);
-        dialog.getDialogPane().setMinSize(720, 520);
-        Button apply = (Button) dialog.getDialogPane().lookupButton(APPLY);
+        dialog.getDialogPane().getButtonTypes().addAll(affirmative, ButtonType.CANCEL);
+        dialog.getDialogPane().setMinSize(0, 0);
+        dialog.getDialogPane().setPrefSize(900, 650);
+        Button apply = (Button) dialog.getDialogPane().lookupButton(affirmative);
+        Button cancel = (Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
         ControlStyles.apply(apply, ControlStyles.Purpose.PRIMARY);
-        ControlStyles.apply((Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
+        ControlStyles.apply(cancel, ControlStyles.Purpose.SECONDARY);
+        // Ordinary Enter belongs to the multiline editor. Only explicit Save or Ctrl+Enter applies.
+        apply.setDefaultButton(false);
         expanded.area().addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
             if (new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN).match(event)) { apply.fire(); event.consume(); }
         });
-		AtomicBoolean applied = new AtomicBoolean();
-        dialog.setResultConverter(button -> button == APPLY && applied.compareAndSet(false, true)
-				? expanded.markdown() : null);
-        dialog.setOnShown(event -> Platform.runLater(() -> expanded.area().requestFocus()));
+        AtomicBoolean accepted = new AtomicBoolean();
+        AtomicBoolean busy = new AtomicBoolean();
+        if (save != null) apply.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            event.consume();
+            if (busy.get()) return;
+            String draft = expanded.markdown();
+            if (draft.isBlank()) {
+                error.setText("Update text is required."); error.setVisible(true); error.setManaged(true);
+                expanded.area().requestFocus(); return;
+            }
+            busy.set(true); apply.setDisable(true); cancel.setDisable(true); expanded.setDisable(true);
+            error.setText("Saving…"); error.setVisible(true); error.setManaged(true);
+            try {
+                save.apply(draft).whenComplete((message, failure) -> Platform.runLater(() -> {
+                    busy.set(false); apply.setDisable(false); cancel.setDisable(false); expanded.setDisable(false);
+                    if (failure == null && message == null) {
+                        accepted.set(true); dialog.setResult(draft); dialog.close();
+                    } else {
+                        error.setText(failure == null ? message : "The update could not be saved. Please try again.");
+                        expanded.area().requestFocus();
+                    }
+                }));
+            } catch (RuntimeException ex) {
+                busy.set(false); apply.setDisable(false); cancel.setDisable(false); expanded.setDisable(false);
+                error.setText("The update could not be saved. Please try again.");
+            }
+        });
+        dialog.setResultConverter(button -> {
+            if (button != affirmative || save != null) return null;
+            accepted.set(true);
+            return expanded.markdown();
+        });
+        dialog.setOnCloseRequest(event -> {
+            if (busy.get() || (!accepted.get() && !baseline.equals(expanded.markdown())
+                    && !AppDialogs.showDiscardConfirmation(dialog.getDialogPane().getScene().getWindow(),
+                            "Unsaved changes", "Discard changes?", "Your changes have not been saved."))) {
+                event.consume();
+            }
+        });
+        dialog.setOnShown(event -> {
+            var stage = (javafx.stage.Stage) dialog.getDialogPane().getScene().getWindow();
+            AppDialogs.installSecondaryWindowResizeHandlers(stage, dialog.getDialogPane());
+            dialog.getDialogPane().addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED,
+                    mouse -> com.shale.ui.util.WindowSizingUtil.constrainToVisualBounds(stage, owner));
+            com.shale.ui.util.WindowSizingUtil.sizeModalStage(stage, owner, 900, 650, 480, 320);
+            var bounds = com.shale.ui.util.WindowSizingUtil.getScreenForWindow(owner).getVisualBounds();
+            stage.setMaxWidth(bounds.getWidth()); stage.setMaxHeight(bounds.getHeight());
+            com.shale.ui.util.WindowSizingUtil.constrainToVisualBounds(stage, owner);
+            Platform.runLater(() -> expanded.area().requestFocus());
+        });
         dialog.setOnHidden(event -> expanded.dispose());
-        Optional<String> result = dialog.showAndWait();
-        result.ifPresent(onApply);
+        return dialog;
     }
 
     private ContextMenu spellingMenu() {

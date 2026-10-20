@@ -14,6 +14,8 @@ import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 
 /** Protects the shared narrative-editor contract for Case Updates. */
 final class CaseUpdatesNarrativeEditorTest {
+    @org.junit.jupiter.api.BeforeAll static void startToolkit() { com.shale.ui.testutil.JavaFxTestSupport.ensureToolkitStarted(); }
+
     private static final String CONTROLLER = read("src/main/java/com/shale/ui/controller/CaseController.java");
     private static final String FXML = read("src/main/resources/fxml/case.fxml");
     private static final String ENHANCED_TEXT_AREA = read("src/main/java/com/shale/ui/component/EnhancedTextArea.java");
@@ -41,17 +43,17 @@ final class CaseUpdatesNarrativeEditorTest {
                 "Submit must not be replaced by a popup-only Add workflow");
         assertTrue(submit.contains("trimmedText.isBlank()") && submit.contains("Update text is required."),
                 "The existing blank-update validation must remain before persistence");
-        assertTrue(submit.contains("caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId)"),
+        assertTrue(submit.contains("caseService.addCaseNote(new CaseServicePort.AddCaseNoteCommand(activeCaseId, activeClientId, createdByUserId, trimmedText))"),
                 "A single Submit must pass the current inline text to the authoritative Case Update DAO path");
         assertTrue(submit.contains("caseUpdateSubmissionInFlight.compareAndSet(false, true)"),
                 "Submit must reject a second activation while the authoritative write is in flight");
         assertTrue(submit.contains("caseUpdatesComposerArea.setDisable(true)"),
                 "The visible draft should communicate that submission is in progress");
-        assertTrue(submit.contains("caseUpdatesComposerArea.setText(\"\")")
-                        && submit.contains("renderCaseUpdates(updates)")
+        assertTrue(submit.contains("if (message == null) caseUpdatesComposerArea.setText(\"\")")
+                        && submit.contains("onCaseUpdatesChanged()")
                         && submit.contains("caseUpdatesComposerArea.requestFocus()"),
                 "A successful Submit must clear the draft, refresh saved updates, and restore sensible focus");
-        String failure = submit.substring(submit.indexOf("} catch (Exception ex)"));
+        String failure = submit.substring(submit.indexOf("} catch (RuntimeException ex)"));
         assertFalse(failure.contains("caseUpdatesComposerArea.setText(\"\")"),
                 "A failed persistence attempt must retain the inline draft for retry");
     }
@@ -86,16 +88,16 @@ final class CaseUpdatesNarrativeEditorTest {
     @Test
     void editUsesCurrentMarkdownAndCreatorRestrictedUpdatePath() {
         String permission = method("private boolean canEditCaseUpdate", "private void startEditingCaseUpdate");
-        String open = method("private void startEditingCaseUpdate", "private void saveEditedCaseUpdate");
-        String save = method("private void saveEditedCaseUpdate", "private static String safeAuthorName");
+        String open = method("private void startEditingCaseUpdate", "private void viewCaseUpdate");
+        String save = method("private CompletableFuture<String> persistCaseUpdate", "private void handleMedicalRecordsRequestedSafeguardAfterSavedUpdate");
 
         assertTrue(permission.contains("actorUserId.intValue() == createdByUserId.intValue()"),
                 "Only the update creator may be offered Edit");
-        assertTrue(open.contains("EnhancedTextArea.openEditor") && open.contains("\"Edit Case Update\"")
+        assertTrue(open.contains("EnhancedTextArea.openSavingEditor") && open.contains("\"Edit Case Update\"")
                         && open.contains("safeText(dto.getNoteText())")
-                        && open.contains("value -> saveEditedCaseUpdate(dto, value)"),
+                        && open.contains("persistCaseUpdate(dto, value)"),
                 "Edit must initialize the shared popup from persisted text and save only on Apply");
-        assertTrue(save.contains("caseDao.updateCaseNote(caseUpdateId, activeCaseId, activeClientId, activeActorUserId, trimmedText)"),
+        assertTrue(save.contains("caseService.updateCaseNote(new CaseServicePort.UpdateCaseNoteCommand") && save.contains("dto.rowVersion()"),
                 "Apply must preserve Case Update identity, case, tenant, actor, and the existing update path");
         assertFalse(cardMethod().contains("new TextArea") || cardMethod().contains("new Button(\"Save\")")
                         || cardMethod().contains("new Button(\"Cancel\")"),

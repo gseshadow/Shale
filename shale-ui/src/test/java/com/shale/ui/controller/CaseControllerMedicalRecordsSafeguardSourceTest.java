@@ -11,10 +11,10 @@ final class CaseControllerMedicalRecordsSafeguardSourceTest {
     @Test
     void caseUpdateSaveStillPersistsBeforeSafeguardPromptRuns() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
-        int save = source.indexOf("caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId)");
+        int save = source.indexOf("caseService.addCaseNote(new CaseServicePort.AddCaseNoteCommand(activeCaseId, activeClientId, createdByUserId, trimmedText))");
         int prompt = source.indexOf("handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(activeCaseId, activeClientId, trimmedText)");
 
-        assertTrue(save >= 0, "Existing case update save path should still call CaseDao.addCaseNote");
+        assertTrue(save >= 0, "Case Update save should use the authoritative service mutation");
         assertTrue(prompt > save, "Medical-record safeguard should run only after the case update save succeeds");
     }
 

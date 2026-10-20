@@ -235,6 +235,16 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				row.opposingCounselContactId(), row.callerName(), row.clientName(), clients, row.opposingCounselName(), List.of(), row.description());
 	}
 
+    @Override public com.shale.core.dto.CaseUpdatePage searchCaseUpdates(com.shale.core.dto.CaseUpdateQuery query) {
+        return caseGateway.searchCaseUpdates(query);
+    }
+    @Override public List<com.shale.core.dto.CaseUpdateAuthorDto> listCaseUpdateAuthors(long caseId, int tenant, int actor) {
+        return caseGateway.listCaseUpdateAuthors(caseId, tenant, actor);
+    }
+    @Override public boolean updateCaseNote(UpdateCaseNoteCommand command) {
+        return caseGateway.updateCaseNote(command);
+    }
+
 	@Override
 	public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
 		return caseGateway.listCaseUpdates(caseId, shaleClientId);
@@ -991,6 +1001,16 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
+        default com.shale.core.dto.CaseUpdatePage searchCaseUpdates(com.shale.core.dto.CaseUpdateQuery query) {
+            throw new UnsupportedOperationException("Case Updates paging requires the production DAO gateway.");
+        }
+        default List<com.shale.core.dto.CaseUpdateAuthorDto> listCaseUpdateAuthors(long caseId, int tenant, int actor) {
+            throw new UnsupportedOperationException("Case Update authors require the production DAO gateway.");
+        }
+        default boolean updateCaseNote(UpdateCaseNoteCommand command) {
+            throw new UnsupportedOperationException("Versioned update editing requires the production DAO gateway.");
+        }
+
 
 		void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId);
 
@@ -1245,6 +1265,16 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		public List<CaseSummaryDao.ServerCaseRow> listActiveAssignedForServer(int t, int a, int u, int l) {
 			return caseSummaryDao.listActiveAssignedForServer(t, a, u, l);
 		}
+
+        @Override public com.shale.core.dto.CaseUpdatePage searchCaseUpdates(com.shale.core.dto.CaseUpdateQuery query) {
+            return caseDao.searchCaseUpdates(query);
+        }
+        @Override public List<com.shale.core.dto.CaseUpdateAuthorDto> listCaseUpdateAuthors(long caseId, int tenant, int actor) {
+            return caseDao.listCaseUpdateAuthors(caseId, tenant, actor);
+        }
+        @Override public boolean updateCaseNote(UpdateCaseNoteCommand command) {
+            return caseDao.updateCaseNote(command);
+        }
 
 		@Override
 		public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {

@@ -10,7 +10,7 @@ dialog (for example, `Description` produces `Edit Description`).
 
 The expanded dialog edits an isolated `ExpandedTextEdit` draft. Apply copies the
 draft to the control; Cancel, the close affordance, and Escape discard it.
-Ctrl+Enter applies. The dialog uses `AppDialogs` ownership and secondary-window
+Ctrl+Enter applies. Changed drafts ask Keep Editing/Discard before cancellation. The dialog targets 900 × 650, is resizable, and fits the available screen through WindowSizingUtil. The dialog uses `AppDialogs` ownership and secondary-window
 styling.
 
 Spell checking is offline and dictionary based. The bundled baseline dictionary
@@ -40,3 +40,8 @@ Spelling is debounced and fully local. Misspelled ranges receive a red dashed
 underline which is recomputed from the local dictionary and omitted by the Markdown
 codec. The caret word's context menu offers replacements, Ignore, and Add to
 dictionary. Apply serializes the isolated draft; Cancel/Escape discards it.
+
+Case Updates also uses `openSavingEditor`, the same rich-text surface with asynchronous
+Save/Cancel. Save validates before close, prevents overlapping writes, and retains the
+draft on persistence failure or version conflict. Other `openEditor` callers retain
+their Apply-only draft callback. See [Case Updates architecture](../architecture/case-updates.md).

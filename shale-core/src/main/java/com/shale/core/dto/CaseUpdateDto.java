@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 public final class CaseUpdateDto {
 
+	private final byte[] rowVersion;
+	private final boolean deleted;
 	private final long id;
 	private final long caseId;
 	private final String noteText;
@@ -19,6 +21,14 @@ public final class CaseUpdateDto {
 			LocalDateTime updatedAt,
 			Integer createdByUserId,
 			String createdByDisplayName) {
+        this(id, caseId, noteText, createdAt, updatedAt, createdByUserId, createdByDisplayName, null, false);
+    }
+
+    public CaseUpdateDto(long id, long caseId, String noteText, LocalDateTime createdAt,
+            LocalDateTime updatedAt, Integer createdByUserId, String createdByDisplayName,
+            byte[] rowVersion, boolean deleted) {
+        this.rowVersion = rowVersion == null ? null : rowVersion.clone();
+        this.deleted = deleted;
 		this.id = id;
 		this.caseId = caseId;
 		this.noteText = noteText == null ? "" : noteText;
@@ -27,6 +37,9 @@ public final class CaseUpdateDto {
 		this.createdByUserId = createdByUserId;
 		this.createdByDisplayName = createdByDisplayName == null ? "" : createdByDisplayName;
 	}
+
+    public byte[] rowVersion() { return rowVersion == null ? null : rowVersion.clone(); }
+    public boolean deleted() { return deleted; }
 
 	public long getId() {
 		return id;

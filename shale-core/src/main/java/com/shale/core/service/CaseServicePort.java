@@ -78,6 +78,29 @@ public interface CaseServicePort {
 
 	List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
+    default com.shale.core.dto.CaseUpdatePage searchCaseUpdates(com.shale.core.dto.CaseUpdateQuery query) {
+        throw new UnsupportedOperationException("Case Updates paging is unavailable in this adapter.");
+    }
+    default List<com.shale.core.dto.CaseUpdateAuthorDto> listCaseUpdateAuthors(long caseId, int tenant, int actor) {
+        throw new UnsupportedOperationException("Case Update authors are unavailable in this adapter.");
+    }
+    default boolean updateCaseNote(UpdateCaseNoteCommand command) {
+        throw new UnsupportedOperationException("Versioned Case Update editing is unavailable in this adapter.");
+    }
+    record UpdateCaseNoteCommand(long id, long caseId, int shaleClientId, int actorUserId,
+            String text, byte[] expectedRowVersion) {
+        public UpdateCaseNoteCommand {
+            if (id <= 0 || caseId <= 0 || shaleClientId <= 0 || actorUserId <= 0)
+                throw new IllegalArgumentException("Update, Case, tenant and actor are required.");
+            text = text == null ? "" : text.trim();
+            if (text.isBlank()) throw new IllegalArgumentException("Update text is required.");
+            if (expectedRowVersion == null || expectedRowVersion.length != 8)
+                throw new IllegalArgumentException("Reload the update before editing.");
+            expectedRowVersion = expectedRowVersion.clone();
+        }
+        @Override public byte[] expectedRowVersion() { return expectedRowVersion.clone(); }
+    }
+
 	List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
 
 	List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive);
