@@ -79,3 +79,33 @@ notes, and a few soft-deleted rows. Use two desktop instances for concurrency/li
 Installed Windows/macOS, live SQL/RLS, real PubSub delivery, DPI, and physical
 multi-monitor acceptance remain manual; local synthetic JavaFX/JDBC checks do not
 claim those environments were exercised.
+
+## Local verification record — 2026-10-20
+
+Java 21 and Maven 3.9.11; JavaFX ran on an Xorg dummy display (`DISPLAY=:99`)
+with a writable native-library cache. Focused feature tests, 25 neighboring Case View
+checks, static FXML/CSS validation, and Git diff checks passed. The final generated
+affected suite passed **122 tests**, and the full default critical reactor passed
+**116 tests**, with zero failures, errors, or skips. Full-suite escalation was not
+selected. Synthetic Light/Dark workspace previews using the production update cards
+were inspected. Installed desktop/live SQL/PubSub acceptance remains the checklist above.
+
+Cases/UI checks cover the shared roots, rail, dialogs and data boundary. The selector
+also chose Contact/Organization/Task adapters, reports/FXML and server smoke checks
+because the shared core DTO/service port has direct consumers in those areas. No
+authentication or permission-retirement implementation was changed. Neighboring test
+maintenance also corrected pre-existing assumptions about selected occurrence identity
+and the shared date-row/Parties-section presentation owner, verified against the base.
+
+Exact verification commands (after selecting Java/Maven in the runner):
+
+```bash
+python3 build/test-selection/validate_ui_resources.py
+python3 build/test-selection/select_tests.py --base 14d8d813a369a8170e664a0df690b6043902185e --head HEAD --format markdown --plan-output work/selected-plan.json
+DISPLAY=:99 mvn -q -pl shale-ui -am -Djavafx.cachedir=/workspace/Shale/work/javafx -Dshale.preview.dir=/workspace/Shale/work/previews -Dtest=CaseUpdateQueryTest,CaseUpdatesPagingJdbcTest,CaseDaoCaseUpdatesQueryTest,CaseServiceAdapterTest,CaseUpdatesNarrativeEditorTest,CaseControllerMedicalRecordsSafeguardSourceTest,CaseSectionNavigationSelectionTest,CaseMaterialsPhase4UiContractTest,CaseOverviewPhase6SupportingComponentsTest,EnhancedTextAreaTest,ExpandedTextEditTest,RichTextExpandedEditorTest,AppDialogsPhase8JTest,CaseUpdatesWorkspaceTest,CaseUpdateEditorTest -Dsurefire.failIfNoSpecifiedTests=false test
+DISPLAY=:99 mvn -q -pl shale-ui -am -Djavafx.cachedir=/workspace/Shale/work/javafx -Dtest=CaseCalendarTabSourceTest,CaseRequestsLifecycleRegressionTest,CaseOverviewPhase2ContractTest,CaseOverviewPhase2CDesignContractTest,CaseOverviewPhase2DDesignContractTest,CaseDatesPhase2CArchitectureTest,MedicalRecordsRequestedCaseUpdateSafeguardTest -Dsurefire.failIfNoSpecifiedTests=false test
+DISPLAY=:99 mvn -q -pl shale-ui -am -Djavafx.cachedir=/workspace/Shale/work/javafx -Dtest=CaseUpdatesWorkspaceTest -Dsurefire.failIfNoSpecifiedTests=false test
+DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx -pl shale-core,shale-data,shale-server,shale-ui -am -Dtest=com.shale.core.dto.CaseUpdateQueryTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.service.adapter.CaseServiceAdapterTest,com.shale.data.service.adapter.CaseUpdatesPagingJdbcTest,com.shale.data.service.adapter.OrganizationServiceAdapterTest,com.shale.data.service.adapter.TaskServiceAdapterTest,com.shale.server.controller.AuthControllerTest,com.shale.ui.component.CaseUpdateEditorTest,com.shale.ui.component.EnhancedTextAreaTest,com.shale.ui.component.RichTextExpandedEditorTest,com.shale.ui.controller.CaseControllerMedicalRecordsSafeguardSourceTest,com.shale.ui.controller.CaseMaterialsPhase4UiContractTest,com.shale.ui.controller.CaseOverviewPhase2CDesignContractTest,com.shale.ui.controller.CaseOverviewPhase2ContractTest,com.shale.ui.controller.CaseOverviewPhase2DDesignContractTest,com.shale.ui.controller.CaseOverviewPhase6SupportingComponentsTest,com.shale.ui.controller.CaseSectionNavigationSelectionTest,com.shale.ui.controller.CaseUpdatesNarrativeEditorTest,com.shale.ui.controller.CaseUpdatesWorkspaceTest,com.shale.ui.controller.OrganizationFxmlLoadTest,com.shale.ui.controller.ReportsControllerLifecycleTest,com.shale.ui.controller.SettingsFxmlLoadTest,com.shale.ui.util.SemanticControlCssContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx test
+git diff --check
+```
