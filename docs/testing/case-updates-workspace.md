@@ -258,3 +258,31 @@ user colors to demonstrate rendering. These do not replace native desktop accept
       remain reachable. Check small screens, desktop scaling and screen-reader output.
 - [ ] Repeat multi-author filtering with pagination and delete a filtered result;
       verify first-page reconciliation, retained filters and synchronized rail/workspace.
+
+### Refinement verification record — 2026-10-20
+
+Java 21 / Maven 3.9.11 on the local dummy Xorg display. Final focused suite: **78
+passed** (4 core, 32 data, 42 UI). Generated affected suite: **28 passed**. Critical
+reactor: **116 passed**. All three final suites had zero failures, errors or skips.
+FXML/CSS resource validation and Git diff checks passed. No full-suite escalation
+was selected. Both themes and the 336px rail previews were inspected. Native installed
+desktop, screen-reader, DPI, live SQL/RLS and real PubSub checks remain manual above.
+The separate exploratory historical style test had 2 failures, reproduced on the
+base as described above; it is not in the selector's affected or critical suite.
+
+Exact final verification commands (from the repository root):
+
+```bash
+source /workspace/.tools/shale-env.sh
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -q -pl shale-ui -am -Djavafx.cachedir=/workspace/Shale/work/javafx -Dshale.preview.dir=/workspace/Shale/work/previews/after -Dtest=UserSelectorMultipleSelectionTest,CaseUpdatesWorkspaceTest,CaseUpdateDeletionTest,CaseUpdatesNarrativeEditorTest,UserSelectionFieldTest,UserSelectorSourceContractTest,TeamCardPresentationTest,TaskDetailUserSelectorMigrationTest,CaseUpdateQueryTest,CaseUpdatesPagingJdbcTest,CaseDaoCaseUpdatesQueryTest,CaseServiceAdapterTest,CaseUpdateEditorTest,CaseOverviewPhase6SupportingComponentsTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/validate_ui_resources.py
+python3 build/test-selection/select_tests.py --base b26c047603dfc13c6c4891cf0e4433de1429b342 --head HEAD --format markdown --plan-output work/selected-plan.json
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -pl shale-data,shale-ui -am -Djavafx.cachedir=/workspace/Shale/work/javafx -Dtest=com.shale.data.service.adapter.TaskServiceAdapterTest,com.shale.ui.component.UserSelectorMultipleSelectionTest,com.shale.ui.component.dialog.TaskDetailUserSelectorMigrationTest,com.shale.ui.controller.CaseUpdateDeletionTest,com.shale.ui.controller.CaseUpdatesNarrativeEditorTest,com.shale.ui.controller.SettingsControllerLifecycleTest,com.shale.ui.util.SemanticControlCssContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx test
+git diff b26c047603dfc13c6c4891cf0e4433de1429b342 HEAD --check
+```
+
+The affected suite covers directly modified UI tests plus Task adapter, Settings
+lifecycle and semantic CSS smoke checks selected for shared user components and card
+CSS. Focused tests additionally cover existing Case Update DAO authority/audit and
+rich-text lifecycle, and modal filtering/paging/synchronization unchanged by the UI.
