@@ -50,6 +50,7 @@ notes, and a few soft-deleted rows. Use two desktop instances for concurrency/li
       for ties; Previous/Next on first, intermediate, last, and empty pages.
 - [ ] Search text, Unicode, literal `%`, `_`, `[`, and no-match terms. Combine creation
       dates, inclusive through date, author, lifecycle, and each sort. Clear all filters.
+      Include local-day boundaries across a daylight-saving transition.
       Invalid/reversed dates must not run a query; rapid typing must not show an old page.
 - [ ] Ordinary users see only active notes and cannot edit another author's note.
       Administrator Active/Deleted/All includes labelled read-only deleted notes.

@@ -40,7 +40,8 @@ gradients, or duplicate card factory are introduced.
 The workspace defaults to newest active updates. Search is debounced 350ms and matches
 literal stored update text case-insensitively according to database comparison rules.
 Dates filter **creation** time, with an inclusive through date expressed as next
-midnight. Author filtering uses immutable user identity, including historical authors
+midnight. The query carries the desktop display zone; local day boundaries are converted
+to UTC before binding, including daylight-saving transitions. Author filtering uses immutable user identity, including historical authors
 with unavailable display names. A distinct metadata query supplies the picker without
 loading note contents. Clear resets text, dates, author, lifecycle, sort, and page.
 Loading, successful empty, filtered empty, validation, and recoverable load failure

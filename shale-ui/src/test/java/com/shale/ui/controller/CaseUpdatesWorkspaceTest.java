@@ -42,7 +42,7 @@ class CaseUpdatesWorkspaceTest {
             assertEquals(CaseUpdateQuery.Sort.EDITED,f.last().sort());
             assertEquals(CaseUpdateQuery.Visibility.DELETED,f.last().visibility());
             f.workspace.resetFilters();
-            assertEquals(CaseUpdateQuery.newest(501,41,31,"",50), f.last(), "Clear must reset every filter and cursor");
+            assertEquals(CaseUpdateQuery.newest(501,41,31,"",50).inZone(java.time.ZoneId.systemDefault()), f.last(), "Clear must reset every filter and cursor");
             int count=f.queries.size();
             field(f.workspace,"from",DatePicker.class).setValue(LocalDate.of(2026,10,21));
             field(f.workspace,"through",DatePicker.class).setValue(LocalDate.of(2026,10,20));

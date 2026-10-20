@@ -169,7 +169,7 @@ public final class CaseUpdatesWorkspaceController {
         try {
             query = new CaseUpdateQuery(caseId, state.getShaleClientId(), state.getUserId(), search.getText(), sort.getValue(),
                     from.getValue(), through.getValue(), author.getSelectedUser() == null ? null : author.getSelectedUser().id(),
-                    visibility.getValue(), cursors.get(pageIndex), 50);
+                    visibility.getValue(), cursors.get(pageIndex), 50).inZone(java.time.ZoneId.systemDefault());
         } catch (RuntimeException ex) { status.setText("Check the date range and search (maximum 1000 characters)."); return; }
         status.setText("Loading updates…");
         executor.execute(() -> {

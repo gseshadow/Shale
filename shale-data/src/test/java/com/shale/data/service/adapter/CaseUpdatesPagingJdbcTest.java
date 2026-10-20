@@ -65,6 +65,16 @@ class CaseUpdatesPagingJdbcTest {
         }
     }
 
+    @Test void dateRangeMatchesDisplayedLocalDaysAcrossDaylightSavingChange() {
+        Jdbc jdbc = new Jdbc();
+        var day = LocalDate.of(2026,3,8);
+        jdbc.adapter().searchCaseUpdates(new CaseUpdateQuery(501,41,31,"",null,day,day,null,null,null,50)
+                .inZone(java.time.ZoneId.of("America/Denver")));
+        assertEquals(Timestamp.valueOf("2026-03-08 07:00:00"), jdbc.bindings.get(6));
+        assertEquals(Timestamp.valueOf("2026-03-09 06:00:00"), jdbc.bindings.get(7),
+                "Inclusive local days can span 23 hours; filtering must agree with displayed local timestamps");
+    }
+
     @Test void emptyAndFinalPagesDoNotOfferAnotherPageAndVersionsAreDefensive() {
         Jdbc jdbc = new Jdbc();
         assertNull(jdbc.adapter().searchCaseUpdates(CaseUpdateQuery.newest(501,41,31,"",50)).next());

@@ -2779,8 +2779,8 @@ public final class CaseDao {
                 // SQL Server bracket escaping treats user wildcards as literal text.
                 values.add("%" + query.text().toLowerCase(Locale.ROOT).replace("[", "[[]").replace("%", "[%]").replace("_", "[_]") + "%");
             }
-            if (query.from() != null) { sql.append(" AND caseUpdate.CreatedAt >= ?"); values.add(Timestamp.valueOf(query.from().atStartOfDay())); }
-            if (query.through() != null) { sql.append(" AND caseUpdate.CreatedAt < ?"); values.add(Timestamp.valueOf(query.through().plusDays(1).atStartOfDay())); }
+            if (query.from() != null) { sql.append(" AND caseUpdate.CreatedAt >= ?"); values.add(Timestamp.valueOf(query.fromUtc())); }
+            if (query.through() != null) { sql.append(" AND caseUpdate.CreatedAt < ?"); values.add(Timestamp.valueOf(query.throughExclusiveUtc())); }
             if (query.authorUserId() != null) { sql.append(" AND caseUpdate.CreatedByUserId = ?"); values.add(query.authorUserId()); }
             if (query.after() != null) {
                 sql.append(" AND (").append(orderAt).append(comparison).append(" OR (").append(orderAt)

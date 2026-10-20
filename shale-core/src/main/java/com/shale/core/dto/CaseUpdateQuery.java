@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 /** Bounded, case-specific CaseUpdates read contract; all filters execute in SQL. */
 public record CaseUpdateQuery(long caseId, int shaleClientId, int actorUserId, String text,
         Sort sort, LocalDate from, LocalDate through, Integer authorUserId,
-        Visibility visibility, Cursor after, int pageSize) {
+        Visibility visibility, Cursor after, int pageSize, java.time.ZoneId dateZone) {
     public enum Sort {
         NEWEST("Newest first"), OLDEST("Oldest first"), EDITED("Recently edited");
         private final String label;
@@ -24,9 +24,24 @@ public record CaseUpdateQuery(long caseId, int shaleClientId, int actorUserId, S
             if (at == null || id <= 0) throw new IllegalArgumentException("A timestamp and update identity are required.");
         }
     }
+    public CaseUpdateQuery(long caseId, int shaleClientId, int actorUserId, String text,
+            Sort sort, LocalDate from, LocalDate through, Integer authorUserId,
+            Visibility visibility, Cursor after, int pageSize) {
+        this(caseId, shaleClientId, actorUserId, text, sort, from, through, authorUserId, visibility, after, pageSize, java.time.ZoneOffset.UTC);
+    }
+    public CaseUpdateQuery inZone(java.time.ZoneId zone) {
+        return new CaseUpdateQuery(caseId, shaleClientId, actorUserId, text, sort, from, through,
+                authorUserId, visibility, after, pageSize, zone);
+    }
+    public LocalDateTime fromUtc() { return from == null ? null : utcMidnight(from); }
+    public LocalDateTime throughExclusiveUtc() { return through == null ? null : utcMidnight(through.plusDays(1)); }
+    private LocalDateTime utcMidnight(LocalDate date) {
+        return date.atStartOfDay(dateZone).withZoneSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime();
+    }
     public CaseUpdateQuery {
         if (caseId <= 0 || shaleClientId <= 0 || actorUserId <= 0)
             throw new IllegalArgumentException("Case, tenant and actor are required.");
+        dateZone = dateZone == null ? java.time.ZoneOffset.UTC : dateZone;
         text = text == null ? "" : text.trim();
         if (text.length() > 1000) throw new IllegalArgumentException("Search must be at most 1000 characters.");
         sort = sort == null ? Sort.NEWEST : sort;
