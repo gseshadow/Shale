@@ -38,6 +38,7 @@ public final class CaseUpdatesWorkspaceController {
     private final VBox rows = new VBox(8);
     private final Label status = new Label();
     private final Label pageLabel = new Label();
+    private final Label authorStatus = new Label();
     private final TextField search = new TextField();
     private final ComboBox<CaseUpdateQuery.Sort> sort = new ComboBox<>();
     private final ComboBox<CaseUpdateQuery.Visibility> visibility = new ComboBox<>();
@@ -51,6 +52,7 @@ public final class CaseUpdatesWorkspaceController {
     private CaseUpdateQuery.Cursor nextCursor;
     private int pageIndex;
     private volatile int generation;
+    private volatile int authorGeneration;
     private volatile boolean active;
     private boolean stale = true;
     private boolean resetting;
@@ -96,8 +98,12 @@ public final class CaseUpdatesWorkspaceController {
                     return picker.showAndWait();
                 }, true).useUnifiedControlStyles();
         author.setAccessibleText("Filter by update author; empty means all authors");
+        authorStatus.setWrapText(true); authorStatus.getStyleClass().add("shale-error-message");
+        authorStatus.setVisible(false); authorStatus.setManaged(false);
+        VBox authorField = field("Author (all when empty)", author);
+        authorField.getChildren().add(authorStatus);
         FlowPane filters = new FlowPane(12, 8, field("Sort", sort), field("Created from", from),
-                field("Created through", through), field("Author (all when empty)", author));
+                field("Created through", through), authorField);
         if (state.isAdmin()) filters.getChildren().add(field("Records", visibility));
         Button clear = action("Clear filters", ControlStyles.Purpose.GHOST, this::resetFilters);
         filters.getChildren().add(clear);
@@ -135,7 +141,7 @@ public final class CaseUpdatesWorkspaceController {
     public long caseId() { return caseId; }
     public boolean isCurrentSession() { return state.sessionRevision() == identityRevision; }
     public void dataChanged() {
-        authorsLoaded = false; invalidate();
+        authorsLoaded = false; authorGeneration++; invalidate();
         if (active) { loadAuthors(); refresh(); }
     }
     public void activate() {
@@ -145,7 +151,10 @@ public final class CaseUpdatesWorkspaceController {
     }
     public void deactivate() { active = false; debounce.stop(); invalidate(); }
     public void invalidate() { generation++; stale = true; previous.setDisable(true); next.setDisable(true); }
-    public void refresh() { filtersChanged(); }
+    public void refresh() {
+        if (!authorsLoaded && !author.isLoading()) loadAuthors();
+        filtersChanged();
+    }
     public void resetFilters() {
         resetting = true;
         try {
@@ -195,17 +204,22 @@ public final class CaseUpdatesWorkspaceController {
     private void loadAuthors() {
         final Integer tenant = state.getShaleClientId(), actor = state.getUserId();
         if (tenant == null || actor == null) return;
+        final int request = ++authorGeneration;
         author.setLoading(true);
+        authorStatus.setVisible(false); authorStatus.setManaged(false);
         executor.execute(() -> {
             try {
+                if (request != authorGeneration || state.sessionRevision() != identityRevision) return;
                 List<CaseUpdateAuthorDto> authors = service.listCaseUpdateAuthors(caseId, tenant, actor);
                 dispatch.accept(() -> {
-                    if (state.sessionRevision() != identityRevision) return;
+                    if (request != authorGeneration || state.sessionRevision() != identityRevision) return;
                     author.setCandidates(authors); author.setLoading(false); authorsLoaded = true;
                 });
             } catch (RuntimeException ex) {
-                dispatch.accept(() -> { if (state.sessionRevision() == identityRevision) {
-                    author.setLoading(false); status.setText("Authors could not be loaded. Reopen this tab to retry.");
+                dispatch.accept(() -> { if (request == authorGeneration && state.sessionRevision() == identityRevision) {
+                    author.setLoading(false);
+                    authorStatus.setText("Authors could not be loaded. Refresh to retry.");
+                    authorStatus.setVisible(true); authorStatus.setManaged(true);
                 } });
             }
         });

@@ -97,6 +97,19 @@ class CaseUpdatesWorkspaceTest {
         });
     }
 
+    @Test void authorLoadFailureIsIndependentFromPageStateAndRefreshRetriesIt() {
+        JavaFxTestSupport.runAndWait(() -> {
+            Fixture f = new Fixture(false); f.failAuthors = true; f.workspace.activate();
+            Label authors = field(f.workspace, "authorStatus", Label.class);
+            assertTrue(authors.isVisible(), "Successful note loading must not erase a failed author lookup");
+            assertTrue(authors.getText().contains("Refresh to retry"));
+            assertTrue(field(f.workspace, "status", Label.class).getText().startsWith("No updates yet"));
+            f.failAuthors = false; f.workspace.refresh();
+            assertFalse(authors.isVisible());
+            assertTrue(field(f.workspace, "authorsLoaded", Boolean.class));
+        });
+    }
+
     @Test void viewAllNavigatesAndSharedMutationRefreshesRailAndTabWithoutReopening() {
         var current = new java.util.concurrent.atomic.AtomicReference<CaseController>();
         var fixture = new java.util.concurrent.atomic.AtomicReference<Fixture>();
@@ -174,7 +187,7 @@ class CaseUpdatesWorkspaceTest {
     private static CaseUpdateDto update(long id,String text) { return new CaseUpdateDto(id,501,text,AT,AT,31,"Author",VERSION,false); }
     private static final class Fixture {
         AppState state=new AppState(); List<CaseUpdateQuery> queries=new ArrayList<>();
-        CaseUpdatePage page=new CaseUpdatePage(List.of(),null); boolean fail; int creates;
+        CaseUpdatePage page=new CaseUpdatePage(List.of(),null); boolean fail, failAuthors; int creates, authorLoads;
         java.util.function.Consumer<Runnable> dispatch=Runnable::run;
         final CaseServicePort service;
         final CaseUpdatesWorkspaceController workspace;
@@ -182,7 +195,7 @@ class CaseUpdatesWorkspaceTest {
             state.setShaleClientId(41);state.setUserId(31);state.setAdmin(admin);
             service=(CaseServicePort) Proxy.newProxyInstance(CaseServicePort.class.getClassLoader(),new Class<?>[]{CaseServicePort.class},(p,m,a)-> switch(m.getName()) {
                 case "searchCaseUpdates" -> { queries.add((CaseUpdateQuery)a[0]); if(fail)throw new IllegalStateException("test failure"); yield page; }
-                case "listCaseUpdateAuthors" -> List.of(new CaseUpdateAuthorDto(17,"Same Name",null));
+                case "listCaseUpdateAuthors" -> { authorLoads++; if(failAuthors) throw new IllegalStateException("Author load failed"); yield List.of(new CaseUpdateAuthorDto(17,"Same Name",null)); }
                 case "addCaseNote" -> { creates++; yield null; }
                 case "updateCaseNote" -> true;
                 case "getPrimaryCaseLink" -> null;

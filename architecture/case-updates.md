@@ -45,7 +45,8 @@ to UTC before binding, including daylight-saving transitions. Author filtering u
 with unavailable display names. A distinct metadata query supplies the picker without
 loading note contents. Clear resets text, dates, author, lifecycle, sort, and page.
 Loading, successful empty, filtered empty, validation, and recoverable load failure
-states are distinct. Previous/Next controls never append unbounded card history.
+states are distinct. Author-lookup failures remain visible independently of the note
+page and Refresh retries them. Previous/Next controls never append unbounded card history.
 
 ## Paging, permissions, and concurrency
 
