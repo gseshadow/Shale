@@ -25,7 +25,7 @@ class CaseUpdatesPagingJdbcTest {
     void everySortUsesSqlSeekWithTimestampAndIdAndOneLookahead(CaseUpdateQuery.Sort sort) {
         Jdbc jdbc = new Jdbc();
         jdbc.rows = List.of(row(90), row(89), row(88));
-        var query = new CaseUpdateQuery(501, 41, 31, "", sort, null, null, null,
+        var query = new CaseUpdateQuery(501, 41, 31, "", sort, null, null, Set.of(17,18),
                 CaseUpdateQuery.Visibility.ACTIVE, new CaseUpdateQuery.Cursor(AT, 100), 2);
         CaseUpdatePage page = jdbc.adapter().searchCaseUpdates(query);
         assertEquals(List.of(90L, 89L), page.items().stream().map(CaseUpdateDto::getId).toList(), "Mapping must preserve SQL row order");
@@ -34,7 +34,7 @@ class CaseUpdatesPagingJdbcTest {
         String direction = sort == CaseUpdateQuery.Sort.OLDEST ? "ASC" : "DESC";
         assertTrue(jdbc.sql.endsWith(", caseUpdate.Id " + direction), "Tied timestamps require deterministic IDs");
         assertTrue(jdbc.sql.contains(sort == CaseUpdateQuery.Sort.OLDEST ? "caseUpdate.Id > ?" : "caseUpdate.Id < ?"));
-        assertEquals(Map.of(1,3,2,501L,3,41,4,41,5,0,6,Timestamp.valueOf(AT),7,Timestamp.valueOf(AT),8,100L), jdbc.bindings);
+        assertEquals(Map.of(1,3,2,501L,3,41,4,41,5,0,6,17,7,18,8,Timestamp.valueOf(AT),9,Timestamp.valueOf(AT),10,100L), jdbc.bindings);
         assertTrue(jdbc.sql.contains("TOP (?)"));
         assertTrue(jdbc.sql.contains("caseUpdate.CaseId = ? AND caseUpdate.ShaleClientId = ? AND c.ShaleClientId = ?"));
         assertTrue(jdbc.sql.contains("c.ShaleClientId = caseUpdate.ShaleClientId"));
@@ -48,18 +48,18 @@ class CaseUpdatesPagingJdbcTest {
                 Jdbc jdbc = new Jdbc();
                 String text = (mask & 1) != 0 ? " ÉLAN_%[東京 " : "";
                 LocalDate from = (mask & 2) != 0 ? AT.toLocalDate() : null;
-                Integer author = (mask & 4) != 0 ? 17 : null;
+                Set<Integer> authors = (mask & 4) != 0 ? new TreeSet<>(Set.of(17,18)) : Set.of();
                 jdbc.adapter().searchCaseUpdates(new CaseUpdateQuery(501,41,31,text,null,from,
-                        from,author,visibility,null,50));
+                        from,authors,visibility,null,50));
                 List<Object> expected = new ArrayList<>(List.of(51,501L,41,41));
                 if (visibility != CaseUpdateQuery.Visibility.ALL) expected.add(visibility == CaseUpdateQuery.Visibility.ACTIVE ? 0 : 1);
                 if (!text.isBlank()) expected.add("%élan[_][%][[]東京%");
                 if (from != null) { expected.add(Timestamp.valueOf(from.atStartOfDay())); expected.add(Timestamp.valueOf(from.plusDays(1).atStartOfDay())); }
-                if (author != null) expected.add(author);
+                expected.addAll(authors);
                 assertEquals(expected, new ArrayList<>(jdbc.bindings.values()), "Every filter combination must bind exactly its own values");
                 assertEquals(visibility != CaseUpdateQuery.Visibility.ACTIVE, jdbc.adminChecked);
                 assertEquals(from != null, jdbc.sql.contains("caseUpdate.CreatedAt < ?"), "Through date is inclusive using next midnight");
-                assertEquals(author != null, jdbc.sql.contains("caseUpdate.CreatedByUserId = ?"));
+                assertEquals(!authors.isEmpty(), jdbc.sql.contains("caseUpdate.CreatedByUserId IN (?,?)"));
                 assertFalse(jdbc.sql.contains("ÉLAN"), "Search text must never be interpolated into SQL");
             }
         }
@@ -156,6 +156,87 @@ class CaseUpdatesPagingJdbcTest {
         assertFalse(failed.transaction.contains("commit")); assertTrue(failed.transaction.contains("rollback"));
     }
 
+    @Test void deletionAllowsPersistedCreatorOrCurrentTenantAdminAndPreservesContentAndCreation() {
+        for (boolean admin : List.of(false, true)) {
+            Jdbc jdbc = new Jdbc(); jdbc.admin = admin; jdbc.creator = admin ? 17 : 31;
+            assertTrue(jdbc.adapter().deleteCaseUpdate(deleteCommand(VERSION)));
+            assertEquals(List.of("begin", "delete", "touch", "audit", "commit", "reset"), jdbc.transaction);
+            assertEquals(1, jdbc.connections, "Delete, case touch and required audit must share one connection");
+            assertTrue(jdbc.editSql.contains("DeletedAt = SYSDATETIME(), DeletedByUserId = ?"));
+            assertTrue(jdbc.editSql.contains("RowVersion = ? AND (CreatedByUserId = ? OR ? = 1)"));
+            String assigned = jdbc.editSql.substring(0, jdbc.editSql.indexOf(" WHERE"));
+            for (String preserved : List.of("NoteText", "CreatedAt", "CreatedByUserId", "EditedByUserId", "UpdatedAt"))
+                assertFalse(assigned.contains(preserved), "Deletion must preserve original content and edit/creation provenance: " + preserved);
+            assertEquals(31, jdbc.editBindings.get(1));
+            assertEquals(90L, jdbc.editBindings.get(2)); assertEquals(501L, jdbc.editBindings.get(3));
+            assertEquals(41, jdbc.editBindings.get(4)); assertArrayEquals(VERSION, (byte[]) jdbc.editBindings.get(5));
+            assertEquals(31, jdbc.editBindings.get(6)); assertEquals(admin, jdbc.editBindings.get(7));
+            assertEquals(41, jdbc.auditBindings.get(1)); assertEquals(31, jdbc.auditBindings.get(2));
+            assertEquals(3, jdbc.auditBindings.get(3)); assertEquals(90L, jdbc.auditBindings.get(4));
+            assertEquals("CaseUpdates.NoteText", jdbc.auditBindings.get(5));
+            assertEquals("old=old;new=null", jdbc.auditBindings.get(7), "Reuse the existing PHI delete representation");
+        }
+    }
+
+    @Test void unrelatedUserAndMostRecentEditorHaveNoDeleteAuthority() {
+        Jdbc jdbc = new Jdbc(); jdbc.admin = false; jdbc.creator = 17; // persisted editor is 31
+        assertFalse(jdbc.adapter().deleteCaseUpdate(deleteCommand(VERSION)));
+        assertEquals(List.of("begin", "rollback", "reset"), jdbc.transaction);
+        assertNull(jdbc.editSql, "An editor who is not the creator must not mutate or audit the update");
+    }
+
+    @Test void missingDeletedForeignCaseAndStaleDeletesShareUnavailableOutcomeWithoutMutation() {
+        for (String condition : List.of("missing", "deleted", "foreignTenant", "foreignCase", "stale")) {
+            Jdbc jdbc = new Jdbc();
+            switch (condition) {
+                case "missing" -> jdbc.editable = false;
+                case "deleted" -> jdbc.deleted = true;
+                case "foreignTenant" -> jdbc.noteTenant = 42;
+                case "foreignCase" -> jdbc.noteCase = 502;
+            }
+            byte[] version = VERSION.clone(); if (condition.equals("stale")) version[7]++;
+            assertFalse(jdbc.adapter().deleteCaseUpdate(deleteCommand(version)), condition);
+            assertEquals(List.of("begin", "rollback", "reset"), jdbc.transaction, condition);
+        }
+        Jdbc mismatch = new Jdbc(); mismatch.sessionTenant = 42;
+        assertThrows(RuntimeException.class, () -> mismatch.adapter().deleteCaseUpdate(deleteCommand(VERSION)));
+        assertNull(mismatch.editSql);
+        Jdbc noCase = new Jdbc(); noCase.caseExists = false;
+        assertThrows(IllegalArgumentException.class, () -> noCase.adapter().deleteCaseUpdate(deleteCommand(VERSION)));
+        assertNull(noCase.editSql);
+    }
+
+    @Test void alreadyCommittedDeletionCannotBeRepeatedAndRevokedAdminCannotDelete() {
+        Jdbc jdbc = new Jdbc();
+        var adapter = jdbc.adapter();
+        assertTrue(adapter.deleteCaseUpdate(deleteCommand(VERSION)));
+        jdbc.transaction.clear();
+        assertFalse(adapter.deleteCaseUpdate(deleteCommand(VERSION)));
+        assertEquals(List.of("begin", "rollback", "reset"), jdbc.transaction);
+        Jdbc revoked = new Jdbc(); revoked.admin = false;
+        assertFalse(revoked.adapter().deleteCaseUpdate(deleteCommand(VERSION)), "Current database authority overrides a formerly administrative UI session");
+        Jdbc unavailableActor = new Jdbc(); unavailableActor.actorExists = false;
+        assertThrows(IllegalArgumentException.class, () -> unavailableActor.adapter().deleteCaseUpdate(deleteCommand(VERSION)));
+        assertNull(unavailableActor.editSql);
+    }
+
+    @Test void deleteAuditFailureRollsBackAndBlankLegacyRowsCannotSkipRequiredAudit() {
+        Jdbc failed = new Jdbc(); failed.auditFailure = true;
+        assertThrows(RuntimeException.class, () -> failed.adapter().deleteCaseUpdate(deleteCommand(VERSION)));
+        assertEquals(List.of("begin", "delete", "touch", "audit", "rollback", "reset"), failed.transaction);
+        Jdbc blank = new Jdbc(); blank.noteText = " ";
+        assertFalse(blank.adapter().deleteCaseUpdate(deleteCommand(VERSION)));
+        assertEquals(List.of("begin", "rollback", "reset"), blank.transaction);
+    }
+
+    @Test void legacyUnversionedDeleteIsFailClosed() {
+        assertThrows(UnsupportedOperationException.class, () -> new CaseDao(() -> { throw new AssertionError("No connection allowed"); })
+                .softDeleteCaseUpdate(90,501,41,31));
+    }
+    private static CaseServicePort.DeleteCaseUpdateCommand deleteCommand(byte[] version) {
+        return new CaseServicePort.DeleteCaseUpdateCommand(90,501,41,31,version);
+    }
+
     private static Map<Object,Object> row(long id) {
         Map<Object,Object> row = new HashMap<>();
         row.put("Id",id); row.put("CaseId",501L); row.put("NoteText","old"); row.put("CreatedByUserId",17);
@@ -167,6 +248,10 @@ class CaseUpdatesPagingJdbcTest {
         List<Map<Object,Object>> rows = List.of();
         int sessionTenant = 41, connections;
         boolean actorExists = true, caseExists = true, admin = true, adminChecked, editable = true, auditFailure;
+        int creator = 17, noteTenant = 41;
+        long noteCase = 501;
+        boolean deleted;
+        String noteText = "old";
         String sql, editSql;
         Map<Integer,Object> bindings, caseBindings, editBindings, auditBindings;
         List<String> transaction = new ArrayList<>();
@@ -190,7 +275,7 @@ class CaseUpdatesPagingJdbcTest {
                 if (name.startsWith("set")) { values.put((Integer)a[0], name.equals("setNull") ? null : a[1]); return null; }
                 if (name.equals("close")) return null;
                 if (name.equals("executeUpdate")) {
-                    if (source.contains("UPDATE dbo.CaseUpdates")) { transaction.add("edit"); editSql=source; editBindings=values; }
+                    if (source.contains("UPDATE dbo.CaseUpdates")) { transaction.add(source.contains("SET IsDeleted = 1") ? "delete" : "edit"); editSql=source; editBindings=values; if(source.contains("SET IsDeleted = 1")) deleted = true; }
                     else if (source.contains("UPDATE dbo.Cases")) transaction.add("touch");
                     else if (source.contains("INSERT INTO dbo.AuditLog")) {
                         transaction.add("audit"); auditBindings=values;
@@ -207,7 +292,20 @@ class CaseUpdatesPagingJdbcTest {
                     return resultSet(actorExists && (!adminChecked || admin) ? List.of(Map.of(1,1)) : List.of());
                 }
                 if (source.startsWith("SELECT 1 FROM dbo.Cases")) { caseBindings=values; return resultSet(caseExists ? List.of(Map.of(1,1)) : List.of()); }
-                if (source.contains("WITH (UPDLOCK, HOLDLOCK)")) return resultSet(editable ? List.of(row(90)) : List.of());
+                if (source.startsWith("SELECT is_admin FROM dbo.Users")) {
+                    assertEquals(Map.of(1,31,2,41), values, "Current tenant membership must be locked, never taken from the UI");
+                    return resultSet(actorExists ? List.of(Map.of("is_admin", admin)) : List.of());
+                }
+                if (source.contains("WITH (UPDLOCK, HOLDLOCK)")) {
+                    boolean available = editable;
+                    if (source.contains("OR ? = 1")) {
+                        available &= !deleted && Objects.equals(values.get(1),90L) && Objects.equals(values.get(2),noteCase)
+                                && Objects.equals(values.get(3),noteTenant) && Arrays.equals(VERSION,(byte[])values.get(4))
+                                && (Objects.equals(values.get(5),creator) || Boolean.TRUE.equals(values.get(6)));
+                    }
+                    var before = row(90); before.put("NoteText", noteText);
+                    return resultSet(available ? List.of(before) : List.of());
+                }
                 if (source.contains("INSERT INTO dbo.CaseUpdates")) { transaction.add("insert"); return resultSet(List.of(Map.of(1,90L))); }
                 sql=source.replaceAll("\\s+"," ").trim(); bindings=values;
                 return resultSet(rows);

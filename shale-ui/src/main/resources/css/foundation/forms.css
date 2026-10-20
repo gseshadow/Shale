@@ -246,3 +246,32 @@
     -fx-border-width: 1px 0 0 0;
     -fx-background-color: -shale-color-content-plane;
 }
+
+/* Opt-in searchable multi-user selector. Each native checkbox is the complete interactive row. */
+.user-selector .check-box.user-selector-choice-row {
+    -fx-alignment: center-left;
+    -fx-padding: 12px;
+    -fx-label-padding: 0 0 0 8px;
+    -fx-background-color: -shale-control-surface;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-width: 2px;
+    -fx-border-color: -shale-control-border;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-cursor: hand;
+}
+.user-selector .check-box.user-selector-choice-row:hover {
+    -fx-background-color: -shale-control-surface-hover;
+    -fx-border-color: -shale-control-border-hover;
+}
+.user-selector .check-box.user-selector-choice-row:selected {
+    -fx-background-color: -shale-color-selection;
+    -fx-border-color: -shale-color-border-selected;
+}
+.user-selector .check-box.user-selector-choice-row:selected:hover {
+    -fx-background-color: derive(-shale-color-selection, 8%);
+}
+.user-selector .check-box.user-selector-choice-row:focused {
+    -fx-border-color: -shale-control-focus-border;
+    -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 10, 0.2, 0, 0);
+}

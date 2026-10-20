@@ -19,6 +19,27 @@ class CaseUpdateQueryTest {
         assertThrows(IllegalArgumentException.class,()->new CaseUpdateQuery(1,7,31,"",null,LocalDate.of(2026,10,21),LocalDate.of(2026,10,20),null,null,null,50));
         assertThrows(IllegalArgumentException.class,()->new CaseUpdateQuery.Cursor(null,1));
     }
+    @Test void authorsAreImmutableIdSetsAndEmptyMeansAll() {
+        var authors = new java.util.HashSet<>(java.util.Set.of(17,18));
+        var q = new CaseUpdateQuery(1,7,31,"",null,null,null,authors,null,null,50);
+        authors.clear();
+        assertEquals(java.util.Set.of(17,18), q.authorUserIds());
+        assertEquals(q.authorUserIds(), q.inZone(java.time.ZoneId.of("America/Denver")).authorUserIds());
+        assertThrows(UnsupportedOperationException.class, () -> q.authorUserIds().add(19));
+        assertTrue(CaseUpdateQuery.newest(1,7,31,"",50).authorUserIds().isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> new CaseUpdateQuery(1,7,31,"",null,null,null,java.util.Set.of(0),null,null,50));
+        assertThrows(IllegalArgumentException.class, () -> new CaseUpdateQuery(1,7,31,"",null,null,null,new java.util.HashSet<>(java.util.Arrays.asList(17,null)),null,null,50));
+        assertThrows(IllegalArgumentException.class, () -> new CaseUpdateQuery(1,7,31,"",null,null,null,java.util.stream.IntStream.rangeClosed(1,1001).boxed().collect(java.util.stream.Collectors.toSet()),null,null,50));
+    }
+    @Test void deletionRequiresIdentityAndDefensiveVersion() {
+        byte[] version = new byte[8];
+        var command = new CaseServicePort.DeleteCaseUpdateCommand(1,2,7,31,version);
+        version[0] = 1; assertEquals(0,command.expectedRowVersion()[0]);
+        command.expectedRowVersion()[0] = 2; assertEquals(0,command.expectedRowVersion()[0]);
+        assertThrows(IllegalArgumentException.class, () -> new CaseServicePort.DeleteCaseUpdateCommand(1,2,7,31,null));
+        assertThrows(IllegalArgumentException.class, () -> new CaseServicePort.DeleteCaseUpdateCommand(1,2,7,31,new byte[7]));
+        assertThrows(IllegalArgumentException.class, () -> new CaseServicePort.DeleteCaseUpdateCommand(1,2,7,0,new byte[8]));
+    }
     @Test void versionsAreRequiredAndDefensivelyCopiedWhileLegacyBeanShapeIsPreserved() throws Exception {
         byte[] version = {0,0,0,0,0,0,0,1};
         var command = new CaseServicePort.UpdateCaseNoteCommand(1,2,7,31," draft ",version);

@@ -109,3 +109,50 @@ DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx -pl shale-core,sh
 DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx test
 git diff --check
 ```
+
+## Multi-author and delete follow-up acceptance
+
+This follow-up uses the same desktop deployment requirements above: **no new SQL migration or
+API deployment**. Existing `IsDeleted`/`DeletedAt`/`DeletedByUserId`/`RowVersion` and PHI AuditLog
+remain prerequisites. No SQL, API, authentication, permission-retirement or release configuration
+is changed. The obsolete unused unversioned DAO delete now throws; desktop callers must use
+the new versioned command. Deleted records remain administrator-only and read-only.
+
+Manual Windows checklist (non-production case, ordinary author, unrelated editor/user, tenant admin,
+and two desktop instances):
+
+- [ ] Open Change and select two or more authors by clicking different parts of their full-width
+      checkbox rows. Both stay checked; clicking a selected row deselects only that author.
+- [ ] Search so some checked authors are hidden, clear search and verify the full checked set.
+      Apply, reopen Change, verify all applied selections; modify then Cancel/Escape/X and verify
+      no filter/query changes. Check one-name/count/All authors summary, Remove and Clear filters.
+- [ ] On a later page, apply multiple authors and verify page one, OR author semantics, AND search,
+      creation dates, every sort and administrator Active/Deleted/All. Verify Next/Previous and
+      displayed page counts after filtering or removing the last result on a page.
+- [ ] Tab through rows; Space toggles only the focused row without applying the dialog. Check
+      accessible name/checked state with a screen reader, hover/focus distinctions, Light/Dark,
+      scrollable long author lists, small screens and Windows scaling; search/footer stay reachable.
+- [ ] Verify Delete in both workspace and quick rail for the original author and current same-tenant
+      administrator. An unrelated user or editor cannot see Delete or acquire authority through editing.
+      A deleted update has View only. No restoration action is introduced.
+- [ ] Cancel/Delete confirmation: confirm author/time and removal-from-normal-history explanation.
+      Cancel, Escape and X make no changes; Enter must not default to destructive confirmation.
+- [ ] Confirm deletion; verify authoritative removal from active history and counts, unchanged filters,
+      page-one reset, and sidebar/workspace synchronization. Reopen the Case and inspect admin deleted
+      history: content, author/creation/edit metadata remain; deletion user/time and PHI audit are present.
+- [ ] Edit/delete the same update from another instance before confirming; stale deletion must fail
+      without overwriting. Repeated deletion, missing records and crafted tenant/case/user requests
+      must not expose another tenant's content. Revoke an administrator's role before deleting and
+      verify the DAO uses current membership.
+- [ ] Interrupt persistence/audit in disposable test infrastructure: failure leaves the update active,
+      no optimistic removal; refresh/retry recovers. Successful deletion emits only the existing
+      tenant/case invalidation; second instance/reconnect reloads with current filters retained.
+
+The automated follow-up inventory maps `CaseUpdateQuery` to its immutable-set/version tests;
+CaseDao/service/gateway to `CaseUpdatesPagingJdbcTest` (including existing binding combinations);
+shared picker changes to the existing `UserSelectionFieldTest`/`UserSelectorSourceContractTest` plus
+`UserSelectorMultipleSelectionTest`; workspace, paging and staging to `CaseUpdatesWorkspaceTest`;
+shared card visibility, real confirmation/cancel, persistence and rail/tab refresh to
+`CaseUpdateDeletionTest`. Narrative/editor, Case navigation, adapter and semantic CSS consumers
+remain focused/selector regressions. Native Windows, screen-reader, deployed SQL/RLS and physical
+PubSub delivery remain manual checks; JDBC doubles do not execute SQL Server.

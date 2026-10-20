@@ -714,3 +714,16 @@ Audit compatibility for this relocation: opening these existing definition windo
 selection adds no new sensitive access or mutation. Case assignment saves and definition mutations
 continue through their existing service/DAO and audit seams; the UI does not construct audit records.
 No audit schema, database migration, API, or server change is introduced.
+
+### Multi-author user selection
+
+Case Updates opts into the shared UserSelector multi-selection capability. Full-width native
+CheckBox rows replace nested pill/card buttons only in this mode; the checkbox and name form
+one interactive target with native Space and accessible checked state. Shared form surfaces,
+selected border, hover and focus tokens own Light/Dark paint in foundation/forms.css. Search
+remains above the scrollable list and Apply/Cancel remain in the dialog footer. The compact
+UserSelectionField uses a name/count/unfiltered summary and stages modal results atomically.
+Single-user selectors retain their existing DTO/card rendering and selection behavior.
+
+Audit compatibility: picker staging, searching and cancellation mutate no domain data and
+add no audit records; Case Updates retains its section PHI read audit and DAO write audit.

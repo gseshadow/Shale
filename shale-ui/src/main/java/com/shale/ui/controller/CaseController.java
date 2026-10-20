@@ -7168,6 +7168,14 @@ public class CaseController {
 			rightActions.getChildren().add(editButton);
 		}
 
+        if (canDeleteCaseUpdate(dto)) {
+            Button delete = ActionButtonFactory.semantic("Delete", null, ControlStyles.Purpose.DANGER, ControlStyles.Size.SMALL);
+            delete.setAccessibleText("Delete Case Update");
+            delete.setDisable(caseUpdateSubmissionInFlight.get());
+            delete.setOnAction(event -> confirmDeleteCaseUpdate(dto, delete));
+            rightActions.getChildren().add(delete);
+        }
+
 		Label avatar = new Label(authorInitials(dto));
 		avatar.getStyleClass().addAll("shale-avatar", "shale-avatar-compact");
 		avatar.setAccessibleText(safeAuthorName(dto) + " avatar");
@@ -7232,6 +7240,69 @@ public class CaseController {
                 return CompletableFuture.completedFuture("This case or session has changed. Reopen the editor.");
             return persistCaseUpdate(dto, value);
         });
+    }
+
+    private boolean canDeleteCaseUpdate(CaseUpdateDto dto) {
+        return dto != null && !dto.deleted() && dto.rowVersion() != null && dto.rowVersion().length == 8
+                && appState != null && appState.getUserId() != null && appState.getShaleClientId() != null
+                && caseId != null && dto.getCaseId() == caseId.longValue()
+                && (appState.isAdmin() || Objects.equals(appState.getUserId(), dto.getCreatedByUserId()));
+    }
+
+    private void confirmDeleteCaseUpdate(CaseUpdateDto dto, Button owner) {
+        if (!canDeleteCaseUpdate(dto) || caseUpdateSubmissionInFlight.get()) return;
+        final long revision = appState.sessionRevision();
+        boolean confirmed = AppDialogs.showDestructiveConfirmation(dialogOwner(owner), "Delete Case Update",
+                "Delete this Case Update?", "The update by " + safeAuthorName(dto) + ", created "
+                        + formatDateTime(dto.getCreatedAt()) + ", will be removed from normal case history."
+                        + " Administrators can still view the deleted record.", "Delete Update");
+        if (!confirmed || appState.sessionRevision() != revision || !canDeleteCaseUpdate(dto)) return;
+        owner.setDisable(true);
+        persistCaseUpdateDeletion(dto).thenAccept(message -> {
+            owner.setDisable(false);
+            if (message != null && caseId != null && caseId.longValue() == dto.getCaseId()
+                    && appState.sessionRevision() == revision)
+                AppDialogs.showError(dialogOwner(owner), "Delete Case Update", message);
+        });
+    }
+
+    private CompletableFuture<String> persistCaseUpdateDeletion(CaseUpdateDto dto) {
+        if (caseService == null || !canDeleteCaseUpdate(dto))
+            return CompletableFuture.completedFuture("This update is unavailable for deletion.");
+        if (!caseUpdateSubmissionInFlight.compareAndSet(false, true))
+            return CompletableFuture.completedFuture("Another update is being saved. Please wait.");
+        final long activeCaseId = dto.getCaseId();
+        final int tenant = appState.getShaleClientId(), actor = appState.getUserId();
+        final long revision = appState.sessionRevision();
+        CompletableFuture<String> completion = new CompletableFuture<>();
+        caseUpdateExecutor.execute(() -> {
+            boolean saved = false;
+            String result = null;
+            try {
+                if (appState.sessionRevision() != revision) throw new IllegalStateException("Session changed");
+                saved = caseService.deleteCaseUpdate(new CaseServicePort.DeleteCaseUpdateCommand(
+                        dto.getId(), activeCaseId, tenant, actor, dto.rowVersion()));
+                if (!saved) result = "This update changed, was deleted, or is no longer available for deletion. Refresh and try again.";
+            } catch (RuntimeException ex) {
+                LOG.error("Case Update deletion failed caseId={} updateId={}", activeCaseId, dto.getId());
+                result = "The update could not be deleted. Refresh and try again.";
+            }
+            final boolean committed = saved;
+            final String message = result;
+            runOnFx(() -> {
+                caseUpdateSubmissionInFlight.set(false);
+                if (caseId == null || caseId.longValue() != activeCaseId || appState.sessionRevision() != revision) {
+                    completion.complete(committed ? null : "This case or session has changed."); return;
+                }
+                if (committed) {
+                    publishCaseUpdateAdded(activeCaseId);
+                    onCaseUpdatesChanged();
+                    refreshLastUpdatedLabelAsync();
+                }
+                completion.complete(message);
+            });
+        });
+        return completion;
     }
 
     private void viewCaseUpdate(CaseUpdateDto dto) {

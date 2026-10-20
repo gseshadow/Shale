@@ -36,8 +36,8 @@ class CaseUpdatesWorkspaceTest {
             combo(f.workspace,"sort").setValue(CaseUpdateQuery.Sort.EDITED);
             combo(f.workspace,"visibility").setValue(CaseUpdateQuery.Visibility.DELETED);
             @SuppressWarnings("unchecked") UserSelectionField<CaseUpdateAuthorDto> authors = field(f.workspace,"author",UserSelectionField.class);
-            authors.setSelectedUser(new CaseUpdateAuthorDto(17,"Same Name",null));
-            assertEquals("records",f.last().text()); assertEquals(17,f.last().authorUserId());
+            authors.setSelectedUsers(List.of(new CaseUpdateAuthorDto(17,"Same Name",null), new CaseUpdateAuthorDto(18,"Other",null)));
+            assertEquals("records",f.last().text()); assertEquals(Set.of(17,18),f.last().authorUserIds());
             assertEquals(LocalDate.of(2026,10,1),f.last().from()); assertEquals(LocalDate.of(2026,10,20),f.last().through());
             assertEquals(CaseUpdateQuery.Sort.EDITED,f.last().sort());
             assertEquals(CaseUpdateQuery.Visibility.DELETED,f.last().visibility());
@@ -64,6 +64,73 @@ class CaseUpdatesWorkspaceTest {
                     "Ordinary users must not receive a deleted-record selector");
             assertEquals(CaseUpdateQuery.Visibility.ACTIVE,f.last().visibility());
         });
+    }
+
+    @Test void authorPickerStagesEverySelectionAcrossSearchReopenApplyAndCancel() {
+        JavaFxTestSupport.runAndWait(() -> {
+            Fixture f = new Fixture(false); f.workspace.activate();
+            @SuppressWarnings("unchecked") UserSelectionField<CaseUpdateAuthorDto> authors = field(f.workspace,"author",UserSelectionField.class);
+            authors.setCandidates(List.of(new CaseUpdateAuthorDto(17,"Alpha",null), new CaseUpdateAuthorDto(18,"Beta",null)));
+            int initial = f.queries.size();
+            choosePicker(() -> {
+                checkbox(17).fire(); checkbox(18).fire();
+                assertTrue(checkbox(17).isSelected()); assertTrue(checkbox(18).isSelected());
+                pickerSearch().setText("Beta");
+                assertTrue(checkbox(18).isSelected());
+                pickerSearch().clear(); assertTrue(checkbox(17).isSelected(), "Searching must retain hidden selections");
+                assertEquals(initial, f.queries.size(), "Draft selections cannot run applied queries");
+                dialogButton("Apply").fire();
+            });
+            fieldButton(authors,"Change").fire();
+            assertEquals(Set.of(17,18),f.last().authorUserIds());
+            assertTrue(authors.getChildren().stream().anyMatch(n -> n instanceof Label l && l.getText().equals("2 authors")));
+            authors.setCandidates(List.of(new CaseUpdateAuthorDto(18,"Beta",null)));
+            choosePicker(() -> {
+                assertTrue(checkbox(17).isSelected()); assertTrue(checkbox(18).isSelected(), "Reopen must restore all applied authors");
+                checkbox(17).fire(); assertTrue(checkbox(18).isSelected());
+                dialogButton("Cancel").fire();
+            });
+            fieldButton(authors,"Change").fire();
+            assertEquals(Set.of(17,18),f.last().authorUserIds(), "Cancel must discard the complete draft");
+            choosePicker(() -> { checkbox(17).fire(); dialogButton("Apply").fire(); });
+            fieldButton(authors,"Change").fire();
+            assertEquals(Set.of(18), f.last().authorUserIds());
+            assertTrue(authors.getChildren().stream().anyMatch(n -> n instanceof Label l && l.getText().equals("Beta")));
+            fieldButton(authors,"Remove").fire(); assertTrue(f.last().authorUserIds().isEmpty());
+        });
+    }
+
+    @Test void appliedAuthorSetRestartsPaginationAndRefreshPreservesCombinedFilters() {
+        JavaFxTestSupport.runAndWait(() -> {
+            Fixture f = new Fixture(true); f.page = new CaseUpdatePage(List.of(update(90,"match")),new CaseUpdateQuery.Cursor(AT,90));
+            f.workspace.activate(); field(f.workspace,"next",Button.class).fire(); assertNotNull(f.last().after());
+            @SuppressWarnings("unchecked") UserSelectionField<CaseUpdateAuthorDto> authors = field(f.workspace,"author",UserSelectionField.class);
+            authors.setSelectedUsers(List.of(new CaseUpdateAuthorDto(17,"Alpha",null),new CaseUpdateAuthorDto(18,"Beta",null)));
+            assertNull(f.last().after()); assertEquals(Set.of(17,18), f.last().authorUserIds());
+            field(f.workspace,"search",TextField.class).setText("match");
+            field(f.workspace,"from",DatePicker.class).setValue(LocalDate.of(2026,10,1));
+            combo(f.workspace,"sort").setValue(CaseUpdateQuery.Sort.EDITED);
+            var before = f.last(); f.workspace.dataChanged();
+            assertEquals(before, f.last(), "Live/deletion refresh keeps applied filters and restarts the bounded page");
+        });
+    }
+
+    private static void choosePicker(Runnable action) { javafx.application.Platform.runLater(action); }
+    private static javafx.scene.Parent pickerRoot() {
+        return javafx.stage.Window.getWindows().stream().filter(javafx.stage.Window::isShowing).map(javafx.stage.Window::getScene)
+                .filter(Objects::nonNull).map(javafx.scene.Scene::getRoot).filter(r -> r.lookup(".user-selector") != null).findFirst().orElseThrow();
+    }
+    private static CheckBox checkbox(int id) {
+        return pickerRoot().lookupAll(".user-selector-choice-row").stream().map(CheckBox.class::cast)
+                .filter(c -> Objects.equals(id,c.getUserData())).findFirst().orElseThrow();
+    }
+    private static TextField pickerSearch() { return (TextField)pickerRoot().lookup(".user-selector .text-field"); }
+    private static Button dialogButton(String label) {
+        return pickerRoot().lookupAll(".button").stream().filter(Button.class::isInstance).map(Button.class::cast)
+                .filter(b -> label.equals(b.getText())).findFirst().orElseThrow();
+    }
+    private static Button fieldButton(UserSelectionField<?> field, String text) {
+        return field.getChildren().stream().filter(Button.class::isInstance).map(Button.class::cast).filter(b -> b.getText().equals(text)).findFirst().orElseThrow();
     }
 
     @Test void newerRequestsNavigationAndIdentityChangesRejectLateResults() {

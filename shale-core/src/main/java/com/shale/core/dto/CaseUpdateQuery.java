@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 /** Bounded, case-specific CaseUpdates read contract; all filters execute in SQL. */
 public record CaseUpdateQuery(long caseId, int shaleClientId, int actorUserId, String text,
-        Sort sort, LocalDate from, LocalDate through, Integer authorUserId,
+        Sort sort, LocalDate from, LocalDate through, java.util.Set<Integer> authorUserIds,
         Visibility visibility, Cursor after, int pageSize, java.time.ZoneId dateZone) {
     public enum Sort {
         NEWEST("Newest first"), OLDEST("Oldest first"), EDITED("Recently edited");
@@ -25,13 +25,13 @@ public record CaseUpdateQuery(long caseId, int shaleClientId, int actorUserId, S
         }
     }
     public CaseUpdateQuery(long caseId, int shaleClientId, int actorUserId, String text,
-            Sort sort, LocalDate from, LocalDate through, Integer authorUserId,
+            Sort sort, LocalDate from, LocalDate through, java.util.Set<Integer> authorUserIds,
             Visibility visibility, Cursor after, int pageSize) {
-        this(caseId, shaleClientId, actorUserId, text, sort, from, through, authorUserId, visibility, after, pageSize, java.time.ZoneOffset.UTC);
+        this(caseId, shaleClientId, actorUserId, text, sort, from, through, authorUserIds, visibility, after, pageSize, java.time.ZoneOffset.UTC);
     }
     public CaseUpdateQuery inZone(java.time.ZoneId zone) {
         return new CaseUpdateQuery(caseId, shaleClientId, actorUserId, text, sort, from, through,
-                authorUserId, visibility, after, pageSize, zone);
+                authorUserIds, visibility, after, pageSize, zone);
     }
     public LocalDateTime fromUtc() { return from == null ? null : utcMidnight(from); }
     public LocalDateTime throughExclusiveUtc() { return through == null ? null : utcMidnight(through.plusDays(1)); }
@@ -50,7 +50,13 @@ public record CaseUpdateQuery(long caseId, int shaleClientId, int actorUserId, S
             throw new IllegalArgumentException("From date must be on or before through date.");
         if (through != null && through.equals(LocalDate.MAX))
             throw new IllegalArgumentException("Through date is outside the supported range.");
-        if (authorUserId != null && authorUserId <= 0) throw new IllegalArgumentException("Author identity must be positive.");
+        if (authorUserIds != null && authorUserIds.stream().anyMatch(id -> id == null || id <= 0))
+            throw new IllegalArgumentException("Author identities must be positive.");
+        // Stay below SQL Server's 2100-parameter limit, including every combined filter and seek cursor.
+        authorUserIds = authorUserIds == null ? java.util.Set.of() :
+                java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(authorUserIds));
+        if (authorUserIds.size() > 1000)
+            throw new IllegalArgumentException("Select at most 1000 positive author identities.");
         if (pageSize < 1 || pageSize > 100) throw new IllegalArgumentException("Page size must be between 1 and 100.");
     }
     public static CaseUpdateQuery newest(long caseId, int tenant, int actor, String text, int size) {

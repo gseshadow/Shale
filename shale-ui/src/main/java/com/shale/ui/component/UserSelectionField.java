@@ -36,6 +36,31 @@ public class UserSelectionField<T> extends HBox {
     private final Function<T, String> colorExtractor;
     private final BiFunction<UserSelectionField<T>, List<T>, Optional<T>> picker;
     private final boolean clearable;
+    private BiFunction<UserSelectionField<T>, List<T>, Optional<List<T>>> multiplePicker;
+    private String selectionNoun = "users";
+    private final ObjectProperty<List<T>> selectedUsers = new SimpleObjectProperty<>(List.of());
+
+    /** Staged modal results replace the complete selection in one property change; empty means unfiltered. */
+    public UserSelectionField<T> useMultipleSelection(
+            BiFunction<UserSelectionField<T>, List<T>, Optional<List<T>>> picker, String pluralNoun) {
+        selectionNoun = Objects.requireNonNull(pluralNoun);
+        multiplePicker = Objects.requireNonNull(picker);
+        addButton.setText("Change");
+        addButton.setAccessibleText("Choose users");
+        changeButton.setAccessibleText("Change selected users");
+        removeButton.setAccessibleText("Remove selected users");
+        render();
+        return this;
+    }
+    public ObjectProperty<List<T>> selectedUsersProperty() { return selectedUsers; }
+    public List<T> getSelectedUsers() { return selectedUsers.get(); }
+    public void setSelectedUsers(Collection<T> users) {
+        var byId = new java.util.LinkedHashMap<Integer, T>();
+        if (users != null) for (T user : users) {
+            if (user != null && userId(user) != null && userId(user) > 0) byId.put(userId(user), user);
+        }
+        selectedUsers.set(List.copyOf(byId.values()));
+    }
     private final ObservableList<T> candidates = FXCollections.observableArrayList();
     private final ObjectProperty<T> selectedUser = new SimpleObjectProperty<>();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
@@ -87,7 +112,7 @@ public class UserSelectionField<T> extends HBox {
 
     public void setSelectedUser(T user) { selectedUser.set(user); }
 
-    public void clearSelection() { selectedUser.set(null); }
+    public void clearSelection() { selectedUser.set(null); selectedUsers.set(List.of()); }
 
     public BooleanProperty loadingProperty() { return loading; }
 
@@ -122,6 +147,7 @@ public class UserSelectionField<T> extends HBox {
     }
 
     private void wireState() {
+        selectedUsers.addListener((obs, oldValue, newValue) -> render());
         selectedUser.addListener((obs, oldValue, newValue) -> render());
         loading.addListener((obs, oldValue, newValue) -> render());
         disabledProperty().addListener((obs, oldValue, newValue) -> render());
@@ -133,6 +159,16 @@ public class UserSelectionField<T> extends HBox {
         addButton.setDisable(unavailable);
         changeButton.setDisable(unavailable);
         removeButton.setDisable(unavailable);
+        if (multiplePicker != null) {
+            List<T> chosen = getSelectedUsers();
+            var summary = new javafx.scene.control.Label(chosen.isEmpty() ? "All " + selectionNoun :
+                    chosen.size() == 1 ? safe(displayName(chosen.getFirst())) : chosen.size() + " " + selectionNoun);
+            summary.getStyleClass().add("shale-field-value");
+            summary.setWrapText(true);
+            getChildren().setAll(summary, chosen.isEmpty() ? addButton : changeButton);
+            if (clearable && !chosen.isEmpty()) getChildren().add(removeButton);
+            return;
+        }
         T selected = getSelectedUser();
         if (selected == null) {
             getChildren().setAll(addButton);
@@ -154,7 +190,14 @@ public class UserSelectionField<T> extends HBox {
 
     private void openPicker() {
         if (isDisabled() || isLoading()) return;
-        picker.apply(this, List.copyOf(candidates)).ifPresent(this::setSelectedUser);
+        if (multiplePicker != null) {
+            // Applied identities remain available for deselection if candidate metadata changes during refresh.
+            var options = new java.util.LinkedHashMap<Integer, T>();
+            for (T user : candidates) options.put(userId(user), user);
+            for (T user : getSelectedUsers()) options.putIfAbsent(userId(user), user);
+            multiplePicker.apply(this, List.copyOf(options.values())).ifPresent(this::setSelectedUsers);
+        }
+        else picker.apply(this, List.copyOf(candidates)).ifPresent(this::setSelectedUser);
     }
 
     private Integer userId(T user) { return user == null ? null : userIdExtractor.apply(user); }

@@ -87,6 +87,20 @@ public interface CaseServicePort {
     default boolean updateCaseNote(UpdateCaseNoteCommand command) {
         throw new UnsupportedOperationException("Versioned Case Update editing is unavailable in this adapter.");
     }
+    default boolean deleteCaseUpdate(DeleteCaseUpdateCommand command) {
+        throw new UnsupportedOperationException("Versioned Case Update deletion is unavailable in this adapter.");
+    }
+    record DeleteCaseUpdateCommand(long id, long caseId, int shaleClientId, int actorUserId,
+            byte[] expectedRowVersion) {
+        public DeleteCaseUpdateCommand {
+            if (id <= 0 || caseId <= 0 || shaleClientId <= 0 || actorUserId <= 0)
+                throw new IllegalArgumentException("Update, Case, tenant and actor are required.");
+            if (expectedRowVersion == null || expectedRowVersion.length != 8)
+                throw new IllegalArgumentException("Reload the update before deleting.");
+            expectedRowVersion = expectedRowVersion.clone();
+        }
+        @Override public byte[] expectedRowVersion() { return expectedRowVersion.clone(); }
+    }
     record UpdateCaseNoteCommand(long id, long caseId, int shaleClientId, int actorUserId,
             String text, byte[] expectedRowVersion) {
         public UpdateCaseNoteCommand {

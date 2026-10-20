@@ -12,8 +12,9 @@ Before this change, `CaseController` loaded the entire active history and applie
 local search. `CaseDao.addCaseNote` created notes, touched `Cases.UpdatedAt`, and used
 PHI auditing. `updateCaseNote` restricted writes by creator, case, tenant, and active
 state, but its legacy overload did not consume the existing `RowVersion` column.
-Soft deletion records `IsDeleted`, `DeletedAt`, and `DeletedByUserId`; this feature
-adds no delete/restore action and leaves those existing semantics unchanged.
+Soft deletion records `IsDeleted`, `DeletedAt`, and `DeletedByUserId`. The follow-up
+adds creator/tenant-admin deletion through the same versioned service/DAO boundary;
+restoration remains unavailable.
 
 `CaseServicePort` -> `CaseServiceAdapter` -> production `DaoCaseGateway` -> `CaseDao`
 is the read/write boundary for both desktop entry points. New port/gateway defaults
@@ -33,7 +34,8 @@ quick composer, Submit, and Edit. **View All Updates** selects the current case'
 `CaseUpdatesWorkspaceController` composes shared content/section surfaces, form
 controls, semantic actions, `UserSelectionField`/`UserSelector`, wrapping filter rows,
 and the existing update cards. Cards show author, creation/edit time, a syntax-free
-preview, full View, and creator-only Edit. Deleted records are labelled and read-only.
+preview, full View, creator-only Edit, and creator/tenant-admin Delete. Deleted records
+are labelled and read-only, with neither Edit nor Delete.
 Shared semantic paint supplies Light/Dark appearance; no feature-specific colors,
 gradients, or duplicate card factory are introduced.
 
@@ -43,7 +45,19 @@ Dates filter **creation** time, with an inclusive through date expressed as next
 midnight. The query carries the desktop display zone; local day boundaries are converted
 to UTC before binding, including daylight-saving transitions. Author filtering uses immutable user identity, including historical authors
 with unavailable display names. A distinct metadata query supplies the picker without
-loading note contents. Clear resets text, dates, author, lifecycle, sort, and page.
+loading note contents. The immutable author-ID set uses SQL `IN` (OR semantics),
+combined with AND for text, creation dates, lifecycle and keyset paging. Empty means all
+authors. At most 1000 identities keep combined queries below SQL Server's parameter limit.
+Clear resets text, dates, authors, lifecycle, sort, and page.
+
+`UserSelector.useMultipleSelection` is an opt-in shared capability: native, full-width
+checkbox rows own the entire click/Space target and expose checked accessibility state.
+They use shared Light/Dark form, selected-border, hover and focus tokens, with a scrollable
+list beneath search. Existing single-user card callers retain their behavior. The compact
+`UserSelectionField` presents All authors, a single name, or an author count. Its modal
+copies all applied DTO identities, including temporarily missing candidates, before
+editing; search never edits the selected set. Apply replaces the full set once, Cancel
+discards it, and Remove clears it. Applied filter changes reset paging; draft changes do not.
 Loading, successful empty, filtered empty, validation, and recoverable load failure
 states are distinct. Author-lookup failures remain visible independently of the note
 page and Refresh retries them. Previous/Next controls never append unbounded card history.
@@ -63,7 +77,7 @@ and author joins qualify tenant. RLS/session initialization remain authoritative
 Active history is available to existing case readers. Deleted/all history is a new,
 conservative administrative read: it reuses the existing active `Users.is_admin`
 check at the DAO boundary and is absent from ordinary-user controls. It grants no
-mutation capability. Authors known only from deleted notes are likewise admin-only.
+restoration capability. Authors known only from deleted notes are likewise admin-only.
 No authentication, role-retirement, or permission-catalog redesign is included.
 
 Both editing entry points use `UpdateCaseNoteCommand` with a defensive copy of the
@@ -102,6 +116,25 @@ the existing style of two-worker daemon executor; FX callbacks check case/sessio
 request generations. A stale page, case switch, detached view, or changed identity
 cannot apply an old response. Remote invalidations do not repaint open editor drafts.
 
+Deletion uses the shared card in both workspace and rail. A cancel-default destructive
+confirmation identifies author/creation time and explains removal from normal case history.
+There is no optimistic removal. Only a committed delete triggers the existing
+`caseUpdateAdded` invalidation, author reload, parent timestamp refresh, and rail/workspace
+reload. Applied search/filters survive; keyset navigation restarts at page one and bounded
+page counts/Next derive from the authoritative results. Failures retain displayed content
+and offer explicit refresh/retry; errors never contain record data or SQL.
+
+`DeleteCaseUpdateCommand` requires a defensively copied 8-byte RowVersion. The DAO validates
+session tenant, active same-tenant actor and accessible Case, then locks current user membership
+and the qualifying update. Its compare-and-swap requires Id/CaseId/tenant, active state, version,
+and persisted CreatedByUserId or current Users.is_admin. EditedByUserId grants no authority.
+Missing, foreign, denied, stale, and already-deleted matches return the same unavailable outcome;
+no lookup of another tenant's record occurs. The update sets only deletion lifecycle fields,
+preserving content, creator, creation and edit provenance. Blank legacy/system rows are unavailable
+to this narrative delete path so a required content audit cannot silently be skipped.
+The unused unversioned `softDeleteCaseUpdate` seam now fails closed with instructions to reload
+and use the versioned command. It has no production callers.
+
 Successful mutations publish the existing PHI-free `caseUpdateAdded` invalidation
 through `UiRuntimeBridge`, then invalidate/reload local rail/workspace state and
 author metadata. Existing tenant/case filtering and subscription lifecycle handle
@@ -117,14 +150,17 @@ and short-window deduplication behavior. Searching, paging, choosing filters, pr
 rendering, and live invalidation add no per-row audit events: they stay within the
 same audited section intent. Existing Case Overview read auditing covers the rail.
 
-Create/edit use the existing registered PHI field `CaseUpdates.NoteText`, object type
+Create/edit/delete use the existing registered PHI field `CaseUpdates.NoteText`, object type
 3, actor and update identity. Their audit append now uses the same connection as the
 business mutation before commit and fails closed; audit failure rolls back the note
 and parent timestamp. The established PHI audit format remains authoritative. No
 note text, search term, author label, RowVersion, or exception is added to live
 messages, entity-action metadata, or user-visible error copy. Conflicts/cancel produce
 no successful mutation audit. This uses the existing audit schema; no entity-action
-Case Update type or ad-hoc timeline event is invented. Legacy soft-delete audit
-modernization is outside this task because no delete mutation is introduced.
+Case Update type or ad-hoc timeline event is invented. Delete reuses the existing PHI DELETE representation (old content to null), tenant/actor/update
+identity and object type 3 on the same connection before commit; the Case relationship remains
+on the preserved update. Audit failure rolls back deletion and parent timestamp. No new
+entity-action type or schema is needed. Confirmation, cancellation and selector staging are
+local UI interactions and intentionally add no audit rows.
 
 See [desktop acceptance and deployment](../docs/testing/case-updates-workspace.md).
