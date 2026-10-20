@@ -1,0 +1,57 @@
+{
+  "version": "1.0.137",
+  "title": "What's New in Shale 1.0.137",
+  "releaseDate": "2026-10-20",
+  "summary": "Draft generated from commit messages since Shale 1.0.136. Review and edit before publishing.",
+  "groups": {
+    "New": [
+      "Add dedicated paged Case Updates workspace and shared protected editor",
+      "Implement Web V2 Phase 2A shared responsive foundation"
+    ],
+    "Improvements": [
+      "Share mini-card picking for Case Status and normalize editor contrast",
+      "Move Overview definition management actions into field editors",
+      "Normalize whitespace in unavailable browser evidence",
+      "Protect Organization Detail drafts with shared Contact guard",
+      "Share selected theme across authenticated route presentation",
+      "Verify theme ownership across routes, editors and native controls",
+      "Refresh provider-neutral AI architecture against current Case REST services",
+      "Document Case-read RLS gap and compatible remediation prerequisites",
+      "Keep auth cutover blocked pending verified legacy login authority",
+      "Align update date filters with local display days and DST",
+      "Keep author lookup errors visible and retryable independently",
+      "Refresh neighboring Case View contracts for existing component ownership",
+      "Record Case Updates verification and desktop acceptance limits",
+      "Support multi-author Case Updates filters and authorized soft deletion",
+      "Record Case Updates verification and Windows acceptance requirements",
+      "Refine Case Update card actions and author mini-card selection",
+      "Document refinement verification results and desktop acceptance"
+    ],
+    "Fixes": [
+      "Share Practice Area mini-card selection and fix dialog theme contrast",
+      "fix(web): patch vulnerable router and CSS tooling dependencies",
+      "fix(web): safely restore requested detail after verified login",
+      "fix(web): retain uncertain startup sessions with explicit verification Retry",
+      "fix(web): report bounded remote logout outcomes truthfully",
+      "fix(web): bound startup session verification and explicit Retry",
+      "fix(web): coordinate established-session rejection by generation",
+      "fix: delegate legacy case search pages to exact SQL paging",
+      "Fix minimized Case bindings and classify internal read failures",
+      "fix(web): exclude API and static resources from SPA fallback",
+      "Fix Windows Maven invocation in local verification launchers",
+      "Fix invocation harness connection builder for Windows PowerShell 5.1",
+      "Fix ODBC SQLCMD argument serialization and reject unsupported clients",
+      "Fix local retirement rehearsal canonical batch boundaries",
+      "Record complete real ODBC batch-fix rehearsal and verification limits",
+      "fix: quote every ODBC SQLCMD variable and retain refusal diagnostics",
+      "docs: record ODBC regression checks and Windows verification still needed",
+      "fix(dev): isolate relay trust from prior SQL TLS initialization",
+      "fix(dev): materialize manifest arrays on Windows PowerShell 5.1",
+      "Fix Windows selector socket placement and add verified startup overlay",
+      "Fix UTC JDBC persistence for remembered and durable sessions",
+      "Correct existing local recovery authority without changing retirement guards",
+      "Fix retirement transport leaking async completion results",
+      "Fix Windows synthetic compiler path and preserve offline failure diagnostics"
+    ]
+  }
+}
