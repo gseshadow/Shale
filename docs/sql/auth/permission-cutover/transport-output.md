@@ -29,7 +29,11 @@ This needs no SQL credentials, Docker, Java, application launch or network conne
 It compiles one local synthetic console executable with PowerShell's existing
 `Add-Type`; that child writes fake Unicode result files and large stdout/stderr streams,
 but never connects to SQL. Its fake executable and result files use a fresh synthetic
-temporary directory, then it removes that exact directory. No operator packet or
+temporary directory. Successful runs remove that exact directory; failures retain
+the directory and compiler diagnostics. Compilation uses a plain directory name
+because Windows PowerShell Add-Type resolves brackets as wildcard syntax. The
+synthetic packet still contains literal brackets, preserving transport and consumer
+path coverage. No operator packet or
 retained SQL resource is touched.
 Windows Core is not a substitute for this native Desktop check.
 
@@ -90,6 +94,13 @@ task-local proxy/trust settings outside the repository after initial network set
 failures; only the final successful runs above are counted. No database rehearsal,
 Azure operation or existing-state update was performed by this implementation task.
 
-**Native Windows PowerShell 5.1 execution of the new real-child regression remains
+A native Windows run identified a test setup defect before the child transport ran:
+`Add-Type -OutputAssembly` treated brackets in the temporary directory as wildcards.
+The test now compiles outside bracket paths, retains brackets in the synthetic packet
+path, and retains compiler output and the exact synthetic directory on failure.
+Core reruns pass; injecting the original transport still fails and retains evidence.
+This changes the regression harness, not the shipping runner or any SQL.
+
+**Native Windows PowerShell 5.1 execution of the corrected real-child regression remains
 unverified.** Keep this correction unapproved for another production attempt until
 that offline result is reviewed; no passing app or SQL rehearsal is repeated here.

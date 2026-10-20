@@ -6,8 +6,9 @@ if (-not $RunnerPath) { $RunnerPath=Join-Path $PSScriptRoot '../../docs/sql/auth
 . $RunnerPath
 Write-Host 'OFFLINE SYNTHETIC PROCESS TEST: no SQL connection; all phase/commit text below is fake-child output.'
 $script:realTransport=${function:Invoke-PacketSql}
-$testRoot=Join-Path ([IO.Path]::GetTempPath()) ('retirement [streams] '+[guid]::NewGuid().ToString('N'))
+$testRoot=Join-Path ([IO.Path]::GetTempPath()) ('retirement-streams '+[guid]::NewGuid().ToString('N'))
 $null=New-Item -ItemType Directory -Path $testRoot
+$testPassed=$false
 $savedIni=[Environment]::GetEnvironmentVariable('SQLCMDINI','Process')
 try {
     $isWindowsHost=$env:OS -eq 'Windows_NT'
@@ -41,8 +42,18 @@ public static class SyntheticSqlcmd {
         Write-NewText $sourcePath $source
         $compiler=Join-Path $testRoot 'compile.ps1'
         Write-NewText $compiler 'param($Source,$Output) $ErrorActionPreference="Stop"; Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -OutputAssembly $Output -OutputType ConsoleApplication'
-        $null=& (Get-Process -Id $PID).Path -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File $compiler -Source $sourcePath -Output $fake
-        if ($LASTEXITCODE -ne 0) { throw 'Synthetic Windows executable compilation failed' }
+        $savedPreference=$ErrorActionPreference
+        try {
+            $ErrorActionPreference='Continue'
+            $compilerOutput=@(& (Get-Process -Id $PID).Path -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File $compiler -Source $sourcePath -Output $fake 2>&1)
+            $compilerExit=$LASTEXITCODE
+        } finally { $ErrorActionPreference=$savedPreference }
+        $compilerLog=Join-Path $testRoot 'compiler.txt'
+        [IO.File]::WriteAllLines($compilerLog,[string[]]@($compilerOutput | ForEach-Object { $_.ToString() }))
+        if ($compilerExit -ne 0 -or -not (Test-Path -LiteralPath $fake -PathType Leaf)) {
+            foreach ($line in $compilerOutput) { Write-Host $line.ToString() }
+            throw "Synthetic Windows executable compilation failed: exit=$compilerExit; retained $compilerLog"
+        }
     } else {
         $fake=Join-Path $testRoot 'synthetic-sqlcmd'
         $body=@'
@@ -92,7 +103,7 @@ sys.stderr.write('E' * 131072)
         if ($Prompt -like '*Observed safe*') { return 'PASSED' }
         return 'SYNTHETIC-TEST-RECORD'
     }
-    $PacketPath=Join-Path $testRoot 'synthetic packet'
+    $PacketPath=Join-Path $testRoot 'synthetic [packet]'
     $null=New-Item -ItemType Directory -Path (Join-Path $PacketPath 'source') -Force
     $before='0x'+('A'*64); $after='0x'+('C'*64)
     $script:syntheticPacket=[pscustomobject]@{BeforeHash=$before; Server='sql.invalid'; Database='Shale'; User='syntheticoperator'}
@@ -127,9 +138,11 @@ sys.stderr.write('E' * 131072)
     $Phase='Verify'; Invoke-Retirement
     if (@(Get-ChildItem -LiteralPath $PacketPath -Filter 'verify-*.checks.json').Count -ne 2) { throw 'Restored-state verification did not complete' }
     if ($env:SQLCMDINI -ne 'MUST_NOT_REACH_CHILD' -or (Test-Path Env:SQLCMDPASSWORD)) { throw 'Process transport changed parent credential environment' }
+    $testPassed=$true
     Write-Output ('PASS real child Apply/Verify/Rollback/Verify path-only results and complete stream capture on '+$PSVersionTable.PSEdition+' '+$PSVersionTable.PSVersion)
 } finally {
     [Environment]::SetEnvironmentVariable('SQLCMDINI',$savedIni,'Process')
     # Exact newly-created synthetic test directory only; no SQL or operator state.
-    Remove-Item -LiteralPath $testRoot -Recurse -Force
+    if ($testPassed) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
+    else { Write-Host ('FAILED offline test evidence retained: '+$testRoot) }
 }
