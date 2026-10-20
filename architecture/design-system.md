@@ -717,13 +717,22 @@ No audit schema, database migration, API, or server change is introduced.
 
 ### Multi-author user selection
 
-Case Updates opts into the shared UserSelector multi-selection capability. Full-width native
-CheckBox rows replace nested pill/card buttons only in this mode; the checkbox and name form
-one interactive target with native Space and accessible checked state. Shared form surfaces,
-selected border, hover and focus tokens own Light/Dark paint in foundation/forms.css. Search
-remains above the scrollable list and Apply/Cancel remain in the dialog footer. The compact
-UserSelectionField uses a name/count/unfiltered summary and stages modal results atomically.
-Single-user selectors retain their existing DTO/card rendering and selection behavior.
+Case Updates opts into the shared UserSelector multi-selection capability. Each full-width native
+CheckBox owns its complete click/Space target and accessible checked state. Its graphic reuses
+`UserCardFactory.Variant.MINI` with `UserCard.usePickerPresentation()`: a wrapping full name and the
+shared Unicode initials avatar using the authoritative user color and readable foreground utility.
+The mini card is display-only and does not introduce a second focus target or profile navigation.
+Shared form surfaces, selected border/background, hover and focus tokens own Light/Dark paint in
+foundation/forms.css; assigned user color appears only in the avatar, independent of selection.
+Search remains above the scrollable list and Apply/Cancel remain in the resizable dialog footer.
+The compact UserSelectionField uses a name/count/unfiltered summary and stages modal results
+atomically. Single-user selectors retain their existing DTO/card rendering and selection behavior.
 
+Case Update cards share one builder in the rail and workspace. Author and metadata use the full
+content width, with wrapping names. A wrapping footer below the preview contains one Primary/Small
+Edit action for authorized authors or View otherwise; Delete remains a separate Danger/Small action
+for the original author or tenant administrator. Administrator status alone never grants Edit.
+The existing read-only viewer, rich-text editor, destructive confirmation, and server permissions
+remain authoritative.
 Audit compatibility: picker staging, searching and cancellation mutate no domain data and
 add no audit records; Case Updates retains its section PHI read audit and DAO write audit.

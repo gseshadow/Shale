@@ -36,7 +36,80 @@ class CaseUpdateDeletionTest {
                 assertEquals(!deleted && (admin || creator == 31), actions.stream().anyMatch(b -> b.getText().equals("Delete")),
                         "Both rail and workspace use this shared card authorization");
                 actions.stream().filter(b -> b.getText().equals("Delete")).forEach(b -> assertTrue(b.getStyleClass().contains("shale-control-danger")));
+                String primary = !deleted && creator == 31 ? "Edit" : "View";
+                assertEquals(List.of(primary), actions.stream().filter(b -> !b.getText().equals("Delete")).map(Button::getText).toList(),
+                        "Offer exactly one Edit/View action; administrators cannot edit another author's update");
+                var footer = ((VBox)card).getChildren().getLast();
+                assertTrue(footer instanceof javafx.scene.layout.FlowPane, "Footer actions must wrap in narrow sidebars");
+                assertTrue(footer.getStyleClass().contains("shale-update-card-actions"));
+                for (Button action : actions) assertSame(footer, action.getParent(), "Every action must be below update content");
+                assertTrue(actions.getFirst().getStyleClass().contains("shale-control-primary"));
+                Label author = (Label)descendants(card).stream().filter(n -> n.getStyleClass().contains("shale-update-author")).findFirst().orElseThrow();
+                assertTrue(author.isWrapText(), "Long author names must wrap instead of competing with actions");
+                assertEquals(0, author.getMinWidth(), "Names must accept the available sidebar width");
+                assertEquals(0, ((VBox)card).getMinWidth());
             }
+        });
+    }
+
+    @Test void readOnlyPrimaryActionOpensTheCompleteSyntaxFreeUpdate() {
+        JavaFxTestSupport.runAndWait(() -> {
+            Fixture f = new Fixture();
+            String text = "**Complete update**\n" + "Full content beyond the card preview. ".repeat(50);
+            var dto = new CaseUpdateDto(90,501,text,LocalDateTime.of(2026,10,20,12,0),null,17,"Author",VERSION,false);
+            Node card = (Node)invoke(f.controller,"createCaseUpdateCardInternal",new Class<?>[]{CaseUpdateDto.class},dto);
+            Button view = descendants(card).stream().filter(Button.class::isInstance).map(Button.class::cast)
+                    .filter(b -> b.getText().equals("View")).findFirst().orElseThrow();
+            Platform.runLater(() -> {
+                Parent root = Window.getWindows().stream().filter(Window::isShowing).map(Window::getScene)
+                        .filter(Objects::nonNull).map(javafx.scene.Scene::getRoot)
+                        .filter(r -> descendants(r).stream().anyMatch(TextArea.class::isInstance)).findFirst().orElseThrow();
+                TextArea content = descendants(root).stream().filter(TextArea.class::isInstance).map(TextArea.class::cast).findFirst().orElseThrow();
+                assertFalse(content.isEditable(), "Read-only authors must never receive the edit surface");
+                assertEquals(com.shale.ui.component.richtext.NarrativeMarkdownCodec.plainText(text), content.getText(),
+                        "View must preserve the entire update, including content beyond the preview");
+                descendants(root).stream().filter(Button.class::isInstance).map(Button.class::cast)
+                        .filter(b -> b.getText().equals("Close")).findFirst().orElseThrow().fire();
+            });
+            view.fire();
+        });
+    }
+
+    @Test void narrowCardsRetainWrappingContentAndSharedThemePresentation() {
+        JavaFxTestSupport.runAndWait(() -> {
+            Fixture f = new Fixture(); f.state.setAdmin(true);
+            VBox rows = new VBox(8);
+            for (int creator : List.of(31,17)) {
+                var dto = new CaseUpdateDto(90,501,"Called the client to confirm the records request.\nFollow up with the provider next week.",
+                        LocalDateTime.of(2026,10,20,12,0),LocalDateTime.of(2026,10,20,13,15),creator,
+                        "Alexandra Catherine Morgan-Rivera",VERSION,false);
+                rows.getChildren().add((Node)invoke(f.controller,"createCaseUpdateCardInternal",new Class<?>[]{CaseUpdateDto.class},dto));
+            }
+            rows.setPadding(new javafx.geometry.Insets(12));
+            var scroll = new ScrollPane(rows); scroll.setFitToWidth(true);
+            scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+            scroll.getStyleClass().add("transparent-scroll");
+            var root = new javafx.scene.layout.StackPane(scroll);
+            root.getStyleClass().add("shale-content-plane");
+            var scene = new javafx.scene.Scene(root,336,640);
+            var themes = new com.shale.ui.theme.ThemeManager(); themes.register(scene);
+            try {
+                for (var theme : com.shale.ui.theme.Theme.values()) {
+                    themes.setActiveTheme(theme); root.applyCss(); root.layout();
+                    for (Node card : rows.getChildren()) {
+                        assertNotNull(((VBox)card).getBackground(), "Card surfaces must resolve in " + theme);
+                        assertTrue(((VBox)card).isFillWidth(), "Content must receive the full narrow sidebar width");
+                    }
+                    String preview = System.getProperty("shale.preview.dir");
+                    if (preview != null) {
+                        var snap = root.snapshot(null,null);
+                        var png = new java.awt.image.BufferedImage((int)snap.getWidth(),(int)snap.getHeight(),java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        for(int y=0;y<png.getHeight();y++) for(int x=0;x<png.getWidth();x++) png.setRGB(x,y,snap.getPixelReader().getArgb(x,y));
+                        java.nio.file.Files.createDirectories(java.nio.file.Path.of(preview));
+                        javax.imageio.ImageIO.write(png,"png",java.nio.file.Path.of(preview,"case-updates-narrow-"+theme+".png").toFile());
+                    }
+                }
+            } finally { themes.unregister(scene); }
         });
     }
 

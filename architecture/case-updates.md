@@ -34,7 +34,8 @@ quick composer, Submit, and Edit. **View All Updates** selects the current case'
 `CaseUpdatesWorkspaceController` composes shared content/section surfaces, form
 controls, semantic actions, `UserSelectionField`/`UserSelector`, wrapping filter rows,
 and the existing update cards. Cards show author, creation/edit time, a syntax-free
-preview, full View, creator-only Edit, and creator/tenant-admin Delete. Deleted records
+preview, one bottom-row primary action (creator-only Edit, otherwise View), and separate
+creator/tenant-admin Delete. Names wrap and actions flow below the preview in either surface. Deleted records
 are labelled and read-only, with neither Edit nor Delete.
 Shared semantic paint supplies Light/Dark appearance; no feature-specific colors,
 gradients, or duplicate card factory are introduced.
@@ -52,8 +53,11 @@ Clear resets text, dates, authors, lifecycle, sort, and page.
 
 `UserSelector.useMultipleSelection` is an opt-in shared capability: native, full-width
 checkbox rows own the entire click/Space target and expose checked accessibility state.
-They use shared Light/Dark form, selected-border, hover and focus tokens, with a scrollable
-list beneath search. Existing single-user card callers retain their behavior. The compact
+Each row displays a shared MINI UserCard using its opt-in picker presentation: wrapping name,
+existing Unicode initials, authoritative assigned color, and shared readable foreground.
+The graphic is display-only; selection border/background, hover and keyboard focus remain
+independent of user color through shared Light/Dark tokens. The resizable picker targets
+560 × 480 with a scrollable list beneath search and Apply/Cancel outside the scroll region. Existing single-user card callers retain their behavior. The compact
 `UserSelectionField` presents All authors, a single name, or an author count. Its modal
 copies all applied DTO identities, including temporarily missing candidates, before
 editing; search never edits the selected set. Apply replaces the full set once, Cancel

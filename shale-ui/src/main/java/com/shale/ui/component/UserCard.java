@@ -171,6 +171,31 @@ public class UserCard extends HBox {
         getChildren().add(nameLabel);
     }
 
+    /** Display-only MINI presentation inside a native selection control. */
+    public void usePickerPresentation() {
+        applyMini();
+        getStyleClass().add("user-card-picker");
+        setMinWidth(0);
+        setMaxWidth(Double.MAX_VALUE);
+        nameLabel.setMinWidth(0);
+        nameLabel.setMaxWidth(Double.MAX_VALUE);
+        nameLabel.setWrapText(true);
+        nameLabel.setStyle("");
+        HBox.setHgrow(nameLabel, Priority.ALWAYS);
+        buildAvatar(14);
+        avatarHolder.setMinWidth(Region.USE_PREF_SIZE);
+        avatarCircle.setStyle(backgroundCss == null ? "" : "-fx-fill: " + backgroundCss + ";");
+        initialsLabel.setText(initialsFromName(nameLabel.getText()));
+        initialsLabel.setStyle(backgroundCss == null ? ""
+                : "-fx-text-fill: " + ColorUtil.readableTextColor(backgroundCss) + ";");
+        avatarHolder.getChildren().setAll(avatarCircle, initialsLabel);
+        getChildren().setAll(avatarHolder, nameLabel);
+        setMouseTransparent(true);
+        setFocusTraversable(false);
+        setAccessibleRole(AccessibleRole.NODE);
+        refreshSurfaceStyle();
+    }
+
     public void applyCompact() {
         getChildren().clear();
 
@@ -242,7 +267,8 @@ public class UserCard extends HBox {
     }
 
     private void refreshSurfaceStyle() {
-        setStyle(getStyleClass().contains("user-card-team-accented") ? teamAccentStyle
+        setStyle(getStyleClass().contains("user-card-picker") ? ""
+                : getStyleClass().contains("user-card-team-accented") ? teamAccentStyle
                 : CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
     }
 }

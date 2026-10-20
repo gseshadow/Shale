@@ -183,3 +183,78 @@ XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -Djavafx.cachedir=/wo
 XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx test
 git diff 3273f808aab688912c8983d9313f01c7a56303e7 HEAD --check
 ```
+
+## Card actions and user mini-card refinement
+
+The rail and workspace still use `CaseController.createCaseUpdateCardInternal`. Its
+footer now wraps below the preview, with one labelled Primary/Small Edit (creator)
+or View (read-only) action and separate Danger/Small Delete (creator or tenant admin).
+An admin viewing another author's update receives View and Delete, never Edit.
+Author names wrap without sharing width with actions; metadata and content retain
+the full card width. Read-only View retains the complete syntax-free content beyond
+the preview limit, and Edit retains the shared rich-text save/conflict lifecycle.
+
+Multi-author selection keeps native checkbox activation/accessibility and renders
+`UserCardFactory` MINI graphics using `UserCard.usePickerPresentation()`. Only this
+opt-in presentation adds wrapping names and the existing Unicode initials avatar.
+The authoritative user color drives the avatar, with the shared readable foreground
+and themed missing/invalid-color fallback. Selection, hover and focus remain owned
+by existing form tokens independently of user color. Single-selection callers keep
+their prior presentation. The author dialog targets 560 × 480 and remains resizable;
+search/footer stay outside its scrolling list.
+
+Pre-edit inventory and changed-file mapping:
+
+| Production area | Reviewed/affected tests |
+| --- | --- |
+| Shared update cards, labels and footer | CaseUpdateDeletionTest, CaseUpdatesNarrativeEditorTest, CaseOverviewPhase6SupportingComponentsTest, CaseUpdatesWorkspaceTest |
+| Shared multi-user rendering and opt-in UserCard | UserSelectorMultipleSelectionTest, UserSelectorSourceContractTest, UserSelectionFieldTest, TeamCardPresentationTest, TaskDetailUserSelectorMigrationTest |
+| Picker sizing and staged modal lifecycle | CaseUpdatesWorkspaceTest (real Apply/Cancel/reopen/search and filtering) |
+| Unchanged editor, DAO/service and synchronization boundaries | CaseUpdateEditorTest, CaseUpdateQueryTest, CaseUpdatesPagingJdbcTest, CaseDaoCaseUpdatesQueryTest, CaseServiceAdapterTest |
+
+Updated the obsolete pencil-button expectation and the neighboring Task Detail
+migration test's stale error-message expectation to match its existing sanitized copy.
+An exploratory run of the historical `Phase1BStyleVocabularyContractTest` exposed two
+pre-existing failures in unchanged resources: it mistakes BEM `--` selectors for
+browser variables and requires hex-only colors despite existing opaque rgba tokens.
+Those tests/resources are unchanged; they are outside the selected feature/critical
+suites. No geometry or contrast expectation was weakened to accommodate this task.
+
+Audit compatibility: this is presentation-only. Existing section PHI reads and
+transactional PHI create/edit/delete audits remain authoritative and use the existing
+schema. Picker search/selection/Cancel and moving buttons add no sensitive read or
+domain mutation and intentionally add no audit rows. There is no new SQL schema,
+API endpoint, permission rule, deployment step, or release/installer publication.
+
+### Preview evidence
+
+These are synthetic JavaFX captures using production components and fictional names.
+Before uses the fetched base `b26c047603dfc13c6c4891cf0e4433de1429b342`; narrow cards
+use the same 336px fixture on both revisions. Picker after-fixtures include supplied
+user colors to demonstrate rendering. These do not replace native desktop acceptance.
+
+| Surface | Before | After |
+| --- | --- | --- |
+| Narrow rail, Light | [Before](case-updates-ui-refinement/before/case-updates-narrow-LIGHT.png) | [After](case-updates-ui-refinement/after/case-updates-narrow-LIGHT.png) |
+| Narrow rail, Dark | [Before](case-updates-ui-refinement/before/case-updates-narrow-DARK.png) | [After](case-updates-ui-refinement/after/case-updates-narrow-DARK.png) |
+| Author picker, Light | [Before](case-updates-ui-refinement/before/author-picker-LIGHT.png) | [After](case-updates-ui-refinement/after/author-picker-LIGHT.png) |
+| Author picker, Dark | [Before](case-updates-ui-refinement/before/author-picker-DARK.png) | [After](case-updates-ui-refinement/after/author-picker-DARK.png) |
+| Workspace, Light | [Before](case-updates-ui-refinement/before/case-updates-LIGHT.png) | [After](case-updates-ui-refinement/after/case-updates-LIGHT.png) |
+| Workspace, Dark | [Before](case-updates-ui-refinement/before/case-updates-DARK.png) | [After](case-updates-ui-refinement/after/case-updates-DARK.png) |
+
+### Additional manual desktop acceptance
+
+- [ ] At narrow and wide rail widths, long author names and created/edited metadata
+      remain readable; all actions appear below content and wrap when necessary.
+- [ ] Verify author Edit/Delete, unrelated user View only, and tenant admin View/Delete
+      on another author's update. Deleted records offer View only. Confirm full viewing,
+      rich-text editing, delete confirmation/cancellation and authoritative denials.
+- [ ] Click the avatar, name, blank space and checkbox on multiple author mini cards;
+      each toggles exactly once. Check assigned colors, Unicode initials and long names.
+- [ ] Tab through the picker and toggle with Space; check checked-state announcements,
+      distinct hover/selection/focus, and visible focus in both themes. Search, Apply,
+      reopen and Cancel/Escape/X must preserve the full previous selection as appropriate.
+- [ ] Resize the picker: names wrap and the list scrolls while search and Apply/Cancel
+      remain reachable. Check small screens, desktop scaling and screen-reader output.
+- [ ] Repeat multi-author filtering with pagination and delete a filtered result;
+      verify first-page reconciliation, retained filters and synchronized rail/workspace.
