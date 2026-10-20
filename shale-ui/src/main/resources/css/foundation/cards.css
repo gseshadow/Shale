@@ -621,3 +621,22 @@
 .dialog-pane.secondary-window-shell .mini-card-selector-card:hover .practice-area-card {
     -fx-background-color: -shale-color-card-hover-surface;
 }
+
+/* Display-only shared MINI user card inside a native multi-selection row. */
+.user-card-picker {
+    -fx-alignment: center-left;
+}
+.user-card-picker .user-card-name {
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+.user-card-picker .user-card-avatar-circle {
+    -fx-fill: -shale-color-content-plane;
+    -fx-stroke: -shale-color-divider;
+}
+.user-card-picker .user-card-avatar-initials {
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}

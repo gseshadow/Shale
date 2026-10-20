@@ -7147,54 +7147,61 @@ public class CaseController {
 	private Node createCaseUpdateCardInternal(CaseUpdateDto dto) {
 		Label authorLabel = new Label(safeAuthorName(dto));
 		authorLabel.getStyleClass().add("shale-update-author");
-		authorLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+		authorLabel.setWrapText(true);
+        authorLabel.setMinWidth(0);
 		authorLabel.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(authorLabel, javafx.scene.layout.Priority.ALWAYS);
 
-		VBox bodyBox;
-		HBox rightActions = new HBox();
-		rightActions.setAlignment(Pos.CENTER_RIGHT);
-        Button view = ActionButtonFactory.semantic("View", event -> viewCaseUpdate(dto),
-                ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
-        rightActions.getChildren().add(view);
-		if (canEditCaseUpdate(dto)) {
-			Button editButton = ActionButtonFactory.semantic("✎", null,
-					ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
-			editButton.getStyleClass().add("shale-update-edit-action");
-			editButton.setAccessibleText("Edit update");
-			editButton.setTooltip(new Tooltip("Edit update"));
-			editButton.setDisable(caseUpdateSubmissionInFlight.get());
-			editButton.setOnAction(e -> startEditingCaseUpdate(dto, editButton));
-			rightActions.getChildren().add(editButton);
-		}
-
+        FlowPane actions = new FlowPane(8, 8);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.getStyleClass().add("shale-update-card-actions");
+        if (canEditCaseUpdate(dto)) {
+            Button editButton = ActionButtonFactory.semantic("Edit", null,
+                    ControlStyles.Purpose.PRIMARY, ControlStyles.Size.SMALL);
+            editButton.setAccessibleText("Edit update");
+            editButton.setTooltip(new Tooltip("Edit update"));
+            editButton.setDisable(caseUpdateSubmissionInFlight.get());
+            editButton.setOnAction(event -> startEditingCaseUpdate(dto, editButton));
+            actions.getChildren().add(editButton);
+        } else {
+            Button view = ActionButtonFactory.semantic("View", event -> viewCaseUpdate(dto),
+                    ControlStyles.Purpose.PRIMARY, ControlStyles.Size.SMALL);
+            view.setAccessibleText("View update");
+            actions.getChildren().add(view);
+        }
         if (canDeleteCaseUpdate(dto)) {
             Button delete = ActionButtonFactory.semantic("Delete", null, ControlStyles.Purpose.DANGER, ControlStyles.Size.SMALL);
             delete.setAccessibleText("Delete Case Update");
             delete.setDisable(caseUpdateSubmissionInFlight.get());
             delete.setOnAction(event -> confirmDeleteCaseUpdate(dto, delete));
-            rightActions.getChildren().add(delete);
+            actions.getChildren().add(delete);
         }
 
 		Label avatar = new Label(authorInitials(dto));
 		avatar.getStyleClass().addAll("shale-avatar", "shale-avatar-compact");
 		avatar.setAccessibleText(safeAuthorName(dto) + " avatar");
-		HBox topRow = new HBox(8, avatar, authorLabel, rightActions);
+		HBox topRow = new HBox(8, avatar, authorLabel);
 		topRow.setAlignment(Pos.CENTER_LEFT);
 		topRow.getStyleClass().add("shale-update-card-header");
 
 		Label metadataLabel = new Label(buildCaseUpdateMetadata(dto));
 		metadataLabel.setWrapText(true);
+        metadataLabel.setMinWidth(0);
+        metadataLabel.setMaxWidth(Double.MAX_VALUE);
 		metadataLabel.getStyleClass().add("shale-update-timestamp");
 
 		String preview = NarrativeMarkdownCodec.plainText(safeText(dto.getNoteText()));
         Label noteLabel = new Label(preview.length() > 1000 ? preview.substring(0, 1000) + "…" : preview);
 		noteLabel.setWrapText(true);
+        noteLabel.setMinWidth(0);
 		noteLabel.setMaxWidth(Double.MAX_VALUE);
 		noteLabel.getStyleClass().add("shale-update-body");
-		bodyBox = new VBox(noteLabel);
+		VBox bodyBox = new VBox(noteLabel);
+        bodyBox.setMinWidth(0);
 
-		VBox card = new VBox(topRow, metadataLabel, bodyBox);
+		VBox card = new VBox(topRow, metadataLabel, bodyBox, actions);
+        card.setMinWidth(0);
+        card.setMaxWidth(Double.MAX_VALUE);
 		card.getStyleClass().add("shale-update-card");
 		return card;
 	}

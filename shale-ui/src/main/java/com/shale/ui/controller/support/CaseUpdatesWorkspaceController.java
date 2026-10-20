@@ -95,6 +95,7 @@ public final class CaseUpdatesWorkspaceController {
             AppDialogs.applySecondaryDialogShell(picker, "Filter by authors");
             picker.setResizable(true);
             picker.getDialogPane().setContent(selector);
+            picker.getDialogPane().setPrefSize(560, 480);
             picker.getDialogPane().getButtonTypes().addAll(ButtonType.APPLY, ButtonType.CANCEL);
             ControlStyles.apply((Button) picker.getDialogPane().lookupButton(ButtonType.APPLY), ControlStyles.Purpose.PRIMARY);
             ControlStyles.apply((Button) picker.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);

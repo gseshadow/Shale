@@ -13,7 +13,9 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class UserSelectorMultipleSelectionTest {
-    private record User(int id, String name) {}
+    private record User(int id, String name, String color) {
+        User(int id, String name) { this(id, name, null); }
+    }
     @Test void nativeRowsToggleIndependentlyExposeCheckedStateAndKeepSelectionWhenSearching() {
         JavaFxTestSupport.runAndWait(() -> {
             var selector = selector();
@@ -41,8 +43,8 @@ class UserSelectorMultipleSelectionTest {
     }
     @Test void bothThemesResolveSelectedRowPaintAndFocusWithoutNestedInteractiveControls() {
         JavaFxTestSupport.runAndWait(() -> {
-            var selector = selector(); var a = new User(17,"Alex Morgan");
-            selector.setCandidates(List.of(a,new User(18,"Jordan Lee"),new User(19,"Sam Rivera")));
+            var selector = selector(); var a = new User(17,"Alex Morgan", "#125A84");
+            selector.setCandidates(List.of(a,new User(18,"Jordan Lee", "#FFFF00"),new User(19,"Sam Rivera with a longer full name")));
             selector.setSelectedUsers(List.of(a));
             StackPane root = new StackPane(selector); root.setStyle("-fx-padding: 16px;");
             Scene scene = new Scene(root,520,400); ThemeManager manager = new ThemeManager(); manager.register(scene);
@@ -51,6 +53,19 @@ class UserSelectorMultipleSelectionTest {
                     manager.setActiveTheme(theme); root.applyCss(); root.layout();
                     CheckBox row = selector.lookupAll(".user-selector-choice-row").stream().map(CheckBox.class::cast).filter(CheckBox::isSelected).findFirst().orElseThrow();
                     assertNotNull(row.getBackground()); assertNotNull(row.getBorder()); assertTrue(row.isFocusTraversable());
+                    assertEquals(javafx.scene.AccessibleRole.CHECK_BOX, row.getAccessibleRole());
+                    assertInstanceOf(UserCard.class, row.getGraphic());
+                    UserCard card = (UserCard)row.getGraphic();
+                    assertTrue(card.isMouseTransparent(), "All card clicks must reach the native checkbox");
+                    assertFalse(card.isFocusTraversable(), "A card must not create a second keyboard target");
+                    assertEquals("AM", ((javafx.scene.control.Label)card.lookup("#user-card-avatar-initials")).getText());
+                    var avatar = (javafx.scene.shape.Circle)card.lookup(".user-card-avatar-circle");
+                    assertEquals(javafx.scene.paint.Color.web(a.color()), avatar.getFill(), "Use the supplied authoritative user color in either theme");
+                    var name = (javafx.scene.control.Label)card.lookup("#user-card-name-label");
+                    assertEquals(a.name(), name.getText()); assertTrue(name.isWrapText());
+                    assertNotEquals(row.getBackground(), selector.lookupAll(".user-selector-choice-row").stream()
+                            .map(CheckBox.class::cast).filter(c -> !c.isSelected()).findFirst().orElseThrow().getBackground(),
+                            "Selection paint must differ independently of the assigned color");
                     assertTrue(row.lookupAll(".button").isEmpty(),"Rows must not contain nested action buttons");
                     String preview = System.getProperty("shale.preview.dir");
                     if (preview != null) {
@@ -63,8 +78,26 @@ class UserSelectorMultipleSelectionTest {
             } finally { manager.unregister(scene); }
         });
     }
+    @Test void sharedMiniCardsKeepUnicodeInitialsInvalidColorFallbackAndProgrammaticSelection() {
+        JavaFxTestSupport.runAndWait(() -> {
+            var selector = selector();
+            var a = new User(17,"élise 李", "invalid"); var b = new User(18,"Other", "#FFFF00");
+            selector.setCandidates(List.of(a,b)); selector.setSelectedUsers(List.of(a,b));
+            new Scene(new StackPane(selector), 520, 400).getRoot().applyCss();
+            var rows = selector.lookupAll(".user-selector-choice-row").stream().map(CheckBox.class::cast).toList();
+            assertTrue(rows.stream().allMatch(CheckBox::isSelected), "Applied selections must restore every checked state");
+            var card = (UserCard)rows.stream().filter(r -> r.getUserData().equals(17)).findFirst().orElseThrow().getGraphic();
+            assertEquals("É李", ((javafx.scene.control.Label)card.lookup("#user-card-avatar-initials")).getText());
+            assertEquals("", card.lookup(".user-card-avatar-circle").getStyle(), "Invalid stored color must use themed neutral fallback");
+            selector.setSelectedUsers(List.of(b));
+            assertFalse(rows.stream().filter(r -> r.getUserData().equals(17)).findFirst().orElseThrow().isSelected());
+            selector.setDisable(true);
+            assertTrue(selector.lookupAll(".user-selector-choice-row").stream().allMatch(javafx.scene.Node::isDisabled));
+        });
+    }
+
     private static UserSelector<User> selector() {
-        var selector = new UserSelector<User>(User::id,User::name,ignored -> null);
+        var selector = new UserSelector<User>(User::id,User::name,User::color);
         selector.useSemanticFormControl(); selector.useMultipleSelection(); return selector;
     }
 }

@@ -115,10 +115,11 @@ final class CaseUpdatesNarrativeEditorTest {
                         && card.contains("shale-update-timestamp")
                         && card.contains("shale-update-body"),
                 "Update cards should compose the shared Phase 1B presentation contract");
-        assertTrue(card.contains("ControlStyles.Purpose.GHOST")
-                        && card.contains("shale-update-edit-action")
+        assertTrue(card.contains("ControlStyles.Purpose.PRIMARY")
+                        && card.contains("shale-update-card-actions")
                         && card.contains("setAccessibleText(\"Edit update\")"),
-                "Creator Edit should use the accessible canonical compact icon action");
+                "The shared card should expose a labelled primary action below the content");
+        assertFalse(card.contains("✎"), "Cards must not expose a duplicate pencil action");
         assertTrue("Important\n• Call client".equals(
                         NarrativeMarkdownCodec.plainText("**Important**\n- Call client")),
                 "Supported formatting should render without exposing Markdown syntax");

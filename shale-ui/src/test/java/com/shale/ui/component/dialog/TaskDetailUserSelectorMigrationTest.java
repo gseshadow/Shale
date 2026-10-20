@@ -19,7 +19,7 @@ final class TaskDetailUserSelectorMigrationTest {
                 "Task Detail should continue loading candidates through its supplied service boundary.");
         assertTrue(taskDetail.contains("assignmentEditor.addAndReload(user.id())"),
                 "Selecting an eligible user should continue invoking the existing assignment workflow by stable ID.");
-        assertTrue(taskDetail.contains("Failed to add assigned user."),
+        assertTrue(taskDetail.contains("Assigned user could not be added. Please try again."),
                 "Task Detail should keep its established assignment error path.");
         assertTrue(picker.contains("new UserSelector<>("),
                 "The Add Assignee picker should be backed by the shared UserSelector component.");

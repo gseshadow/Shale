@@ -30,7 +30,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 /**
- * Reusable single-selection control for choosing a Shale user supplied by the caller.
+ * Reusable single- or multi-selection control for choosing a Shale user supplied by the caller.
  *
  * @param <T> caller-owned user DTO type
  */
@@ -189,10 +189,16 @@ public class UserSelector<T> extends VBox {
         }
         for (T user : filtered) {
             if (multipleSelection) {
-                // One native CheckBox owns the entire row, including its text and selected accessibility state.
+                // The native checkbox owns activation and checked state; its shared mini card is display-only.
                 javafx.scene.control.CheckBox row = new javafx.scene.control.CheckBox(safe(displayName(user)));
                 row.getStyleClass().add("user-selector-choice-row");
                 row.setMaxWidth(Double.MAX_VALUE);
+                row.setMinWidth(0);
+                var card = cardFactory.create(new UserCardModel(userId(user), safe(displayName(user)), color(user), null),
+                        UserCardFactory.Variant.MINI);
+                card.usePickerPresentation();
+                row.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
+                row.setGraphic(card);
                 row.setAccessibleText(safe(displayName(user)));
                 row.setUserData(userId(user));
                 row.setSelected(getSelectedUsers().stream().anyMatch(selected -> Objects.equals(userId(selected), userId(user))));
