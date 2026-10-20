@@ -186,7 +186,11 @@ function Invoke-PacketSql([string]$Root, [string]$Server, [string]$Database, [st
             if ($Deadline -and [datetime]::UtcNow -ge $Deadline) { $expired=$true; $process.Kill(); break }
             if (($ticks++ % 15) -eq 0 -and $Deadline) { Write-Host "UTC $([datetime]::UtcNow.ToString('o')); STOP/APPLY cutoff $($Deadline.ToString('o'))" }
         }
-        $process.WaitForExit(); $outTask.GetAwaiter().GetResult(); $errTask.GetAwaiter().GetResult()
+        $process.WaitForExit()
+        # CopyToAsync may surface VoidTaskResult through PowerShell's success
+        # pipeline. Await both drains, but return only the log path below.
+        $null = $outTask.GetAwaiter().GetResult()
+        $null = $errTask.GetAwaiter().GetResult()
         $outStream.Flush($true); $errStream.Flush($true)
         if (Test-Path -LiteralPath ($Log+'.sqlcmd.txt')) {
             $durable = [IO.File]::Open($Log+'.sqlcmd.txt',[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite)

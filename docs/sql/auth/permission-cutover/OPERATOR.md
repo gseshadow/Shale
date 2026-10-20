@@ -1,5 +1,12 @@
 # Brian's controlled retirement packet
 
+## Process-output correction
+
+Before using a newly reviewed runner, read [transport-output.md](transport-output.md).
+It covers the single-log-path return fix and one real-child offline Windows regression.
+It does not authorize editing or replaying an existing attempted packet, transferring
+its decisions, or rerunning completed application/rehearsal checks.
+
 ## Remaining acceptance — use this continuation first
 
 For the missing synthetic application sandbox, use the
