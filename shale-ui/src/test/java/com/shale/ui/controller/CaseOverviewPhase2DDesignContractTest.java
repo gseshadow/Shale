@@ -48,7 +48,8 @@ final class CaseOverviewPhase2DDesignContractTest {
         assertTrue(rail.contains("styleClass=\"shale-update-search-row\""));
         assertTrue(rail.contains("styleClass=\"shale-search-field\""));
         assertTrue(rail.contains("fx:id=\"clearCaseUpdatesSearchButton\""));
-        assertTrue(rail.contains("styleClass=\"transparent-scroll shale-update-list-scroll\""));
+        assertTrue(rail.matches("(?s).*styleClass=\"transparent-scroll[,\\s]+shale-update-list-scroll\".*"),
+                "The feed must retain both semantic scroll classes regardless of FXML list separators");
         assertTrue(rail.contains("VBox.vgrow=\"ALWAYS\""));
         assertEquals(1, count(rail, "<ScrollPane"), "the update feed should have one independent scroll host");
         assertTrue(rail.indexOf("caseUpdatesComposerArea") < rail.indexOf("caseUpdatesSearchField"));
@@ -59,7 +60,7 @@ final class CaseOverviewPhase2DDesignContractTest {
     void distinctStatesAndCreatorOnlyEditRemainExplicit() throws Exception {
         String source = Files.readString(CONTROLLER);
         assertTrue(source.contains("Loading updates…\", \"shale-loading-message"));
-        assertTrue(source.contains("Updates could not be loaded. Try refreshing the case."));
+        assertTrue(source.contains("Updates could not be loaded. Use View All Updates to refresh."));
         assertTrue(source.contains("searchQuery.isBlank() ? \"No updates yet.\" : \"No updates match the current search.\""));
         assertTrue(source.contains("actorUserId.intValue() == createdByUserId.intValue()"));
         assertTrue(source.contains("if (canEditCaseUpdate(dto))"));
