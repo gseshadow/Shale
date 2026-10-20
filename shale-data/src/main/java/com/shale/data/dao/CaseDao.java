@@ -2781,7 +2781,11 @@ public final class CaseDao {
             }
             if (query.from() != null) { sql.append(" AND caseUpdate.CreatedAt >= ?"); values.add(Timestamp.valueOf(query.fromUtc())); }
             if (query.through() != null) { sql.append(" AND caseUpdate.CreatedAt < ?"); values.add(Timestamp.valueOf(query.throughExclusiveUtc())); }
-            if (query.authorUserId() != null) { sql.append(" AND caseUpdate.CreatedByUserId = ?"); values.add(query.authorUserId()); }
+            if (!query.authorUserIds().isEmpty()) {
+                sql.append(" AND caseUpdate.CreatedByUserId IN (")
+                        .append(String.join(",", java.util.Collections.nCopies(query.authorUserIds().size(), "?"))).append(")");
+                values.addAll(query.authorUserIds());
+            }
             if (query.after() != null) {
                 sql.append(" AND (").append(orderAt).append(comparison).append(" OR (").append(orderAt)
                         .append(" = ? AND caseUpdate.Id").append(comparison).append("))");
@@ -3200,59 +3204,59 @@ public final class CaseDao {
 				|| lower.contains("changed: from");
 	}
 
-	public void softDeleteCaseUpdate(long caseUpdateId, long caseId, int shaleClientId, Integer deletedByUserId) {
-		String existingSql = """
-				SELECT NoteText
-				FROM dbo.CaseUpdates
-				WHERE Id = ?
-				  AND CaseId = ?
-				  AND ShaleClientId = ?
-				  AND ISNULL(IsDeleted, 0) = 0;
-				""";
-		String sql = """
-				UPDATE dbo.CaseUpdates
-				SET IsDeleted = 1,
-				    DeletedAt = SYSDATETIME(),
-				    DeletedByUserId = ?,
-				    UpdatedAt = SYSDATETIME(),
-				    EditedByUserId = COALESCE(?, EditedByUserId)
-				WHERE Id = ?
-				  AND CaseId = ?
-				  AND ShaleClientId = ?
-				  AND ISNULL(IsDeleted, 0) = 0;
-				""";
+    /** The unversioned legacy seam is deliberately fail-closed; there are no production callers. */
+    @Deprecated
+    public void softDeleteCaseUpdate(long id, long caseId, int tenant, Integer actor) {
+        throw new UnsupportedOperationException("Reload the update and use deleteCaseUpdate with its RowVersion.");
+    }
 
-		try (Connection con = db.requireConnection();
-				PreparedStatement existingPs = con.prepareStatement(existingSql);
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			existingPs.setLong(1, caseUpdateId);
-			existingPs.setLong(2, caseId);
-			existingPs.setInt(3, shaleClientId);
-			String oldText = null;
-			try (ResultSet rs = existingPs.executeQuery()) {
-				if (rs.next()) {
-					oldText = rs.getString("NoteText");
-				}
-			}
-			if (deletedByUserId == null)
-				ps.setNull(1, java.sql.Types.INTEGER);
-			else
-				ps.setInt(1, deletedByUserId);
-			if (deletedByUserId == null)
-				ps.setNull(2, java.sql.Types.INTEGER);
-			else
-				ps.setInt(2, deletedByUserId);
-			ps.setLong(3, caseUpdateId);
-			ps.setLong(4, caseId);
-			ps.setInt(5, shaleClientId);
-			int rows = ps.executeUpdate();
-			if (rows > 0) {
-				phiAuditService.auditDelete(deletedByUserId, "CaseUpdates", "NoteText", caseUpdateId, oldText);
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to soft delete case update (id=" + caseUpdateId + ")", e);
-		}
-	}
+    /** Same-tenant creator/admin compare-and-swap, with the required PHI audit in this transaction. */
+    public boolean deleteCaseUpdate(CaseServicePort.DeleteCaseUpdateCommand command) {
+        Objects.requireNonNull(command, "command");
+        try (Connection con = db.requireConnection()) {
+            con.setAutoCommit(false);
+            try {
+                validateCaseUpdateReader(con, command.caseId(), command.shaleClientId(), command.actorUserId(), CaseUpdateQuery.Visibility.ACTIVE);
+                // Lock current membership until commit: a removed administrator cannot use cached UI authority.
+                boolean admin;
+                try (PreparedStatement ps = con.prepareStatement("SELECT is_admin FROM dbo.Users WITH (UPDLOCK, HOLDLOCK) WHERE id = ? AND ShaleClientId = ? AND is_deleted = 0")) {
+                    ps.setInt(1, command.actorUserId()); ps.setInt(2, command.shaleClientId());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) { con.rollback(); return false; }
+                        admin = rs.getBoolean("is_admin");
+                    }
+                }
+                String predicate = " WHERE Id = ? AND CaseId = ? AND ShaleClientId = ? AND ISNULL(IsDeleted, 0) = 0 AND RowVersion = ?"
+                        + " AND (CreatedByUserId = ? OR ? = 1)";
+                String oldText;
+                try (PreparedStatement ps = con.prepareStatement("SELECT NoteText FROM dbo.CaseUpdates WITH (UPDLOCK, HOLDLOCK)" + predicate)) {
+                    bindCaseUpdateDeletion(ps, 1, command, admin);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) { con.rollback(); return false; }
+                        oldText = rs.getString("NoteText");
+                    }
+                }
+                // Only narrative updates appear in this workspace; blank legacy/system rows cannot skip a required audit.
+                if (oldText == null || oldText.isBlank()) { con.rollback(); return false; }
+                try (PreparedStatement ps = con.prepareStatement("UPDATE dbo.CaseUpdates SET IsDeleted = 1, DeletedAt = SYSDATETIME(), DeletedByUserId = ?" + predicate)) {
+                    ps.setInt(1, command.actorUserId());
+                    bindCaseUpdateDeletion(ps, 2, command, admin);
+                    if (ps.executeUpdate() != 1) { con.rollback(); return false; }
+                }
+                touchCaseUpdatedAt(con, command.caseId(), command.shaleClientId());
+                phiAuditService.auditDelete(con, command.actorUserId(), "CaseUpdates", "NoteText", command.id(), oldText);
+                con.commit();
+                return true;
+            } catch (SQLException | RuntimeException ex) { con.rollback(); throw ex; }
+            finally { con.setAutoCommit(true); }
+        } catch (SQLException ex) { throw new RuntimeException("Unable to delete Case Update.", ex); }
+    }
+
+    private static void bindCaseUpdateDeletion(PreparedStatement ps, int start,
+            CaseServicePort.DeleteCaseUpdateCommand c, boolean admin) throws SQLException {
+        ps.setLong(start++, c.id()); ps.setLong(start++, c.caseId()); ps.setInt(start++, c.shaleClientId());
+        ps.setBytes(start++, c.expectedRowVersion()); ps.setInt(start++, c.actorUserId()); ps.setBoolean(start, admin);
+    }
 
 	public boolean updateCaseNote(long caseUpdateId, long caseId, int shaleClientId, int actorUserId, String noteText) {
 		String trimmedText = noteText == null ? "" : noteText.trim();

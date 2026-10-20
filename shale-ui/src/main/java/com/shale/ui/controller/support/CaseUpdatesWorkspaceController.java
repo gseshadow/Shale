@@ -82,21 +82,25 @@ public final class CaseUpdatesWorkspaceController {
         sort.setAccessibleText("Sort updates"); visibility.setAccessibleText("Active or deleted updates");
         from.setAccessibleText("Created from date"); through.setAccessibleText("Created through date, inclusive");
         author = new UserSelectionField<>(CaseUpdateAuthorDto::id, CaseUpdateAuthorDto::displayName,
-                CaseUpdateAuthorDto::color, (field, candidates) -> {
-                    UserSelector<CaseUpdateAuthorDto> selector = new UserSelector<>(CaseUpdateAuthorDto::id,
-                            CaseUpdateAuthorDto::displayName, CaseUpdateAuthorDto::color);
-                    selector.useSemanticFormControl(); selector.setCandidates(candidates);
-                    selector.setEmptyText("No authors available for this case.");
-                    Dialog<CaseUpdateAuthorDto> picker = new Dialog<>();
-                    if (root.getScene() != null) picker.initOwner(root.getScene().getWindow());
-                    AppDialogs.applySecondaryDialogShell(picker, "Filter by author");
-                    picker.getDialogPane().setContent(selector);
-                    picker.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-                    ControlStyles.apply((Button) picker.getDialogPane().lookupButton(ButtonType.OK), ControlStyles.Purpose.PRIMARY);
-                    ControlStyles.apply((Button) picker.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
-                    picker.setResultConverter(button -> button == ButtonType.OK ? selector.getSelectedUser() : null);
-                    return picker.showAndWait();
-                }, true).useUnifiedControlStyles();
+                CaseUpdateAuthorDto::color, (field, candidates) -> java.util.Optional.empty(), true);
+        author.useUnifiedControlStyles().useMultipleSelection((field, candidates) -> {
+            UserSelector<CaseUpdateAuthorDto> selector = new UserSelector<>(CaseUpdateAuthorDto::id,
+                    CaseUpdateAuthorDto::displayName, CaseUpdateAuthorDto::color);
+            selector.useSemanticFormControl(); selector.useMultipleSelection(); selector.setCandidates(candidates);
+            selector.setSelectedUsers(field.getSelectedUsers());
+            selector.setPromptText("Search authors…");
+            selector.setEmptyText("No matching authors available for this case.");
+            Dialog<List<CaseUpdateAuthorDto>> picker = new Dialog<>();
+            if (root.getScene() != null) picker.initOwner(root.getScene().getWindow());
+            AppDialogs.applySecondaryDialogShell(picker, "Filter by authors");
+            picker.setResizable(true);
+            picker.getDialogPane().setContent(selector);
+            picker.getDialogPane().getButtonTypes().addAll(ButtonType.APPLY, ButtonType.CANCEL);
+            ControlStyles.apply((Button) picker.getDialogPane().lookupButton(ButtonType.APPLY), ControlStyles.Purpose.PRIMARY);
+            ControlStyles.apply((Button) picker.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
+            picker.setResultConverter(button -> button == ButtonType.APPLY ? List.copyOf(selector.getSelectedUsers()) : null);
+            return picker.showAndWait();
+        }, "authors");
         author.setAccessibleText("Filter by update author; empty means all authors");
         authorStatus.setWrapText(true); authorStatus.getStyleClass().add("shale-error-message");
         authorStatus.setVisible(false); authorStatus.setManaged(false);
@@ -127,7 +131,7 @@ public final class CaseUpdatesWorkspaceController {
         visibility.valueProperty().addListener((o, a, b) -> filtersChanged());
         from.valueProperty().addListener((o, a, b) -> filtersChanged());
         through.valueProperty().addListener((o, a, b) -> filtersChanged());
-        author.selectedUserProperty().addListener((o, a, b) -> filtersChanged());
+        author.selectedUsersProperty().addListener((o, a, b) -> filtersChanged());
     }
 
     private static VBox field(String text, Node control) {
@@ -177,7 +181,7 @@ public final class CaseUpdatesWorkspaceController {
         next.setDisable(true); previous.setDisable(true); rows.getChildren().clear();
         try {
             query = new CaseUpdateQuery(caseId, state.getShaleClientId(), state.getUserId(), search.getText(), sort.getValue(),
-                    from.getValue(), through.getValue(), author.getSelectedUser() == null ? null : author.getSelectedUser().id(),
+                    from.getValue(), through.getValue(), author.getSelectedUsers().stream().map(CaseUpdateAuthorDto::id).collect(java.util.stream.Collectors.toSet()),
                     visibility.getValue(), cursors.get(pageIndex), 50).inZone(java.time.ZoneId.systemDefault());
         } catch (RuntimeException ex) { status.setText("Check the date range and search (maximum 1000 characters)."); return; }
         status.setText("Loading updates…");
@@ -190,7 +194,7 @@ public final class CaseUpdatesWorkspaceController {
                     stale = false; nextCursor = page.next();
                     rows.getChildren().setAll(page.items().stream().map(card).toList());
                     boolean filtered = !query.text().isBlank() || query.from() != null || query.through() != null
-                            || query.authorUserId() != null || query.visibility() != CaseUpdateQuery.Visibility.ACTIVE;
+                            || !query.authorUserIds().isEmpty() || query.visibility() != CaseUpdateQuery.Visibility.ACTIVE;
                     status.setText(page.items().isEmpty() ? (filtered ? "No updates match these filters." : "No updates yet. Create the first update.")
                             : page.items().size() + " updates on this page");
                     pageLabel.setText("Page " + (pageIndex + 1));

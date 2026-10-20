@@ -48,6 +48,21 @@ public class UserSelector<T> extends VBox {
     private final StringProperty emptyText = new SimpleStringProperty("No additional users available");
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
 
+    private boolean multipleSelection;
+    private final ObjectProperty<List<T>> selectedUsers = new SimpleObjectProperty<>(List.of());
+
+    /** Opt-in multi-select rows; existing single-user card pickers retain their contract. */
+    public void useMultipleSelection() { multipleSelection = true; renderUsers(); }
+    public ObjectProperty<List<T>> selectedUsersProperty() { return selectedUsers; }
+    public List<T> getSelectedUsers() { return selectedUsers.get(); }
+    public void setSelectedUsers(Collection<T> users) {
+        var byId = new java.util.LinkedHashMap<Integer, T>();
+        if (users != null) for (T user : users) {
+            if (user != null && userId(user) != null && userId(user) > 0) byId.put(userId(user), user);
+        }
+        selectedUsers.set(List.copyOf(byId.values()));
+    }
+
     private final TextField searchField = new TextField();
     private final VBox list = new VBox(8);
     private final Label stateLabel = new Label();
@@ -142,6 +157,12 @@ public class UserSelector<T> extends VBox {
     }
 
     private void wireState() {
+        selectedUsers.addListener((o, a, b) -> {
+            for (var node : list.getChildren()) {
+                if (node instanceof javafx.scene.control.CheckBox row && row.getUserData() != null)
+                    row.setSelected(b.stream().anyMatch(user -> Objects.equals(userId(user), row.getUserData())));
+            }
+        });
         candidates.addListener((ListChangeListener<T>) change -> renderUsers());
         excludedUserIds.addListener((ListChangeListener<Integer>) change -> renderUsers());
         searchField.textProperty().addListener((obs, oldValue, newValue) -> renderUsers());
@@ -167,6 +188,23 @@ public class UserSelector<T> extends VBox {
             return;
         }
         for (T user : filtered) {
+            if (multipleSelection) {
+                // One native CheckBox owns the entire row, including its text and selected accessibility state.
+                javafx.scene.control.CheckBox row = new javafx.scene.control.CheckBox(safe(displayName(user)));
+                row.getStyleClass().add("user-selector-choice-row");
+                row.setMaxWidth(Double.MAX_VALUE);
+                row.setAccessibleText(safe(displayName(user)));
+                row.setUserData(userId(user));
+                row.setSelected(getSelectedUsers().stream().anyMatch(selected -> Objects.equals(userId(selected), userId(user))));
+                row.setOnAction(event -> {
+                    var chosen = new java.util.ArrayList<>(getSelectedUsers());
+                    chosen.removeIf(selected -> Objects.equals(userId(selected), userId(user)));
+                    if (row.isSelected()) chosen.add(user);
+                    setSelectedUsers(chosen);
+                });
+                list.getChildren().add(row);
+                continue;
+            }
             var card = cardFactory.create(new UserCardModel(userId(user), safe(displayName(user)), color(user), null), UserCardFactory.Variant.MINI);
             Button cardButton = new Button();
             cardButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary", "user-selector-card-button");

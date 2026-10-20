@@ -109,3 +109,77 @@ DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx -pl shale-core,sh
 DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx test
 git diff --check
 ```
+
+## Multi-author and delete follow-up acceptance
+
+This follow-up uses the same desktop deployment requirements above: **no new SQL migration or
+API deployment**. Existing `IsDeleted`/`DeletedAt`/`DeletedByUserId`/`RowVersion` and PHI AuditLog
+remain prerequisites. No SQL, API, authentication, permission-retirement or release configuration
+is changed. The obsolete unused unversioned DAO delete now throws; desktop callers must use
+the new versioned command. Deleted records remain administrator-only and read-only.
+
+Manual Windows checklist (non-production case, ordinary author, unrelated editor/user, tenant admin,
+and two desktop instances):
+
+- [ ] Open Change and select two or more authors by clicking different parts of their full-width
+      checkbox rows. Both stay checked; clicking a selected row deselects only that author.
+- [ ] Search so some checked authors are hidden, clear search and verify the full checked set.
+      Apply, reopen Change, verify all applied selections; modify then Cancel/Escape/X and verify
+      no filter/query changes. Check one-name/count/All authors summary, Remove and Clear filters.
+- [ ] On a later page, apply multiple authors and verify page one, OR author semantics, AND search,
+      creation dates, every sort and administrator Active/Deleted/All. Verify Next/Previous and
+      displayed page counts after filtering or removing the last result on a page.
+- [ ] Tab through rows; Space toggles only the focused row without applying the dialog. Check
+      accessible name/checked state with a screen reader, hover/focus distinctions, Light/Dark,
+      scrollable long author lists, small screens and Windows scaling; search/footer stay reachable.
+- [ ] Verify Delete in both workspace and quick rail for the original author and current same-tenant
+      administrator. An unrelated user or editor cannot see Delete or acquire authority through editing.
+      A deleted update has View only. No restoration action is introduced.
+- [ ] Cancel/Delete confirmation: confirm author/time and removal-from-normal-history explanation.
+      Cancel, Escape and X make no changes; Enter must not default to destructive confirmation.
+- [ ] Confirm deletion; verify authoritative removal from active history and counts, unchanged filters,
+      page-one reset, and sidebar/workspace synchronization. Reopen the Case and inspect admin deleted
+      history: content, author/creation/edit metadata remain; deletion user/time and PHI audit are present.
+- [ ] Edit/delete the same update from another instance before confirming; stale deletion must fail
+      without overwriting. Repeated deletion, missing records and crafted tenant/case/user requests
+      must not expose another tenant's content. Revoke an administrator's role before deleting and
+      verify the DAO uses current membership.
+- [ ] Interrupt persistence/audit in disposable test infrastructure: failure leaves the update active,
+      no optimistic removal; refresh/retry recovers. Successful deletion emits only the existing
+      tenant/case invalidation; second instance/reconnect reloads with current filters retained.
+
+The automated follow-up inventory maps `CaseUpdateQuery` to its immutable-set/version tests;
+CaseDao/service/gateway to `CaseUpdatesPagingJdbcTest` (including existing binding combinations);
+shared picker changes to the existing `UserSelectionFieldTest`/`UserSelectorSourceContractTest` plus
+`UserSelectorMultipleSelectionTest`; workspace, paging and staging to `CaseUpdatesWorkspaceTest`;
+shared card visibility, real confirmation/cancel, persistence and rail/tab refresh to
+`CaseUpdateDeletionTest`. Narrative/editor, Case navigation, adapter and semantic CSS consumers
+remain focused/selector regressions. Native Windows, screen-reader, deployed SQL/RLS and physical
+PubSub delivery remain manual checks; JDBC doubles do not execute SQL Server.
+
+### Follow-up local verification — 2026-10-20
+
+All final local checks passed with Java 21/Maven 3.9.11 and a synthetic Xorg display:
+**62 focused tests**, **85 selector-affected tests**, and **116 default critical tests**;
+zero failures, errors, or skips in each run. Static FXML/CSS validation and final Git diff
+checks passed. The selector requested no full-suite escalation. Both-theme author-row and
+workspace previews were generated and inspected; selected background uses the existing
+selection token and checkbox state, independent of focus/hover.
+
+The first compile attempt was blocked by restricted dependency download access; retry with
+the managed network permission succeeded. All final Maven commands below completed successfully.
+No native Windows, deployed SQL Server/RLS, real PubSub or screen-reader acceptance is claimed.
+Audit integration reuses the existing PHI audit schema and transaction; no SQL migration.
+
+Exact final commands in the cloud runner (source the runner's Java/Maven environment first):
+
+```bash
+source /workspace/.tools/shale-env.sh
+mvn -q -U -pl shale-ui -am -DskipTests compile
+python3 build/test-selection/validate_ui_resources.py
+python3 build/test-selection/select_tests.py --base 3273f808aab688912c8983d9313f01c7a56303e7 --head HEAD --format markdown --plan-output work/selected-plan.json
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -pl shale-ui -am -Djavafx.cachedir=/workspace/Shale/work/javafx -Dshale.preview.dir=/workspace/Shale/work/previews -Dtest=CaseUpdateQueryTest,CaseUpdatesPagingJdbcTest,CaseUpdatesWorkspaceTest,CaseUpdateDeletionTest,UserSelectorMultipleSelectionTest,UserSelectionFieldTest,UserSelectorSourceContractTest,CaseUpdatesNarrativeEditorTest,CaseDaoCaseUpdatesQueryTest,CaseServiceAdapterTest,CaseUpdateEditorTest -Dsurefire.failIfNoSpecifiedTests=false test
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx -pl shale-core,shale-data,shale-server,shale-ui -am -Dtest=com.shale.core.dto.CaseUpdateQueryTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.service.adapter.CaseUpdatesPagingJdbcTest,com.shale.data.service.adapter.OrganizationServiceAdapterTest,com.shale.data.service.adapter.TaskServiceAdapterTest,com.shale.server.controller.AuthControllerTest,com.shale.ui.component.UserSelectorMultipleSelectionTest,com.shale.ui.controller.CaseUpdateDeletionTest,com.shale.ui.controller.CaseUpdatesWorkspaceTest,com.shale.ui.controller.ReportsControllerLifecycleTest,com.shale.ui.controller.SettingsControllerLifecycleTest,com.shale.ui.util.SemanticControlCssContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx test
+git diff 3273f808aab688912c8983d9313f01c7a56303e7 HEAD --check
+```

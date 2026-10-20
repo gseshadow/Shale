@@ -241,6 +241,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
     @Override public List<com.shale.core.dto.CaseUpdateAuthorDto> listCaseUpdateAuthors(long caseId, int tenant, int actor) {
         return caseGateway.listCaseUpdateAuthors(caseId, tenant, actor);
     }
+    @Override public boolean deleteCaseUpdate(DeleteCaseUpdateCommand command) {
+        return caseGateway.deleteCaseUpdate(command);
+    }
     @Override public boolean updateCaseNote(UpdateCaseNoteCommand command) {
         return caseGateway.updateCaseNote(command);
     }
@@ -1007,6 +1010,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
         default List<com.shale.core.dto.CaseUpdateAuthorDto> listCaseUpdateAuthors(long caseId, int tenant, int actor) {
             throw new UnsupportedOperationException("Case Update authors require the production DAO gateway.");
         }
+        default boolean deleteCaseUpdate(DeleteCaseUpdateCommand command) {
+            throw new UnsupportedOperationException("Versioned deletion requires the production DAO gateway.");
+        }
         default boolean updateCaseNote(UpdateCaseNoteCommand command) {
             throw new UnsupportedOperationException("Versioned update editing requires the production DAO gateway.");
         }
@@ -1271,6 +1277,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
         }
         @Override public List<com.shale.core.dto.CaseUpdateAuthorDto> listCaseUpdateAuthors(long caseId, int tenant, int actor) {
             return caseDao.listCaseUpdateAuthors(caseId, tenant, actor);
+        }
+        @Override public boolean deleteCaseUpdate(DeleteCaseUpdateCommand command) {
+            return caseDao.deleteCaseUpdate(command);
         }
         @Override public boolean updateCaseNote(UpdateCaseNoteCommand command) {
             return caseDao.updateCaseNote(command);
