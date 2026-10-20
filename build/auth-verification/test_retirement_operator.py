@@ -31,6 +31,18 @@ class RetirementOperatorTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertIn('PASS retirement operator offline behavior', result.stdout)
 
+    @unittest.skipUnless(NATIVE or (CORE and os.name != 'nt'),
+                         'Native Windows PS5.1 or POSIX Core required for real child regression')
+    def test_real_child_results_reach_verify_and_rollback_consumers(self):
+        result = subprocess.run([NATIVE or CORE, '-NoLogo', '-NoProfile', '-NonInteractive',
+                                 '-File', str(BEHAVIOR.with_name('test_retirement_transport.ps1'))],
+                                cwd=ROOT, capture_output=True, text=True, timeout=60)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn('PASS real child Apply/Verify/Rollback/Verify', result.stdout)
+        self.assertNotIn('SYNTHETIC_ONLY_PASSWORD', result.stdout + result.stderr)
+        if NATIVE:
+            self.assertIn('Desktop 5.1.', result.stdout)
+
     @unittest.skipUnless(CORE and os.name != 'nt', 'Portable fake executable transport uses POSIX test host')
     def test_real_process_transport_retains_full_output_exit_and_deadline(self):
         with tempfile.TemporaryDirectory(prefix='retirement transport ') as directory:
@@ -71,7 +83,12 @@ try {
   $deadline=$null
   if($name -eq 'slow'){$deadline=[datetime]::UtcNow.AddSeconds(1)}
   $caught=$false
-  try { $null=Invoke-PacketSql $c.root 'sql.invalid' 'Shale' 'testuser' $password 'unused.sql' @('ExpectedDatabase=Shale') $log $c.executable $deadline }
+  try {
+   $actual=@(Invoke-PacketSql $c.root 'sql.invalid' 'Shale' 'testuser' $password 'unused.sql' @('ExpectedDatabase=Shale') $log $c.executable $deadline)
+   if($actual.Count -ne 1 -or $actual[0] -isnot [string] -or $actual[0] -cne ($log+'.sqlcmd.txt')) {
+    throw 'Success transport must return exactly one string log path, without async completion values'
+   }
+  }
   catch { $caught=$true; if ($name -eq 'success') { throw } }
   if (($name -eq 'success') -eq $caught) { throw "Wrong process result: $name" }
   $r=Read-Json ($log+'.result.json')
