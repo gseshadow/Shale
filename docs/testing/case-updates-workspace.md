@@ -156,3 +156,30 @@ shared card visibility, real confirmation/cancel, persistence and rail/tab refre
 `CaseUpdateDeletionTest`. Narrative/editor, Case navigation, adapter and semantic CSS consumers
 remain focused/selector regressions. Native Windows, screen-reader, deployed SQL/RLS and physical
 PubSub delivery remain manual checks; JDBC doubles do not execute SQL Server.
+
+### Follow-up local verification — 2026-10-20
+
+All final local checks passed with Java 21/Maven 3.9.11 and a synthetic Xorg display:
+**62 focused tests**, **85 selector-affected tests**, and **116 default critical tests**;
+zero failures, errors, or skips in each run. Static FXML/CSS validation and final Git diff
+checks passed. The selector requested no full-suite escalation. Both-theme author-row and
+workspace previews were generated and inspected; selected background uses the existing
+selection token and checkbox state, independent of focus/hover.
+
+The first compile attempt was blocked by restricted dependency download access; retry with
+the managed network permission succeeded. All final Maven commands below completed successfully.
+No native Windows, deployed SQL Server/RLS, real PubSub or screen-reader acceptance is claimed.
+Audit integration reuses the existing PHI audit schema and transaction; no SQL migration.
+
+Exact final commands in the cloud runner (source the runner's Java/Maven environment first):
+
+```bash
+source /workspace/.tools/shale-env.sh
+mvn -q -U -pl shale-ui -am -DskipTests compile
+python3 build/test-selection/validate_ui_resources.py
+python3 build/test-selection/select_tests.py --base 3273f808aab688912c8983d9313f01c7a56303e7 --head HEAD --format markdown --plan-output work/selected-plan.json
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -pl shale-ui -am -Djavafx.cachedir=/workspace/Shale/work/javafx -Dshale.preview.dir=/workspace/Shale/work/previews -Dtest=CaseUpdateQueryTest,CaseUpdatesPagingJdbcTest,CaseUpdatesWorkspaceTest,CaseUpdateDeletionTest,UserSelectorMultipleSelectionTest,UserSelectionFieldTest,UserSelectorSourceContractTest,CaseUpdatesNarrativeEditorTest,CaseDaoCaseUpdatesQueryTest,CaseServiceAdapterTest,CaseUpdateEditorTest -Dsurefire.failIfNoSpecifiedTests=false test
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx -pl shale-core,shale-data,shale-server,shale-ui -am -Dtest=com.shale.core.dto.CaseUpdateQueryTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.service.adapter.CaseUpdatesPagingJdbcTest,com.shale.data.service.adapter.OrganizationServiceAdapterTest,com.shale.data.service.adapter.TaskServiceAdapterTest,com.shale.server.controller.AuthControllerTest,com.shale.ui.component.UserSelectorMultipleSelectionTest,com.shale.ui.controller.CaseUpdateDeletionTest,com.shale.ui.controller.CaseUpdatesWorkspaceTest,com.shale.ui.controller.ReportsControllerLifecycleTest,com.shale.ui.controller.SettingsControllerLifecycleTest,com.shale.ui.util.SemanticControlCssContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+XDG_CACHE_HOME=/workspace/Shale/work/cache DISPLAY=:99 mvn -Djavafx.cachedir=/workspace/Shale/work/javafx test
+git diff 3273f808aab688912c8983d9313f01c7a56303e7 HEAD --check
+```
