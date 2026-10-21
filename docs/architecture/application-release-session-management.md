@@ -17,29 +17,31 @@ artifacts and startup overlay 62a12940. [Continuation and recovery](../testing/r
 documents pending-pair loss after 401/500, protected-state archival and supported password re-enrollment.
 Native Windows/DPAPI and existing-state update acceptance remain pending. No retirement acceptance is inferred.
 
-## Auth permission evidence and cutover candidate — 2026-10-15
+## Current authentication/security reconciliation — 2026-10-21
 
-The [owning permission cutover runbook](../testing/auth-module-permission-cutover.md) records the user's native Windows
-auth SQL PASS for credential_identity, remembered_rotation and runtime_isolation, exit 0, and the
-user-run Azure collation/principal/effective-permission evidence. These supersede earlier pending
-Windows retest/unknown catalog statements for those reported observations only. Actual deployed
-server/desktop credential configuration and compatible installed fleet remain UNCONFIRMED.
+The [canonical API/MCP roadmap §2.5](ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
+records the October 20 **operator-reported production retirement** of EXECUTE on the three legacy login
+procedures for `shale_app`, runtime principal/role denials, and successful API login/identity/refresh/logout
+plus installed-desktop automatic sign-in/user-detail checks. Do not repeat completed operator rehearsals
+or treat the older retirement-BLOCKED statements below as current status for that exact delta.
 
-Existing runtime database/schema EXECUTE would expose new dbo owner-executed modules. The candidate
-installs both modules with runtime principal/role object DENY fences atomically, grants auth only object
-EXECUTE, and separately gates additive auth-table/runtime-hash read fences on approved caller inventory
-and old-client drain. Existing User projections and password-management writes are preserved. Original
-grants/grantors/states are captured and never rewritten; exact staged postchecks and rollback are owned
-there. Broader runtime audit SELECT/INSERT/UPDATE/DELETE remediation remains OPEN: deployed history must
-not be described as database-enforced append-only. No three FILTERs, existing predicates, original export,
-Case harness or R4 accepted reports change. CASE SQL NOT RUN; security acceptance OPEN; deployment BLOCKED.
-No Azure connection/live grant/migration, client release, configuration change, merge or deployment here.
+The separate V1/V2 auth-module Stage A installation/fences, Stage B table/hash read restrictions,
+subsequent desktop/API/SQL deployment details and monitoring closeout are not established by that report.
+Current source is merged through release 1.0.137; merge/release metadata does not establish deployed parity.
+Users/auditLog/Statuses read coverage, runtime hash/audit capabilities, write/admin restrictions and
+Case SQL acceptance remain open as qualified in that ledger. Supplied offline schema confirmed the gap;
+older missing-input statements are historical. No complete least-privilege, MCP or native-mobile acceptance.
+
+Follow the [SQL/API/client release order](../azure-app-service-deployment.md#release-dependencies-and-order--2026-10-21).
+The one next implementation phase is the roadmap's [Phase 1R prompt](ai-integration-and-mcp.md#91-ready-to-run-codex-prompt--phase-1r),
+a local three-FILTER candidate, without production changes. Earlier dated tests, local Windows/source
+recovery limits and all accepted R4/session observations retain their scopes. This update executes no SQL.
 
 
 **Status:** Desktop session enrollment, revocation enforcement, My Sessions, and Stay logged in acceptance are
 closed; the wider release/session initiative remains in progress and logged-out updates remain `UNSUPPORTED`
 
-**Last reviewed:** 2026-10-06
+**Last reviewed:** 2026-10-21 (reconciliation; original acceptance dates retained)
 
 ## Pre-tenant authentication compatibility candidate — 2026-10-14
 
@@ -1466,6 +1468,8 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
 | Login visual refresh | **IN PROGRESS; RUNTIME FLOW ACCEPTED** | The remaining tall-window stretch was traced to `-1.0`, which is JavaFX `USE_COMPUTED_SIZE`, not `USE_PREF_SIZE`; the content-sized groups now use the preferred-size sentinel inside a full-height centering viewport. The user reports local Maven tests pass and the application successfully launches, signs in, enrolls the durable session with HTTP 200, and logs out with HTTP 200. Rendered tall/short-window acceptance for this sizing correction remains **PENDING**. Stay logged in acceptance is closed separately below; this does not close the pending visual sizing acceptance. |
 | Remembered desktop sign-in (Stay logged in) | **COMPLETE — USER-REPORTED WINDOWS ACCEPTANCE 2026-10-06** | User reports PASS for checked login across application/Windows restart, repeated restore after rotation, X-close preservation, explicit Logout clearing, unchecked login with no remembered sign-in, self/admin revocation invalidating restore, installed-MSI sign-in/logout, and outage recovery through Retry without credential loss. The previously recorded user-reported local `mvn test` PASS is preserved. No checks were executed in this documentation run; unrelated release/session work remains open. |
+| October 20 auth/installed-desktop checks | **OPERATOR-REPORTED PRODUCTION PASS** | After the exact three-procedure retirement, API login/identity/refresh/logout and installed automatic sign-in/user-detail checks succeeded. Supplements original session acceptance; does not close cross-tenant, monitoring, all-artifact parity or deployment-stage unknowns. |
+| V1/V2 auth boundary and UTC session corrections | **IMPLEMENTED / MERGED; deployment details UNCONFIRMED** | #1868/#1871 and later #1870/#1889 exist in current source. Stage A/B, compatible deployed server/desktop identities/builds and restrictive-grant/RLS prerequisites remain separate from legacy retirement. See canonical §2.5 and deployment dependency matrix above. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.

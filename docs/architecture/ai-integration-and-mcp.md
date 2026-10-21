@@ -2,9 +2,9 @@
 
 **Status:** Phase 0 assessment COMPLETE; architecture/contract review IN PROGRESS; shared Case/REST foundation IN PROGRESS; MCP implementation NOT STARTED.
 
-**Last reviewed:** 2026-10-14
+**Last reviewed:** 2026-10-21
 
-**Repository baseline:** live `origin/codex/latest`, commit `b4023ff33036d108aec0feb941bc365c5e529aca`.
+**Repository baseline:** current `origin/codex/latest`, commit `9330133a43a2c125cd20c9f3548f3c4a892caa31`.
 This is repository inspection, not evidence of deployed SQL, API configuration, or runtime security acceptance.
 
 ## 1. Purpose, scope, and document ownership
@@ -39,6 +39,14 @@ Reviewed evidence and continuing authorities:
 * [Release/session roadmap](application-release-session-management.md), especially the later Phase 7B/7C,
   Phase 8A/8B implementation records and remembered-sign-in closeout. Earlier inventory sections describe
   historical states and must not be interpreted as today's exclusively in-memory revocation design.
+* [Auth permission cutover](../testing/auth-module-permission-cutover.md), its private-evidence scope and
+  remaining-acceptance references; [UTC verification](../testing/remembered-session-utc-results.md),
+  [retirement transport correction](../sql/auth/permission-cutover/transport-output.md),
+  [release publication](../release-publishing.md), release 1.0.137 source notes/manifest and
+  [Case Updates deployment requirements](../testing/case-updates-workspace.md). GitHub merged metadata
+  for #1868/#1871/#1889/#1892 and recent merged PR descriptions/discussions were read; no later exact
+  production SQL/API/artifact closeout was found there. The October 20 production report comes from
+  the operator's task statement. Lack of a PR comment or failure report is not acceptance evidence.
 * [Firm-wide roles](../../architecture/firm-wide-roles.md), [Case Team roles](../../architecture/case-team-roles.md),
   [Contacts](../../architecture/contact-management.md), [Organizations](organization-management.md),
   [Case Materials](../../architecture/case-materials.md), [summary/document projection inventory](../../architecture/case-summary-projection-inventory.md),
@@ -97,8 +105,9 @@ summary pages have an explicit owner-approved audit exemption for this slice onl
 boundaries, not proof of complete AI attribution or permission for wider payloads. Source and recorded
 synthetic tests establish implementation; the R4 ledger records bounded user-reported desktop/hosted/iPhone
 acceptance. Two-tenant/non-dbo/pooled-context, audit-failure/commit uncertainty, deployed protection and
-performance gates remain open. The isolated SQL harness has not run because approved authoritative
-schema-only definitions are missing; this assessment runs no SQL or runtime tests.
+performance gates remain open. The isolated Case SQL harness has not run. The subsequently supplied
+authoritative export confirmed missing coverage; reviewed derived/candidate preparation remains pending.
+This reconciliation runs no SQL or runtime tests.
 
 * RLS coverage is not uniformly established. The Contacts roadmap explicitly records that the parent
   `dbo.Contacts` has no TenantFilter predicate, while newer Contact child tables use strict RLS; the
@@ -156,6 +165,63 @@ checked serialized byte budgets. Row limits/timeouts do not establish bounded sc
 end-to-end deadline. Broad legacy responses still expose UI-oriented fields or concurrency bytes, and
 `getCase` returns Java `Object`. Harden those contracts per use case; retain the newer proven source seams.
 
+### 2.5 Authentication, permissions and delivery reconciliation — 2026-10-21
+
+This is the current cross-workstream status; dated implementation/rehearsal records retain their
+original scope. **Implemented** means present in inspected source; **merged** means GitHub records the
+change in the base; **operator-reported deployed** attributes an operational report; **verified** must
+name the environment and check. None of these alone means complete security or operational acceptance.
+
+| Workstream | Implemented / merged evidence | Deployment / verification boundary and remaining work |
+| --- | --- | --- |
+| Legacy login-procedure retirement | Guarded exact ACL delta and rollback in #1874/#1880/#1881; runner corrections through [#1892](https://github.com/gseshadow/Shale/pull/1892), merged October 20. | **Operator-reported production success, October 20:** removed `shale_app` EXECUTE on `dbo.sp_login_get_hash`, `dbo.sp_login_mark_failure`, `dbo.sp_login_mark_success`; denied all three to `shale_runtime` and `shale_runtime_role`. The operator then reported API login/identity/refresh/logout and installed-desktop automatic sign-in/user-detail checks successful. This report is supplied in the reconciliation task, not independently rerun or a reviewed private packet. Retirement is no longer an unperformed next task. |
+| Bounded pre-tenant authentication | [#1868](https://github.com/gseshadow/Shale/pull/1868) adds `LookupAuthenticationCredentialV1` and `ResolveDesktopRememberCredentialV2`; current shared password and server remembered callers use them. [#1871](https://github.com/gseshadow/Shale/pull/1871) adds separate Stage A installation/module fences and Stage B table/hash read fences. | Auth SQL scenarios have recorded Linux/disposable and operator-reported native Windows passes. The three legacy-procedure retirement does **not** prove Stage A or Stage B applied. Exact current production module hashes/owners, effective auth/runtime identity mapping, fence roles/grants and compatible fleet/job drain remain unconfirmed in available records. No new direct-SELECT fallback exists in current password code. |
+| Password and API sessions | `AuthServiceImpl` calls bounded V1 and verifies BCrypt in Java. `AuthController` implements login, `/me`, refresh and logout; `ServerAuthSessionService` binds new WEB/DESKTOP JWTs to SQL `sid`/current `jti`, conditional refresh and durable revocation. | October 20 operator-reported API checks supplement earlier acceptance. They do not certify every instance, negative authorization path or legacy-token drain. Existing bounded legacy JWT compatibility is not authority for AI credentials. |
+| Remembered desktop and session management | Existing DPAPI-protected opaque remembered credential, SQL hash/installation binding, serializable credential/JTI rotation, fixed 30-day remembered deadline, self/admin sessions and revocation. [#1889](https://github.com/gseshadow/Shale/pull/1889) preserves current V2 lookup and corrects remaining UTC JDBC session persistence/projections; pinned recovery compatibility stays separate. | October 6 installed-Windows Stay logged in and October 2 session-management reports remain accepted at their original scopes. October 20 installed automatic sign-in/user-detail checks add production observations, not every DPAPI/outage/account-disable/security case. Ordinary close preserves remembered sign-in; explicit logout clears local state and attempts server revocation. No offline authority is established. |
+| Desktop / API / SQL delivery | Release source `9330133a` and manifest identify 1.0.137. #1893–#1895 add desktop Case Updates work and explicitly require existing schema/audit support, with no new API deployment/migration. | A release commit/manifest is evidence of repository release metadata, not installed fleet, active API JAR or SQL state. Subsequent desktop/API/SQL deployment work is separate from retirement; available runbooks, merged PR bodies/discussions and release notes do not establish its exact production sequence/artifact/ACL state. Follow the [release dependency matrix](../azure-app-service-deployment.md#release-dependencies-and-order--2026-10-21). |
+| Web V2 / phone delivery | R1/R2 minimized Case APIs and R3 browser workspace, themes, routing and session work are merged. R4 records hosted publication and bounded physical iPhone/Firefox use. | Preserve [R4](../../shale-web/docs/r4-desktop-acceptance.md): hosted browser use on a phone is accepted only for its reported flows; it is not an iOS/Android app. Web Phases 2/3 remain in progress and Phase 4 incomplete. Native/PWA decisions, secure storage, packaged assets, signing/store delivery and wider device/AT/security acceptance remain pending in the web roadmap. |
+| AI / MCP | Existing ports, minimized Case operations and OpenAPI are reusable. No inspected MCP adapter, delegated integration identity/grant or complete AI access-audit extension exists. | **NOT STARTED / activation blocked.** No MCP deployment follows from auth retirement, installed desktop acceptance, web publication or release 1.0.137. Start with the two Case tools only after shared-read and AI controls pass. |
+
+**Evidence scopes retained:** the October 15 native Windows auth-SQL report covers its three named
+scenarios; Linux/Core SQLCMD rehearsals cover their disposable fixtures; source/overlay recovery and
+the pinned 1.0.136-compatible sandbox are not installed production artifacts. #1889's current-source
+SQL/JDBC/Tomcat UTC lifecycle checks are local, with synthetic credential verification, not Windows
+DPAPI or full production-profile acceptance. The known historical account-revocation source assertion
+and other advisory failures remain documented, not retroactively green. Private packets/captures were
+not read here. No password, token, production rows or wholesale packet upload is needed for this ledger.
+
+**Retirement scope is exact.** It revokes three auth EXECUTEs and adds runtime denials; it does not drop
+procedures, remove desktop JDBC, revoke every direct table/column capability, install the new auth
+modules/fences, attach RLS, prove complete least privilege, or finish a monitoring window. Absence of a
+reported failure is not monitoring evidence. Monitoring/observation duration, review/sign-off and actual
+post-change catalog/artifact parity remain unconfirmed; retain them as uncertainties, not a request
+to repeat completed rehearsals or retirement.
+
+**Security debt versus activation blockers:**
+
+* The last recorded authoritative catalog has no FILTER on `dbo.Users`, `dbo.auditLog` or `dbo.Statuses`.
+  No later merged three-FILTER migration or operator report closes that gap. Strict Users/audit and
+  tenant-or-global Statuses read isolation, non-dbo A/B/NULL and pooled-context evidence are selected
+  Case-read security prerequisites. Explicit minimized-query predicates remain valuable; the gap is
+  not a demonstrated API leak. The older claim that the offline schema was never supplied is obsolete:
+  the supplied export confirmed the gap; safe derived/candidate preparation and execution remain open.
+* Last reported runtime authority included Users password-hash SELECT/UPDATE and audit SELECT/INSERT/
+  UPDATE/DELETE. Stage B restricts hash **SELECT**, not password-management writes or audit CRUD.
+  Auth base-table restrictions, broader runtime grants, append-only audit enforcement, authoritative
+  admin-only audit reads and audit-list SQL/value logging need their own compatible remediation.
+  FILTERs alone do not block foreign INSERT/ownership changes or make global Statuses immutable.
+  Do not call the repair complete least privilege or repeat broad June RLS SQL.
+* Shared desktop SQL credentials and client-initialized context remain capabilities outside HTTP token
+  enforcement. Desktop revocation relies on corrected-client polling/locking (push accelerates it);
+  it is not database credential revocation. A full JDBC-to-API migration is separate work, not a
+  prerequisite for every ordinary web feature or for preparing a tightly scoped MCP candidate.
+* Before MCP activation, prove the selected operation's live user/tenant/entity/field policy, bounded
+  results and fail-closed required audit, then integration opt-in/registration, approved issuer/transport,
+  audience/scope/grant intersection, durable revoke/expiry, AI read/failure attribution and extraction
+  limits. Unrelated desktop UI parity or all five proposed tools need not finish first. Broad SQL
+  exposure of selected data/audits must be resolved or explicitly dispositioned by security owners;
+  a narrow FILTER pass is not permission to activate.
+
 ## 3. Target architecture
 
 ```text
@@ -181,6 +247,14 @@ end-to-end deadline. Broad legacy responses still expose UI-oriented fields or c
 ```
 
 Arrows flow inward: both adapters translate protocol requests to the same authoritative operations.
+Today's JavaFX desktop also reaches core/data through direct auth/runtime JDBC; it separately uses
+HTTP for durable enrollment, remembered restore and session management. Web and future phone clients
+use the server's REST contracts and receive no SQL credentials. Browser `sessionStorage`/explicit
+re-login is the present web choice; desktop DPAPI is not a phone credential-storage contract. A future
+native client needs its own reviewed protected storage/lifecycle and packaged delivery. An AI client
+must enter through a delegated integration boundary with tenant opt-in, narrower grants and audit;
+it cannot borrow desktop SQL credentials, reuse the desktop remembered secret or assert tenant/user.
+
 Neither adapter executes raw SQL, calls low-level DAOs to evade a service policy, or calls another HTTP
 controller as its business layer. A shared operation may reuse an existing port unchanged when verification
 proves its requirements, extend a port with actor-aware policy, or add a small non-UI orchestration facade
@@ -334,9 +408,10 @@ do not require another success PHI row merely to attach AI provenance. Later ser
 failure after commit must be distinguishable from successful server access; an audit row does not prove
 delivery to a human or model.
 
-Use existing Shale audit ownership, tenant RLS, append-only retention, administrator review, sanitization,
+Use existing Shale audit ownership, intended append-only retention, administrator review, sanitization,
 and transaction patterns. Do not create a parallel AI audit product or use Case/Task Timeline as compliance
-history. Required conceptual access-event fields are:
+history. Reported runtime audit CRUD means database-enforced append-only/admin-only protection is still
+debt; intended architecture is not a verified permission property. Required conceptual access-event fields are:
 
 | Field | Recommended treatment |
 | --- | --- |
@@ -540,7 +615,7 @@ use cases. No dependency on MCP, AI OAuth, registration/grants or completion of 
   this roadmap; the R3 browser consumer and R4 acceptance ledger remain owned by the web roadmap.
 * [ ] Formalize remaining selected endpoints/schemas/errors/paging before adding any missing use case.
 * [ ] Close outstanding Case-read runtime security/deployment/performance gates using the existing
-  runbook/ledger; approved schema-only definitions block execution of the local SQL harness.
+  runbook/ledger; the supplied export confirms missing FILTERs and needs labelled derived/candidate preparation.
 * [ ] Align authoritative auth/authorization and audit below REST; retain current compatible routes.
 * [ ] Review generated OpenAPI and typed web/mobile contract consumption and version/deprecation policy.
 * [ ] Document the separation of browser user authority and future integration audience/scopes;
@@ -652,17 +727,116 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 5 administration experience | NOT STARTED | Minimum controls first, then pilot feedback. |
 | Phase 6 optional controlled writes | NOT STARTED | Read-only maturity and per-command approval. |
 | Phase 7 customer readiness | NOT STARTED | Read-only acceptance; write maturity only if offered. |
+| Legacy login EXECUTE retirement | OPERATOR-REPORTED DEPLOYED, October 20 | Exact three procedures and reported API/installed-desktop checks in §2.5; monitoring closeout not established. Do not replay retirement. |
+| Bounded auth modules / Stage A and B permissions | IMPLEMENTED / MERGED; production details UNCONFIRMED | #1868/#1871, later UTC/session corrections #1870/#1889; separate from the legacy ACL delta. |
+| Password / durable sessions / remembered desktop | IMPLEMENTED / MERGED; scoped operator acceptance RECORDED | October 2/6 session records and October 20 production checks, each with original environment limits. |
+| Desktop/API/database release compatibility | IN PROGRESS | 1.0.137 repository release metadata exists; current API JAR, SQL/fence state and fleet/source parity need separate deployment evidence. SQL/API/client order is in the deployment guide. |
+| Web V2 and eventual native phone clients | IN PROGRESS / native NOT STARTED | Merged R1–R3 and R4 reported hosted/iPhone browser flows; web acceptance incomplete; no native release. |
 | Live RLS coverage acceptance | BLOCKED | Non-dbo deployment evidence, including documented Contacts parent-predicate gap. |
 | Wider Case/field and AI grant policy acceptance | BLOCKED | R2 web minimized tenant-wide policy is accepted; additional fields/children/directories and AI restrictions need scoped decisions. Team membership is not a general access policy. |
 | Complete AI read/failure audit representation | BLOCKED | Scoped compatible enhancement decision and verification. |
-| Local Case-read SQL security execution | BLOCKED | Existing harness needs approved authoritative schema-only definitions; no SQL run claimed. |
+| Local Case-read SQL security execution | BLOCKED | Supplied authoritative export confirms three missing FILTERs; reviewed derived input/candidate and execution remain pending. Auth SQL/recovery passes do not close Case SQL. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
-**Recommended next tasks:** Close the web Case slice's remaining acceptance gates through its existing
-ledger/runbook; obtain approved schema-only definitions before running the isolated SQL harness. For the
-next web REST use case, verify its existing service mapping, bearer session, tenant/user/entity/field
-policy, required audit and stable contract, then implement only necessary shared-boundary improvements.
-For AI, prioritize the two reusable Case queries, decide integration restrictions and compatible read/failure
-attribution, and obtain issuer/grant/tool decisions before activation. Inventory task/directory gaps before
-expanding the catalog. Keep AI disabled/read-only according to its own gates; ordinary authorized
-web delivery continues without completing MCP or AI OAuth.
+**ONE recommended next implementation phase: Phase 1R — targeted Case-read RLS candidate and local
+acceptance.** Prepare the three missing read FILTERs and verify the existing minimized Case boundary
+in an explicitly disposable candidate database. This is a finite shared API/database security prerequisite
+toward MCP, not a general security rewrite or MCP implementation. Reuse the existing pre-tenant V1/V2,
+durable sessions, minimized ports and OpenAPI; no new API endpoint or auth redesign must come first.
+Before activating Users RLS, confirm the compatible API/desktop deployment, confined auth execution and
+old-caller drain from sanitized existing records. Retirement alone does not establish those facts. Candidate
+source/local work can proceed with the documented module/permission recipe; missing authoritative input
+or live provenance blocks the corresponding acceptance, not a demand to repeat operator rehearsals.
+
+This phase closes only selected read coverage if its tests pass. MCP remains disabled until approved
+delegation, integration controls and AI audit representation in §§4–5 exist and selected runtime security
+acceptance closes. Web/phone delivery continues through its owning roadmap independently of those AI gates.
+
+### 9.1 Ready-to-run Codex prompt — Phase 1R
+
+```text
+Repository: gseshadow/Shale
+PR base: codex/latest
+Task: Implement Phase 1R, a targeted three-FILTER Case-read RLS candidate with isolated local acceptance.
+
+Fetch current origin/codex/latest; read AGENTS.md and architecture/codex-prompt-rules.md completely.
+Create a separate task branch/worktree and preserve unrelated work. Follow documentation routing.
+Read docs/architecture/ai-integration-and-mcp.md §§2.5/9, architecture/database-schema.md,
+architecture/tenancy-and-rls.md, docs/testing/case-read-local-security-verification.md (especially
+RLS blocker assessment and prerequisite rollout), docs/testing/auth-module-permission-cutover.md,
+docs/azure-app-service-deployment.md and R4. Inspect current V1/V2 auth callers, module installer,
+Stage A/B guards, runtime context initialization, minimized Case queries/audit and their existing tests.
+
+Preserve October 20 operator-reported production retirement and API/installed-desktop passes.
+Do not repeat retirement, completed recovery/rehearsals or accepted desktop/phone-browser checks.
+Do not treat retirement as evidence of Stage A/B, current JAR/MSI parity, three FILTERs or monitoring.
+
+Scope:
+1. Add a fail-fast, transactional, idempotent candidate migration/preflight/postcheck and exact scoped
+   rollback for only Users and actual auditLog -> sec.fn_FilterByTenant, Statuses ->
+   sec.fn_FilterByTenantOrGlobal, on existing enabled sec.TenantFilter. Resolve actual identifier
+   collation/ownership and reviewed function definitions. Matching predicates are a no-op; unknown,
+   conflicting or disabled policy/function shapes fail. Preserve all pre-existing policies/functions,
+   grants, rows, history, columns, indexes and overlay precedence. Do not run the June broad proposal.
+2. Keep original authoritative offline schema artifact immutable. Use only approved offline schema-only
+   input already available; record source/derived/candidate hashes and dependency inventories separately.
+   Preserve actual constraints/computed functions/collation. Derive a labelled candidate with exactly
+   these additions. Keep CaseReadLocalSqlServerTest's fixed security expectations unchanged. If importer
+   support needs extension, make the smallest safety-reviewed/tested change; never fabricate coverage.
+   If the artifact is unavailable, complete independently reviewable migration/static/fixture work and
+   explicitly mark authoritative Case SQL acceptance blocked. Do not request data or wholesale packets.
+3. Only in a new loopback disposable database with synthetic data, verify null-context V1 password and
+   V2 remembered resolution, confined owner authority/caller restoration, separate non-bypass runtime,
+   login/me/refresh/logout and remembered rotation/replay/revocation under the new Users FILTER.
+   Reuse existing auth fixtures; distinguish their synthetic schema from authoritative Case input.
+4. Run the unchanged Case harness against the labelled candidate: non-dbo tenants A/B/NULL, pooled
+   context reuse/setup failure, global/current Statuses and foreign exclusion, active actors/joins,
+   paging/hasMore and required Overview audit. Real denied audit INSERT must withhold data/roll back;
+   preserve committed audit under injected lost-acknowledgement and label that injection accurately.
+5. Record SQL-before-API/desktop compatibility and deployment gates without performing deployment.
+   Users FILTER activation requires sanitized existing evidence of installed V1/V2/module fences,
+   intended auth/runtime identities and compatible deployed callers/drain. Never use dbo/ShaleAdmins
+   runtime bypass or an auth SELECT fallback to preserve old clients. Unknowns stay explicit.
+
+Acceptance:
+- Exact three-predicate delta, repeat no-op, drift rejection, failure atomicity and exact rollback tested.
+- Auth/bootstrap/session compatibility plus non-bypass two-tenant/null/pool and required-audit scenarios
+  pass locally, with real versus synthetic/injected/authoritative evidence labelled separately.
+- Review existing affected migration/auth/session/Case/runner tests before edits; test production
+  delegation and negative paths, not only source strings. Run focused tests, repository selector's
+  relevant affected suite and critical mvn test. Attribute inherited advisories; no blanket all-tests.
+- Update this canonical tracker and owning runbook with exact commands/results, remaining gates and
+  rollback; check relative links, anchors, fences and git diff --check. Commit/push/open a PR to codex/latest.
+  Unexecuted authoritative SQL is unverified, never a passed security gate.
+
+Explicit exclusions: production/Azure connections or SQL, permission changes outside disposable fixtures,
+deployment/publication/version bumps, executing old operator packets, editing private captures,
+password/token/data collection, whole JDBC migration, auth rewrite, RLS write BLOCKs, broad least-privilege
+or audit-admin/logging remediation, schema/data backfills, new Case fields/endpoints, MCP/OAuth/grants/AI
+audit implementation, mobile/PWA/native features. No MCP activation or claim of complete least privilege.
+Preserve existing audit schema and fail-closed Overview event/transaction; summary web audit exemption
+stays unchanged. Audit grant/BLOCK/admin gaps and AI attribution stay explicit follow-on activation gates.
+```
+
+### 9.2 Reconciliation verification — 2026-10-21
+
+Documentation only: ten existing Markdown files changed; no production/test/SQL/configuration contract
+changes. Audit compatibility uses existing schema/events unchanged; recording evidence and dependencies
+creates no sensitive read or domain/admin mutation. AI attribution remains the scoped gap in §5.
+
+The configured Git proxy refused fetch connections. The GitHub connector fetched current branch/tree/
+blob and PR metadata instead; imported head/tree/text blob hashes were checked against GitHub before
+creating the isolated task worktree. Original checkout/work and unrelated image tree entries are preserved.
+
+Checks for this reconciliation (not runtime/production acceptance):
+
+```bash
+python3 /workspace/work/check-roadmap-docs.py
+python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown --plan-output /workspace/work/roadmap-selection.json
+git diff --check origin/codex/latest HEAD
+```
+
+The task-local documentation checker verifies all relative links/anchors, fences, documentation-only
+scope, SQL prerequisite paths and evidence/status markers. No Maven/npm/SQL/Windows/rehearsal suite is
+appropriate to unchanged runtime contracts; selector output is impact review only. Exact executed
+results are recorded in the PR, without promoting historical or unexecuted tests to new passes.

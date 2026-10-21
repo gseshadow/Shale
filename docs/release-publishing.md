@@ -1,5 +1,17 @@
 # Release and publication runbook
 
+## SQL and API dependencies before client publication
+
+A desktop release is not a self-contained database/API deployment. The scripts below build/package,
+publish artifacts/manifest and import release content; they do not apply SQL migrations, install auth
+modules/fences or deploy the server JAR. Before a separately authorized release, use the
+[SQL/API/client dependency matrix](azure-app-service-deployment.md#release-dependencies-and-order--2026-10-21)
+and record which prerequisites are already deployed for that exact source. Module SQL precedes its
+new API and direct-JDBC desktop callers; compatible fleet/job drain precedes restrictive permissions
+or Users RLS. Never infer these steps from a successful app build, release commit or catalog import.
+The [current roadmap ledger](architecture/ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
+distinguishes October 20 retirement acceptance from separate later deployment work.
+
 ## Normal release
 
 From an attached Windows Git branch with a configured upstream, a clean index/worktree, Azure CLI access, and the

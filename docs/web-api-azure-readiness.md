@@ -1,22 +1,24 @@
 # Shale Server Azure App Service Readiness
 
-## Auth permission evidence and cutover candidate — 2026-10-15
+## Current authentication/security reconciliation — 2026-10-21
 
-The [owning permission cutover runbook](testing/auth-module-permission-cutover.md) records the user's native Windows
-auth SQL PASS for credential_identity, remembered_rotation and runtime_isolation, exit 0, and the
-user-run Azure collation/principal/effective-permission evidence. These supersede earlier pending
-Windows retest/unknown catalog statements for those reported observations only. Actual deployed
-server/desktop credential configuration and compatible installed fleet remain UNCONFIRMED.
+The [canonical API/MCP roadmap §2.5](architecture/ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
+records the October 20 **operator-reported production retirement** of EXECUTE on the three legacy login
+procedures for `shale_app`, runtime principal/role denials, and successful API login/identity/refresh/logout
+plus installed-desktop automatic sign-in/user-detail checks. Do not repeat completed operator rehearsals
+or treat the older retirement-BLOCKED statements below as current status for that exact delta.
 
-Existing runtime database/schema EXECUTE would expose new dbo owner-executed modules. The candidate
-installs both modules with runtime principal/role object DENY fences atomically, grants auth only object
-EXECUTE, and separately gates additive auth-table/runtime-hash read fences on approved caller inventory
-and old-client drain. Existing User projections and password-management writes are preserved. Original
-grants/grantors/states are captured and never rewritten; exact staged postchecks and rollback are owned
-there. Broader runtime audit SELECT/INSERT/UPDATE/DELETE remediation remains OPEN: deployed history must
-not be described as database-enforced append-only. No three FILTERs, existing predicates, original export,
-Case harness or R4 accepted reports change. CASE SQL NOT RUN; security acceptance OPEN; deployment BLOCKED.
-No Azure connection/live grant/migration, client release, configuration change, merge or deployment here.
+The separate V1/V2 auth-module Stage A installation/fences, Stage B table/hash read restrictions,
+subsequent desktop/API/SQL deployment details and monitoring closeout are not established by that report.
+Current source is merged through release 1.0.137; merge/release metadata does not establish deployed parity.
+Users/auditLog/Statuses read coverage, runtime hash/audit capabilities, write/admin restrictions and
+Case SQL acceptance remain open as qualified in that ledger. Supplied offline schema confirmed the gap;
+older missing-input statements are historical. No complete least-privilege, MCP or native-mobile acceptance.
+
+Follow the [SQL/API/client release order](azure-app-service-deployment.md#release-dependencies-and-order--2026-10-21).
+The one next implementation phase is the roadmap's [Phase 1R prompt](architecture/ai-integration-and-mcp.md#91-ready-to-run-codex-prompt--phase-1r),
+a local three-FILTER candidate, without production changes. Earlier dated tests, local Windows/source
+recovery limits and all accepted R4/session observations retain their scopes. This update executes no SQL.
 
 
 ## Pre-tenant auth candidate — 2026-10-14
