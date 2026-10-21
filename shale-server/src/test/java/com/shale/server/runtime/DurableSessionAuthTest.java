@@ -38,6 +38,44 @@ class DurableSessionAuthTest {
         assertFalse(new LegacyTokenCompatibilityPolicy(NOW,3600,Clock.fixed(NOW.plusSeconds(3600),ZoneOffset.UTC)).permits(legacy),"window must close deterministically");
         assertFalse(new LegacyTokenCompatibilityPolicy(NOW.minusSeconds(20),3600,Clock.fixed(NOW,ZoneOffset.UTC)).permits(legacy),"post-cutover unbound token must fail");
     }
+    @Test void selectedCaseRoutesRequireCurrentDurableBearerAndIgnoreClientIdentity() throws Exception {
+        var store=new MemoryStore();
+        var clock=Clock.fixed(NOW,ZoneOffset.UTC);
+        var tokens=new ShaleAuthTokenService("test-auth-token-secret-that-is-long-enough",3600,clock);
+        var auth=new ServerAuthSessionService(tokens,store,new DurableSessionTokenValidator(store,clock),
+                new LegacyTokenCompatibilityPolicy(NOW,3600,clock),new InMemoryTokenRevocationStore(clock));
+        String bearer=auth.issue(PRINCIPAL);
+        var request=new org.springframework.mock.web.MockHttpServletRequest();
+        request.addHeader("Authorization","Bearer " + bearer);
+        var beans=new org.springframework.beans.factory.support.DefaultListableBeanFactory();
+        beans.registerSingleton("currentRequest",request);
+        var sessions=new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokens,auth),
+                beans.getBeanProvider(jakarta.servlet.http.HttpServletRequest.class));
+        var calls=new ArrayList<List<Object>>();
+        var item=new com.shale.core.dto.MinimizedCaseOverview(1,null,"Synthetic",null,null,null,null,null);
+        var port=(com.shale.core.service.CaseServicePort)java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(),new Class<?>[]{com.shale.core.service.CaseServicePort.class},(p,m,a)->{
+                    calls.add(Arrays.asList(a));
+                    return m.getName().equals("readMinimizedCaseOverview") ? Optional.of(item)
+                            : new com.shale.core.dto.MinimizedCasePage(List.of(item),0,25,false);
+                });
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new com.shale.server.controller.MinimizedCaseReadController(port,sessions,new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()))
+                .setControllerAdvice(new com.shale.server.controller.MinimizedCaseReadErrors()).build();
+        var routes=List.of(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v2/cases/search-page")
+                        .contentType("application/json").content("{\"query\":\"Synthetic\",\"userId\":99,\"tenant\":99}"),
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v2/cases/assigned-page").param("userId","99"),
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v2/cases/1/overview").param("tenant","99"));
+        for (var route : routes) mvc.perform(route).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        assertEquals(List.of(List.of("Synthetic",7,9,0,25),List.of(7,9,0,25),List.of(1L,7,9)),calls,
+                "Every route must use authenticated tenant/user, never caller-selected identity");
+        auth.logout(tokens.verifyToken(bearer).orElseThrow());
+        calls.clear();
+        for (var route : routes) mvc.perform(route).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+        assertTrue(calls.isEmpty(),"A durably revoked bound session must reach no Case operation");
+    }
+
     private static VerifiedAuthToken token(ServerPrincipal p,UUID j,UUID s){return new VerifiedAuthToken(p,j.toString(),NOW.getEpochSecond(),NOW.plusSeconds(60).getEpochSecond(),s.toString());}
     private static UserSessionView view(UUID s,UUID j,ServerPrincipal p,Instant e,Instant r){return new UserSessionView(1,s,ClientType.WEB,null,j,NOW,e,null,r,r==null?null:"USER_LOGOUT");}
     static final class MemoryStore implements DurableSessionStore {UserSessionView value;

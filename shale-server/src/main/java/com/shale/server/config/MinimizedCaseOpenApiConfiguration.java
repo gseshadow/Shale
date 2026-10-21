@@ -47,6 +47,14 @@ public class MinimizedCaseOpenApiConfiguration {
             page.getProperties().get("items").setMaxItems(25);
             page.getProperties().get("page").setMinimum(BigDecimal.ZERO);page.getProperties().get("page").setMaximum(BigDecimal.valueOf(100));
             page.getProperties().get("size").setMinimum(BigDecimal.ONE);page.getProperties().get("size").setMaximum(BigDecimal.valueOf(25));
+            page.setDescription("Authorized SQL page, no total/count or snapshot guarantee. Keep size fixed; concurrent changes may shift offset pages.");
+            page.getProperties().get("items").setMinItems(0);
+            page.getProperties().get("hasMore").setDescription("True iff the authorized size+1 SQL probe found another row. At page 100 this remains truthful, but clients must stop and narrow the search: page 101 is invalid.");
+            Schema<?> search = schemas.get("SearchRequest");
+            search.addExtension("x-max-stripped-query-utf16-length", 100);
+            // Required record members are always serialized, including explicit null relationships.
+            // This existing shared error record is also generated from its Java type.
+            schemas.get("ApiErrorResponse").setRequired(List.of("timestamp", "status", "error", "message", "path", "fieldErrors"));
         };
     }
     private static void refine(Schema<?> schema,List<String> required) { schema.setRequired(required);schema.setAdditionalProperties(false); }

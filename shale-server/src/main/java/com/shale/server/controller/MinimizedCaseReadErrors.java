@@ -52,7 +52,12 @@ public final class MinimizedCaseReadErrors {
         log.warn("Minimized Case read operation={} category={} exceptionClass={}",
                 operation(request), category, failure.getClass().getName());
         return ResponseEntity.status(status).cacheControl(CacheControl.noStore()).body(
-                new ApiErrorResponse(Instant.now(), status, code, message, request.getRequestURI()));
+                new ApiErrorResponse(Instant.now(), status, code, message, boundedPath(request)));
+    }
+    private static String boundedPath(HttpServletRequest request) {
+        // A malformed ID can be arbitrarily long. Never reflect it into an unbounded error body.
+        String path = request.getRequestURI();
+        return path != null && path.length() <= 512 ? path : "/api/v2/cases";
     }
     private static String operation(HttpServletRequest request) {
         Object pattern = request.getAttribute(org.springframework.web.servlet.HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);

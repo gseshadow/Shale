@@ -135,6 +135,174 @@ class OpenApiDocumentationTest {
                 java.util.Set.of("NORMAL", "READ_ONLY", "MAINTENANCE", "BLOCKED"));
     }
 
+    /** Bounded compatibility baseline: wire semantics only, never generated ordering/metadata. */
+    @Test
+    void stableCaseContractRetainsRoutesInputsTypesRequiredNullabilityAndAuthentication() throws Exception {
+        var root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var schemas = root.path("components").path("schemas");
+        var scheme = root.at("/components/securitySchemes/bearerAuth");
+        org.junit.jupiter.api.Assertions.assertEquals("http", scheme.path("type").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("bearer", scheme.path("scheme").asText());
+        for (String path : java.util.List.of("/api/v2/cases/search-page", "/api/v2/cases/assigned-page", "/api/v2/cases/{caseId}/overview")) {
+            var operation = root.path("paths").path(path).path(path.endsWith("search-page") ? "post" : "get");
+            org.junit.jupiter.api.Assertions.assertFalse(operation.isMissingNode(), "Stable route removed: " + path);
+            org.junit.jupiter.api.Assertions.assertTrue(operation.path("security").findValues("bearerAuth").size() == 1,
+                    "Stable operations must retain bearer authentication: " + path);
+            String responseType = path.endsWith("overview") ? "MinimizedCaseOverview" : "MinimizedCasePage";
+            org.junit.jupiter.api.Assertions.assertEquals("#/components/schemas/" + responseType,
+                    operation.at("/responses/200/content/application~1json/schema/$ref").asText());
+            for (String code : java.util.List.of("400", "401", "403", "503"))
+                org.junit.jupiter.api.Assertions.assertEquals("#/components/schemas/ApiErrorResponse",
+                        operation.path("responses").path(code).at("/content/application~1json/schema/$ref").asText(), path + " " + code);
+        }
+        var assigned = root.path("paths").path("/api/v2/cases/assigned-page").path("get");
+        java.util.Map<String, com.fasterxml.jackson.databind.JsonNode> parameters = new java.util.HashMap<>();
+        assigned.path("parameters").forEach(p -> parameters.put(p.path("name").asText(), p));
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.Set.of("page", "size"), parameters.keySet());
+        for (String name : parameters.keySet()) {
+            var parameter = parameters.get(name);
+            org.junit.jupiter.api.Assertions.assertEquals("query", parameter.path("in").asText());
+            org.junit.jupiter.api.Assertions.assertFalse(parameter.path("required").asBoolean());
+            assertBounds(parameter.path("schema"), name.equals("page") ? 0 : 1, name.equals("page") ? 100 : 25);
+            org.junit.jupiter.api.Assertions.assertEquals(name.equals("page") ? 0 : 25, parameter.at("/schema/default").asInt());
+        }
+        var overview = root.path("paths").path("/api/v2/cases/{caseId}/overview").path("get");
+        var id = overview.path("parameters").get(0);
+        org.junit.jupiter.api.Assertions.assertEquals("caseId", id.path("name").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("path", id.path("in").asText());
+        org.junit.jupiter.api.Assertions.assertTrue(id.path("required").asBoolean());
+        assertBounds(id.path("schema"), 1, Integer.MAX_VALUE);
+        org.junit.jupiter.api.Assertions.assertEquals("#/components/schemas/ApiErrorResponse",
+                overview.at("/responses/404/content/application~1json/schema/$ref").asText());
+        var search = root.path("paths").path("/api/v2/cases/search-page").path("post");
+        org.junit.jupiter.api.Assertions.assertTrue(search.at("/requestBody/required").asBoolean());
+        org.junit.jupiter.api.Assertions.assertEquals("#/components/schemas/SearchRequest",
+                search.at("/requestBody/content/application~1json/schema/$ref").asText());
+        assertFields(schemas, "SearchRequest", java.util.Map.of("query", "string", "page", "integer", "size", "integer"),
+                java.util.Set.of(), java.util.Set.of("query", "page", "size"));
+        org.junit.jupiter.api.Assertions.assertFalse(schemas.at("/SearchRequest/properties/query").has("maxLength"),
+                "Raw maxLength would reject valid surrounding whitespace; runtime bounds the stripped UTF-16 query");
+        org.junit.jupiter.api.Assertions.assertEquals(100, schemas.path("SearchRequest").path("x-max-stripped-query-utf16-length").asInt());
+        assertBounds(schemas.at("/SearchRequest/properties/page"), 0, 100);
+        assertBounds(schemas.at("/SearchRequest/properties/size"), 1, 25);
+        assertFields(schemas, "MinimizedCaseOverview", java.util.Map.of(
+                "caseId", "integer", "caseNumber", "string", "caseName", "string", "status", "CaseReadStatus",
+                "practiceArea", "CaseReadPracticeArea", "responsibleAttorney", "CaseReadUser",
+                "primaryLegalAssistant", "CaseReadUser", "updatedAt", "string"), null,
+                java.util.Set.of("caseNumber", "status", "practiceArea", "responsibleAttorney", "primaryLegalAssistant", "updatedAt"));
+        assertFields(schemas, "MinimizedCasePage", java.util.Map.of("items", "array", "page", "integer", "size", "integer", "hasMore", "boolean"), null, java.util.Set.of());
+        assertFields(schemas, "CaseReadStatus", java.util.Map.of("id", "integer", "name", "string", "color", "string"), null, java.util.Set.of("color"));
+        assertFields(schemas, "CaseReadPracticeArea", java.util.Map.of("id", "integer", "name", "string"), null, java.util.Set.of());
+        assertFields(schemas, "CaseReadUser", java.util.Map.of("userId", "integer", "displayName", "string"), null, java.util.Set.of());
+        assertFields(schemas, "ApiErrorResponse", java.util.Map.of("timestamp", "string", "status", "integer", "error", "string", "message", "string", "path", "string", "fieldErrors", "array"), null, java.util.Set.of());
+        org.junit.jupiter.api.Assertions.assertEquals("#/components/schemas/MinimizedCaseOverview", schemas.at("/MinimizedCasePage/properties/items/items/$ref").asText());
+        assertBounds(schemas.at("/MinimizedCasePage/properties/page"), 0, 100);
+        assertBounds(schemas.at("/MinimizedCasePage/properties/size"), 1, 25);
+        for (String[] identity : java.util.List.of(new String[]{"MinimizedCaseOverview","caseId"},
+                new String[]{"CaseReadStatus","id"},new String[]{"CaseReadPracticeArea","id"},new String[]{"CaseReadUser","userId"}))
+            assertBounds(schemas.path(identity[0]).path("properties").path(identity[1]),1,Integer.MAX_VALUE);
+        org.junit.jupiter.api.Assertions.assertFalse(schemas.at("/MinimizedCaseOverview/properties/updatedAt").has("format"),
+                "Stored local timestamp text must not become an offset/UTC date-time schema");
+        for (String[] text : java.util.List.of(new String[]{"MinimizedCaseOverview","caseName"},
+                new String[]{"CaseReadStatus","name"},new String[]{"CaseReadPracticeArea","name"},new String[]{"CaseReadUser","displayName"}))
+            org.junit.jupiter.api.Assertions.assertEquals(255,schemas.path(text[0]).path("properties").path(text[1]).path("maxLength").asInt());
+        org.junit.jupiter.api.Assertions.assertEquals(200,schemas.at("/MinimizedCaseOverview/properties/caseNumber/maxLength").asInt());
+
+    }
+
+    @Autowired private com.fasterxml.jackson.databind.ObjectMapper wireJson;
+
+    @Test
+    void generatedCaseSchemasDescribeActualSerializedRecordsIncludingNullsAndRelationships() throws Exception {
+        var root=wireJson.readTree(mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var empty=new com.shale.core.dto.MinimizedCaseOverview(1,null,"",null,null,null,null,null);
+        var populated=new com.shale.core.dto.MinimizedCaseOverview(2147483647,"N", "Synthetic",
+                new com.shale.core.dto.MinimizedCaseOverview.CaseReadStatus(2,"Open",null),
+                new com.shale.core.dto.MinimizedCaseOverview.CaseReadPracticeArea(3,"Area"),
+                new com.shale.core.dto.MinimizedCaseOverview.CaseReadUser(4,"Attorney"),
+                new com.shale.core.dto.MinimizedCaseOverview.CaseReadUser(5,"Assistant"),"2026-10-21T09:25");
+        var schemas=root.at("/components/schemas");
+        for (var item : java.util.List.of(empty,populated)) {
+            assertSerialized(schemas,schemas.path("MinimizedCaseOverview"),wireJson.readTree(wireJson.writeValueAsBytes(item)));
+            var page=new com.shale.core.dto.MinimizedCasePage(java.util.List.of(item),100,1,true);
+            assertSerialized(schemas,schemas.path("MinimizedCasePage"),wireJson.readTree(wireJson.writeValueAsBytes(page)));
+        }
+        var error=new com.shale.server.dto.ApiErrorResponse(java.time.Instant.parse("2026-10-21T15:25:00Z"),503,
+                "case_read_unavailable","Case read unavailable. Retry explicitly.","/api/v2/cases/assigned-page");
+        assertSerialized(schemas,schemas.path("ApiErrorResponse"),wireJson.readTree(wireJson.writeValueAsBytes(error)));
+    }
+
+    /** Checks the schema features used by these records, rather than snapshots of generated JSON. */
+    private static void assertSerialized(com.fasterxml.jackson.databind.JsonNode schemas,
+            com.fasterxml.jackson.databind.JsonNode schema, com.fasterxml.jackson.databind.JsonNode value) {
+        if (value.isNull()) {
+            org.junit.jupiter.api.Assertions.assertTrue(schema.path("nullable").asBoolean(),"Serialized null must be documented");
+            return;
+        }
+        if (schema.has("$ref")) {
+            assertSerialized(schemas,schemas.path(schema.path("$ref").asText().replace("#/components/schemas/","")),value);
+            return;
+        }
+        if (schema.has("allOf")) {
+            for (var member : schema.path("allOf")) assertSerialized(schemas,member,value);
+            return;
+        }
+        switch (schema.path("type").asText()) {
+            case "object" -> {
+                org.junit.jupiter.api.Assertions.assertTrue(value.isObject());
+                schema.path("required").forEach(field -> org.junit.jupiter.api.Assertions.assertTrue(value.has(field.asText()),"Missing serialized " + field));
+                value.fields().forEachRemaining(field -> {
+                    org.junit.jupiter.api.Assertions.assertTrue(schema.path("properties").has(field.getKey()),"Undocumented serialized member: " + field.getKey());
+                    assertSerialized(schemas,schema.path("properties").path(field.getKey()),field.getValue());
+                });
+            }
+            case "array" -> {
+                org.junit.jupiter.api.Assertions.assertTrue(value.isArray());
+                if (schema.has("maxItems")) org.junit.jupiter.api.Assertions.assertTrue(value.size()<=schema.path("maxItems").asInt());
+                value.forEach(item -> assertSerialized(schemas,schema.path("items"),item));
+            }
+            case "string" -> {
+                org.junit.jupiter.api.Assertions.assertTrue(value.isTextual());
+                if (schema.has("maxLength")) org.junit.jupiter.api.Assertions.assertTrue(value.asText().length()<=schema.path("maxLength").asInt());
+                if (schema.has("pattern")) org.junit.jupiter.api.Assertions.assertTrue(value.asText().matches(schema.path("pattern").asText()));
+            }
+            case "integer" -> {
+                org.junit.jupiter.api.Assertions.assertTrue(value.isIntegralNumber());
+                if (schema.has("minimum")) org.junit.jupiter.api.Assertions.assertTrue(value.asLong()>=schema.path("minimum").asLong());
+                if (schema.has("maximum")) org.junit.jupiter.api.Assertions.assertTrue(value.asLong()<=schema.path("maximum").asLong());
+            }
+            case "boolean" -> org.junit.jupiter.api.Assertions.assertTrue(value.isBoolean());
+            default -> org.junit.jupiter.api.Assertions.fail("Unhandled selected schema: " + schema);
+        }
+    }
+
+    private static void assertBounds(com.fasterxml.jackson.databind.JsonNode schema, int minimum, int maximum) {
+        org.junit.jupiter.api.Assertions.assertEquals("integer", schema.path("type").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(minimum, schema.path("minimum").asInt());
+        org.junit.jupiter.api.Assertions.assertEquals(maximum, schema.path("maximum").asInt());
+    }
+
+    private static void assertFields(com.fasterxml.jackson.databind.JsonNode schemas, String name,
+            java.util.Map<String, String> types, java.util.Set<String> required, java.util.Set<String> nullable) {
+        var schema = schemas.path(name);
+        java.util.Set<String> actual = new java.util.HashSet<>();
+        schema.path("properties").fieldNames().forEachRemaining(actual::add);
+        org.junit.jupiter.api.Assertions.assertEquals(types.keySet(), actual, name + " field allowlist changed; review compatibility/disclosure");
+        java.util.Set<String> actualRequired = new java.util.HashSet<>();
+        schema.path("required").forEach(n -> actualRequired.add(n.asText()));
+        org.junit.jupiter.api.Assertions.assertEquals(required == null ? types.keySet() : required, actualRequired, name + " required members");
+        types.forEach((field, type) -> {
+            var property = schema.path("properties").path(field);
+            org.junit.jupiter.api.Assertions.assertEquals(nullable.contains(field), property.path("nullable").asBoolean(), name + "." + field);
+            String actualType = property.path("type").asText();
+            if (type.startsWith("CaseRead")) {
+                org.junit.jupiter.api.Assertions.assertEquals("#/components/schemas/" + type, property.path("allOf").get(0).path("$ref").asText());
+            } else org.junit.jupiter.api.Assertions.assertEquals(type, actualType, name + "." + field);
+        });
+    }
+
     private static void assertClosedEnum(com.fasterxml.jackson.databind.JsonNode property, java.util.Set<String> expected) {
         java.util.Set<String> actual = new java.util.HashSet<>();
         property.path("enum").forEach(value -> actual.add(value.asText()));

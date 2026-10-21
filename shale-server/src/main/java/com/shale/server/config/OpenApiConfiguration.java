@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @OpenAPIDefinition(info = @Info(
         title = "Shale Server API",
         version = "v1",
-        description = "HTTP API for Shale web clients. Protected endpoints use server-issued bearer tokens; tenant context is derived from the token/server session, not client input."))
+        description = "HTTP API for Shale clients. info.version is document metadata, not a URL version or a stability promise for every listed path. The stable selected Case reads use /api/v2/cases; see docs/web-api-azure-readiness.md for scope and compatibility policy. Protected endpoints use server-issued bearer tokens validated against durable sessions; tenant and actor come from server authority, not client input."))
 @SecurityScheme(
         name = "bearerAuth",
         type = SecuritySchemeType.HTTP,
