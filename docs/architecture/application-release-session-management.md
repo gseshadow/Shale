@@ -28,6 +28,20 @@ behavior and this document's historical acceptance remain unchanged. Future user
 reset must invalidate integration sessions too; live user eligibility checks remain mandatory even before
 a sweep completes. No new session schema, auth route, audit event or deployment is added here.
 
+## MCP delegated-session foundation — Phase 3B.1
+
+The [canonical implementation record](ai-integration-and-mcp.md#1013-phase-3b1-integration-persistence-and-security-foundation)
+and [SQL authority/rollback inventory](../sql/ai-integration/README.md) now define candidate durable
+AiDelegationGrant/AiDelegatedSession/AiOAuthCredential storage. This is separate from UserSessions and its
+closed WEB/DESKTOP/MOBILE vocabulary. No ordinary JWT, remembered credential, API session or desktop behavior
+is changed. Both context keys still come from the existing authenticated lease initializer; provisional
+bootstrap references are never ordinary REST principals or permission to disclose Case data.
+
+Live gates check current user/tenant, grant, registration, key and expiry. Explicit family revoke is audited;
+tenant disable revokes families/grants. Credential issuance, refresh/reuse/reset lifecycle wiring and maintained
+OAuth transaction storage remain 3B.2. There is no token issuance or endpoint, and no capability is enabled.
+The earlier Phase 3A paragraph is a historical design record, superseded only for this implemented foundation.
+
 ## Current authentication/security reconciliation — 2026-10-21
 
 The [canonical API/MCP roadmap §2.5](ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)

@@ -175,3 +175,21 @@ tenant/actor the same way and recheck active same-tenant `is_admin` at the servi
 is explicitly tenant-qualified; a cross-tenant UUID is indistinguishable from an unavailable UUID. The new
 `SessionSecurityAuditLog` is strict tenant-owned data protected by the existing `TenantFilter` FILTER and AFTER
 INSERT/UPDATE predicates. RLS is defense in depth, not a replacement for predicates.
+
+
+## AI integration controls — Phase 3B.1 candidate
+
+The [new-object authority inventory](../docs/sql/ai-integration/README.md#runtime-permissions-and-tenant-isolation)
+reviews every new tenant table: TenantAiIntegrationPolicy, AiIntegrationRegistration, AiIntegrationRedirect,
+AiIntegrationClientKey, AiDelegationGrant, AiConsentIntent, AiDelegatedSession, AiOAuthCredential and
+AiQuotaReservation. Each uses non-null ShaleClientId and the existing strict sec.TenantFilter FILTER plus
+AFTER INSERT/UPDATE BLOCK predicates. No overlay, shared-function change or unrelated-table remediation.
+Composite FKs and immutable-owner triggers prevent tenant/user/integration movement; no cascade deletes.
+
+Procedure-only runtime roles deny direct table reads/DML/ALTER/CONTROL. Tenant modules retain caller/RLS
+and derive both context keys; active same-tenant Users.is_admin controls administration, while consent is
+self-bound. Global AiProductCapability has no tenant RLS and a separate operator-only audited boundary.
+Confined owner resolvers return provisional references only; ordinary runtime cannot execute them. Identity
+restoration and every new table's FILTER/BLOCK are tested with actual separate non-bypass SQL identities in
+synthetic local databases. This is not production or authoritative Case RLS acceptance. The separate missing
+Case artifact/Stage A/B/deployment gates remain unchanged. Keep all capability and tenant flags off.

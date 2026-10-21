@@ -1405,3 +1405,23 @@ defense in depth.
 ## dbo.TaskPolicyConfigurations (Task Due Date Policy)
 
 One strict tenant-owned row stores `DueDatePolicy` as `OPTIONAL`, `WARN`, or `REQUIRED`; the unique tenant key prevents duplicate authority and a missing row resolves to `WARN`. `WARN` is desktop confirmation behavior only. `REQUIRED` is enforced by `TaskDao` immediately before every task create/update, while existing undated tasks remain readable. The table has timestamps, actor columns, `RowVer`, a closed-value check, and strict tenant filter/insert/update RLS predicates. Administrative changes use the established transactional entity-action audit seam with TASK_POLICY_CONFIGURATION/UPDATED and allowlisted PREVIOUS_POLICY/RESULTING_POLICY metadata. The tenant-qualified RowVer update and audit append share one connection and transaction; administrator, tenant context, and actor identity are checked before mutation.
+
+
+## AI integration security foundation — Phase 3B.1 candidate
+
+The additive, manual-only [Phase 3B.1 candidate](../docs/sql/ai-integration/README.md) owns ten new dbo entities:
+`AiProductCapability` (global), and strict tenant-owned `TenantAiIntegrationPolicy`, `AiIntegrationRegistration`,
+`AiIntegrationRedirect`, `AiIntegrationClientKey`, `AiDelegationGrant`, `AiConsentIntent`, `AiDelegatedSession`,
+`AiOAuthCredential`, `AiQuotaReservation`. The operator record inventories every existing dependency before
+DDL and documents exact constraints/FKs/indexes/ownership, RowVer, UTC and immutable/revoked history.
+No historical migration changes. Global default=false; absent tenant policy=false; no automatic registrations,
+consents or credentials. All tenant relationships are non-cascading and tenant-qualified using the existing
+Users composite key. Keys contain only pinned public RSA material; random credential/intent values are
+hash-only. Quota facts are durable SQL admission/accounting, never process counters.
+
+The same candidate minimally extends the existing EntityActionAuditLog positive allowlist with
+TENANT_AI_POLICY, AI_INTEGRATION, AI_CLIENT_KEY, AI_DELEGATION_GRANT, AI_DELEGATED_SESSION; actions reuse
+CREATED/UPDATED/DEACTIVATED, metadata is ACTIVE/AI_SCOPE_MASK only. Product switch audit reuses
+GlobalControlPlaneAuditLog. The [canonical implementation record](../docs/architecture/ai-integration-and-mcp.md#1013-phase-3b1-integration-persistence-and-security-foundation)
+classifies local synthetic evidence and remaining gates. These are candidate source definitions, not deployed
+facts. No OAuth/MCP endpoint or Case disclosure is installed; flags remain off outside disposable tests.

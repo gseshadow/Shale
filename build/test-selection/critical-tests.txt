@@ -28,3 +28,6 @@ com.shale.ui.services.CaseDatesLiveUpdateContractTest
 com.shale.updater.InstallServiceTest
 com.shale.updater.MainTest
 com.shale.updater.platform.MacPlatformSupportTest
+
+com.shale.core.security.ai.AiScopeTest
+com.shale.data.security.ai.AiSecurityContractTest

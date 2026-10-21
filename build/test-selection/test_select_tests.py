@@ -23,6 +23,12 @@ class ChangeSelectorTest(unittest.TestCase):
     def selected(self, path):
         return SELECTOR.select([path])
 
+    def test_ai_migration_selects_security_foundation_and_default_off_smokes(self):
+        result = self.selected("docs/sql/ai-integration/phase3b1.sql")
+        self.assertIn("security-data", result["selected_areas"])
+        self.assertIn("com.shale.core.security.ai.AiScopeTest", result["test_patterns"])
+        self.assertIn("com.shale.data.security.ai.AiSecurityContractTest", result["test_patterns"])
+
     def test_contact_change_selects_contacts_but_not_calendar(self):
         result = self.selected("shale-ui/src/main/java/com/shale/ui/controller/ContactViewController.java")
         self.assertIn("contacts", result["selected_areas"])

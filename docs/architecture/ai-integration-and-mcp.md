@@ -1,6 +1,6 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B MCP implementation NOT STARTED (inactive).
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); MCP inactive.
 
 **Last reviewed:** 2026-10-21
 
@@ -597,7 +597,7 @@ audit transaction/disclosure policy, resource limits, revocation, tool schemas, 
 threat controls and the testable implementation sequence. No authorization semantics are left for the
 adapter author to invent. This status does not approve a deployment or claim controls exist.
 
-#### Phase 3B — First read-only MCP implementation (**NOT STARTED**)
+#### Phase 3B — First read-only MCP implementation (**IN PROGRESS**)
 
 **Goal:** Implement §10 in small increments [§10.11](#1011-phase-3b-implementation-sequence), with every
 activation flag off until acceptance. Dependencies: selected Phase 1S/2 operations, new persistence/auth/audit/
@@ -685,7 +685,14 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 1 shared secured operations | IN PROGRESS | Phase 1S proves the R2 minimized Case boundary (§9.3); wider operations, AI restrictions/attribution and runtime acceptance remain. No dependency on AI issuer/grants for ordinary web work. |
 | Phase 2 stable REST/OpenAPI foundation | SELECTED CASE FOUNDATION COMPLETE; broader REST IN PROGRESS | §9.4 and the owning API contract formalize the existing three minimized reads; broader operation review and live runtime/security/performance acceptance remain open. Independent of MCP/AI OAuth. |
 | Phase 3A MCP security/integration contract | COMPLETE (design only) | §10; no route, credential, schema or disclosure activated. |
-| Phase 3B first read-only MCP implementation | NOT STARTED | §10.11 sequence; persistence/auth/audit/quotas plus runtime/SQL/client gates. |
+| Phase 3B first read-only MCP implementation | IN PROGRESS | §10.11 sequence; no endpoint or disclosure; remaining auth/audit/runtime/client gates. |
+| Phase 3B.1 integration persistence/security | COMPLETE (source/synthetic proof) | §10.13; focused/affected/critical checks pass; defaults off. |
+| Phase 3B.2 credential/authentication validation | NOT STARTED | Maintained OAuth implementation, AS bindings/rotation and credential validation. |
+| Phase 3B.3 AI audit/shared disclosure seam | NOT STARTED | Mandatory integration access audit and final handoff gate. |
+| Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery in 3B.1. |
+| Phase 3B.5 search_cases | NOT STARTED | No Case tool implementation. |
+| Phase 3B.6 get_case_overview | NOT STARTED | No Case tool implementation. |
+| Phase 3B.7 adversarial/local acceptance | NOT STARTED | Authoritative Case artifact and remaining operational/security/client acceptance required. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
 | Phase 5 administration experience | NOT STARTED | Minimum controls first, then pilot feedback. |
 | Phase 6 optional controlled writes | NOT STARTED | Read-only maturity and per-command approval. |
@@ -703,13 +710,13 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Local Case-read SQL security execution | BLOCKED | Original export is absent from this task workspace; derived/candidate schema artifacts and hashes unavailable. Authoritative Case SQL, real audit denial and injected lost acknowledgement remain unexecuted. Synthetic auth passes do not close Case SQL. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
-**Latest contract phase: Phase 3A COMPLETE (§10); Phase 3B NOT STARTED and MCP inactive.**
+**Phase 3A COMPLETE (design); Phase 3B IN PROGRESS, with 3B.1 COMPLETE at source/synthetic scope (§10.13); MCP inactive.**
 Phase 1S shared Case source/synthetic proof and selected Phase 2 REST completion are retained.
 Broader REST review remains IN PROGRESS. Phase 1R is merged and its three-FILTER candidate locally/
 synthetically validated; authoritative Case SQL remains **BLOCKED** by unavailable approved offline input.
 Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RLS and operational acceptance
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
-The next MCP implementation increment is 3B.1 (§10.11), with all capability/tenant flags off.
+Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the next increment is 3B.2. All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
 
@@ -1031,7 +1038,7 @@ installer publication occurred. Phase 1R authoritative Case SQL remains **BLOCKE
 
 **Status: COMPLETE as the proposed Phase 3B implementation contract; MCP inactive.** Normative “must”
 below specifies future behavior, not existing functionality or deployment authorization. Phase 3B is
-**NOT STARTED**. This section resolves the pilot recommendations in §§4–6. No production source,
+**NOT STARTED** at design completion; current implementation status is in §10.13. This section resolves the pilot recommendations in §§4–6. No production source,
 dependency, schema, permission, endpoint, version or installer changes are needed for Phase 3A.
 
 ### 10.1 Evidence and boundaries
@@ -1740,3 +1747,143 @@ Command-line Git's configured proxy was unreachable. The GitHub connector retrie
 Git hashes were verified before the isolated worktree was advanced to the exact live base. Unrelated image
 entries remain in the base tree and were excluded from sparse checkout, not deleted. Publication uses the
 connector's Git object/ref operations, preserving every unrelated base entry and the original checkout.
+
+
+### 10.13 Phase 3B.1 integration persistence and security foundation
+
+**Status: COMPLETE — persistent security foundation and focused/affected/critical source/synthetic verification.**
+Phase 3A remains COMPLETE as design. Phase 3B.2–3B.7 are NOT STARTED. MCP is inactive.
+Live base `a97691ecb2147d9888d9f636aee8cc9e07842cdd` includes merged Phase 1R #1898,
+Phase 1S #1899, selected Phase 2 #1900 and Phase 3A #1901, confirmed using live GitHub metadata.
+The isolated task branch preserves the original checkout. Source/tree hashes were checked; a sandbox-network
+fetch subsequently succeeded. No historical source/deployment assumption replaces that live base.
+
+The [SQL candidate and operator record](../sql/ai-integration/README.md) contains the pre-DDL dependency
+inventory, exact role/module authority, schema, audit compatibility, race protocol and retained-history rollback.
+It reuses Users/ShaleClients, their existing tenant key, strict TenantFilter, UTC/RowVer and both existing audit
+families. Only new integration-owned tables receive FILTER/BLOCK predicates; shared functions and legacy
+RLS are unchanged. Missing dependencies/drift abort transactionally. Nothing installs at startup.
+
+Implemented source is `AiScope`, `AiIntegrationSecurityService`, `AiProductCapabilityService`,
+`AiBootstrapResolver`, `VerifiedIntegrationContext`, and the additive `docs/sql/ai-integration/phase3b1.sql`.
+Ten persistent entities are:
+
+| Entity | Foundation |
+| --- | --- |
+| AiProductCapability | Global default-false singleton, restricted actual SQL operator, revision/RowVer and atomic global audit. |
+| TenantAiIntegrationPolicy | Strict tenant singleton, absent=false, current admin, RowVer, audited change; disable revokes grants/families/intents. |
+| AiIntegrationRegistration / AiIntegrationRedirect | Immutable tenant and random public/client IDs; closed status/ceiling, 90-day bound, exact ≤5 redirects, actor/time/revoke/revision/RowVer. |
+| AiIntegrationClientKey | Pinned RSA public modulus/exponent/fingerprint only; two-key maximum, ≤24-hour overlap, bounded validity, current registration RowVer for rotation, immediate revoke. |
+| AiDelegationGrant / AiConsentIntent | Server-issued hash-only single-use intent bound to current user; explicit same-user scopes, ≤5-minute acceptance, ≤24-hour consent, permanent revoke. No admin impersonation. |
+| AiDelegatedSession / AiOAuthCredential | Separate durable tuple/family, absolute/idle expiry, generation and revoke; hash-only ACCESS/REFRESH snapshots and unique refresh generation. No issuance/protocol implementation. |
+| AiQuotaReservation | SQL transaction admission across user/integration/tenant, trailing rows/calls, ≤15-second concurrency lease, unique invocation, durable no-refund accounting. |
+
+The default service constructor is off; configured startup enablement can only further deny the shared SQL
+switches. No tenant/user/key/grant/session/credential is automatically provisioned. Only synthetic tests enable
+new disposable rows. The closed case-sensitive scopes remain `cases.search` and `cases.overview.read`.
+Ceiling/grant/session intersection is deterministic; credential intersection/validation is 3B.2. Reduction also
+revokes affected grants, preserving explicit re-consent after later ceiling increases. No Case operation accepts
+this context yet, so the new foundation cannot disclose data through existing ordinary Case reads.
+
+The runtime role has bounded EXECUTE and explicit table denials. Tenant modules derive both identities from
+current authenticated context and revalidate active membership; administrative checks use `Users.is_admin`,
+not custom roles or SQL ShaleAdmins. Only the two pre-tenant resolvers execute as owner; their bounded exact
+inputs/projection produce provisional references, restore identity and grant no tenant business access.
+A separately initialized runtime lease and live session gate create immutable verified context. It carries
+server correlation/invocation, tenant/user/integration/grant/session and exact scopes, without credentials,
+servlet state or an ordinary REST principal. It remains a snapshot requiring future final revalidation.
+
+Admin/security changes use existing entity-action storage with five additive closed entity types and existing
+CREATED/UPDATED/DEACTIVATED actions, fixed source, stable target and correlation. Metadata is only ACTIVE and
+AI_SCOPE_MASK. Product enable/disable uses existing global audit. SQL owns mutation plus audit before commit;
+failed/zero-row append rolls back. JDBC consumes procedure completion and closes before returning, so lost
+commit acknowledgement/close failures withhold results. Eligibility/bounded configuration reads, consent intent
+preparation and intrinsic quota facts intentionally add no mutation-audit spam. No PHI or access-read audit
+vocabulary is misused; IntegrationAccessAudit remains 3B.3 work.
+
+The shared lock order is capability then tenant, with exclusive tenant admission/mutations and shared
+verification. Durable worst-case row reservations enforce 200/user, 500/integration, 1000/tenant per trailing
+24 hours, sliding minute 10/20/60, distributed concurrency 1/2/5. Rejected quota attempts count calls; release
+never refunds committed rows/calls. A replacement JVM and distinct service instances use the same SQL state.
+Future transport must add edge/discovery/process limits and account every verified attempted tool dispatch.
+No data-work queue, tool dispatch or response handoff is implemented in this foundation.
+
+Pre-edit impact inspection covered current tenant policy/admin/firm-role, EntityActionAuditEvent/DAO and
+migration chain, auth modules, durable sessions, context initializer and local SQL fixtures. The existing
+chronological audit test was extended for this successor (including the already-existing Task policy token),
+without rewriting historical migrations. New scope/context/SQL tests route through security-data and default
+critical smokes; opt-in SQL remains an explicit separate run. Full changed-file/test review is required below.
+
+**Evidence classes and continuing boundaries:**
+
+- **Source/static:** exact live base, additive schema/module review, selector and default-off/no-route contracts.
+- **Synthetic real SQL:** new loopback-only SQL Server 2022 Developer, separate actual setup/runtime/bootstrap/
+  operator/verifier logins, synthetic prerequisites and nonce-owned databases. Per-table FILTER/BLOCK, foreign/
+  NULL context, ownership, constraints, live gates, scopes, RowVer/races, atomic audit, quota dimensions and
+  replacement-JVM persistence are tested; these are not authoritative Case-schema or deployed-security claims.
+- **Injected evidence:** partial DDL/audit/resolver faults and JDBC lost-ack/close failure are explicit injections.
+- **Authoritative evidence:** merged source and repository migration definitions only. The approved Case schema
+  artifact remains unavailable; authoritative Case SQL acceptance is **BLOCKED**, unchanged by these tables.
+- **Unexecuted production evidence:** all production/Azure SQL, deployed grants/owners, RLS activation, actual
+  independent OAuth/MCP clients, load/real-data retention and deployment acceptance. No such execution is claimed.
+
+Next increment: **3B.2**, select a maintained OAuth implementation and prove Boot/JDK compatibility before
+protocol work. Bind maintained AS transactions/PKCE/redirect/browser-CSRF/resource; implement code/access/
+refresh/assertion replay, exact credential scopes, expiry clipping, conditional rotation and security-reset
+family revocation before any credentials issue. 3B.3 must add integration access audit and final handoff at the
+shared Case worker. 3B.4–3B.6 own all transport and tools. Existing ordinary auth is unchanged.
+
+No MCP dependency/route/discovery/tool, OAuth protocol endpoint, AI Case data disclosure, local-AI bypass,
+production/Azure SQL, RLS production activation, deployment, version bump or installer publication occurs.
+No Phase 3B completion or real-data enablement is implied.
+
+Executed verification (local Maven 3.9.9 / Temurin JDK 21.0.12.1; no POM/toolchain changes):
+
+| Check | Result and evidence boundary |
+| --- | --- |
+| Focused scope/context/audit plus explicit local SQL | **44 PASS**, zero failures/errors/skips: 2 core scope, 5 context/default-off/failure tests, 12 existing audit tests and **25 real synthetic SQL scenarios**. |
+| Repository selector affected suite | **67 PASS**, zero failures/errors. Security-data plus the modified chronological audit test, core/data/server dependencies. Its opt-in SQL class reports zero executed tests without credentials; the separate explicit 25-scenario run above is its acceptance evidence. |
+| Critical Maven reactor | **125 PASS**, zero failures/errors/skips; all seven reactor modules BUILD SUCCESS. |
+| Selector Python tests | **26 PASS**, including new AI SQL ownership/default-off routing. |
+| Exact SQLCMD install / repeat / verify | PASS in a separate fresh nonce-owned synthetic database: nine tables each have FILTER/INSERT BLOCK/UPDATE BLOCK = 1/1/1, no disabled/untrusted findings; global=0, enabled tenants=0, registrations=0. Exact fixture removed afterward. |
+| Documentation / diff | Five Markdown owners, **68 relative links/anchors**, balanced fences and four parseable JSON schema blocks; full 24-file diff reviewed and `git diff --check` passes. |
+
+SQL is Microsoft SQL Server **16.0.4305.5** (2022 Developer), task-owned loopback-only container pinned to
+`mcr.microsoft.com/mssql/server@sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`.
+Each test creates/removes only its exact nonce-owned synthetic databases and separate SQL logins. The test-only
+verifier gets direct grants solely to prove real BLOCK rejection on otherwise valid foreign inserts for every
+new tenant table; the ordinary runtime has direct denials and no bypass roles. Successful and injected-failure
+resolver calls prove caller restoration, including comparison of the installed resolver definition to source.
+Synthetic process restart means an **actual replacement JVM**, not a counter reset or just a new service object;
+no SQL Server/production restart is claimed. Existing missing authoritative Case evidence remains BLOCKED.
+
+Exact commands (the task-local Maven wrapper supplies JDK, configured proxy and system CA trust):
+
+```bash
+# Password supplied privately only to the explicitly disposable fixture, never in argv/logs:
+SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI SHALE_AI_SQL_PORT=14337 \
+  /workspace/work/tools/bin/mvn -B -pl shale-data -am \
+  -Dtest=AiScopeTest,AiSecurityContractTest,AiSecurityLocalSqlServerTest,EntityActionAuditEventTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/work/tools/bin:$PATH JAVA_TOOL_OPTIONS=-Djdk.attach.allowAttachSelf=true \
+  python3 build/test-selection/select_tests.py \
+  --base a97691ecb2147d9888d9f636aee8cc9e07842cdd --head HEAD \
+  --format markdown --plan-output work/phase3b1-selection.json --run
+# --run executed the emitted affected core/data/server command, then critical mvn test.
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+python3 work/run_verify_sql.py
+python3 work/check_ai_docs.py
+git diff --check
+git diff --check a97691ecb2147d9888d9f636aee8cc9e07842cdd HEAD
+```
+
+`run_verify_sql.py` is task-local orchestration of actual SQLCMD `-b` against one new synthetic database:
+prerequisites → exact installer → exact repeat → `verify.sql` → exact cleanup. It does not alter candidate SQL,
+use an old operator packet, or connect to another server. `run_ai_sql.py` supplies only generated disposable
+credentials to the exact focused Maven command. These scratch helpers and secrets are not committed.
+
+Early local failures were corrected before the passing runs: runtime-only JDK/proxy CA setup, JDBC binary
+NULL typing, zero-row trigger behavior, ordered catalog hashing, and a BLOCK fixture colliding with an existing
+unique tenant row. The final per-table test requires actual SQL error 33504, not a coincidental constraint
+failure. No failed/initial run is reported as passing. Selector changes recommend historical all-tests only
+informationally; that optional broad suite was not run. No required focused/affected/critical check is blocked.

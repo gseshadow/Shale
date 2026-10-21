@@ -70,6 +70,12 @@ final class ContactPhase2BAuditMigrationContractTest {
         String presentation=Files.readString(AuditEntityTypeMigrationChain.CASE_DATE_PRESENTATION);
         assertTrue(presentation.contains("''CASE_DATE_PRESENTATION_CONFIGURATION''"));
         complete.add("CASE_DATE_PRESENTATION_CONFIGURATION");
+        String taskPolicy=Files.readString(Path.of("..","docs","sql","2026-10-05_task_policy_entity_action_audit.sql"));
+        assertTrue(taskPolicy.contains("'TASK_POLICY_CONFIGURATION'")); complete.add("TASK_POLICY_CONFIGURATION");
+        String ai=Files.readString(Path.of("..","docs","sql","ai-integration","phase3b1.sql"));
+        for(String type:Set.of("TENANT_AI_POLICY","AI_INTEGRATION","AI_CLIENT_KEY","AI_DELEGATION_GRANT","AI_DELEGATED_SESSION")) {
+            assertTrue(ai.contains("('"+type+"')")); complete.add(type);
+        }
         assertEquals(AuditEntityTypeMigrationChain.currentlyRequiredVocabulary(),complete,
                 "every chronological successor must preserve the deployed vocabulary and add only its intended tokens");
         assertEquals(List.of(AuditEntityTypeMigrationChain.PHASE_1C,AuditEntityTypeMigrationChain.PHASE_2B,
