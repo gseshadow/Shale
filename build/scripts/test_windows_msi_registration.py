@@ -74,6 +74,7 @@ class RegistrationMutationTest(unittest.TestCase):
                            ("Permission", {"User": "Everyone", "GenericAll": "yes"}),
                            ("RegistryValue", {"Root": "HKMU"}),
                            ("CustomAction", {"Id": "ShaleRegistrationInstall"}),
+                           ("CustomAction", {"Id": "Other", "ExeCommand": "schtasks /create"}),
                            ("CustomAction", {"Id": "Other", "ExeCommand": "powershell.exe"}),
                            ("Property", {"Id": "Srp", "Value": "encoded"})):
             self.wxs.write_text(fixture())

@@ -23,6 +23,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
             self.assertNotIn("ExecutionPolicy Bypass", source)
         release = batch_source("build-shale-release.bat")
         self.assertLess(release.index("build-native.bat"), release.index("echo Building desktop application image"))
+        self.assertLess(release.index("if not defined JAVA_HOME"), release.index("build-native.bat"))
         msi = batch_source("build-shale-windows-msi.bat")
         self.assertLess(msi.index('windows_msi_payload.py" sign-source'), msi.index("light.exe -nologo"))
 

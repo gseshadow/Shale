@@ -97,7 +97,8 @@ def validate_registration(root):
             raise ValueError("installer ACL overrides are forbidden")
         if node.tag == tag("CustomAction"):
             text = " ".join(node.attrib.values()).casefold()
-            if any(word in text for word in ("shaleregistration", "powershell", "frombase64string", "invoke-expression", "iex(")):
+            if any(word in text for word in ("shaleregistration", "powershell", "frombase64string", "invoke-expression", "iex(",
+                                             "schtasks", "register-scheduledtask", "new-scheduledtask", "new-service", "createservice")):
                 raise ValueError("script registration custom actions are forbidden")
         if node.tag == tag("Property") and node.get("Id") == "Srp":
             raise ValueError("encoded registration payload is forbidden")

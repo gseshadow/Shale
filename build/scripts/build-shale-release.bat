@@ -58,6 +58,7 @@ python "%ROOT%\build\scripts\windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNC
 call "%ROOT%\build\scripts\build-updater.bat" --package-only || goto :fail
 
 python "%ROOT%\build\scripts\windows_runtime_input.py" "%DESKTOP_TARGET%" "%RUNTIME_INPUT%" "%VERSION%" || goto :fail
+if not defined JAVA_HOME for /f "delims=" %%J in ('where java.exe 2^>nul') do if not defined JAVA_HOME for %%H in ("%%~dpJ..") do set "JAVA_HOME=%%~fH"
 call "%ROOT%\build\native\windows-toast\build-native.bat" "%RUNTIME_INPUT%\native" || goto :fail
 copy /y "%ROOT%\build\packaging\windows\shale-windows-toast.properties" "%RUNTIME_INPUT%\shale-windows-toast.properties" >nul || goto :fail
 
