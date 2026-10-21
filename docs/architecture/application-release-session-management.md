@@ -17,6 +17,17 @@ artifacts and startup overlay 62a12940. [Continuation and recovery](../testing/r
 documents pending-pair loss after 401/500, protected-state archival and supported password re-enrollment.
 Native Windows/DPAPI and existing-state update acceptance remain pending. No retirement acceptance is inferred.
 
+## MCP delegated-session boundary — Phase 3A (2026-10-21)
+
+The [canonical MCP security contract](ai-integration-and-mcp.md#10-phase-3a--mcp-security-delegation-integration-and-audit-contract)
+owns the proposed separate OAuth integration registration, user consent/grant, opaque credentials and
+delegated-session lifecycle. Phase 3A is documentation-only; Phase 3B is NOT STARTED and MCP inactive.
+Reuse durable ownership/revalidation/conditional rotation/revocation patterns, not WEB/DESKTOP tokens,
+remembered secrets or the closed UserSessions client-type vocabulary. Ordinary login/session/desktop
+behavior and this document's historical acceptance remain unchanged. Future user disable/remove/security
+reset must invalidate integration sessions too; live user eligibility checks remain mandatory even before
+a sweep completes. No new session schema, auth route, audit event or deployment is added here.
+
 ## Current authentication/security reconciliation — 2026-10-21
 
 The [canonical API/MCP roadmap §2.5](ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
