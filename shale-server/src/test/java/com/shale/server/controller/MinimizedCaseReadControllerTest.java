@@ -196,6 +196,65 @@ class MinimizedCaseReadControllerTest {
         var response=new MinimizedCaseReadErrors().failure(new IllegalArgumentException("Private search"),request);
         assertEquals(503,response.getStatusCode().value());assertFalse(response.getBody().toString().contains("Private search"));
     }
+    @Test void bothPageRoutesAcceptMinimumMaximumAndExplicitPagingAndReturnContinuation() throws Exception {
+        for (int[] bounds : List.of(new int[]{0,1}, new int[]{1,2}, new int[]{100,25})) {
+            int page=bounds[0], size=bounds[1];
+            result=new MinimizedCasePage(Collections.nCopies(size,item("Name")),page,size,true);
+            mvc(true).perform(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(Map.of("query","Name","page",page,"size",size))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.page").value(page))
+                    .andExpect(jsonPath("$.size").value(size)).andExpect(jsonPath("$.hasMore").value(true));
+            assertEquals(List.of("searchMinimizedCases",List.of("Name",41,31,page,size)),calls.getLast());
+            mvc(true).perform(get("/api/v2/cases/assigned-page").param("page",""+page).param("size",""+size))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.page").value(page))
+                    .andExpect(jsonPath("$.size").value(size)).andExpect(jsonPath("$.hasMore").value(true));
+            assertEquals(List.of("listMinimizedAssignedCases",List.of(41,31,page,size)),calls.getLast());
+        }
+    }
+
+    @Test void searchOptionalNullInputsAndStrippedQueryBoundsMatchDocumentation() throws Exception {
+        for (String body : List.of("{}", "{\"query\":null,\"page\":null,\"size\":null}")) {
+            mvc(true).perform(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk());
+            assertEquals(List.of("searchMinimizedCases",List.of("",41,31,0,25)),calls.getLast());
+        }
+        String query="x".repeat(100);
+        mvc(true).perform(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("query","  "+query+"  ")))).andExpect(status().isOk());
+        assertEquals(List.of("searchMinimizedCases",List.of(query,41,31,0,25)),calls.getLast());
+        calls.clear();
+        for (String body : List.of("{\"page\":-1}","{\"page\":101}","{\"size\":-1}","{\"size\":0}","{\"size\":26}"))
+            mvc(true).perform(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest()).andExpect(header().string("Cache-Control","no-store"));
+        assertTrue(calls.isEmpty());
+    }
+
+    @Test void everyRouteRequiresAuthenticationAndAssignedAlsoEnforcesExactByteBudget() throws Exception {
+        var requests=List.of(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON).content("{}"),
+                get("/api/v2/cases/assigned-page"),get("/api/v2/cases/5/overview"));
+        for (var request : requests)
+            mvc(false).perform(request).andExpect(status().isUnauthorized())
+                    .andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.status").value(401));
+        assertTrue(calls.isEmpty());
+        result=new MinimizedCasePage(Collections.nCopies(25,escapedItem()),0,25,true);
+        var response=mvc(true).perform(get("/api/v2/cases/assigned-page"))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.error").value("case_payload_oversized"))
+                .andReturn().getResponse();
+        var error=json.readTree(response.getContentAsByteArray());
+        assertEquals(Set.of("timestamp","status","error","message","path","fieldErrors"),keys(error));
+        assertTrue(response.getContentAsByteArray().length<8192,"Failure must withhold the oversized data");
+    }
+
+    @Test void malformedLongIdsCannotInflateTheSafeErrorResponse() throws Exception {
+        for (String id : List.of("x".repeat(10000), "é".repeat(10000))) {
+            var response=mvc(true).perform(get("/api/v2/cases/"+id+"/overview"))
+                    .andExpect(status().isBadRequest()).andExpect(header().string("Cache-Control","no-store"))
+                    .andExpect(jsonPath("$.path").value("/api/v2/cases")).andReturn().getResponse();
+            assertTrue(response.getContentAsByteArray().length<=8192,"Malformed paths must not inflate Case error bodies");
+        }
+        assertTrue(calls.isEmpty());
+    }
+
     private static MinimizedCaseOverview escapedItem() {
         String value="\u0001".repeat(255);
         return new MinimizedCaseOverview(5,"\u0001".repeat(200),value,

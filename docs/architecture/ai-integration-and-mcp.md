@@ -1,11 +1,12 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; architecture/contract review and shared Case/REST foundation IN PROGRESS; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; MCP implementation NOT STARTED.
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; MCP implementation NOT STARTED.
 
 **Last reviewed:** 2026-10-21
 
-**Repository baseline:** Phase 1S fetched live `origin/codex/latest`, commit `345452f9e196bc537b78dc70fc46e6353b2b8d22`,
-the merge of [#1898 / Phase 1R](https://github.com/gseshadow/Shale/pull/1898).
+**Repository baseline:** Phase 2 fetched live `origin/codex/latest`, commit `18f2dbf09955e0ee8d25e50c4beb5f0aa685587c`,
+the merge of [#1899 / Phase 1S](https://github.com/gseshadow/Shale/pull/1899), following merged
+[#1898 / Phase 1R](https://github.com/gseshadow/Shale/pull/1898).
 This is repository inspection, not evidence of deployed SQL, API configuration, or runtime security acceptance.
 
 ## 1. Purpose, scope, and document ownership
@@ -64,7 +65,7 @@ Reviewed evidence and continuing authorities:
 | Implementations | `shale-data`, `com.shale.data.service.adapter.*`, backed by `CaseDao`, `CaseSummaryDao`, `TaskDao`, `ContactDao`, Organization aggregate DAOs | Many adapters are thin delegates. Important validation, lifecycle, concurrency, relationship, and transaction rules live in DAOs/aggregate workers. Keep these authoritative workers. |
 | Server composition | `shale-server`, `ShaleServerServiceConfiguration` | Spring Boot composes core/data services without `shale-ui` or `shale-desktop`. This is the natural initial host for both external adapters. Separate deployment is not currently required. |
 | REST | `MinimizedCaseReadController`, `ApiReadController` plus auth, session, release, instance, admin, and contact-value-validation controllers | Minimized actor-aware Case search/assigned/Overview reads now exist alongside broad legacy reads and writes. Despite its name, `ApiReadController` is not read-only. Reuse operations; do not expose a controller wholesale to MCP. |
-| OpenAPI | `OpenApiConfiguration`, `MinimizedCaseOpenApiConfiguration`, Springdoc dependency in `shale-server/pom.xml`, `OpenApiDocumentationTest` | Generated `/v3/api-docs`, `/swagger-ui/index.html`, and `bearerAuth` exist. Minimized Case schemas have concrete required/nullable fields and bounds. The advertised `v1` is not yet a complete external compatibility policy. |
+| OpenAPI | `OpenApiConfiguration`, `MinimizedCaseOpenApiConfiguration`, Springdoc dependency in `shale-server/pom.xml`, `OpenApiDocumentationTest` | Generated `/v3/api-docs`, `/swagger-ui/index.html`, and `bearerAuth` exist. Minimized Case schemas have concrete required/nullable fields and bounds. The historical `v1` document label is distinct from the selected v2 URL compatibility policy (§9.4); broader API review remains pending. |
 | Tenant context | `ServerSessionResolver`, `ServerRuntimeSessionState`, `RequestScopedDbSessionProvider`, `RuntimeSessionServiceConnectionProvider`, data `RuntimeSessionService` | Authenticated principal is resolved before business access; connections set `ShaleClientId` and `PrincipalUserId`. DAOs also use tenant equality and lifecycle predicates. |
 | Sessions | `ShaleAuthTokenService`, `ServerAuthSessionService`, `DurableSessionTokenValidator`, `SqlDurableSessionStore`, `UserSessionServicePort`/adapter/DAO | Bound JWT `sid`/`jti` is checked against SQL expiry, current JTI, ownership, and revocation; refresh rotates conditionally. Reuse durable lifecycle patterns, not an in-memory-only replacement. |
 | Audit | `PhiFieldRegistry`, data `PhiAuditService`/`AuditLogDao`, `EntityActionAuditEvent`/DAO, `AdministrativeReadAuditEvent`/DAO, server `SessionManagementService` | Existing tenant-owned PHI, mutation, bounded administrative-read, and session-security mechanisms. Their vocabularies are constrained and not interchangeable. |
@@ -622,12 +623,15 @@ use cases. No dependency on MCP, AI OAuth, registration/grants or completion of 
 
 * [x] Reconcile the implemented R1 exact legacy Case paging and R2 minimized endpoints/OpenAPI with
   this roadmap; the R3 browser consumer and R4 acceptance ledger remain owned by the web roadmap.
-* [ ] Formalize remaining selected endpoints/schemas/errors/paging before adding any missing use case.
+* [x] Formalize the selected three minimized Case endpoints/schemas/errors/paging (§9.4).
+* [ ] Review broader REST operations before adding any missing use case.
 * [ ] Close outstanding Case-read runtime security/deployment/performance gates using the existing
   runbook/ledger; the supplied export confirms missing FILTERs and needs labelled derived/candidate preparation.
-* [ ] Align authoritative auth/authorization and audit below REST; retain current compatible routes.
-* [ ] Review generated OpenAPI and typed web/mobile contract consumption and version/deprecation policy.
-* [ ] Document the separation of browser user authority and future integration audience/scopes;
+* [x] Retain the selected Phase 1S authority/audit boundary below REST and compatible existing routes.
+* [ ] Review authoritative auth/authorization and audit for broader REST operations.
+* [x] Review generated selected Case OpenAPI, existing web validators and version/deprecation policy;
+  protect material compatibility and serialized DTOs with executing tests (§9.4).
+* [x] Document the separation of browser user authority and future integration audience/scopes;
   implementing AI OAuth or grants is not part of ordinary web acceptance.
 
 **Tests:** Existing `OpenApiDocumentationTest` plus selected controller/service integration contracts,
@@ -730,7 +734,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Recommended target/security/audit/REST/tool direction | COMPLETE | Sections 3–7 are documented recommendations, not accepted wire contracts. |
 | Phase 0 review and final contract | IN PROGRESS | Per-operation REST review and separate AI policy/issuer/audit decisions remain; this aggregate status does not gate all web work. |
 | Phase 1 shared secured operations | IN PROGRESS | Phase 1S proves the R2 minimized Case boundary (§9.3); wider operations, AI restrictions/attribution and runtime acceptance remain. No dependency on AI issuer/grants for ordinary web work. |
-| Phase 2 stable REST/OpenAPI foundation | IN PROGRESS | R1/R2 Case paging, minimized routes/schemas and R3 consumer exist; remaining contract/runtime gates follow the web ledger. Independent of MCP/AI OAuth. |
+| Phase 2 stable REST/OpenAPI foundation | SELECTED CASE FOUNDATION COMPLETE; broader REST IN PROGRESS | §9.4 and the owning API contract formalize the existing three minimized reads; broader operation review and live runtime/security/performance acceptance remain open. Independent of MCP/AI OAuth. |
 | Phase 3 MCP and minimum tenant controls | NOT STARTED | Transport/grants, audit and service gates. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
 | Phase 5 administration experience | NOT STARTED | Minimum controls first, then pilot feedback. |
@@ -749,7 +753,8 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Local Case-read SQL security execution | BLOCKED | Original export is absent from this task workspace; derived/candidate schema artifacts and hashes unavailable. Authoritative Case SQL, real audit denial and injected lost acknowledgement remain unexecuted. Synthetic auth passes do not close Case SQL. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
-**Latest bounded implementation phase: Phase 1S — shared secured Case reads COMPLETE (§9.3).**
+**Latest bounded implementation phase: Phase 2 — selected Case REST/OpenAPI foundation COMPLETE (§9.4).**
+The proven Phase 1S shared Case boundary (§9.3) is retained. Broader REST review remains IN PROGRESS.
 Phase 1R is merged, its three-FILTER candidate locally validated with synthetic SQL. Authoritative Case
 SQL acceptance remains **BLOCKED** because the approved offline artifact is unavailable. Do not rerun or
 redesign Phase 1R as part of shared-operation proof. Production activation, Stage A/B deployment, compatible
@@ -980,3 +985,99 @@ The selector's emitted Maven arguments were run unchanged with the test-JVM prop
 was rechecked after the final documentation-only update. No blanket all-tests, Phase 1R SQL, authoritative
 Case SQL, production/Azure connection, deployment, version/installer publication or AI-specific work ran.
 The unavailable authoritative artifact remains an independent BLOCKED acceptance gate, not a Phase 1S pass.
+
+
+### 9.4 Phase 2 — stable selected Case REST/OpenAPI foundation — 2026-10-21
+
+**COMPLETE for the selected contract/source foundation; broader REST review remains IN PROGRESS.**
+The [owning API/OpenAPI contract](../web-api-azure-readiness.md#stable-selected-case-rest-contract--phase-2-2026-10-21)
+records the pre-change exact route/parameter/DTO/error/audit/byte inventory, retained stable versus legacy
+paths, current authentication/session authority, paging/hasMore limits and practical compatibility policy.
+The live base is Phase 1S merge `18f2dbf0`; Phase 1R merge #1898 and Phase 1S merge #1899 are confirmed
+by fetched source/ancestry. Existing minimized REST and Springdoc configuration already supply this slice.
+
+Retain one stable contract for all ordinary clients:
+
+* `POST /api/v2/cases/search-page`
+* `GET /api/v2/cases/assigned-page`
+* `GET /api/v2/cases/{caseId}/overview`
+
+No route, response DTO, worker, business rule, request default/limit or web consumer changes.
+The safe error envelope retains its fields; only overlong error paths now use a bounded fallback. REST still
+calls only the proven shared operations (§9.3). OpenAPI now gives the path ID bounds, explicit integer
+query/path types, optional/null body defaults, stripped UTF-16 query semantics (rather than an incorrect
+raw maxLength), paging/hasMore semantics and required shared error-record members. `info.version` remains
+historical metadata; URL v2 is this selected major. The response allowlist is closed to preserve existing
+strict web validators and disclosure controls. Future added fields/closed-enum values require explicit
+compatibility review; breaking contracts receive a new URL major. No legacy removal deadline is invented;
+compatibility routes remain until documented consumer migration and a release decision permit removal.
+
+Audit compatibility retains existing schema/events and committed Overview transaction, plus the approved
+ordinary summary exemption. No migration, new audit vocabulary or client-side audit is added. There is
+no AI client identity/grant/audit implementation. Documentation/contract refinement adds no sensitive read
+or mutation of its own. Unknown infrastructure errors still require safe bounded client parsing; no global
+error/privacy guarantee is inferred from these three MVC operations.
+
+**Remaining REST work:** per-operation review of broader Case detail/children, other domains, DTOs,
+authorization, audit and resource controls; selected authoritative SQL/non-bypass/deployment/audit-fault/
+performance gates remain open under the owning runbook and R4 ledger. This contract completion does not
+close Web V2's separately numbered Phase 2/3/4 acceptance or declare the entire REST API stable.
+**Phase 1R remains merged, locally/synthetically validated; authoritative Case SQL acceptance BLOCKED**
+by unavailable approved offline input. No production activation occurs. **MCP remains NOT STARTED**:
+approved delegated authority/audience/issuer/grants, opt-in/integration controls, AI audit representation,
+resource budgets and selected runtime security acceptance remain prerequisites (§§4–5).
+
+#### Test impact and verification
+
+Before editing, reviewed the existing selected controller and all OpenAPI tests, error/validation tests,
+web caller/runtime validators and client tests, service/gateway/JDBC/paging/projection tests, and relevant
+bearer/durable-session/request-context/composition tests. Production changes are annotations/schema customization plus a scoped error-path cap: malformed IDs
+cannot inflate reflected error bodies; paths over 512 UTF-16 units use `/api/v2/cases`. Existing controller tests cover principal-only authority, denied reads, no-store,
+malformed requests, explicit/default/min/max paging, all-route 401, query stripping/null defaults and all
+three routes' byte failures. Existing Phase 1S JDBC doubles retain same/foreign/deleted Case/actor/assignment
+filtering, SQL probes, timeouts, audit/transaction failure and uncertain commit without disclosure.
+
+The bounded `OpenApiDocumentationTest` baseline asserts exact supported paths/methods, parameters/defaults/
+bounds, body input, bearer scheme, response/error references, field types/required/null semantics and paging.
+Descriptions/order/operation metadata remain free to improve. A schema walk checks actual Jackson-serialized
+null/populated records, page and error against the generated schema features used here. No full OpenAPI
+snapshot or metadata freeze is introduced. These are local synthetic/source contract tests, not authoritative
+SQL or deployed client/security evidence. Exact executed commands/results are recorded below after validation.
+
+
+Final local verification used Maven 3.9.11 / Temurin JDK 21.0.12.1 through the existing
+`/workspace/.tools/bin/mvn` wrapper (`mvn` below). Network access was enabled for the configured proxy;
+initial offline attempts lacked ICU/phone/JNA dependencies. The JDK attach property plus network-enabled
+execution was needed for this sandbox's Mockito instrumentation. No POM/toolchain/dependency change.
+
+| Executed check | Result / scope |
+| --- | --- |
+| Focused selected controller/service/JDBC/projection, selected and legacy Case OpenAPI, validation/legacy HTTP and bearer/durable-session/context | **145 PASS**, zero failures/errors/skips. |
+| Selector affected suite | **91 PASS, 1 inherited failure**, zero errors/skips (92 total). Only the unrelated application-release OpenAPI `channel` binding fails. |
+| Full existing OpenAPI/error tests, with unchanged-base reproduction | Three existing `ApiExceptionHandlerTest` diagnostic assertions and the existing application-release OpenAPI binding fail identically at untouched `18f2dbf0`. They are not new regressions or passing checks. The selected scoped error/Case OpenAPI tests pass. |
+| Critical Maven reactor | **117 PASS**, zero failures/errors/skips; BUILD SUCCESS. |
+| Selector unit tests | **25 PASS**; no full-suite escalation. |
+| Docs / final diff | **49 relative links/anchors**, balanced fences/status markers and `git diff --check` PASS. Full nine-file diff reviewed; unchanged DAO/core DTO/web/SQL/build/version sources confirmed. |
+
+```bash
+mvn -o -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-server -am -Dtest=MinimizedCaseReadControllerTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,CaseSearchPagingJdbcTest,CaseSummaryServerProjectionContractTest,OpenApiDocumentationTest#minimizedReadSchemasAreConcreteBoundedNullableSecuredAndAdditive+legacyCaseSearchPageKeepsParametersDtoAndFourFieldPageSchema+openApiDocumentsBearerAuthAndCoreWebEndpoints+stableCaseContractRetainsRoutesInputsTypesRequiredNullabilityAndAuthentication+generatedCaseSchemasDescribeActualSerializedRecordsIncludingNullsAndRelationships,ContactValueApiTest,ApiReadControllerTest,DurableSessionAuthTest,ServerAuthSessionLogoutTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest,AuthControllerTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 18f2dbf09955e0ee8d25e50c4beb5f0aa685587c --head HEAD --format markdown --plan-output work/selection.json
+mvn -o -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-data,shale-server -am -Dtest=com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.server.controller.AuthControllerTest,com.shale.server.controller.MinimizedCaseReadControllerTest,com.shale.server.controller.OpenApiDocumentationTest,com.shale.server.runtime.DurableSessionAuthTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -DargLine=-Djdk.attach.allowAttachSelf=true test
+# Existing failing checks reproduced in a separate clean detached base worktree:
+mvn -o -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-server -am -Dtest=ApiExceptionHandlerTest,OpenApiDocumentationTest#openApiDocumentsAuthenticatedApplicationReleaseContractsAndClosedVocabularies -Dsurefire.failIfNoSpecifiedTests=false test
+python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+python work/check_docs.py
+git diff --check 18f2dbf09955e0ee8d25e50c4beb5f0aa685587c HEAD
+```
+
+The emitted affected argv were executed from the JSON plan, then critical Maven ran separately even
+though the inherited affected failure was nonzero. The failed offline critical attempt was repeated
+online after resolving the missing JNA artifact; it is not counted as a passing run. The task-local
+uncommitted documentation checker verifies all relative links/anchors, fences and status markers in
+the two changed owners. The final selector recheck uses the same nine paths. No new blanket all-tests,
+SQL, browser or npm run is claimed: web files are unchanged, and its validators/callers/tests were reviewed
+against retained DTO/routes/defaults/limits; the bounded error-path fallback is not consumed by that client.
+
+No MCP, AI-specific integration, production/Azure SQL, RLS activation, deployment, version bump or
+installer publication occurred. Phase 1R authoritative Case SQL remains **BLOCKED**, not a synthetic pass.

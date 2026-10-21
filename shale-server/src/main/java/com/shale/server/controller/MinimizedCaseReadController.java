@@ -24,19 +24,19 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping(value = "/api/v2/cases", produces = MediaType.APPLICATION_JSON_VALUE)
-@Tag(name = "Minimized Case reads")
+@Tag(name = "Minimized Case reads", description = "Stable v2 Case read contract for web, mobile and conventional integrations. Uses the authenticated user session; no client-selected tenant or actor. Scoped errors are safe JSON below 8 KiB: path is at most 512 UTF-16 units, otherwise /api/v2/cases. Success and scoped errors use Cache-Control: no-store.")
 @SecurityRequirement(name = "bearerAuth")
 @ApiResponses({
-    @ApiResponse(responseCode = "400", description = "Invalid request or page boundary", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-    @ApiResponse(responseCode = "401", description = "Confirmed session rejection", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-    @ApiResponse(responseCode = "403", description = "Operation denied; retain the session", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-    @ApiResponse(responseCode = "503", description = "Read, timeout, required audit or payload unavailable; no Case data", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "400", description = "invalid_case_request (malformed JSON/numeric binding) or case_request_failed (invalid query, paging or ID bounds)", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+    @ApiResponse(responseCode = "401", description = "case_request_failed: authentication missing or session rejected", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+    @ApiResponse(responseCode = "403", description = "case_read_denied: operation denied; retain the session", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+    @ApiResponse(responseCode = "503", description = "No Case data: case_read_unavailable (server/read failure), case_read_timeout, case_audit_unavailable or case_payload_oversized. Retry explicitly; an audit may already have committed.", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
 })
 public final class MinimizedCaseReadController {
     public record SearchRequest(
-            @Schema(maxLength = 100, description = "Literal Case-name substring; blank returns no browse. Never put search text in URLs.") String query,
-            @Schema(minimum = "0", maximum = "100", defaultValue = "0") Integer page,
-            @Schema(minimum = "1", maximum = "25", defaultValue = "25") Integer size) {
+            @Schema(nullable = true, description = "Optional/null becomes empty. Literal Case-name substring, case-insensitive under database collation; strip surrounding Unicode whitespace, then at most 100 UTF-16 code units. Blank returns no browse. Never put search text in URLs.") String query,
+            @Schema(nullable = true, minimum = "0", maximum = "100", defaultValue = "0", description = "Zero-based page; omitted/null defaults to 0.") Integer page,
+            @Schema(nullable = true, minimum = "1", maximum = "25", defaultValue = "25", description = "Page size; omitted/null defaults to 25. Keep fixed while paging.") Integer size) {
         // Spring's request-body converter may format this object at DEBUG/TRACE.
         @Override public String toString() { return "MinimizedCaseSearchRequest[query=REDACTED]"; }
     }
@@ -65,8 +65,8 @@ public final class MinimizedCaseReadController {
     @Operation(summary = "Assigned selection before paging", description = "Assignment filters this list only; search and Overview are tenant-wide. Summary reads are audit-exempt. At page 100 hasMore still reflects the probe; Next must stop at the ceiling. UTF-8 JSON at most 128 KiB.")
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = MinimizedCasePage.class)))
     public ResponseEntity<byte[]> assigned(
-            @Schema(minimum = "0", maximum = "100") @RequestParam(name = "page", defaultValue = "0") int page,
-            @Schema(minimum = "1", maximum = "25") @RequestParam(name = "size", defaultValue = "25") int size) {
+            @Schema(type = "integer", format = "int32", minimum = "0", maximum = "100", defaultValue = "0") @RequestParam(name = "page", defaultValue = "0") int page,
+            @Schema(type = "integer", format = "int32", minimum = "1", maximum = "25", defaultValue = "25") @RequestParam(name = "size", defaultValue = "25") int size) {
         var principal = sessions.requirePrincipal();
         return bounded(cases.listMinimizedAssignedCases(principal.shaleClientId(), principal.userId(), page(page), size(size)), 128 * 1024);
     }
@@ -75,7 +75,9 @@ public final class MinimizedCaseReadController {
     @Operation(summary = "Read one minimized active tenant Case with required committed Overview audit", description = "One authoritative Case.Overview.Read per successful server read. UTF-8 JSON at most 8 KiB. No broad detail/child hydration.")
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = MinimizedCaseOverview.class)))
     @ApiResponse(responseCode = "404", description = "Case unavailable; missing, foreign and deleted are indistinguishable", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    public ResponseEntity<byte[]> overview(@PathVariable("caseId") long caseId) {
+    public ResponseEntity<byte[]> overview(
+            @Schema(type = "integer", format = "int64", minimum = "1", maximum = "2147483647", description = "Stable Shale Case identity.")
+            @PathVariable("caseId") long caseId) {
         var principal = sessions.requirePrincipal();
         if (caseId <= 0 || caseId > Integer.MAX_VALUE) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Case ID.");
         var result = cases.readMinimizedCaseOverview(caseId, principal.shaleClientId(), principal.userId())

@@ -1,6 +1,155 @@
 # Shale Server Azure App Service Readiness
 
+## Stable selected Case REST contract — Phase 2 (2026-10-21)
+
+This section owns the supported wire contract and compatibility policy for **only the three minimized
+Case reads**. It supersedes historical Step 3/4 examples below for this slice. The current implementation
+was inspected on fetched live `origin/codex/latest` `18f2dbf09955e0ee8d25e50c4beb5f0aa685587c`
+(merged Phase 1S #1899, following Phase 1R #1898). Generated `GET /v3/api-docs` and
+`GET /swagger-ui/index.html` describe these same endpoints. No separate mobile/integration route is needed.
+Broader REST review is pending; this is contract/source acceptance, not deployed SQL security acceptance.
+
+### Route inventory and supported scope
+
+| HTTP method and exact path | Inputs and bounds | Success DTO / shared operation | Disposition |
+| --- | --- | --- | --- |
+| `POST /api/v2/cases/search-page` | Required JSON object; optional/null `query`, `page`, `size`. Defaults empty query, 0, 25. Page 0–100; size 1–25. Strip surrounding Unicode whitespace, then query ≤100 UTF-16 code units. | `MinimizedCasePage` / `searchMinimizedCases` | Stable; retained unchanged. Body-only literal Case-name substring search, not number/client/full text. Blank checks actor authority and returns empty, never browse. |
+| `GET /api/v2/cases/assigned-page` | Optional query `page=0`, `size=25`; same bounds. | `MinimizedCasePage` / `listMinimizedAssignedCases` | Stable; retained unchanged. Current authenticated user's assignments select this list only. |
+| `GET /api/v2/cases/{caseId}/overview` | Required integral path `caseId`, 1–2147483647. | `MinimizedCaseOverview` / `readMinimizedCaseOverview` | Stable; retained unchanged. Active same-tenant Case, independently authorized and audited on each read. |
+| `GET /api/cases/search`, `GET /api/cases/search-page`, `GET /api/cases/assigned`, `GET /api/cases/{caseId}` | Existing legacy inputs, including search-page size up to 100. | Broad legacy `CaseOverviewDto`, `PagedResponse` (`total=null`) or detail composition. | Compatibility-only for this Case slice; **not aliases** of v2. No removal or response narrowing here. No v1 path is introduced. |
+
+Other generated API paths retain their existing consumers and ownership; listing them in OpenAPI does not
+promote them to this stable external contract. `/api/dev/*` is internal development infrastructure.
+There are no `/external`, `/mobile`, `/ai` or MCP variants. Names such as `MinimizedCaseOverview` are schema
+identifiers, not database types. Domain IDs retain their existing JSON numbers; no SQL IDs beyond domain
+identities, JDBC objects, RowVer, UI state, narratives, child collections or serialized internals are added.
+
+### Authentication, authority and audit
+
+All three stable routes require `Authorization: Bearer <server-issued JWT>` in prod/azure. Obtain a user
+session through the existing `/api/auth/login` flow; use `/api/auth/me`, refresh and logout under the
+[durable-session contract](architecture/application-release-session-management.md#phase-7b-implementation-record--2026-09-29).
+No API keys, service accounts, third-party OAuth or special client-type permissions are provided.
+The bearer resolver verifies signature/time, and bound `sid`/`jti` authority is checked against SQL ownership,
+current JTI, expiry, revocation and current user eligibility. Legacy unbound tokens remain subject to the
+existing finite cutover window; they are not an integration credential design. Development headers work
+only in dev/local, never as production authentication. No new authentication filter is needed: these routes
+resolve through `ServerRuntimeSessionState` and the configured `ServerSessionResolver`.
+
+Tenant and user come from that principal. HTTP body/query identity fields cannot replace authority.
+Each request's runtime connection initializes both tenant and principal context; the shared worker checks
+current same-tenant, nondeleted/nonremoved user and matching context. Eligible users may search/read all
+active tenant Cases; assignment is only a list filter. There is no administrator bypass. Missing, foreign
+and deleted Overview targets share the same 404. Invalidated user sessions may fail as 401 before the
+operation; an actor/context denial in the worker is 403. No invented `is_active` column is used.
+
+REST delegates once through `CaseServicePort → CaseServiceAdapter / DaoCaseGateway → CaseSummaryDao`.
+Controller work is input binding, early validation, encoding/byte checks and safe HTTP errors. The shared
+worker retains tenant/deletion filtering, actor checks, SQL paging and Overview transaction/audit ownership.
+Search/Assigned retain their approved ordinary minimized-summary audit exemption. Overview requires one
+existing `Case.Overview.Read` event (Case type 1, FieldCode 4, `action=READ;screen=Case.Overview`) on the same
+connection, committed before result return. Audit/commit failure withholds data; uncertain commit may leave
+a durable event. Never delete/replay audit to hide uncertainty. Audit integration uses existing schema,
+with no migration. This exemption does not authorize future AI summary disclosure or wider sensitive reads.
+
+### Response schema, paging and resource limits
+
+Every success member is present, including explicit nulls. Both page items and Overview use exactly:
+
+| Member | JSON type / semantics |
+| --- | --- |
+| `caseId` | Required positive integer, ≤2147483647; stable domain identity. |
+| `caseName` | Required non-null string, ≤255 UTF-16 units; may be empty. |
+| `caseNumber` | Required nullable string, ≤200 UTF-16 units. |
+| `status` | Required nullable object: required non-null `id`, `name`; required nullable `color` (`#RRGGBB` or null). |
+| `practiceArea` | Required nullable object: required non-null `id`, `name`. |
+| `responsibleAttorney`, `primaryLegalAssistant` | Required nullable objects: required non-null `userId`, `displayName`. |
+| `updatedAt` | Required nullable stored local date-time string; no timezone/UTC/Z reinterpretation. |
+
+Relationship IDs have the same 1–2147483647 range; names/display names have the same 255-unit limit.
+Page shape is exactly `{items, page, size, hasMore}`: non-null array, integers and boolean, all required.
+`items.length ≤ size ≤ 25`; no total/count. Keep size fixed across pages. Tenant/deletion/search/assignment
+filters precede SQL `OFFSET page*size FETCH size+1` (offset ≤2500, fetched rows ≤26).
+`hasMore=true` means the authorized extra row exists, including at page 100; **stop at page 100 and narrow
+the query**, rather than requesting page 101 or claiming all results have ended. An empty/final page has
+`hasMore=false`. Concurrent changes can shift offset pages; no snapshot pagination guarantee is made.
+Search order is name ASC, ID ASC; Assigned is status sort order ASC, authoritative Intake date DESC,
+ID DESC. Assigned ordering uses CaseDates internally; no dates are disclosed or hydrated into Overview.
+
+Selected SQL statements retain five-second timeouts and DATALENGTH guards on projected text. Oversized
+source values fail safely without truncation. Exact delivered UTF-8 JSON is checked once: **128 KiB/page,
+8 KiB/Overview**. Selected success and scoped errors use `Cache-Control: no-store`. Row/statement bounds
+are not an end-to-end deadline or proof of bounded scans; the web's eight-second fetch/body budget is a
+client choice. Representative SQL plans/performance remain a separate acceptance gate.
+
+### Error contract
+
+For requests reaching the selected MVC contract, safe JSON errors use the type-backed `ApiErrorResponse`:
+required `timestamp` (UTC instant), numeric `status`, string `error`, `message`, `path`, and `fieldErrors`
+(empty array for this slice). The path contains no query string and is capped at 512 UTF-16 units; longer/absent paths use `/api/v2/cases`.
+Fixed messages, codes, empty field errors and this path cap keep selected scoped errors below 8 KiB UTF-8. Do not interpret human-readable messages
+as codes. No SQL text, table names, stack traces, credentials, foreign tenant metadata or raw exception
+messages are returned. Errors contain no partial Case result. Invalid bindings can fail before authentication,
+so status precedence is not a promise that every malformed unauthenticated request returns 401.
+
+| HTTP status | `error` / meaning |
+| --- | --- |
+| 400 | `invalid_case_request` for malformed JSON/numeric binding; `case_request_failed` for explicit query/page/size/ID validation. |
+| 401 | `case_request_failed`: missing/rejected authentication. Reauthenticate explicitly. |
+| 403 | `case_read_denied` for shared operation authority denial; retain the session. |
+| 404 | `case_request_failed`: Case unavailable, indistinguishable missing/foreign/deleted. Overview only. |
+| 503 | `case_payload_oversized`, `case_read_timeout`, `case_audit_unavailable`, or `case_read_unavailable` for internal/read/encoding failures. No partial data; retry explicitly. Oversize is not HTTP 413 in this existing contract. |
+
+Framework/edge failures outside mapped controller requests (unsupported routes/methods/media, CORS, proxy or
+host failures) are not guaranteed to use this envelope. Consumers must safely handle non-JSON/non-success
+responses and cap error bodies; current web caps them at 8 KiB. The scoped path cap does not impose a global byte budget on infrastructure or other controllers’ errors.
+
+### Versioning and compatibility policy
+
+* The supported selected contract is the existing **URL major `/api/v2/cases`**. OpenAPI `info.version=v1`
+  is historical document metadata, not a v1 URL or a promise that all generated operations are stable.
+  `/v3/api-docs` names the documentation route, not the application API major. No application version bump.
+* A breaking change includes removing/renaming a route, method, parameter or response member; changing
+  types, required/null semantics, identity/time meaning, paging/defaults/limits, auth requirements, error
+  status/code meaning, or broadening the approved disclosure allowlist. A future breaking contract uses a
+  new URL major (normally `/api/v3/...`) alongside v2 with an explicit client migration plan.
+* **This selected response allowlist is closed.** Fields may not be silently added, even optional ones:
+  the current web runtime validators reject unknown fields to prevent accidental wider disclosure.
+  Future mobile/API clients may use the same conservative validation. New response fields require a
+  reviewed compatibility plan/new major or explicit negotiated contract. Unknown request members are
+  currently ignored and never trusted as tenant/actor authority. Unknown response tolerance is not required
+  for this slice; no blanket additive-field promise is made for other APIs.
+* This slice exposes no closed business enums: status IDs/names are data, not an enum. If a future contract
+  introduces closed enums, adding a value is breaking for exhaustive clients unless that version explicitly
+  defines an unknown-value fallback. Error codes listed above are supported; clients should fall back to a
+  generic safe error for unrecognized failures rather than rendering raw payloads.
+* Documentation/examples and schema descriptions may improve compatibly; generated ordering and operation
+  metadata are not frozen. Any implementation change still must preserve behavior and disclosure policy.
+* Legacy routes above remain available for existing callers. No deprecation/removal date is declared.
+  Compatibility routes/aliases may remain indefinitely while supported clients need them; removal requires
+  an explicit announced replacement, consumer inventory/migration evidence and release decision. No fixed
+  calendar support window or alias proliferation is introduced at this maturity. Future deprecated stable
+  routes must be marked in OpenAPI and these owning docs before removal; never silently repoint a broad
+  route to the minimized DTO.
+
+The unchanged web `features/cases/client.ts` and exact unknown-JSON validators already consume this
+contract. No web migration/UX change is required. The same authenticated endpoints and business rules
+serve future mobile and conventional integrations; SDKs, registration and public developer portals are deferred.
+The bounded compatibility baseline in `OpenApiDocumentationTest` protects routes, parameters, bearer scheme,
+required/null/type schemas and paging; serialized-record checks and HTTP/service tests complement it.
+
+Phase 2 closes the **selected Case REST/OpenAPI foundation only**. Broader operation review and live gates
+remain open in the [canonical roadmap](architecture/ai-integration-and-mcp.md#phase-2--stable-restopenapi-foundation-in-progress).
+Phase 1R remains merged and locally/synthetically validated; **authoritative Case SQL acceptance BLOCKED**
+by the unavailable approved offline artifact. Nothing here activates production RLS or establishes deployed
+SQL security. MCP remains NOT STARTED; AI authority/grants/audit and runtime acceptance remain separate gates.
+
+
 ## Current authentication/security reconciliation — 2026-10-21
+
+This dated reconciliation precedes merged Phase 1R/1S. The Phase 2 contract above and canonical
+roadmap now record their merged status; the historical Phase 1R next-step wording below is superseded.
+Authoritative Case SQL acceptance remains BLOCKED.
 
 The [canonical API/MCP roadmap §2.5](architecture/ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
 records the October 20 **operator-reported production retirement** of EXECUTE on the three legacy login
