@@ -113,3 +113,19 @@ Developer procedure: run `build\scripts\release-all.bat <major>.<minor>.<build> 
 opens a draft, review/edit it and rerun the exact same release command. Shale then creates the narrowly scoped notes
 commit and continues through the existing clean-tree preflight and synchronization workflow.
 The version argument remains the only release-version source of truth and must match both filename and JSON value.
+
+## Windows installer integrity and standard-user release gate
+
+For the installer remediation, use a new version above 1.0.137 and rebuild both desktop ZIP and MSI; do not publish
+an existing version again. `build-shale-release.bat` is the build-only entry point and does not deploy/upload.
+The [Windows packaging guide](windows-update-packaging.md#standard-user-msi-registration-remediation--2026-10-21)
+owns scope, legacy migration, payload, signing settings, and the pending installed acceptance matrix. Legacy MSI
+removal requires a separate same-owner administrator step; fresh corrected packages use native HKCU registration.
+
+Signing credentials remain external. Ordinary developer builds remain explicitly unsigned; approved production
+builds set `SHALE_WINDOWS_SIGNING_REQUIRED=true` and the documented signtool, timestamp, expected publisher, and
+certificate selectors. Final jpackage executable sources are signed before final Light, and the MSI afterward.
+Verify final MSI and installed Shale/updater/diagnostic signatures and timestamps; signing alone does not prove
+Defender acceptance. Build scripts follow the host's normal PowerShell execution policy.
+This installer delta requires desktop distribution and Windows acceptance, no server/API deployment or SQL migration.
+No production release, Azure change, or SQL action is authorized by the remediation task itself.

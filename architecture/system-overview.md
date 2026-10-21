@@ -17,21 +17,24 @@ Primary modules:
 - shale-desktop
 - shale-server
 
-## Installer-owned Windows registration (Phase 13F; complete)
+## Per-user Windows installer registration
 
-The WiX 3.14 lifecycle, not Shale runtime, owns one protected 64-bit HKLM registration per per-user installation at
-`SOFTWARE\Shale\Installations\<opaque UUID>`. It stores only schema, UUID, Windows owner SID, install root, and owner
-support root. Elevated actions validate the pre-elevation MSI owner SID against ProfileList path authority, reject
-reparse roots, harden ACLs, preserve identity across upgrade/repair, and perform exact uninstall/rollback. A read-only
-core reader classifies invalid, stale, duplicate, and unsafe records without healing them. Windows packaging feeds
-a minimally augmented copy of JDK 21's own `main.wxs` resource into jpackage's original compile, so
-jpackage retains its implicit WiX defaults and generated package identity without a second main-source compile.
-The source template leaves per-user scope to jpackage through `InstallScope="$(var.JpInstallScope)"` and declares no
-privilege attribute. WiX 3.14 Dark represents the compiled MSI with `InstallPrivileges="limited"` and no required
-`InstallScope`; same-owner administrator consent elevates `msiexec`, after which
-deferred non-impersonating actions use the installer service for protected writes. Secondary-credential elevation
-is unsupported because it changes the per-user installation owner.
-Installed Windows acceptance is PASS: the protected 64-bit record, owner/roots, strict ACL, production-reader `VALID`, schema-1 `1.0.129` / `PRODUCTION` metadata, and updater were confirmed. Repair and major upgrade preserved the UUID, and exact uninstall removed it. Production Authenticode is still a separate deployment prerequisite because the accepted developer artifacts were intentionally unsigned. Logged-out automatic updating remains `UNSUPPORTED`; there is no task, service, SYSTEM executor, principal selection, or scheduler.
+The standard-user installer remediation supersedes Phase 13F's elevated per-user installation requirement.
+Native WiX/MSI registry operations own `HKCU\SOFTWARE\Shale\Desktop` schema 2, bound to the MSI user SID,
+install/support roots, and stable product UpgradeCode. Native MSI handles repair, rollback, upgrade, and exact
+value removal; there is no registration PowerShell/custom-action execution or HKLM write. User-writable HKCU data
+is discovery information only and must never authorize a privileged executor. The existing protected HKLM schema-1
+reader remains a read-only legacy diagnostic, with no HKCU trust fallback. Runtime update discovery remains based
+on the installed launcher and updater path, and logged-out automatic updating remains UNSUPPORTED.
+
+A native early migration gate blocks in-place removal of legacy 1.0.128–1.0.137 MSIs because their cached removal
+code still requires elevation. One-time same-owner administrator removal is separate from the corrected normal
+per-user lifecycle. The corrected installer preserves legacy HKLM state and never guesses/migrates a protected UUID.
+The build stages a deliberate runtime allowlist and validates generated/final payloads. See
+`docs/windows-update-packaging.md` for root cause, scope, signing, and legacy migration, and
+`docs/testing/windows-installed-registration-phase13f.md` for current pending Windows acceptance.
+Historical Phase 13F administrator acceptance remains historical evidence only. This change has no tenant/domain
+read or mutation, so database audit events and migrations do not apply; MSI logs supply operational diagnostics.
 
 ## Privacy-safe update-attempt observability (Phase 12)
 

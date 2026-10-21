@@ -56,7 +56,7 @@ def mutate(path):
     # Refuse that transaction before RemoveExistingProducts, even if elevated.
     upgrade = ET.SubElement(product, tag("Upgrade"), {"Id": product.get("UpgradeCode")})
     ET.SubElement(upgrade, tag("UpgradeVersion"), {
-        "Minimum": "1.0.128", "IncludeMinimum": "yes", "Maximum": "1.0.136",
+        "Minimum": "1.0.128", "IncludeMinimum": "yes", "Maximum": "1.0.137",
         "IncludeMaximum": "yes", "OnlyDetect": "yes", "Property": LEGACY_PROPERTY})
     ET.SubElement(product, tag("Condition"), {"Message": LEGACY_MESSAGE}).text = LEGACY_CONDITION
     tree.write(path, encoding="utf-8", xml_declaration=True)
@@ -91,8 +91,10 @@ def validate_registration(root):
         raise ValueError("registration component must be selected by one Feature")
     # No installer command strings, HKLM writes, or legacy encoded payload may return.
     for node in root.iter():
-        if node.tag == tag("RegistryValue") and node.get("Root") in ("HKLM", "HKMU"):
+        if node.tag in (tag("RegistryValue"), tag("RegistryKey"), tag("RemoveRegistryKey"), tag("RemoveRegistryValue")) and node.get("Root") in ("HKLM", "HKMU"):
             raise ValueError("machine registry writes are forbidden in the per-user package")
+        if node.tag in (tag("Permission"), tag("PermissionEx")) or node.tag.rsplit("}", 1)[-1] == "PermissionEx":
+            raise ValueError("installer ACL overrides are forbidden")
         if node.tag == tag("CustomAction"):
             text = " ".join(node.attrib.values()).casefold()
             if any(word in text for word in ("shaleregistration", "powershell", "frombase64string", "invoke-expression", "iex(")):
@@ -101,7 +103,7 @@ def validate_registration(root):
             raise ValueError("encoded registration payload is forbidden")
     product = one(root, "Product")
     legacy = [n for n in root.iter(tag("UpgradeVersion")) if n.get("Property") == LEGACY_PROPERTY]
-    expected = {"Minimum": "1.0.128", "IncludeMinimum": "yes", "Maximum": "1.0.136",
+    expected = {"Minimum": "1.0.128", "IncludeMinimum": "yes", "Maximum": "1.0.137",
                 "IncludeMaximum": "yes", "OnlyDetect": "yes", "Property": LEGACY_PROPERTY}
     if len(legacy) != 1 or legacy[0].attrib != expected or parents[legacy[0]].get("Id") != product.get("UpgradeCode"):
         raise ValueError("legacy MSI migration detection must remain explicit")

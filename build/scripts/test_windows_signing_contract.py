@@ -24,6 +24,11 @@ class WindowsSigningContractTest(unittest.TestCase):
         orchestrator = (ROOT / "build/scripts/release.bat").read_text()
         self.assertLess(orchestrator.index("build-shale-release.bat"), orchestrator.index("update-manifest.bat"))
 
+    def test_signing_paths_are_literal_not_wildcard_expressions(self):
+        script = (ROOT / "build/scripts/sign-windows-artifact.ps1").read_text()
+        self.assertIn("Test-Path -LiteralPath $Path -PathType Leaf", script)
+        self.assertIn("Get-AuthenticodeSignature -LiteralPath $Path", script)
+
     def test_password_is_never_echoed(self):
         script = (ROOT / "build/scripts/sign-windows-artifact.ps1").read_text()
         self.assertNotIn("Write-Host $env:SHALE_SIGN_CERT_PASSWORD", script)

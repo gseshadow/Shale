@@ -58,7 +58,7 @@ class RegistrationMutationTest(unittest.TestCase):
         tree = self.mutate()
         upgrade = next(tree.getroot().iter(m.tag("UpgradeVersion")))
         self.assertEqual("yes", upgrade.get("OnlyDetect"))
-        self.assertEqual("1.0.136", upgrade.get("Maximum"))
+        self.assertEqual("1.0.137", upgrade.get("Maximum"))
         condition = next(tree.getroot().iter(m.tag("Condition")))
         self.assertEqual(m.LEGACY_CONDITION, condition.text)
         self.assertIn("administrator consent", condition.get("Message"))
@@ -69,6 +69,9 @@ class RegistrationMutationTest(unittest.TestCase):
 
     def test_rejects_machine_writes_encoded_actions_and_payload(self):
         for tag, attrs in (("RegistryValue", {"Root": "HKLM"}),
+                           ("RegistryKey", {"Root": "HKLM"}),
+                           ("RemoveRegistryKey", {"Root": "HKLM"}),
+                           ("Permission", {"User": "Everyone", "GenericAll": "yes"}),
                            ("RegistryValue", {"Root": "HKMU"}),
                            ("CustomAction", {"Id": "ShaleRegistrationInstall"}),
                            ("CustomAction", {"Id": "Other", "ExeCommand": "powershell.exe"}),

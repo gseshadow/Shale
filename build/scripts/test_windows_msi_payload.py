@@ -1,4 +1,3 @@
-import importlib.util
 import copy
 from pathlib import Path
 import tempfile
@@ -6,9 +5,10 @@ import unittest
 import xml.etree.ElementTree as ET
 import zipfile
 
-spec = importlib.util.spec_from_file_location("payload", Path(__file__).with_name("windows_msi_payload.py"))
-m = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(m)
+try:
+    import windows_msi_payload as m
+except ModuleNotFoundError:
+    from build.scripts import windows_msi_payload as m
 
 class CompiledPayloadTest(unittest.TestCase):
     def fixture(self, *, marker_count=1, dll_count=1, launcher_count=1, marker_dir="app",

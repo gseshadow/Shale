@@ -1,7 +1,10 @@
 from pathlib import Path
 import tempfile
 import unittest
-from windows_runtime_input import FORBIDDEN, stage, validate_paths
+try:
+    from windows_runtime_input import FORBIDDEN, stage, validate_paths
+except ModuleNotFoundError:
+    from build.scripts.windows_runtime_input import FORBIDDEN, stage, validate_paths
 
 class RuntimeInputTest(unittest.TestCase):
     def setUp(self):

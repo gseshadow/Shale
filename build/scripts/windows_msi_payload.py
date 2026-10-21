@@ -6,7 +6,10 @@ import sys
 import xml.etree.ElementTree as ET
 import zipfile
 import subprocess
-from windows_runtime_input import validate_paths, validate_tree
+if __package__:
+    from .windows_runtime_input import validate_paths, validate_tree
+else:
+    from windows_runtime_input import validate_paths, validate_tree
 
 NS = "http://schemas.microsoft.com/wix/2006/wi"
 REQUIRED_MARKER = {
