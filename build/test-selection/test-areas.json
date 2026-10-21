@@ -497,6 +497,9 @@
         "architecture/tenancy-and-rls.md",
         "build/case-read-verification/**",
         "build/auth-verification/**",
+        "build/phase1r-verification/**",
+        "docs/sql/phase1r/**",
+        "**/Phase1R*.java",
         "**/verification/CaseRead*.java"
       ],
       "reason": "Security, RLS, tenant session, or audit infrastructure changed; critical and affected data/security contracts are blocking.",

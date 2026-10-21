@@ -84,6 +84,15 @@ class ChangeSelectorTest(unittest.TestCase):
         explicit = SELECTOR.select([], ["ui-visual-advisory"])
         self.assertEqual("mvn -Pui-visual test", explicit["selected_command"])
 
+    def test_phase1r_tooling_routes_to_security_contracts(self):
+        for path in ("docs/sql/phase1r/engine.sql", "build/phase1r-verification/run.py",
+                     "shale-server/src/test/java/com/shale/server/runtime/Phase1RCandidateFixture.java"):
+            with self.subTest(path=path):
+                result = SELECTOR.select([path])
+                self.assertIn("security-data", result["selected_areas"])
+                self.assertIn("com.shale.data.auth.AuthCredentialLookupTest", result["test_patterns"])
+                self.assertIn("com.shale.data.dao.RequestLookupRlsPhase2MigrationTest", result["test_patterns"])
+
     def test_security_and_rls_select_critical_affected_data_coverage(self):
         result = self.selected("shale-data/src/main/java/com/shale/data/auth/AuthUserLifecycle.java")
         self.assertIn("security-data", result["selected_areas"])
