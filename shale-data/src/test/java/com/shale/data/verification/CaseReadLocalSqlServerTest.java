@@ -164,8 +164,9 @@ class CaseReadLocalSqlServerTest {
                 String expected = STRICT.contains(table) ? "fn_FilterByTenant" : "fn_FilterByTenantOrGlobal";
                 require(scalar(con, "SELECT COUNT_BIG(*) FROM sys.security_predicates p JOIN sys.security_policies s ON s.object_id=p.object_id "
                         + "WHERE p.target_object_id=OBJECT_ID(?) AND p.predicate_type_desc='FILTER' AND s.name='TenantFilter' AND s.is_enabled=1 "
-                        + "AND LOWER(REPLACE(REPLACE(REPLACE(p.predicate_definition,'[',''),']',''),' ',''))=?",
-                        "dbo." + table, "sec." + expected.toLowerCase(Locale.ROOT) + "(shaleclientid)") == 1);
+                        + "AND LOWER(REPLACE(REPLACE(REPLACE(p.predicate_definition,'[',''),']',''),' ','')) IN (?,?)",
+                        "dbo." + table, "sec." + expected.toLowerCase(Locale.ROOT) + "(shaleclientid)",
+                        "(sec." + expected.toLowerCase(Locale.ROOT) + "(shaleclientid))") == 1);
             }
             require(scalar(con, "SELECT COUNT_BIG(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trusted=1") == 0);
             require(scalar(con, "SELECT COUNT_BIG(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1") == 0);

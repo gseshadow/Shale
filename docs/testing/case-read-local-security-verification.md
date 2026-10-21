@@ -1,6 +1,180 @@
 # Minimized Case reads: disposable local SQL verification
 
+## Phase 1R candidate — 2026-10-21
+
+**Candidate implemented; synthetic acceptance recorded below; authoritative Case SQL acceptance BLOCKED.**
+Base: live `origin/codex/latest` at `73c23475a4001dfcd36ec8a06c91d85cd1bad6c3`, isolated branch
+`codex/phase1r-case-read-rls`. The original checkout and unrelated work were preserved. October 20
+operator-reported retirement/API/installed-desktop acceptance remains accepted at its original scope;
+no retirement, recovery, rehearsal, desktop or phone/browser check was repeated.
+
+### Implementation and review
+
+[Phase 1R SQL entry points and rollback](../sql/phase1r/README.md) add only these FILTERs to existing
+enabled, schema-bound `sec.TenantFilter`: `dbo.Users` and actual **`dbo.auditLog`** use
+`sec.fn_FilterByTenant(ShaleClientId)`; `dbo.Statuses` uses
+`sec.fn_FilterByTenantOrGlobal(ShaleClientId)`. No BLOCK, function, grant, row, history, column or index
+change is part of the candidate. A schema extended-property receipt records only candidate-owned additions,
+full before/after predicate fingerprints and database/policy/function identities. All-matching pre-existing
+coverage is a true no-op without a receipt. Repeated application preserves the original receipt. Scoped
+rollback preserves pre-existing matching predicates and refuses catalog/function/receipt drift.
+
+Preflight/apply/postcheck/rollback share one transaction engine, fail-fast guards and an exclusive transaction
+application lock. Review pins exact function definitions and all unrelated predicate IDs/definitions;
+unknown/disabled/conflicting target state, owner changes, wrong collation/identifiers or changed inventories
+stop. No state is repaired or normalized. Fixed ADD batches are deferred with `sp_executesql` to avoid SQL
+Server's eager duplicate-predicate binding even in a skipped branch. No arbitrary dynamic SQL is accepted.
+Coordinated exclusion of other administrative DDL remains necessary; this lock covers these entry points.
+
+Reviewed AGENTS/prompt rules, database-schema/tenancy, roadmap §§2.5/9 and audit/service model, this runbook's
+assessment/dependencies, auth cutover Stage A/B, App Service order and R4/current deployment acceptance.
+Source review confirmed current shared password callers use V1 with BCrypt and **no SELECT fallback**;
+remembered lookup uses V2 before runtime-qualified serializable rotation; verified JWT identity supplies
+context for durable sessions. Stage A/B guards deliberately require the pre-FILTER baseline, so their old
+preflight must not be replayed after this candidate. Existing runtime stamps both mutable context keys on
+every borrow and closes a failed lease. Minimized Case reads retain explicit tenant/actor/join predicates,
+pre-page filtering, same-transaction required Overview append/commit and the summary-web exemption.
+
+Test-impact review covered existing migration/auth/session/Case JDBC/controller tests, real SQL fixtures,
+importer/runner guards and pool initialization. New tests reuse existing nonce/SID cleanup and auth fixture
+patterns without invoking `AuthPermissionCutoverFixture` or any old operator/retirement packet. The synthetic
+fixture installs current V1/V2 definitions with explicit confined grants/denials in a new database; that is
+functional compatibility evidence, **not Stage A/B deployment or production grant acceptance**.
+
+One existing harness defect was proven using SQL Server 2022 metadata: an exact FILTER is rendered as
+`([sec].[fn_FilterByTenant]([ShaleClientId]))`, while the old normalized comparison expected no outer pair.
+The only Case harness change accepts both exact equivalent catalog spellings. Function, column, enabled
+policy and single-FILTER expectations and every runtime scenario remain intact. Real SQL regression checks
+prove the wrapped strict match passes and wrong function/column fail. No importer extension or fixed
+security requirement was weakened. The original authoritative artifact is unchanged.
+
+### Offline artifact and evidence classification
+
+| Evidence class | Current result / precise limit |
+| --- | --- |
+| Authoritative source | Prior supplied schema-only `shale-schema-source.sql`, 728,862 bytes, UTF-16LE; recorded SHA-256 `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`. **Absent from this workspace** after search of available workspace/tmp inputs. Original bytes were not read, regenerated or modified in this task. Historical schema findings remain attributed. |
+| Derived authoritative schema | **BLOCKED / not generated; hash unavailable.** Must retain real constraints, computed definitions/`dbo.ToBitNV`, ownership/dependencies, collations and transitive FK/type/function inventory listed in the existing dependency table. |
+| Candidate authoritative schema | **BLOCKED / not generated; hash unavailable.** Candidate migration source is committed separately; its Git hash is not a candidate-schema hash. No synthetic schema is substituted. |
+| Synthetic real SQL | New loopback SQL Server 2022 database and synthetic Users/auditLog/Statuses; real existing session/remembered foundation migrations, current V1/V2 modules, BCrypt, Hikari, production HTTP controllers/JWT/DAOs. Migration/rollback, auth, session and raw read isolation scenarios below. Does not establish authoritative Case schema or installed/deployed callers. |
+| Injected failures | Test-only THROW after first actual ADD / first DROP proves atomic apply/rollback; malformed receipts/owner/policy/conflict injections prove rejection. A JDBC wrapper fails the second context setup; lease closes and the next borrow overwrites both keys. These are controlled injections, not observed production failures. |
+| Static inspection / doubles | Case query/audit/overlay and existing JDBC/controller regressions, importer/launcher safety, documentation review. These do not establish SQL execution of Case joins/paging/required audits. |
+| Unexecuted authoritative Case path | **BLOCKED:** full A/B/NULL Case reads, actor joins, overlay precedence, paging/hasMore, successful audit commit, real denied audit INSERT and injected pre-commit/lost-ack Case scenarios have no new authoritative SQL execution result. Opt-in test skip is not a pass. |
+
+The auth fixture proves password NULL-context bootstrap for A/B, unavailable/deleted/removed/NULL-tenant/
+orphan/ambiguous/wrong-password rejection, caller restoration after successful and deliberately failing
+owner-module work, separate non-bypass runtime, raw A/B/NULL Users/audit visibility and Statuses global/current
+visibility, same-SPID A1/A2/B1/A1 reuse and setup-failure recovery. Production login/`/me`/refresh/logout and
+remembered enrollment/restore run through MockMvc and real SQL with session/JTI and remembered-secret rotation,
+old-secret/old-JTI replay rejection and durable revocation. MockMvc is in-process HTTP execution, not a serving
+network API, installed desktop, browser or production acceptance. Auth pool context remains NULL; ordinary
+runtime cannot execute the bootstrap modules, impersonate dbo, alter them/policy or read password hashes.
+
+The authoritative Case audit distinction is preserved: `audit_insert_denied` must exercise an actual SQL
+permission DENY with zero durable audit delta and no returned Case; `commit_lost_ack` invokes real commit
+then injects SQLState 08007, withholds the DTO and measures a committed audit row. A rollback attempt does
+not undo a committed row. Neither Case scenario ran here; passing JDBC doubles are synthetic only. No audit
+rows are deleted to hide uncertainty and no automatic replay is introduced.
+
+### Executed checks
+
+Local toolchain: Python 3.12.14, Maven 3.9.11, Temurin JDK 21.0.12.1; actual SQL Server **16.0.4305.5** (2022), image pinned to
+`sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`.
+The existing `/workspace/.tools/bin/mvn` wrapper supplies this environment's JDK/proxy/CA settings;
+no POM, release version or application configuration changes. Initial offline dependency misses were
+resolved through the configured proxy. Development-time candidate failures (catalog parentheses and eager
+DDL binding) are corrected failures, not passing acceptance evidence.
+
+| Executed check | Result |
+| --- | --- |
+| New launcher protocol Python tests | 3 PASS. Missing scenarios/nonzero exit/cleanup failure cannot pass; arbitrary child output is discarded. |
+| Existing auth Python tests | 35 PASS, 8 explicit unavailable native Windows/PowerShell/ODBC skips (43 total). No operator packet or retirement/recovery run. |
+| Existing Case launcher / selector Python tests | 4 PASS / 25 PASS, including new Phase 1R security routing. |
+| Initial focused Java | 54 PASS, 1 inherited failure, 1 Case SQL skip (56 total); server unexecuted after data-module failure. |
+| Unchanged-base failure reproduction | `UserSessionMigrationContractTest`: 2 PASS, same 1 failure at base `73c23475`. Its blanket forbidden `nvarchar(max)` assertion rejects the migration's existing SQL variable. Neither test nor migration changed. |
+| Remaining focused Java | 86 PASS, 2 explicit SQL opt-in skips (88 total). Current auth/module/session, Case JDBC/paging/audit doubles, launcher safety and HTTP/context contracts. |
+| Selector affected suite | 54 PASS, 2 SQL opt-in skips (56 total). Security-data contracts plus modified Case/Phase 1R tests; helper compiles but has no JUnit methods. |
+| Critical reactor | `mvn test`: **116 PASS**, zero failures/errors/skips, BUILD SUCCESS. |
+| New real SQL fixture and real public quiet launcher | All six required PASS lines, cleanup successful, exit 0. Synthetic real SQL plus labelled injected migration/setup failures; no authoritative Case result. |
+| SQLCMD entry points | Real `sqlcmd -b -V 16`: preflight, apply, repeat apply, postcheck, rollback, repeat rollback PASS; original full predicate hash restored and exact nonce cleanup PASS in a separate new synthetic database. |
+| Scope / docs / whitespace | Full diff reviewed; four Markdown files, 77 relative links/anchors and fences checked; `git diff --check` passes. |
+
+Exact commands from this worktree (`python` is Python 3.12.14):
+
+```bash
+python -m unittest discover -s build/phase1r-verification -p 'test_*.py'
+python -m unittest discover -s build/auth-verification -p 'test_*.py'
+python -m unittest discover -s build/case-read-verification -p 'test_*.py'
+python -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+/workspace/.tools/bin/mvn -o -pl shale-data,shale-server -am -Dtest=Phase1RLocalSqlServerTest,CaseReadLocalSqlServerTest,CaseReadVerificationSafetyTest,AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest,SqlRememberCredentialStoreTest,DesktopRememberCredentialMigrationContractTest,UserSessionMigrationContractTest,UserSessionDaoContractTest,RequestLookupRlsPhase2MigrationTest,MinimizedCaseReadJdbcTest,CaseSearchPagingJdbcTest,CaseServiceAdapterTest,AuthControllerTest,DesktopSessionControllerTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest -Dsurefire.failIfNoSpecifiedTests=false test
+# On the unchanged detached base worktree, to attribute the inherited failure:
+/workspace/.tools/bin/mvn -o -pl shale-data -am -Dtest=UserSessionMigrationContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+# Remaining focused tests, allowing the server module to execute independently:
+/workspace/.tools/bin/mvn -o -pl shale-data,shale-server -am -Dtest=Phase1RLocalSqlServerTest,CaseReadLocalSqlServerTest,CaseReadVerificationSafetyTest,AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,AuthVerificationSupportTest,SqlRememberCredentialStoreTest,DesktopRememberCredentialMigrationContractTest,UserSessionDaoContractTest,RequestLookupRlsPhase2MigrationTest,MinimizedCaseReadJdbcTest,CaseSearchPagingJdbcTest,CaseServiceAdapterTest,AuthControllerTest,DesktopSessionControllerTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest -Dsurefire.failIfNoSpecifiedTests=false test
+PATH=/workspace/.tools/bin:$PATH python build/test-selection/select_tests.py --base 73c23475a4001dfcd36ec8a06c91d85cd1bad6c3 --head HEAD --format markdown --plan-output work/selection.json --run
+python work/run_sql.py
+python work/run_launcher.py
+python work/test_sqlcmd.py
+python work/check_docs.py
+git diff --check
+git diff --check 73c23475a4001dfcd36ec8a06c91d85cd1bad6c3 HEAD
+```
+
+The selector `--run` executed its emitted security-data Maven command and then critical `mvn test`;
+its exact argv are retained in the local plan. Ownership routing for new SQL/tool paths was added with
+one selector regression; that metadata change recommends the historical full suite informationally only.
+No blanket all-tests or visual suite ran. Existing full-suite advisories (12 data failures, three
+ApiExceptionHandlerTest failures, legacy application-release OpenAPI binding) retain their prior attribution;
+they were not rerun or repaired. The separately reproduced session-migration assertion above is an additional
+explicit inherited failure, not a Phase 1R regression or an all-tests pass.
+
+Private `work/` helpers are local orchestration, not committed artifacts: `run_sql.py` supplies only new
+synthetic admin credentials to the exact focused opt-in JUnit command; `run_launcher.py` supplies the two
+private prompts to the real public launcher without replacing its validation/Maven/report paths. Both
+capture/discard unrestricted output. `test_sqlcmd.py` copies only the candidate SQL into the task-owned
+container and exercises the actual SQLCMD includes with independently labelled synthetic definitions;
+it records only fixed outcomes and the SQL version. An initial copied-file readability failure preceded
+SQL execution and was corrected only in that disposable container. Public reproduction uses
+`python3 build/phase1r-verification/run.py --opt-in LOCAL_DISPOSABLE_PHASE1R --port 14333` with an installed
+Maven (or `--maven /absolute/path/to/mvn`). Each run creates fresh nonce/SID-guarded resources. No prior
+operator resource or private capture was adopted. The original Case importer remains unchanged.
+
+### Remaining activation and rollback gates
+
+SQL-before-client compatibility is conditional. Existing additive V1/V2 modules with Stage A fences must
+precede dependent API **and direct-JDBC desktop** callers. Accept the actual compatible deployed API/JAR,
+installed V1/V2 callers/jobs and intended auth/runtime identity mappings, then drain incompatible old callers
+before restrictive Stage B or Users FILTER activation. Existing Stage A/B scripts reject newly present
+three-table predicates: complete any missing separately approved stages before RLS; do not remove their guards.
+Sanitized existing deployment/catalog evidence must establish module definitions/owners, effective fences,
+non-bypass runtime, compatible versions, old-caller drain/coordination and operational monitoring/sign-off.
+These facts are unknown here. Do not infer them from retirement, release 1.0.137 metadata or local passes.
+No privileged runtime, direct SQL bypass, auth fallback or new permission workaround is permitted.
+
+Before any later activation, close authoritative derived/candidate acceptance and review identifier collation
+against Case consumers' `AuditLog` spelling, deployed policy/grants and representative plans. Source/column
+collation does not establish database identifier collation. The fixture's `SQL_Latin1_General_CP1_CI_AS` is
+synthetic evidence only. Preserve actual source ownership/computed/constraint dependencies; do not transcode
+or simplify a missing source into apparent authoritative coverage.
+
+Prepare rollback with the original review inputs and untouched receipt, then invoke
+[`rollback.sql`](../sql/phase1r/rollback.sql) as documented. It removes **only recorded candidate additions**;
+no receipt means no removal; drift blocks action for review. Rollback of FILTERs does not remove auth modules
+needed by current callers or restore compatibility with retired direct-SELECT paths. It does not reverse
+unrelated permissions, application deployments or already committed audit history.
+
+Audit-grant/append-only/admin-only and existing viewer logging gaps remain OPEN. FILTERs do not enforce
+write BLOCKs, protect password columns or make global Statuses immutable. This task adds no application
+audit schema/events: Overview retains its existing event/transaction and summaries retain the approved
+exemption. Future AI integration/tool/grant/outcome attribution remains an independent follow-on activation
+gate. REST and future MCP must share secured application/service boundaries; no AI database access.
+Stage A/B completion, complete least privilege/RLS, monitoring readiness, production activation and MCP
+readiness are **not claimed**. No production/Azure SQL, deployment, installer/version publication, MCP
+activation or broad RLS/permission redesign occurred.
+
+
 ## Current authentication/security reconciliation — 2026-10-21
+
+Historical reconciliation record, before the Phase 1R local work above; its production evidence scopes remain intact.
 
 The [canonical API/MCP roadmap §2.5](../architecture/ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
 records the October 20 **operator-reported production retirement** of EXECUTE on the three legacy login

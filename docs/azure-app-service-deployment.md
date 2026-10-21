@@ -50,6 +50,13 @@ state is unconfirmed here; the October 20 operator report has the bounded scope 
 | Desktop release 1.0.137 / Case Updates | Existing CaseUpdates lifecycle/RowVersion and PHI AuditLog dependencies in the [feature acceptance record](testing/case-updates-workspace.md); current shared authentication dependencies still apply to the complete artifact. | #1893–#1895 themselves add no new SQL migration/API deployment. That does not make an upgrade from an older base independent of previously introduced SQL/API requirements. Repository release metadata does not prove installation or server rollout. |
 | Web V2 and future phone apps | Selected API routes, tenant/actor checks, required audit schema/grants and live security acceptance; browser origin CORS and compiled `VITE_SHALE_API_BASE_URL`; native credentials/origins/deep-links reviewed separately when implemented. | API/SQL first, then compatible static assets or packaged client. Static web deployment is separate from the API JAR/MSI. iPhone browser acceptance is not a native release; web publication cannot update embedded native assets. |
 
+Phase 1R now supplies a [local three-FILTER candidate and exact rollback](sql/phase1r/README.md).
+Its [synthetic acceptance](testing/case-read-local-security-verification.md#phase-1r-candidate--2026-10-21)
+does not establish authoritative Case SQL or deployed caller compatibility. Stage A/B preflight deliberately
+rejects these three predicates: finish any missing separately approved module/fence stages before RLS,
+then compatible API/desktop rollout and old-caller drain. Do not rerun Stage A/B after FILTER attachment
+or remove those guards. Users FILTER activation and all production actions remain blocked here.
+
 Required sequence: review exact source-to-SQL/API/client compatibility and existing state -> install only
 missing approved additive SQL/modules with fences -> deploy/verify compatible API -> package/roll out
 compatible desktop/web clients -> confirm older caller drain -> separately authorize restrictive grants

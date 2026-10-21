@@ -1,18 +1,18 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; architecture/contract review IN PROGRESS; shared Case/REST foundation IN PROGRESS; MCP implementation NOT STARTED.
+**Status:** Phase 0 assessment COMPLETE; architecture/contract review and shared Case/REST foundation IN PROGRESS; Phase 1R candidate locally tested with synthetic fixtures; authoritative Case SQL BLOCKED; MCP implementation NOT STARTED.
 
 **Last reviewed:** 2026-10-21
 
-**Repository baseline:** current `origin/codex/latest`, commit `9330133a43a2c125cd20c9f3548f3c4a892caa31`.
+**Repository baseline:** Phase 1R live `origin/codex/latest`, commit `73c23475a4001dfcd36ec8a06c91d85cd1bad6c3`.
 This is repository inspection, not evidence of deployed SQL, API configuration, or runtime security acceptance.
 
 ## 1. Purpose, scope, and document ownership
 
 This document is the authoritative roadmap for provider-neutral AI integration and the shared secured
 application operations used by REST/OpenAPI and future MCP. It records recommendations for review; it does
-not authorize deployment or claim that proposed contracts or controls exist. This task changes documentation
-only: no MCP implementation, endpoints, database migrations, production code, or runtime configuration.
+not authorize deployment or claim that proposed contracts or controls exist. Phase 1R adds a narrowly scoped
+local SQL candidate and synthetic acceptance tooling; it does not activate MCP or authorize deployment.
 
 This existing document already owns the combined external REST/MCP contract, delegated integration
 authority, and AI access audit model. Update it rather than creating another roadmap. The web roadmap
@@ -168,7 +168,9 @@ end-to-end deadline. Broad legacy responses still expose UI-oriented fields or c
 ### 2.5 Authentication, permissions and delivery reconciliation — 2026-10-21
 
 This is the current cross-workstream status; dated implementation/rehearsal records retain their
-original scope. **Implemented** means present in inspected source; **merged** means GitHub records the
+original scope. Phase 1R's [local candidate record](../testing/case-read-local-security-verification.md#phase-1r-candidate--2026-10-21)
+supplements this ledger with synthetic results; authoritative Case SQL and all deployment gates remain open.
+**Implemented** means present in inspected source; **merged** means GitHub records the
 change in the base; **operator-reported deployed** attributes an operational report; **verified** must
 name the environment and check. None of these alone means complete security or operational acceptance.
 
@@ -735,12 +737,15 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Live RLS coverage acceptance | BLOCKED | Non-dbo deployment evidence, including documented Contacts parent-predicate gap. |
 | Wider Case/field and AI grant policy acceptance | BLOCKED | R2 web minimized tenant-wide policy is accepted; additional fields/children/directories and AI restrictions need scoped decisions. Team membership is not a general access policy. |
 | Complete AI read/failure audit representation | BLOCKED | Scoped compatible enhancement decision and verification. |
-| Local Case-read SQL security execution | BLOCKED | Supplied authoritative export confirms three missing FILTERs; reviewed derived input/candidate and execution remain pending. Auth SQL/recovery passes do not close Case SQL. |
+| Phase 1R three-FILTER migration / exact rollback | IMPLEMENTED; SYNTHETIC LOCAL acceptance | [Owning runbook](../testing/case-read-local-security-verification.md#phase-1r-candidate--2026-10-21): transactional/idempotent candidate, drift/atomic-failure tests, confined V1/V2 and real SQL session/controller compatibility; no production activation. |
+| Local Case-read SQL security execution | BLOCKED | Original export is absent from this task workspace; derived/candidate schema artifacts and hashes unavailable. Authoritative Case SQL, real audit denial and injected lost acknowledgement remain unexecuted. Synthetic auth passes do not close Case SQL. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
-**ONE recommended next implementation phase: Phase 1R — targeted Case-read RLS candidate and local
-acceptance.** Prepare the three missing read FILTERs and verify the existing minimized Case boundary
-in an explicitly disposable candidate database. This is a finite shared API/database security prerequisite
+**Current implementation phase: Phase 1R — targeted Case-read RLS candidate and local acceptance.**
+The three-FILTER candidate and synthetic auth/session acceptance are implemented. Complete the remaining
+authoritative offline derivation/candidate and Case SQL gates when approved input is available; the
+original export is absent here. Exact evidence and commands are in the owning runbook linked above.
+This is a finite shared API/database security prerequisite
 toward MCP, not a general security rewrite or MCP implementation. Reuse the existing pre-tenant V1/V2,
 durable sessions, minimized ports and OpenAPI; no new API endpoint or auth redesign must come first.
 Before activating Users RLS, confirm the compatible API/desktop deployment, confined auth execution and
@@ -753,6 +758,9 @@ delegation, integration controls and AI audit representation in §§4–5 exist 
 acceptance closes. Web/phone delivery continues through its owning roadmap independently of those AI gates.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
+
+Retained scope/acceptance specification. Candidate implementation and synthetic evidence are recorded above;
+remaining authoritative and deployment gates must not be mistaken for completed work.
 
 ```text
 Repository: gseshadow/Shale
