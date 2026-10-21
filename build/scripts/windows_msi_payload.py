@@ -5,6 +5,8 @@ import argparse
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
+import subprocess
+from windows_runtime_input import validate_paths, validate_tree
 
 NS = "http://schemas.microsoft.com/wix/2006/wi"
 REQUIRED_MARKER = {
@@ -240,6 +242,7 @@ def require_unique_desktop_diagnostic(effective_jars, packaged_jars):
         raise ValueError(f"production registration reader must remain in exactly one effective shale-core JAR; found {len(core_readers)}")
 
 def validate_image(root):
+    validate_tree(root)
     if not (root / "Shale.exe").is_file():
         raise ValueError("application image is missing Shale.exe")
     if not (root / DIAGNOSTIC_LAUNCHER).is_file():
@@ -314,8 +317,27 @@ def marker_properties(path):
         if values[0] != expected:
             raise ValueError(f"invalid installed marker contents: conflicting value for {key}")
 
+def validate_wix_runtime_paths(root, compiled=False):
+    for node in root.iter(tag("File")):
+        name = installed_file_name(node)
+        if not name and not compiled:
+            name = node.get("Source", "").replace("\\", "/").rsplit("/", 1)[-1]
+        if not name:
+            raise ValueError("payload file is missing its installed name")
+        validate_paths([Path(*installed_directory(root, node), name)])
+
+def sign_source(wxs):
+    root = ET.parse(wxs).getroot()
+    script = Path(__file__).with_name("sign-windows-artifact.ps1").resolve()
+    # Sign the exact files referenced by Candle/Light, including fresh jpackage launchers.
+    for name, directory in (("Shale.exe", ()), (DIAGNOSTIC_LAUNCHER, ()),
+                            ("ShaleUpdater.exe", ("app", "updater"))):
+        source = required_source_file(root, name, directory, "signing input")
+        subprocess.run(["powershell.exe", "-NoProfile", "-File", str(script), "-Path", str(source.resolve())], check=True)
+
 def validate_compiled(wxs):
     root = ET.parse(wxs).getroot()
+    validate_wix_runtime_paths(root, compiled=True)
     marker = required_file(root, "shale-windows-toast.properties", ("app",), "installed marker")
     required_file(root, "shale_windows_toast.dll", ("app", "native"), "native DLL")
     required_file(root, "Shale.exe", (), "launcher")
@@ -330,6 +352,7 @@ def validate_compiled(wxs):
 
 def validate_source(wxs):
     root = ET.parse(wxs).getroot()
+    validate_wix_runtime_paths(root)
     launcher_config = required_source_file(root, "Shale.cfg", ("app",), "launcher configuration")
     required_source_file(root, DIAGNOSTIC_LAUNCHER, (), "registration diagnostic launcher")
     diagnostic_config = required_source_file(root, DIAGNOSTIC_CONFIG, ("app",), "registration diagnostic configuration")
@@ -340,13 +363,13 @@ def validate_source(wxs):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["config", "launcher", "image", "source", "compiled"])
+    parser.add_argument("mode", choices=["config", "launcher", "image", "source", "compiled", "sign-source"])
     parser.add_argument("path", type=Path)
     args = parser.parse_args()
     try:
         {"config": validate_launcher_config, "launcher": validate_add_launcher_properties,
-         "image": validate_image, "source": validate_source, "compiled": validate_compiled}[args.mode](args.path)
-    except (OSError, ET.ParseError, ValueError) as error:
+         "image": validate_image, "source": validate_source, "compiled": validate_compiled, "sign-source": sign_source}[args.mode](args.path)
+    except (OSError, ET.ParseError, ValueError, subprocess.CalledProcessError) as error:
         print(f"Windows MSI payload validation failed: {error}", file=sys.stderr)
         return 1
     print(f"Windows launcher/payload {args.mode} validation passed: {args.path.name}")

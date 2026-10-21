@@ -14,6 +14,18 @@ def command_lines(source, command):
             if line.strip().lower().startswith(command.lower())]
 
 class WindowsReleaseBatchContractTest(unittest.TestCase):
+    def test_desktop_and_msi_use_curated_runtime_staging(self):
+        for filename in ("build-shale-release.bat", "build-shale-windows-msi.bat"):
+            source = batch_source(filename)
+            self.assertIn("windows_runtime_input.py", source)
+            self.assertNotIn('--input "%DESKTOP_TARGET%"', source)
+            self.assertIn("desktop-input", source)
+            self.assertNotIn("ExecutionPolicy Bypass", source)
+        release = batch_source("build-shale-release.bat")
+        self.assertLess(release.index("build-native.bat"), release.index("echo Building desktop application image"))
+        msi = batch_source("build-shale-windows-msi.bat")
+        self.assertLess(msi.index('windows_msi_payload.py" sign-source'), msi.index("light.exe -nologo"))
+
     def test_full_release_requires_and_forwards_boolean_mandatory_flag(self):
         source = (ROOT / "build/scripts/release-all.bat").read_text(encoding="utf-8")
         self.assertIn('if "%~2"=="" goto :usage', source)
@@ -477,7 +489,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', validate)
         self.assertEqual([extract, selection, mutate, jpackage, validate_original, preliminary_dark, validate_preliminary, link, validate, publish],
                          sorted([extract, selection, mutate, jpackage, validate_original, preliminary_dark, validate_preliminary, link, validate, publish]))
-        self.assertIn('--script "%ROOT%\\build\\scripts\\windows-installation-registration.ps1"', source)
+        self.assertNotIn("--script", source)
         self.assertNotIn('for /r "%JPACKAGE_RESOURCE_EXTRACT%" %%F in (main.wxs)', source)
         self.assertIn("stage=jpackage-resource-preparation", source)
         self.assertIn("stage=original-compile-registration-validation", source)

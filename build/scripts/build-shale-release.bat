@@ -19,6 +19,7 @@ set DESKTOP_TARGET=%ROOT%\shale-desktop\target
 set UPDATER_TARGET=%ROOT%\shale-updater\target
 set DESKTOP_JAR=%DESKTOP_TARGET%\shale-desktop-%VERSION%.jar
 set UPDATER_JAR=%UPDATER_TARGET%\shale-updater-%VERSION%.jar
+set RUNTIME_INPUT=%ROOT%\build\staging\desktop-input
 set DESKTOP_LIB=%DESKTOP_TARGET%\lib
 set DIST=%ROOT%\dist
 set DIST_APP=%ROOT%\dist-appimage
@@ -56,11 +57,15 @@ python "%ROOT%\build\scripts\windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNC
 
 call "%ROOT%\build\scripts\build-updater.bat" --package-only || goto :fail
 
+python "%ROOT%\build\scripts\windows_runtime_input.py" "%DESKTOP_TARGET%" "%RUNTIME_INPUT%" "%VERSION%" || goto :fail
+call "%ROOT%\build\native\windows-toast\build-native.bat" "%RUNTIME_INPUT%\native" || goto :fail
+copy /y "%ROOT%\build\packaging\windows\shale-windows-toast.properties" "%RUNTIME_INPUT%\shale-windows-toast.properties" >nul || goto :fail
+
 echo Building desktop application image...
 jpackage ^
   --type app-image ^
   --name Shale ^
-  --input "%DESKTOP_TARGET%" ^
+  --input "%RUNTIME_INPUT%" ^
   --dest "%DIST_APP%" ^
   --main-jar "shale-desktop-%VERSION%.jar" ^
   --main-class "com.shale.desktop.ShaleLauncher" ^
@@ -72,8 +77,9 @@ jpackage ^
 python "%ROOT%\build\scripts\windows_msi_payload.py" image "%DIST_APP%\Shale" || goto :fail
 
 rem Sign final executable bytes before ZIP hashing/manifest publication or MSI construction.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_APP%\Shale\Shale.exe" || goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_APP%\Shale\app\updater\ShaleUpdater.exe" || goto :fail
+powershell -NoProfile -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_APP%\Shale\Shale.exe" || goto :fail
+powershell -NoProfile -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_APP%\Shale\ShaleRegistrationDiagnostic.exe" || goto :fail
+powershell -NoProfile -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_APP%\Shale\app\updater\ShaleUpdater.exe" || goto :fail
 
 powershell -NoProfile -Command "Compress-Archive -Path '%DIST_APP%\Shale\*' -DestinationPath '%DIST%\ShaleApp-%VERSION%.zip' -Force" || goto :fail
 
