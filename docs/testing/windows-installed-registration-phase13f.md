@@ -1,5 +1,10 @@
 # Phase 13F installed-Windows registration acceptance
 
+> Current standard-user remediation acceptance is the addendum below. All original Phase 13F PASS rows
+> apply only to the historical administrator-owned 1.0.128/1.0.129 builds. Its elevated commands and
+> HKLM validator are legacy diagnostics, not the corrected schema-2 installer acceptance procedure.
+
+
 **Status on 2026-10-01: COMPLETE.** Platform-neutral repository verification and required installed-Windows
 acceptance are PASS. The final fresh-install run found the authoritative 64-bit HKLM record, no duplicate UUID,
 schema 1, current owner SID, canonical install/support roots, the protected ACL, production-reader `VALID` with exact
@@ -236,3 +241,96 @@ complete.
 The helper prints no token, Shale identity, tenant, credential, fingerprint, session data, or PHI and creates no
 Phase 12 attempt. Paths must equal normal owner paths independent of the validator environment. Registration alone
 never makes an unsigned executable trustworthy.
+
+## Standard-user remediation acceptance — 2026-10-21
+
+**Every row below is PENDING.** Codex Cloud is Linux; Python contracts and Maven tests cannot prove Windows MSI
+installation, native registry transaction behavior, Defender acceptance, UAC behavior, or Authenticode trust.
+Use a disposable Windows VM with snapshots, Defender enabled, an ordinary employee account, and a second account.
+Build a version above 1.0.137; do not upload/publish it. Record OS/build, version, account type, SHA-256, MSI
+ProductCode/UpgradeCode, exit codes, logs, and before/after registration and user-state evidence.
+
+From the Windows repository root, build locally:
+
+```bat
+build\scripts\build-shale-release.bat
+```
+
+In the **unelevated employee PowerShell**, set the actual version and install/repair/uninstall one operation at a
+time, retaining each log. Successful exit is 0 or documented reboot-required 3010; `/norestart` prevents reboot.
+No operation may prompt for administrator credentials on a fresh/corrected installation.
+
+```powershell
+$version = '1.0.138' # replace with the actual new test version
+$msi = (Resolve-Path ".\dist\Shale-$version.msi").Path
+$logs = Join-Path $env:TEMP 'Shale-installer-acceptance'
+New-Item -ItemType Directory -Force -Path $logs | Out-Null
+Get-FileHash -Algorithm SHA256 -LiteralPath $msi
+$p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList "/i `"$msi`" /norestart /L*V `"$logs\install.log`""
+$p.ExitCode
+reg.exe query 'HKCU\SOFTWARE\Shale\Desktop' /s /reg:64
+[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+& "$env:LOCALAPPDATA\Shale\Shale.exe"
+# After closing Shale, test repair separately:
+$p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList "/fa `"$msi`" /norestart /L*V `"$logs\repair.log`""
+$p.ExitCode
+# Run uninstall only after the other lifecycle scenarios and state snapshots:
+$p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList "/x `"$msi`" /norestart /L*V `"$logs\uninstall.log`""
+$p.ExitCode
+reg.exe query 'HKCU\SOFTWARE\Shale\Desktop' /s /reg:64
+```
+
+Confirm schemaVersion=2, scope=perUser, ownerSid matches the command above, installRoot equals the actual installed
+root, supportRoot is that owner's LocalAppData Shale path, and upgradeCode matches the MSI. After uninstall, those
+MSI-owned values must be absent; user-created sibling values and user data must remain. Use the historical HKLM
+helper only against an explicitly legacy installation; new HKCU discovery must never receive its trusted `VALID`
+classification. A missing legacy HKLM record on a fresh install is expected.
+
+Inspect the final package independently:
+
+```powershell
+$dark = Join-Path $logs 'dark'
+New-Item -ItemType Directory -Force -Path $dark | Out-Null
+& dark.exe -x "$dark\payload" -o "$dark\final.wxs" $msi
+python .\build\scripts\windows_msi_registration.py final "$dark\final.wxs"
+python .\build\scripts\windows_msi_payload.py compiled "$dark\final.wxs"
+Get-AuthenticodeSignature -LiteralPath $msi
+Get-AuthenticodeSignature -LiteralPath "$env:LOCALAPPDATA\Shale\Shale.exe"
+Get-AuthenticodeSignature -LiteralPath "$env:LOCALAPPDATA\Shale\ShaleRegistrationDiagnostic.exe"
+Get-AuthenticodeSignature -LiteralPath "$env:LOCALAPPDATA\Shale\app\updater\ShaleUpdater.exe"
+# On an approved signing build host, verify with the Windows SDK tool:
+signtool.exe verify /pa /all /v $msi
+Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Operational'; Id=1116,1117; StartTime=(Get-Date).AddHours(-2)} | Select-Object TimeCreated,Id,Message
+```
+
+Developer signatures may be NotSigned; record that rather than PASS for production. Production requires Valid,
+approved publisher, timestamp, and equivalent verification of installed executables. Do not change protection or
+add exclusions when investigating detections. Logs can contain workstation paths; retain them through normal support
+handling, not tenant audit records.
+
+| Scenario | Required behavior | Status |
+| --- | --- | --- |
+| Fresh standard-user install | No elevation/1603; schema-2 HKCU values, no Shale HKLM writes or PowerShell custom actions | PENDING |
+| Launch/login | Installed launcher, API login, remembered sign-in and machine identity operate normally | PENDING |
+| Close/reopen | Configuration/identity persist and updater remains discoverable | PENDING |
+| Upgrade between two corrected MSIs | Same product-family/component identity, owner paths and settings; no duplicate product or shortcut | PENDING |
+| Legacy 1.0.128–1.0.137 installed | New MSI blocks before old removal; no old scripts execute, no state/UUID deletion | PENDING |
+| Explicit legacy migration | Same-owner administrator removes old product using recorded ProductCode; fresh ordinary-user new install preserves expected settings/identity | PENDING |
+| Standard employee with legacy product | IT-assisted old removal required; never use secondary administrator credentials to install the new per-user product | PENDING |
+| ZIP/manual and session automatic update | Existing path, consent/window, lock and attempt lifecycle work; MSI registration remains stable | PENDING |
+| Repair | `/fa` restores deleted installed component and registry key; preserves user state, no elevation | PENDING |
+| Uninstall | Only current user's MSI components/values removed; sibling user values, ProgramData identity/preference, logs and other user installation preserved | PENDING |
+| Failed install/repair and rollback | In disposable VM deny write to the exact test HKCU key to force WriteRegistryValues failure; confirm file/registration rollback and previous state. Restore fixture ACL through the VM administrator/snapshot afterward | PENDING |
+| Failure after registry execution | Disposable test MSI: add WiX Type-19 test Error action after InstallExecute and before InstallFinalize; verify rollback restores prior registry/file state. Never distribute this fixture | PENDING |
+| Stale/legacy HKLM registration | Snapshot exact legacy values; new fresh install/repair/uninstall leaves them unchanged, no trust fallback or silent migration | PENDING |
+| Second Windows user | Separate HKCU owner roots; A install/repair/uninstall cannot change B registration or files | PENDING |
+| Path quoting | Non-ASCII, spaces, apostrophe, dollar sign in a disposable user/path remain literal data; normal lifecycle succeeds | PENDING |
+| Defender enabled | Install/repair/upgrade/uninstall without detections, exclusions, disabled protection, or encoded execution | PENDING |
+| Payload | No generated sources/test classes/reports/Maven metadata; desktop dependencies, native toast DLL, both Java runtimes, updater, metadata and notices present | PENDING |
+| Release integrity | Preliminary/final ProductCode/UpgradeCode/version equal; signature policy verified on final bytes; repeated build structure stable | PENDING |
+
+The legacy blocker is deliberate compatibility behavior, not a claim of seamless standard-user upgrading from an
+MSI whose own removal code requires HKLM access. If legacy removal is blocked by Defender, stop and use supported
+IT/Microsoft remediation. Old protected UUIDs are retained as legacy evidence when left stale, not silently reused as
+schema-2 identity. Future automatic migration, a protected broker, runtime publisher verification, and byte-identical
+MSI reproducibility require separately scoped follow-up; none is enabled here.

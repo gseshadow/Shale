@@ -1464,6 +1464,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 13D | **COMPLETE — UNSUPPORTED** | Logged-out alternatives were assessed, the safe-default capability contract was verified, and no executor was registered. |
 | 13E | **COMPLETE** | Public policy, signing gates, strict registration values, owner paths, and installed-version metadata are implemented and verified; no registration writer or logged-out executor was added. |
 | 13F | **COMPLETE** | Elevated MSI registration and lifecycle are verified; installed Windows fresh-install acceptance confirmed the protected 64-bit HKLM record, exact owner/roots, ACL, schema/version/channel, updater, and production-reader `VALID`. Production signing remains a separate deployment prerequisite. |
+| Windows installer remediation | **IN PROGRESS — WINDOWS ACCEPTANCE PENDING** | Native per-user HKCU schema 2 replaces encoded elevated registration; legacy 1.0.128–1.0.137 MSI removal is explicitly gated. Runtime allowlist and source/final payload checks added. Historical 13F evidence does not establish standard-user acceptance. See current packaging guide and Phase 13F runbook addendum. |
 | 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
 | 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
 | Login visual refresh | **IN PROGRESS; RUNTIME FLOW ACCEPTED** | The remaining tall-window stretch was traced to `-1.0`, which is JavaFX `USE_COMPUTED_SIZE`, not `USE_PREF_SIZE`; the content-sized groups now use the preferred-size sentinel inside a full-height centering viewport. The user reports local Maven tests pass and the application successfully launches, signs in, enrolls the durable session with HTTP 200, and logs out with HTTP 200. Rendered tall/short-window acceptance for this sizing correction remains **PENDING**. Stay logged in acceptance is closed separately below; this does not close the pending visual sizing acceptance. |
@@ -2821,3 +2822,52 @@ The closed verified scope does not close the whole initiative. Remaining items a
 3. release-pipeline Git synchronization is the next implementation task; and
 4. no manual cross-tenant or crafted-request security acceptance is claimed beyond available automated/runtime
    evidence.
+
+## Windows installer reliability remediation — 2026-10-21
+
+The current installer contract supersedes the elevated-only Phase 13F writer described historically above.
+A limited per-user MSI must not require HKLM registration for the unsupported logged-out-update architecture.
+Native schema-2 HKCU discovery supports the normal user lifecycle; protected schema-1 HKLM records remain
+untouched legacy evidence, never silently downgraded or migrated. Current desktop/ZIP update discovery does not
+consume the protected reader. Runtime policy, session-only automatic updating, machine identity, and authentication
+are unchanged. Logged-out execution remains UNSUPPORTED.
+
+The decoded writer performed machine registration, ACL changes, UUID snapshots, and rollback; its interpolated
+encoded PowerShell is removed rather than classified as an antivirus false positive. Native MSI owns registry
+rollback/removal. Existing affected MSIs embed the old actions, so the new installer stops their automatic removal
+before executing them; one-time same-owner administrator removal is the documented migration gate. Corrected MSI
+upgrades retain stable component identity. HKCU values are user-editable and cannot authorize future privileged work.
+
+Curated desktop/updater runtime input replaces whole-target packaging. Static validation rejects build/test output
+at staging, image, generated WiX, and final installed-path boundaries. Existing optional external signing is retained;
+fresh MSI executable sources are now signed before final Light rather than relying on signed ZIP launchers. Signing
+and Defender acceptance still require actual Windows evidence. No production artifact is published by this work.
+
+Audit review: installer-local registry/files and operational MSI logs only; no tenant sensitive read, business/admin
+mutation, SQL/API/schema change, or database audit event applies. Full design, migration procedure, release integrity,
+and deployment boundaries are in `docs/windows-update-packaging.md`; the current Windows matrix is the addendum in
+`docs/testing/windows-installed-registration-phase13f.md`. All installed acceptance is PENDING for this remediation;
+prior 13F PASS rows retain their original administrator/version scope. Repository verification is recorded below
+once executed, without substituting static checks for Windows acceptance.
+
+### Remediation repository verification
+
+Executed on Linux against the latest fetched `origin/codex/latest` (30193e18):
+
+- `python -m unittest discover -s build/scripts -p 'test_windows*.py'`: PASS, 96 tests (registration,
+  payload, runtime staging, identity, JDK resource selection, signing, release batch contracts).
+- `python -m unittest discover -s build/scripts -p 'test_validate*.py'`: PASS, 16 tests (installed legacy
+  diagnostic contract, native dependency and WiX toolchain validators).
+- `python -m unittest build.scripts.test_windows_release_batch_contract build.scripts.test_windows_msi_registration build.scripts.test_windows_msi_payload build.scripts.test_windows_runtime_input build.scripts.test_windows_signing_contract`:
+  PASS (direct module invocation also verifies import portability).
+- `mvn -pl shale-desktop,shale-updater -am -Dtest=WindowsInstallationRegistrationTest,WindowsInstallationRegistrationReaderTest,WindowsInstallationRegistrationDiagnosticTest,DesktopUpdateLauncherTest,WindowsUnattendedTerminationContractTest,InstallServiceTest -Dsurefire.failIfNoSpecifiedTests=false test`:
+  PASS, 18 tests for unchanged trusted legacy discovery and runtime updater contracts.
+- `python build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown`:
+  build-scripts/updater selected; no full-suite escalation. Its updater command
+  `mvn -pl shale-updater -am -Dtest=com.shale.updater.InstallServiceTest -Dsurefire.failIfNoSpecifiedTests=false test`
+  PASS, 2 tests; its Python batch command is included above.
+- `mvn test`: PASS, 116 critical tests. `git diff --check`: PASS.
+
+The first offline focused run was blocked by uncached ICU/libphonenumber dependencies; online reruns succeeded
+using the configured execution network access. No MSI was built or installed on this Linux runner. Native WiX/MSI
+transaction behavior, legacy removal, signatures, Defender, and all Windows matrix rows remain unverified/PENDING.

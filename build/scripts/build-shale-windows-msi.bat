@@ -83,13 +83,15 @@ set LOC_ZH_CN=%GENERATED_CONFIG_DIR%\MsiInstallerStrings_zh_CN.wxl
 set FINAL=%STAGE%\final
 set PRELIMINARY_MSI=%PRELIM%\Shale-%VERSION%.msi
 set FINAL_MSI=%FINAL%\Shale-%VERSION%.msi
-set APPINPUT=%ROOT%\shale-desktop\target
+set APPINPUT=%ROOT%\build\staging\desktop-input
 set DIAGNOSTIC_LAUNCHER_CONFIG=%ROOT%\build\packaging\windows\shale-registration-diagnostic.properties
 echo Windows MSI stage started: staging command=mkdir expected="%PRELIM%" and "%FINAL%"
 if exist "%STAGE%" rmdir /s /q "%STAGE%"
 mkdir "%PRELIM%" "%FINAL%"
 if errorlevel 1 goto :staging_failed
 echo Windows MSI stage completed: staging
+python "%ROOT%\build\scripts\windows_runtime_input.py" "%ROOT%\shale-desktop\target" "%APPINPUT%" "%VERSION%"
+if errorlevel 1 goto :runtime_staging_failed
 echo Windows MSI stage started: diagnostic-launcher-validation input="%DIAGNOSTIC_LAUNCHER_CONFIG%"
 if not exist "%DIAGNOSTIC_LAUNCHER_CONFIG%" goto :missing_diagnostic_launcher_config
 python "%ROOT%\build\scripts\windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNCHER_CONFIG%"
@@ -103,7 +105,7 @@ if errorlevel 1 goto :jpackage_resource_failed
 if errorlevel 1 goto :jpackage_resource_failed
 python "%ROOT%\build\scripts\windows_jpackage_resource.py" "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_MAIN_TEMPLATE%"
 if errorlevel 1 goto :jpackage_resource_failed
-python "%ROOT%\build\scripts\windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%" --script "%ROOT%\build\scripts\windows-installation-registration.ps1"
+python "%ROOT%\build\scripts\windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%"
 if errorlevel 1 goto :jpackage_resource_failed
 echo Windows MSI stage completed: jpackage-resource-preparation
 
@@ -174,6 +176,8 @@ if not exist "%LOC_DE%" goto :missing_loc_de
 if not exist "%LOC_EN%" goto :missing_loc_en
 if not exist "%LOC_JA%" goto :missing_loc_ja
 if not exist "%LOC_ZH_CN%" goto :missing_loc_zh_cn
+python "%ROOT%\build\scripts\windows_msi_payload.py" sign-source "%BUNDLE_SOURCE%"
+if errorlevel 1 goto :msi_signing_failed
 echo Modified bundle.wxf recompilation started.
 echo Windows MSI stage started: candle-recompile tool=candle.exe input="%BUNDLE_SOURCE%" expected="%BUNDLE_WIXOBJ%"
 candle.exe -nologo "%BUNDLE_SOURCE%" -ext WixUtilExtension -arch x64 -out "%BUNDLE_WIXOBJ%"
@@ -205,7 +209,7 @@ echo Final light.exe reconstruction completed.
 echo Windows MSI stage completed: light-reconstruction output="%FINAL_MSI%"
 if not exist "%FINAL_MSI%" goto :missing_final_msi
 echo Windows MSI stage started: Authenticode signing before publication
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%FINAL_MSI%"
+powershell -NoProfile -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%FINAL_MSI%"
 if errorlevel 1 goto :msi_signing_failed
 echo Compiled final MSI validation started.
 mkdir "%STAGE%\dark"
@@ -426,3 +430,7 @@ exit /b 40
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=dark-extraction tool=dark.exe input="%FINAL_MSI%" expected="%STAGE%\dark\final.wxs" exit=%STAGE_EXIT%
 exit /b 25
+
+:runtime_staging_failed
+echo Windows MSI stage failed: stage=runtime-input-staging
+exit /b 51

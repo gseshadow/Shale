@@ -1,4 +1,3 @@
-import importlib.util
 import copy
 from pathlib import Path
 import tempfile
@@ -6,9 +5,10 @@ import unittest
 import xml.etree.ElementTree as ET
 import zipfile
 
-spec = importlib.util.spec_from_file_location("payload", Path(__file__).with_name("windows_msi_payload.py"))
-m = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(m)
+try:
+    import windows_msi_payload as m
+except ModuleNotFoundError:
+    from build.scripts import windows_msi_payload as m
 
 class CompiledPayloadTest(unittest.TestCase):
     def fixture(self, *, marker_count=1, dll_count=1, launcher_count=1, marker_dir="app",
@@ -74,6 +74,49 @@ class CompiledPayloadTest(unittest.TestCase):
         wxs = temporary / "final.wxs"
         wxs.write_text(xml, encoding="utf-8")
         return wxs
+
+    def test_compiled_payload_rejects_hidden_build_output_by_installed_directory(self):
+        wxs = self.fixture()
+        tree = ET.parse(wxs)
+        app = next(n for n in tree.getroot().iter(m.tag("Directory")) if n.get("Name") == "app")
+        directory = ET.SubElement(app, m.tag("Directory"), {"Id": "bad", "Name": "TESTCL~1|test-classes"})
+        component = ET.SubElement(directory, m.tag("Component"), {"Id": "bad-component"})
+        ET.SubElement(component, m.tag("File"), {"Id": "bad-file", "Name": "Test.class", "Source": "opaque"})
+        tree.write(wxs)
+        with self.assertRaisesRegex(ValueError, "development-only"):
+            m.validate_compiled(wxs)
+
+    def test_image_rejects_test_output_before_launcher_validation(self):
+        directory = Path(tempfile.mkdtemp())
+        (directory / "app" / "surefire-reports").mkdir(parents=True)
+        with self.assertRaisesRegex(ValueError, "development-only"):
+            m.validate_image(directory)
+
+    def test_final_link_inputs_are_signed_with_literal_argument_arrays(self):
+        from unittest.mock import patch
+        directory = Path(tempfile.mkdtemp(prefix="Shale user's files "))
+        nodes = []
+        for index, (name, relative) in enumerate((("Shale.exe", ()), (m.DIAGNOSTIC_LAUNCHER, ()),
+                                                 ("ShaleUpdater.exe", ("app", "updater")))):
+            source = directory.joinpath(*relative, name)
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_bytes(b"launcher")
+            nodes.append(f'<Component Id="c{index}" Directory="d{index}"><File Id="f{index}" Source="{source}"/></Component>')
+            chain = ''.join(f'<Directory Id="p{index}-{j}" Name="{part}">' for j, part in enumerate(relative))
+            # A DirectoryRef to the last path resolves the same canonical location.
+            nodes.append(f'<DirectoryRef Id="INSTALLDIR">{chain}<Directory Id="d{index}"/>')
+            nodes.append('</Directory>' * len(relative) + '</DirectoryRef>')
+        wxs = directory / "bundle.wxf"
+        wxs.write_text(f'<Wix xmlns="{m.NS}"><Fragment>{"".join(nodes)}</Fragment></Wix>')
+        with patch.object(m.subprocess, "run") as execute:
+            m.sign_source(wxs)
+        self.assertEqual(3, execute.call_count)
+        for call in execute.call_args_list:
+            argv = call.args[0]
+            self.assertEqual(["powershell.exe", "-NoProfile", "-File"], argv[:3])
+            self.assertEqual("-Path", argv[4])
+            self.assertIn("user's files", argv[5])
+            self.assertEqual({"check": True}, call.kwargs)
 
     def test_opaque_dark_sources_and_installed_names_pass(self):
         m.validate_compiled(self.fixture())
