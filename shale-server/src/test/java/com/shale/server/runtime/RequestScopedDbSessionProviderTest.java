@@ -122,6 +122,36 @@ class RequestScopedDbSessionProviderTest {
         assertEquals(2, dataSource.executeCount);
     }
 
+    @Test
+    void sharedCaseOperationsWithholdResultsAndCloseLeaseWhenEitherContextKeyFails() {
+        for (int failedKey : List.of(1, 2)) {
+            for (int operation = 0; operation < 3; operation++) {
+                RecordingDataSource dataSource = new RecordingDataSource();
+                dataSource.failInitializationAt = failedKey;
+                var principal = new ServerPrincipal(11, 13, null);
+                var provider = new RequestScopedDbSessionProvider(
+                        request -> ServerSessionContext.authenticated(principal), fixedRequest(null),
+                        new RuntimeSessionServiceConnectionProvider(dataSource.proxy()));
+                com.shale.core.service.CaseServicePort cases = new com.shale.data.service.adapter.CaseServiceAdapter(
+                        new com.shale.data.dao.CaseDao(provider));
+                final int selected = operation;
+                var failure = assertThrows(ResponseStatusException.class, () -> {
+                    switch (selected) {
+                        case 0 -> cases.searchMinimizedCases("Synthetic", 13, 11, 0, 25);
+                        case 1 -> cases.listMinimizedAssignedCases(13, 11, 0, 25);
+                        case 2 -> cases.readMinimizedCaseOverview(1, 13, 11);
+                        default -> throw new AssertionError("Unknown operation");
+                    }
+                });
+                assertEquals(503, failure.getStatusCode().value());
+                assertEquals(failedKey, dataSource.executeCount);
+                assertEquals(1, dataSource.closeCount, "A partly initialized lease must be closed");
+                assertEquals(failedKey, dataSource.sql.size(), "No authority, Case or audit SQL may run after failed context setup");
+                assertTrue(dataSource.sql.stream().allMatch(sql -> sql.startsWith("EXEC sys.sp_set_session_context")));
+            }
+        }
+    }
+
     private static ObjectProvider<HttpServletRequest> fixedRequest(HttpServletRequest request) {
         return new ObjectProvider<>() {
             @Override
@@ -166,6 +196,8 @@ class RequestScopedDbSessionProviderTest {
         private final List<String> sql = new ArrayList<>();
         private final List<Integer> values = new ArrayList<>();
         private int executeCount;
+        private int failInitializationAt;
+        private int closeCount;
         private final Connection connectionProxy = (Connection) Proxy.newProxyInstance(
                 Connection.class.getClassLoader(),
                 new Class<?>[] {Connection.class},
@@ -176,6 +208,10 @@ class RequestScopedDbSessionProviderTest {
                     }
                     if ("isClosed".equals(method.getName())) {
                         return false;
+                    }
+                    if ("close".equals(method.getName())) {
+                        closeCount++;
+                        return null;
                     }
                     if ("toString".equals(method.getName())) {
                         return "recording-connection";
@@ -206,6 +242,7 @@ class RequestScopedDbSessionProviderTest {
                         }
                         if ("execute".equals(method.getName())) {
                             executeCount++;
+                            if (executeCount == failInitializationAt) throw new SQLException("Synthetic context setup failure");
                             return true;
                         }
                         if ("close".equals(method.getName())) {

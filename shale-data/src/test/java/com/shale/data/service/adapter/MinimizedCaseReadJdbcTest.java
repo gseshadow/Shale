@@ -8,10 +8,122 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import com.shale.core.dto.MinimizedCaseOverview;
 import com.shale.core.service.CaseReadException;
+import com.shale.core.service.CaseServicePort;
 import com.shale.data.dao.CaseDao;
 
 /** Synthetic JDBC execution of the public production adapter/gateway/DAO, not live SQL/RLS proof. */
 class MinimizedCaseReadJdbcTest {
+    private enum Read {
+        SEARCH, BLANK_SEARCH, ASSIGNED, OVERVIEW;
+        Object invoke(CaseServicePort service) {
+            return switch (this) {
+                case SEARCH -> service.searchMinimizedCases("match", 41, 31, 0, 25);
+                case BLANK_SEARCH -> service.searchMinimizedCases("", 41, 31, 0, 25);
+                case ASSIGNED -> service.listMinimizedAssignedCases(41, 31, 0, 25);
+                case OVERVIEW -> service.readMinimizedCaseOverview(1, 41, 31);
+            };
+        }
+    }
+
+    @Test void everySharedReadRevalidatesCurrentActorAndBothContextKeysBeforeCaseAccess() {
+        List<java.util.function.Consumer<Jdbc>> denials = List.of(
+                db -> db.deleted = true, db -> db.removed = true,
+                db -> db.actorId = 32, db -> db.actorTenant = 42,
+                db -> db.sessionActor = 32, db -> db.sessionTenant = 42,
+                db -> db.sessionActor = null, db -> db.sessionTenant = null);
+        for (Read read : Read.values()) {
+            for (int scenario = 0; scenario < denials.size(); scenario++) {
+                Jdbc db = new Jdbc(); db.rows.add(with(row(1, "match"), "Assigned", true));
+                denials.get(scenario).accept(db);
+                var failure = assertThrows(CaseReadException.class, () -> read.invoke(db.adapter()),
+                        read + " must deny authority scenario " + scenario);
+                assertEquals(CaseReadException.Kind.DENIED, failure.kind());
+                assertFalse(db.events.contains("cases"), "Denied reads must not query Case data");
+                assertEquals(0, db.audits); assertFalse(db.events.contains("commit"));
+                assertEquals("close", db.events.getLast(), "Denied reads must release their lease");
+                if (read == Read.OVERVIEW) assertTrue(db.events.contains("rollback"));
+            }
+        }
+    }
+
+    @Test void assignedPagesExcludeForeignDeletedAndUnassignedRowsBeforeProbeAndKeepDateAuthority() {
+        Jdbc db = new Jdbc();
+        db.rows.add(with(with(row(1, "Match"), "Assigned", true), "ShaleClientId", 42));
+        db.rows.add(with(with(row(2, "Match"), "Assigned", true), "IsDeleted", true));
+        db.rows.add(row(3, "Match"));
+        IntStream.rangeClosed(4, 6).forEach(id -> db.rows.add(with(row(id, "Match"), "Assigned", true)));
+        var first = db.adapter().listMinimizedAssignedCases(41, 31, 0, 2);
+        assertEquals(List.of(4L, 5L), first.items().stream().map(MinimizedCaseOverview::caseId).toList());
+        assertTrue(first.hasMore()); assertEquals(3, db.returnedRows);
+        var last = db.adapter().listMinimizedAssignedCases(41, 31, 1, 2);
+        assertEquals(List.of(6L), last.items().stream().map(MinimizedCaseOverview::caseId).toList());
+        assertFalse(last.hasMore());
+        assertEquals(2, db.bindings.get(5)); assertEquals(3, db.bindings.get(6));
+        // JDBC doubles cannot prove SQL date resolution; protect the executed query's source contract.
+        for (String required : List.of("dbo.CaseDates", "cd.StartsAt", "cd.ShaleClientId=c.ShaleClientId",
+                "cd.IsDeleted=0", "CaseDateTypeSemanticRoleMappings", "effective.SemanticRoleKey='INTAKE'"))
+            assertTrue(db.sql.contains(required), "Assigned ordering must retain " + required);
+        for (String retired : List.of("c.CallerDate", "c.CallerTime", "c.StatuteOfLimitations", "c.TortNoticeDeadline"))
+            assertFalse(db.sql.contains(retired), "Assigned ordering must not reconstruct " + retired);
+        assertEquals(0, db.audits, "The approved summary exemption applies to Assigned pages only");
+    }
+
+    @Test void bothPageOperationsRejectInvalidBoundsWithoutBorrowingAConnection() {
+        for (int[] boundary : List.of(new int[]{-1, 25}, new int[]{101, 25}, new int[]{0, 0},
+                new int[]{0, -1}, new int[]{0, 26}, new int[]{Integer.MAX_VALUE, 25})) {
+            Jdbc db = new Jdbc();
+            assertThrows(IllegalArgumentException.class,
+                    () -> db.adapter().searchMinimizedCases("match", 41, 31, boundary[0], boundary[1]));
+            assertThrows(IllegalArgumentException.class,
+                    () -> db.adapter().listMinimizedAssignedCases(41, 31, boundary[0], boundary[1]));
+            assertEquals(0, db.connections, "Invalid boundaries must fail before SQL work");
+        }
+    }
+
+    @Test void bothPagesRetainBoundedHasMoreAtWindowCeiling() {
+        Jdbc db = new Jdbc();
+        IntStream.rangeClosed(1, 2526).forEach(id -> db.rows.add(with(row(id, "match"), "Assigned", true)));
+        for (var page : List.of(db.adapter().searchMinimizedCases("match", 41, 31, 100, 25),
+                db.adapter().listMinimizedAssignedCases(41, 31, 100, 25))) {
+            assertEquals(25, page.items().size()); assertTrue(page.hasMore());
+            assertEquals(100, page.page());
+        }
+        assertEquals(26, db.returnedRows); assertEquals(2500, db.bindings.get(5));
+        assertEquals(26, db.bindings.get(6)); assertEquals(0, db.audits);
+    }
+
+    @Test void overviewTransactionSetupAndReadFailureWithholdResultWithoutSuccessAudit() {
+        for (boolean beginFailure : List.of(false, true)) {
+            Jdbc db = new Jdbc(); db.rows.add(row(1, "Secret"));
+            db.failBegin = beginFailure; db.failRead = !beginFailure;
+            var failure = assertThrows(CaseReadException.class,
+                    () -> db.adapter().readMinimizedCaseOverview(1, 41, 31));
+            assertEquals(CaseReadException.Kind.READ_UNAVAILABLE, failure.kind());
+            assertEquals(0, db.audits); assertFalse(db.events.contains("commit"));
+            assertEquals("close", db.events.getLast());
+            if (!beginFailure) assertTrue(db.events.contains("rollback"));
+        }
+    }
+
+    @Test void zeroRowAuditAppendWithholdsOverviewAndRollsBack() {
+        Jdbc db = new Jdbc(); db.rows.add(row(1, "Secret")); db.auditUpdateCount = 0;
+        var failure = assertThrows(CaseReadException.class,
+                () -> db.adapter().readMinimizedCaseOverview(1, 41, 31));
+        assertEquals(CaseReadException.Kind.AUDIT_UNAVAILABLE, failure.kind());
+        assertFalse(db.events.contains("commit")); assertTrue(db.events.contains("rollback"));
+        assertEquals(0, db.durableAudits);
+    }
+
+    @Test void lostCommitAcknowledgementWithholdsOverviewWithoutReplayingOrErasingCommittedAudit() {
+        Jdbc db = new Jdbc(); db.rows.add(row(1, "Secret")); db.lostCommitAck = true;
+        var failure = assertThrows(CaseReadException.class,
+                () -> db.adapter().readMinimizedCaseOverview(1, 41, 31));
+        assertEquals(CaseReadException.Kind.AUDIT_UNAVAILABLE, failure.kind());
+        assertEquals(List.of("begin", "authority", "cases", "audit-tenant", "audit", "commit", "rollback", "close"), db.events);
+        assertEquals(1, db.connections); assertEquals(1, db.audits);
+        assertEquals(1, db.durableAudits, "Rollback after uncertain commit cannot erase a committed read audit");
+    }
+
     @Test void searchFiltersEntireEligibleDatasetBeforePagingIncludingBeyondFirst25() {
         Jdbc db = new Jdbc();
         IntStream.rangeClosed(1, 35).forEach(id -> db.rows.add(row(id, "A unfiltered " + id)));
@@ -127,14 +239,18 @@ class MinimizedCaseReadJdbcTest {
 
     private static final class Jdbc {
         List<Map<Object,Object>> rows=new ArrayList<>(); List<String> events=new ArrayList<>();
-        Integer sessionActor=31,sessionTenant=41;boolean removed,failAudit,failCommit,timeout;
-        int connections,audits,returnedRows;String sql;Map<Integer,Object> bindings,auditBindings;
-        CaseServiceAdapter adapter(){return new CaseServiceAdapter(new CaseDao(()->{
+        Integer sessionActor=31,sessionTenant=41;int actorId=31,actorTenant=41;
+        boolean deleted,removed,failAudit,failCommit,timeout,failBegin,failRead,lostCommitAck;
+        int connections,audits,returnedRows,pendingAudits,durableAudits,auditUpdateCount=1;
+        String sql;Map<Integer,Object> bindings,auditBindings;
+        CaseServicePort adapter(){return new CaseServiceAdapter(new CaseDao(()->{
             connections++;return proxy(Connection.class,(p,m,a)->switch(m.getName()){
                 case "prepareStatement"->statement((String)a[0]);
-                case "setAutoCommit"->{assertEquals(false,a[0]);events.add("begin");yield null;}
-                case "commit"->{events.add("commit");if(failCommit)throw new SQLException("private failure");yield null;}
-                case "rollback"->{events.add("rollback");yield null;}
+                case "setAutoCommit"->{assertEquals(false,a[0]);events.add("begin");if(failBegin)throw new SQLException("private begin failure");yield null;}
+                case "commit"->{events.add("commit");if(failCommit)throw new SQLException("private failure");
+                    durableAudits+=pendingAudits;pendingAudits=0;
+                    if(lostCommitAck)throw new SQLException("synthetic lost acknowledgement","08007");yield null;}
+                case "rollback"->{events.add("rollback");pendingAudits=0;yield null;}
                 case "close"->{events.add("close");yield null;}
                 case "getCatalog"->"catalog";
                 case "getMetaData"->proxy(DatabaseMetaData.class,(pp,mm,aa)->{assertEquals("getColumns",mm.getName());return resultSet(List.of(Map.of("DATA_TYPE",Types.INTEGER)));});
@@ -146,13 +262,18 @@ class MinimizedCaseReadJdbcTest {
                 case "setInt","setLong","setString","setTimestamp"->{values.put((Integer)a[0],a[1]);yield null;}
                 case "setNull"->{values.put((Integer)a[0],null);yield null;}
                 case "close"->null;
-                case "executeUpdate"->{assertEquals(5,timeoutSet[0]);assertTrue(text.contains("INSERT INTO dbo.AuditLog"));events.add("audit");auditBindings=new HashMap<>(values);if(failAudit)throw new SQLException("Secret source text");audits++;yield 1;}
+                case "executeUpdate"->{assertEquals(5,timeoutSet[0]);assertTrue(text.contains("INSERT INTO dbo.AuditLog"));events.add("audit");auditBindings=new HashMap<>(values);if(failAudit)throw new SQLException("Secret source text");audits+=auditUpdateCount;pendingAudits+=auditUpdateCount;yield auditUpdateCount;}
                 case "executeQuery"->{assertEquals(5,timeoutSet[0],"Every selected SQL statement must have the five-second timeout");
                     assertEquals(text.chars().filter(c->c=='?').count(),values.size(),"Exact SQL placeholder/binding contract");
-                    if(text.startsWith("SELECT 1 FROM dbo.Users")){events.add("authority");assertTrue(text.contains("IsRemoved"));
-                        yield resultSet(!removed&&Objects.equals(sessionActor,values.get(4))&&Objects.equals(sessionTenant,values.get(3))?List.of(Map.of(1,1)):List.of());}
+                    if(text.startsWith("SELECT 1 FROM dbo.Users")){events.add("authority");
+                        for(String predicate:List.of("u.Id=?", "u.ShaleClientId=?", "COALESCE(u.is_deleted,0)=0", "COALESCE(u.IsRemoved,0)=0",
+                                "TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))=?", "TRY_CONVERT(int,SESSION_CONTEXT(N'PrincipalUserId'))=?"))
+                            assertTrue(text.contains(predicate), "Shared authority must enforce " + predicate);
+                        yield resultSet(!deleted&&!removed&&Objects.equals(actorId,values.get(1))&&Objects.equals(actorTenant,values.get(2))
+                            &&Objects.equals(sessionActor,values.get(4))&&Objects.equals(sessionTenant,values.get(3))?List.of(Map.of(1,1)):List.of());}
                     if(text.contains("SESSION_CONTEXT")){events.add("audit-tenant");yield resultSet(List.of(Map.of(1,sessionTenant)));}
                     events.add("cases");sql=text.replaceAll("\\s+"," ");bindings=new HashMap<>(values);if(timeout)throw new SQLTimeoutException("Secret timeout");
+                    if(failRead)throw new SQLException("private read failure");
                     int where=sql.indexOf("WHERE c.ShaleClientId=?"),order=sql.indexOf("ORDER BY c.Name ASC,c.Id ASC OFFSET");
                     assertTrue(where>=0&&sql.contains("ISNULL(c.IsDeleted,0)=0"));
                     boolean assigned=sql.contains("scope.UserId=?"),detail=sql.contains("AND c.Id=?");
