@@ -1,10 +1,11 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; architecture/contract review and shared Case/REST foundation IN PROGRESS; Phase 1R candidate locally tested with synthetic fixtures; authoritative Case SQL BLOCKED; MCP implementation NOT STARTED.
+**Status:** Phase 0 assessment COMPLETE; architecture/contract review and shared Case/REST foundation IN PROGRESS; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; MCP implementation NOT STARTED.
 
 **Last reviewed:** 2026-10-21
 
-**Repository baseline:** Phase 1R live `origin/codex/latest`, commit `73c23475a4001dfcd36ec8a06c91d85cd1bad6c3`.
+**Repository baseline:** Phase 1S fetched live `origin/codex/latest`, commit `345452f9e196bc537b78dc70fc46e6353b2b8d22`,
+the merge of [#1898 / Phase 1R](https://github.com/gseshadow/Shale/pull/1898).
 This is repository inspection, not evidence of deployed SQL, API configuration, or runtime security acceptance.
 
 ## 1. Purpose, scope, and document ownership
@@ -105,9 +106,10 @@ summary pages have an explicit owner-approved audit exemption for this slice onl
 boundaries, not proof of complete AI attribution or permission for wider payloads. Source and recorded
 synthetic tests establish implementation; the R4 ledger records bounded user-reported desktop/hosted/iPhone
 acceptance. Two-tenant/non-dbo/pooled-context, audit-failure/commit uncertainty, deployed protection and
-performance gates remain open. The isolated Case SQL harness has not run. The subsequently supplied
-authoritative export confirmed missing coverage; reviewed derived/candidate preparation remains pending.
-This reconciliation runs no SQL or runtime tests.
+performance gates remain open. Phase 1R is merged and its three-FILTER candidate passed local synthetic SQL
+validation. Authoritative Case SQL acceptance remains BLOCKED: the approved offline export is unavailable
+in this workspace, so derived/candidate artifacts and their acceptance remain pending. Phase 1S proves the
+shared source boundary separately (§9.3); it does not rerun or activate Phase 1R.
 
 * RLS coverage is not uniformly established. The Contacts roadmap explicitly records that the parent
   `dbo.Contacts` has no TenantFilter predicate, while newer Contact child tables use strict RLS; the
@@ -202,11 +204,13 @@ to repeat completed rehearsals or retirement.
 **Security debt versus activation blockers:**
 
 * The last recorded authoritative catalog has no FILTER on `dbo.Users`, `dbo.auditLog` or `dbo.Statuses`.
-  No later merged three-FILTER migration or operator report closes that gap. Strict Users/audit and
+  Phase 1R (#1898) merged a three-FILTER candidate, locally validated only with synthetic SQL; no
+  production activation report closes that gap. Strict Users/audit and
   tenant-or-global Statuses read isolation, non-dbo A/B/NULL and pooled-context evidence are selected
   Case-read security prerequisites. Explicit minimized-query predicates remain valuable; the gap is
   not a demonstrated API leak. The older claim that the offline schema was never supplied is obsolete:
-  the supplied export confirmed the gap; safe derived/candidate preparation and execution remain open.
+  the supplied export confirmed the gap; it is unavailable in this workspace, so authoritative
+  derived/candidate preparation and execution remain BLOCKED.
 * Last reported runtime authority included Users password-hash SELECT/UPDATE and audit SELECT/INSERT/
   UPDATE/DELETE. Stage B restricts hash **SELECT**, not password-management writes or audit CRUD.
   Auth base-table restrictions, broader runtime grants, append-only audit enforcement, authoritative
@@ -561,8 +565,9 @@ and audit. It does not need a corresponding new HTTP route or a one-to-one endpo
 ## 8. Phased implementation roadmap
 
 Checkboxes mean verified completion of the stated item, not merely code written. Update evidence and owning
-documents with each subsequent task; split implementation into small reviewable changes. No runtime tests are
-required for this documentation task; the tests below are future phase acceptance requirements.
+documents with each subsequent task; split implementation into small reviewable changes. Historical
+documentation-only checks remain scoped to their dated records; implementation phases must
+run the relevant focused, affected and critical checks below.
 
 ### Phase 0 — Architecture and contract (**IN PROGRESS**)
 
@@ -590,6 +595,8 @@ prerequisites for ordinary web/service work.
 
 * [x] Identify existing minimized Case ports/adapters/workers with actor/context checks, SQL paging
   and committed Overview audit; source evidence is in the first-read R2 record.
+* [x] Phase 1S: prove the existing three minimized Case operations at the shared boundary (§9.3),
+  retaining one worker, actor/context checks, committed Overview audit and bounded DTO/paging behavior.
 * [ ] Complete each additional selected path's actor, tenant, field policy, audit, connection and bounds.
 * [ ] Reuse core ports/data adapters/DAO workers; extract only necessary non-UI orchestration.
 * [ ] Establish verified immutable execution context and actor-aware shared query operations.
@@ -722,7 +729,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Repository architecture assessment | COMPLETE | Sections 1–2, pinned live base and concrete source inspection. |
 | Recommended target/security/audit/REST/tool direction | COMPLETE | Sections 3–7 are documented recommendations, not accepted wire contracts. |
 | Phase 0 review and final contract | IN PROGRESS | Per-operation REST review and separate AI policy/issuer/audit decisions remain; this aggregate status does not gate all web work. |
-| Phase 1 shared secured operations | IN PROGRESS | R2 minimized Case operations implemented; wider operations, AI restrictions/attribution and runtime acceptance remain. No dependency on AI issuer/grants for ordinary web work. |
+| Phase 1 shared secured operations | IN PROGRESS | Phase 1S proves the R2 minimized Case boundary (§9.3); wider operations, AI restrictions/attribution and runtime acceptance remain. No dependency on AI issuer/grants for ordinary web work. |
 | Phase 2 stable REST/OpenAPI foundation | IN PROGRESS | R1/R2 Case paging, minimized routes/schemas and R3 consumer exist; remaining contract/runtime gates follow the web ledger. Independent of MCP/AI OAuth. |
 | Phase 3 MCP and minimum tenant controls | NOT STARTED | Transport/grants, audit and service gates. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
@@ -737,29 +744,27 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Live RLS coverage acceptance | BLOCKED | Non-dbo deployment evidence, including documented Contacts parent-predicate gap. |
 | Wider Case/field and AI grant policy acceptance | BLOCKED | R2 web minimized tenant-wide policy is accepted; additional fields/children/directories and AI restrictions need scoped decisions. Team membership is not a general access policy. |
 | Complete AI read/failure audit representation | BLOCKED | Scoped compatible enhancement decision and verification. |
-| Phase 1R three-FILTER migration / exact rollback | IMPLEMENTED; SYNTHETIC LOCAL acceptance | [Owning runbook](../testing/case-read-local-security-verification.md#phase-1r-candidate--2026-10-21): transactional/idempotent candidate, drift/atomic-failure tests, confined V1/V2 and real SQL session/controller compatibility; no production activation. |
+| Phase 1R three-FILTER migration / exact rollback | MERGED #1898; SYNTHETIC LOCAL acceptance | [Owning runbook](../testing/case-read-local-security-verification.md#phase-1r-candidate--2026-10-21): transactional/idempotent candidate, drift/atomic-failure tests, confined V1/V2 and real SQL session/controller compatibility; no production activation. |
+| Phase 1S shared minimized Case boundary | COMPLETE (source/synthetic proof) | §9.3: existing three JavaFX-free operations retained, direct service/context/audit/paging and REST/OpenAPI checks pass. No broad API, live SQL or MCP acceptance. |
 | Local Case-read SQL security execution | BLOCKED | Original export is absent from this task workspace; derived/candidate schema artifacts and hashes unavailable. Authoritative Case SQL, real audit denial and injected lost acknowledgement remain unexecuted. Synthetic auth passes do not close Case SQL. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
-**Current implementation phase: Phase 1R — targeted Case-read RLS candidate and local acceptance.**
-The three-FILTER candidate and synthetic auth/session acceptance are implemented. Complete the remaining
-authoritative offline derivation/candidate and Case SQL gates when approved input is available; the
-original export is absent here. Exact evidence and commands are in the owning runbook linked above.
-This is a finite shared API/database security prerequisite
-toward MCP, not a general security rewrite or MCP implementation. Reuse the existing pre-tenant V1/V2,
-durable sessions, minimized ports and OpenAPI; no new API endpoint or auth redesign must come first.
-Before activating Users RLS, confirm the compatible API/desktop deployment, confined auth execution and
-old-caller drain from sanitized existing records. Retirement alone does not establish those facts. Candidate
-source/local work can proceed with the documented module/permission recipe; missing authoritative input
-or live provenance blocks the corresponding acceptance, not a demand to repeat operator rehearsals.
+**Latest bounded implementation phase: Phase 1S — shared secured Case reads COMPLETE (§9.3).**
+Phase 1R is merged, its three-FILTER candidate locally validated with synthetic SQL. Authoritative Case
+SQL acceptance remains **BLOCKED** because the approved offline artifact is unavailable. Do not rerun or
+redesign Phase 1R as part of shared-operation proof. Production activation, Stage A/B deployment, compatible
+API/desktop callers and old-caller drain remain independent gates; retirement does not establish them.
+No production RLS activation is authorized and no Stage A/B completion or MCP readiness is implied.
 
-This phase closes only selected read coverage if its tests pass. MCP remains disabled until approved
-delegation, integration controls and AI audit representation in §§4–5 exist and selected runtime security
-acceptance closes. Web/phone delivery continues through its owning roadmap independently of those AI gates.
+Broader REST expansion still needs per-operation field/policy/audit/bounds review and the existing live
+security/performance gates. MCP remains **NOT STARTED**, blocked by approved delegation, integration
+controls and AI audit representation (§§4–5), as well as selected runtime acceptance. Web/phone delivery
+continues independently through its owning roadmap.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
 
-Retained scope/acceptance specification. Candidate implementation and synthetic evidence are recorded above;
+Historical scope/acceptance specification, implemented and merged in #1898. Do not treat it as the next task.
+Candidate implementation and synthetic evidence are recorded above;
 remaining authoritative and deployment gates must not be mistaken for completed work.
 
 ```text
@@ -848,3 +853,130 @@ The task-local documentation checker verifies all relative links/anchors, fences
 scope, SQL prerequisite paths and evidence/status markers. No Maven/npm/SQL/Windows/rehearsal suite is
 appropriate to unchanged runtime contracts; selector output is impact review only. Exact executed
 results are recorded in the PR, without promoting historical or unexecuted tests to new passes.
+
+### 9.3 Phase 1S — shared secured Case read operations — 2026-10-21
+
+**Status: COMPLETE for the selected source/application boundary and local synthetic proof.** This is a narrow application-boundary proof,
+not broad REST completion, live SQL acceptance or MCP readiness. The fetched base is the #1898 merge
+`345452f9e196bc537b78dc70fc46e6353b2b8d22`; Phase 1R remains merged/synthetically validated, with
+**authoritative Case SQL acceptance BLOCKED** by the unavailable approved offline schema artifact.
+No Stage A/B completion or production RLS activation is inferred.
+
+**Finding and implementation decision:** R2 already supplied the appropriate JavaFX-free shared boundary.
+Keep the three existing [CaseServicePort](../../shale-core/src/main/java/com/shale/core/service/CaseServicePort.java)
+operations; no new service/module, execution-context framework or duplicate business implementation is needed.
+Their production [CaseServiceAdapter / DaoCaseGateway](../../shale-data/src/main/java/com/shale/data/service/adapter/CaseServiceAdapter.java)
+delegates to [CaseSummaryDao](../../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java).
+`CaseDao` supplies the same configured `DbSessionProvider`; its broad detail worker is not invoked by these reads.
+Port membership alone is not a security proof for the other Case methods.
+
+| Selected shared operation | Authoritative behavior | Existing REST adapter |
+| --- | --- | --- |
+| `searchMinimizedCases(query, tenant, actor, page, size)` | Current eligible actor, active tenant-wide Cases; literal name filter before SQL paging. Blank query still checks authority and returns no browse. | `POST /api/v2/cases/search-page` |
+| `listMinimizedAssignedCases(tenant, actor, page, size)` | Same authority/active tenant predicate, plus tenant-qualified `CaseUsers` EXISTS for this actor before paging. Assignment selects this list only. | `GET /api/v2/cases/assigned-page` |
+| `readMinimizedCaseOverview(caseId, tenant, actor)` | Same authority/active tenant predicate, narrow one-Case read and required committed Overview audit. Missing, deleted and foreign Cases all return empty. | `GET /api/v2/cases/{caseId}/overview` |
+
+#### Enforcement map (source inspection and synthetic execution)
+
+| Concern | Actual owner / guarantee |
+| --- | --- |
+| Authenticated principal | Prod/azure `BearerTokenServerSessionResolver` verifies the token and `ServerAuthSessionService` validates the session; bound tokens use durable ownership/current JTI/expiry/revocation and current eligible Users. Legacy compatibility remains separately bounded. Development headers remain dev/local only. Authentication is infrastructure, not a Case query parameter. |
+| Request actor and tenant | `MinimizedCaseReadController` obtains one `ServerRuntimeSessionState.requirePrincipal()` per invocation and passes its tenant/user. `RequestScopedDbSessionProvider` resolves the authenticated request again for the DB borrow. Parameters are assertions against that authority, not a freely selectable identity. |
+| Current actor eligibility | `CaseSummaryDao.verifyMinimizedActor`, on the actual read connection, requires positive IDs, matching `Users.Id`/`ShaleClientId`, `COALESCE(is_deleted,0)=0`, `COALESCE(IsRemoved,0)=0`, and both SQL session keys equal the supplied tenant/actor. In this schema eligibility means non-deleted/non-removed; no invented `is_active` or role flag. All three reads, including blank search, use it. |
+| Context initialization / RLS participation | `RequestScopedDbSessionProvider` → `RuntimeSessionServiceConnectionProvider` creates a fresh `RuntimeSessionService` per borrow and stamps both `ShaleClientId` and `PrincipalUserId`. Either setup failure closes the lease. No shared mutable desktop identity, auth/global datasource or privileged bypass is used for these operations. Existing mutable pooled keys are preserved. Missing Phase 1R live FILTER acceptance is not silently treated as active protection. |
+| Explicit isolation / visibility / deletion | `selectMinimized` predicates `c.ShaleClientId=?` and `ISNULL(c.IsDeleted,0)=0`; assignment/status/user/practice-area/date joins retain tenant or approved global-overlay constraints. Eligible ordinary users may search/read active tenant Cases; no Team-only ACL, role-label inference or administrator exception is added. |
+| Paging / limits | Worker validates pages 0–100, sizes 1–25 and stripped query ≤100 UTF-16 units. SQL OFFSET is `page*size` (≤2500), FETCH is size+1 (≤26), and hasMore derives from that authorized probe even at page 100. No count, prefix materialization or client security filtering. Five-second statement timeouts and SQL DATALENGTH guards remain. Row limits do not bound scanned work or end-to-end latency. |
+| DTOs | Immutable `MinimizedCasePage` and `MinimizedCaseOverview` core records expose the existing semantic eight-field allowlist and bounded immutable relationship records, no DAO model/JDBC type/RowVer/UI state. `updatedAt` remains nullable stored local text; no UTC reinterpretation. Existing application and HTTP shapes agree, so no extra DTO layer is justified. |
+| Case Dates | Minimized Overview exposes **no dates** and performs no date/detail hydration. Assigned ordering alone uses existing tenant-qualified active `CaseDates.StartsAt` occurrences with the protected tenant-effective INTAKE mapping. Broad legacy `getAuthoritativeCaseDetail` uses `CaseDateDao` migrated compatibility state separately; it is not this secured slice. No retired Case scalar reconstruction or new date source is introduced. |
+| Summary transaction / audit | Search/Assigned borrow and close one connection using normal autocommit reads. Their approved ordinary minimized summary audit exemption is unchanged; it is not extended to Overview, broad reads or future AI disclosure. |
+| Overview transaction / audit | `CaseSummaryDao.readMinimizedCaseOverview` owns begin → actor check → narrow read → `AuditLogDao.appendPhiWriteAudit` on the same connection → commit → return. Empty reads roll back without success audit. Required audit must append exactly one row; read/audit/commit failure withholds the result and attempts rollback where a transaction began. Connection close must succeed before return completes. |
+| Error handling / uncertainty | Invalid operation bounds throw `IllegalArgumentException`; worker authority throws `CaseReadException.DENIED`; SQL timeout/read failures and required audit failures use typed Case-read outcomes. REST `MinimizedCaseReadErrors` maps these to safe 400/401/403/404/503 outcomes without data or private exception text. A lost commit acknowledgement withholds data; a rollback attempt cannot undo a committed audit. No automatic replay or audit deletion. |
+| Protocol-only work | REST parses/validates request inputs, maps empty Overview to 404, serializes once and checks the exact delivered UTF-8 bytes (128 KiB page / 8 KiB Overview), sets no-store, and translates errors. Duplicate input validation is deliberate early HTTP rejection; worker bounds and authority remain enforced for direct callers. Exact JSON byte budgets belong to the encoder, not an HTTP-dependent core operation. |
+
+**Audit compatibility:** the existing schema/event is sufficient for this slice: Case object type 1,
+FieldCode 4, `Case.Overview.Read`, `action=READ;screen=Case.Overview`, Case ID and authoritative actor,
+connection-derived tenant, existing timestamp; no sensitive values or search text. No migration or new audit
+vocabulary is required. Committed audit records server access; subsequent serialization failure/disconnect
+is not proof of delivery. Integration read/failure attribution and AI summary auditing remain §5 blockers.
+
+**REST/OpenAPI impact:** no URL, payload, default, limit or schema change. The REST controller continues to
+call the shared port once; no controller owns SQL, actor eligibility or audit decisions. Existing
+`MinimizedCaseOpenApiConfiguration` and selected `OpenApiDocumentationTest` contracts describe the same core
+results. `shale-web/src/features/cases/client.ts`, validators and tests continue to consume those exact
+contracts; no web UX or legacy `ApiReadController` contract is changed.
+
+**Future adapter seam and remaining blockers:** an independently authenticated adapter can inject the same
+`CaseServicePort` with an application-owned `DbSessionProvider` and invoke these methods without importing
+REST controllers, DAOs, SQL, JavaFX, AppState or desktop identity. The current server provider uses servlet
+request resolution; it is not an async or MCP identity carrier. A future transport must supply verified
+execution identity through server/application infrastructure and initialize each borrowed connection;
+passing arbitrary IDs alone is insufficient and fails against SQL context. No new context carrier is
+necessary for today's synchronous REST slice. Future integration restrictions and required AI auditing must
+extend the same authoritative worker/seam, never fork the query or inherit the web summary exemption.
+OAuth/transport/issuer/audience, tenant opt-in, registration/grants, revocation, attribution, extraction/rate/
+concurrency/encoding budgets and live acceptance remain independent MCP blockers. MCP is **NOT STARTED**.
+
+Before REST expansion, approve each added operation's field/actor policy, audit/transaction ownership,
+bounds and contract, and close the existing authoritative Case SQL, non-bypass deployed RLS/grants,
+compatibility/session/audit-fault and representative performance gates. These broader gates do not justify
+rewriting the proven minimized operation or declaring all REST/API work complete.
+
+#### Test impact and verification
+
+Pre-edit review inspected `MinimizedCaseReadJdbcTest`, `CaseServiceAdapterTest`, `CaseSearchPagingJdbcTest`,
+`CaseSummaryServerProjectionContractTest`, `MinimizedCaseReadControllerTest`, `OpenApiDocumentationTest`,
+`RequestScopedDbSessionProviderTest`, `ServerSessionSkeletonTest`, `ShaleServerServiceConfigurationTest`,
+and the opt-in `CaseReadLocalSqlServerTest` audit-denial/lost-ack scenarios. The owning R2/audit/date/web
+contracts, schema/tenancy, web migration/readiness and current browser consumer/tests were inspected first.
+
+No runtime production behavior changed. Port Javadoc makes the existing secured contract explicit.
+The existing JDBC test now invokes the production implementation through `CaseServicePort` and covers all
+three reads (plus blank search) against deleted/removed/missing/foreign actors and absent/mismatched context,
+Assigned foreign/deleted exclusion and probe bounds, both page limits/ceiling continuation, transaction
+setup/read failure, zero-row audit append and injected lost acknowledgement after simulated commit. The
+existing runtime test invokes each Case operation through the real server provider/initializer, fails either
+context key, and proves lease closure with no Case/audit SQL. REST tests verify caller identity fields cannot
+replace principal authority and all operations translate shared denial without a fallback read.
+
+These executing JDBC/HTTP/context tests are **synthetic**, with SQL shapes/bindings asserted and rows modeled
+by doubles; they do not execute SQL Server or establish deployed isolation/date-resolution semantics. Existing
+authoritative Case SQL harness and its stronger real audit-denial/commit scenarios remain unchanged and
+BLOCKED, not reported as passing. Existing tests retain same-tenant success, paging, projection/date source,
+required-audit transaction ordering, privacy, response-byte and OpenAPI compatibility assertions.
+
+Final local commands/results follow. No MCP, AI integration, production/Azure SQL,
+RLS activation, deployment, version bump or installer publication is part of Phase 1S.
+
+
+Executed with the existing Maven 3.9.11 / Temurin JDK 21.0.12.1 wrapper (`mvn` below denotes
+`/workspace/.tools/bin/mvn`). The initial offline attempt could not resolve two uncached dependencies;
+using the configured network resolved them. An OpenAPI attempt without the JVM attach property hit this
+sandbox's Mockito self-attachment restriction; the unchanged test passed with the property below.
+No repository toolchain, POM or dependency configuration changed. These corrected environment attempts
+are not passing runs; final results are:
+
+| Check | Result |
+| --- | --- |
+| Focused service/gateway/JDBC, paging/date-source, controller, runtime/composition, legacy REST and selected Case OpenAPI contracts | **122 PASS**, zero failures/errors/skips. |
+| Committed-base selector affected suite | **114 PASS**, zero failures/errors/skips; 18 classes across data/server/UI and core dependencies. Shared-port consumers plus security/audit/session tests explain the selected cases/contacts/organizations/reports/security-data/server/tasks areas. No full-suite escalation. |
+| Critical reactor | **117 PASS**, zero failures/errors/skips; BUILD SUCCESS. |
+| Selector units | **25 PASS**. |
+| Documentation / diff review | **37 relative links/anchors**, balanced fences, retained evidence/status markers and `git diff --check` PASS. Complete five-file diff reviewed; only port Javadoc, existing tests and this roadmap changed. |
+
+```bash
+mvn -o -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-data,shale-server -am -Dtest=MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,CaseSearchPagingJdbcTest,CaseSummaryServerProjectionContractTest,MinimizedCaseReadControllerTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest,ShaleServerServiceConfigurationTest,ApiReadControllerTest,OpenApiDocumentationTest#minimizedReadSchemasAreConcreteBoundedNullableSecuredAndAdditive+legacyCaseSearchPageKeepsParametersDtoAndFourFieldPageSchema -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 345452f9e196bc537b78dc70fc46e6353b2b8d22 --head HEAD --format markdown --plan-output work/selection.json
+mvn -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-core,shale-data,shale-server,shale-ui -am -Dtest=com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.service.adapter.MinimizedCaseReadJdbcTest,com.shale.data.service.adapter.OrganizationServiceAdapterTest,com.shale.data.service.adapter.TaskServiceAdapterTest,com.shale.server.controller.AuthControllerTest,com.shale.server.controller.MinimizedCaseReadControllerTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest,com.shale.ui.controller.ReportsControllerLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -DargLine=-Djdk.attach.allowAttachSelf=true test
+python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+python3 work/check_docs.py
+git diff --check
+git diff --check 345452f9e196bc537b78dc70fc46e6353b2b8d22 HEAD
+```
+
+`work/check_docs.py` is an uncommitted task-local checker, consistent with prior roadmap checks: verify
+relative targets/heading anchors, balanced fences and retained Phase 1R/MCP evidence classifications.
+The selector's emitted Maven arguments were run unchanged with the test-JVM property added. Its plan
+was rechecked after the final documentation-only update. No blanket all-tests, Phase 1R SQL, authoritative
+Case SQL, production/Azure connection, deployment, version/installer publication or AI-specific work ran.
+The unavailable authoritative artifact remains an independent BLOCKED acceptance gate, not a Phase 1S pass.

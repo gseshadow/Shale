@@ -55,6 +55,33 @@ class MinimizedCaseReadControllerTest {
         result=Optional.empty();
         mvc(true).perform(get("/api/v2/cases/999/overview")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Case unavailable."));
     }
+    @Test void callerIdentityFieldsCannotReplaceAuthenticatedAuthorityOnAnyRead() throws Exception {
+        mvc(true).perform(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"Name\",\"tenant\":42,\"actor\":32,\"shaleClientId\":42,\"userId\":32}"))
+                .andExpect(status().isOk());
+        assertEquals(List.of("searchMinimizedCases", List.of("Name",41,31,0,25)), calls.getLast());
+        mvc(true).perform(get("/api/v2/cases/assigned-page").param("tenant","42").param("actor","32"))
+                .andExpect(status().isOk());
+        assertEquals(List.of("listMinimizedAssignedCases", List.of(41,31,0,25)), calls.getLast());
+        result=Optional.of(item("Overview"));
+        mvc(true).perform(get("/api/v2/cases/5/overview").param("shaleClientId","42").param("userId","32"))
+                .andExpect(status().isOk());
+        assertEquals(List.of("readMinimizedCaseOverview", List.of(5L,41,31)), calls.getLast());
+        assertEquals(3, calls.size(), "Each REST read must delegate once to the shared operation");
+    }
+
+    @Test void allReadsTranslateSharedAuthorityDenialWithoutReturningCaseData() throws Exception {
+        failure=new CaseReadException(CaseReadException.Kind.DENIED);
+        var requests=List.of(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"Name\"}"),
+                get("/api/v2/cases/assigned-page"), get("/api/v2/cases/5/overview"));
+        for (var request : requests) {
+            mvc(true).perform(request).andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.error").value("case_read_denied"))
+                    .andExpect(jsonPath("$.items").doesNotExist()).andExpect(jsonPath("$.caseName").doesNotExist());
+        }
+        assertEquals(3, calls.size(), "Policy denial must come from the shared operation, without a fallback read");
+    }
     @Test void ordinaryBuildBindsOverviewIdBeforeCallingTheService() throws Exception {
         result=Optional.of(new MinimizedCaseOverview(6502,null,"Synthetic",null,null,null,null,null));
         var outcome=mvc(true).perform(get("/api/v2/cases/6502/overview")).andReturn();

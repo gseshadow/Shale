@@ -47,12 +47,29 @@ import java.util.Collection;
  */
 public interface CaseServicePort {
 
+    /**
+     * Shared minimized read operation, independent of HTTP or UI state. Tenant and actor must
+     * come from authenticated application infrastructure; production rechecks both against the
+     * borrowed connection's session context and current non-deleted/non-removed Users row.
+     * Eligible actors may search active tenant Cases without assignment or administrator gates.
+     * Blank search still checks authority. Query is a literal name substring, at most 100 stripped
+     * characters; page is 0–100 and size 1–25. SQL fetches size+1 to determine hasMore, including
+     * at the window ceiling. Ordinary minimized summary pages retain their approved audit exemption.
+     */
     default MinimizedCasePage searchMinimizedCases(String query, int tenant, int actor, int page, int size) {
         throw new UnsupportedOperationException("Implement CaseServicePort.searchMinimizedCases with authorized SQL paging.");
     }
+    /** Same authority and bounds as search; assignment selects this list before SQL paging only. */
     default MinimizedCasePage listMinimizedAssignedCases(int tenant, int actor, int page, int size) {
         throw new UnsupportedOperationException("Implement CaseServicePort.listMinimizedAssignedCases with authorized SQL paging.");
     }
+    /**
+     * Same actor/tenant authority as search; missing, foreign and deleted Cases are unavailable.
+     * Production owns authority, narrow read and required Case.Overview.Read append on one
+     * transaction/connection, committing before returning. Audit/commit uncertainty withholds
+     * the result; rollback does not prove a lost-acknowledgement commit was undone. No automatic replay.
+     * This minimized projection contains no Case Dates or broad detail/child hydration.
+     */
     default Optional<MinimizedCaseOverview> readMinimizedCaseOverview(long caseId, int tenant, int actor) {
         throw new UnsupportedOperationException("Implement CaseServicePort.readMinimizedCaseOverview with required committed read audit.");
     }
