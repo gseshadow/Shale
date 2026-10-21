@@ -1,22 +1,24 @@
 # Shale Server Azure App Service Deployment Guide
 
-## Auth permission evidence and cutover candidate — 2026-10-15
+## Current authentication/security reconciliation — 2026-10-21
 
-The [owning permission cutover runbook](testing/auth-module-permission-cutover.md) records the user's native Windows
-auth SQL PASS for credential_identity, remembered_rotation and runtime_isolation, exit 0, and the
-user-run Azure collation/principal/effective-permission evidence. These supersede earlier pending
-Windows retest/unknown catalog statements for those reported observations only. Actual deployed
-server/desktop credential configuration and compatible installed fleet remain UNCONFIRMED.
+The [canonical API/MCP roadmap §2.5](architecture/ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
+records the October 20 **operator-reported production retirement** of EXECUTE on the three legacy login
+procedures for `shale_app`, runtime principal/role denials, and successful API login/identity/refresh/logout
+plus installed-desktop automatic sign-in/user-detail checks. Do not repeat completed operator rehearsals
+or treat the older retirement-BLOCKED statements below as current status for that exact delta.
 
-Existing runtime database/schema EXECUTE would expose new dbo owner-executed modules. The candidate
-installs both modules with runtime principal/role object DENY fences atomically, grants auth only object
-EXECUTE, and separately gates additive auth-table/runtime-hash read fences on approved caller inventory
-and old-client drain. Existing User projections and password-management writes are preserved. Original
-grants/grantors/states are captured and never rewritten; exact staged postchecks and rollback are owned
-there. Broader runtime audit SELECT/INSERT/UPDATE/DELETE remediation remains OPEN: deployed history must
-not be described as database-enforced append-only. No three FILTERs, existing predicates, original export,
-Case harness or R4 accepted reports change. CASE SQL NOT RUN; security acceptance OPEN; deployment BLOCKED.
-No Azure connection/live grant/migration, client release, configuration change, merge or deployment here.
+The separate V1/V2 auth-module Stage A installation/fences, Stage B table/hash read restrictions,
+subsequent desktop/API/SQL deployment details and monitoring closeout are not established by that report.
+Current source is merged through release 1.0.137; merge/release metadata does not establish deployed parity.
+Users/auditLog/Statuses read coverage, runtime hash/audit capabilities, write/admin restrictions and
+Case SQL acceptance remain open as qualified in that ledger. Supplied offline schema confirmed the gap;
+older missing-input statements are historical. No complete least-privilege, MCP or native-mobile acceptance.
+
+Follow the [SQL/API/client release order](azure-app-service-deployment.md#release-dependencies-and-order--2026-10-21).
+The one next implementation phase is the roadmap's [Phase 1R prompt](architecture/ai-integration-and-mcp.md#91-ready-to-run-codex-prompt--phase-1r),
+a local three-FILTER candidate, without production changes. Earlier dated tests, local Windows/source
+recovery limits and all accepted R4/session observations retain their scopes. This update executes no SQL.
 
 
 This guide is the repeatable deployment checklist for deploying `shale-server` to Azure App Service. It assumes the Step 4A-4D API migration work is present: Azure/local profiles, bearer auth, health endpoints, Swagger/OpenAPI, standardized errors, and paged read endpoints.
@@ -30,6 +32,40 @@ configuration change, deployment or production fault testing is authorized by th
 Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 INCOMPLETE. Appearance remains provisional;
 web delivery is independent of AI/MCP. Hosted routing/cache/privacy, two-tenant/non-dbo isolation,
 isolated audit failure/commit uncertainty, remaining live sessions and device/AT gates remain open.
+
+## Release dependencies and order — 2026-10-21
+
+This is a dependency checklist for a future separately authorized change, not instructions to replay
+completed SQL or retirement. Inspect existing non-secret deployment/change records first and skip
+already established steps. Health, a merged PR, a release manifest or successful catalog import alone
+does not prove the remaining SQL/API/desktop dependencies. Exact subsequent production deployment
+state is unconfirmed here; the October 20 operator report has the bounded scope stated above.
+
+| Consumer / change | Required SQL and configuration before consumer rollout | Compatibility / evidence required |
+| --- | --- | --- |
+| Bound API sessions and self/admin session management | Phase 7A `2026-09-29_user_sessions_foundation_phase7a.sql`; Phase 8A `2026-09-29_session_security_audit_phase8a.sql`, their verification scripts, existing tenant Users and instance dependencies, actual runtime grants/RLS. Configure `SHALE_AUTH_SESSION_BINDING_CUTOVER_AT` and signing secret before the bound-session API. | Existing Phase 7B/7C/8A/8B server routes and durable validation must be deployed before dependent desktops. Audit failure must not be bypassed to make session lists work. Preserve legacy cutover/maximum-TTL and emergency secret-rotation rollback rules below. |
+| Remembered desktop enrollment/restore | `2026-10-05_desktop_remember_credentials.sql` plus approved resolver/object permissions from the October 6 correction; UserSessions/Users/RLS and runtime SELECT/INSERT/UPDATE/DELETE on remembered credentials, required session grants. Current callers additionally require V1/V2 below. | API desktop-session/restore support precedes dependent desktop packaging. Preserve DPAPI credential/installation state, fixed remembered expiry and existing SQL UTC defaults/constraints. #1889's remaining UTC session fixes require rebuilt affected API/desktop artifacts; pinned recovery overlays are not production deployment artifacts. |
+| Current password and remembered identity callers (#1868 and later) | Approved `docs/sql/auth/permission-cutover/install.sql` Stage A wraps `2026-10-14_pretenant_authentication_modules.sql` atomically with object EXECUTE for auth and object DENY for both runtime principal/role. Check exact definitions/owners/effective permissions and no bypass. Do not execute the historical bare installer or blindly rerun grants. | SQL modules/fences **before** rebuilt API **and** direct-JDBC desktop callers. `AuthServiceImpl` has no direct Users SELECT fallback. Functional login alone does not prove which artifact/module/fence is serving. |
+| Stage B restrictions or future Users FILTER | `restrict-reads.sql` has separate approved-inventory/drained-fleet guards and module hash requirements. It adds auth table/old-resolver SELECT/EXECUTE fences and runtime password-hash SELECT denial; it does not remove password-management INSERT/UPDATE or audit CRUD. | First accept compatible deployed API/desktop/job callers and drain incompatible pre-context/direct-SELECT paths. Restriction and FILTER are distinct changes; neither is implied by the three legacy-procedure retirement. Future three-FILTER work follows Phase 1R, not the broad June proposal. |
+| Desktop release 1.0.137 / Case Updates | Existing CaseUpdates lifecycle/RowVersion and PHI AuditLog dependencies in the [feature acceptance record](testing/case-updates-workspace.md); current shared authentication dependencies still apply to the complete artifact. | #1893–#1895 themselves add no new SQL migration/API deployment. That does not make an upgrade from an older base independent of previously introduced SQL/API requirements. Repository release metadata does not prove installation or server rollout. |
+| Web V2 and future phone apps | Selected API routes, tenant/actor checks, required audit schema/grants and live security acceptance; browser origin CORS and compiled `VITE_SHALE_API_BASE_URL`; native credentials/origins/deep-links reviewed separately when implemented. | API/SQL first, then compatible static assets or packaged client. Static web deployment is separate from the API JAR/MSI. iPhone browser acceptance is not a native release; web publication cannot update embedded native assets. |
+
+Required sequence: review exact source-to-SQL/API/client compatibility and existing state -> install only
+missing approved additive SQL/modules with fences -> deploy/verify compatible API -> package/roll out
+compatible desktop/web clients -> confirm older caller drain -> separately authorize restrictive grants
+or RLS after candidate acceptance -> record bounded operational checks and monitoring closeout. Do not
+re-run October 20 retirement as a prerequisite to this sequence. Its three-procedure ACL delta is separate.
+
+For the next RLS candidate, prepare rollback before any future authorization: remove only added
+predicates/permission deltas against recorded hashes/SIDs, preserve pre-existing policies, auth modules
+needed by current callers and all audit history. Old direct-SELECT auth clients cannot be restored under
+strict Users filtering without a coordinated compatibility decision. No whole-policy disablement,
+runtime dbo/ShaleAdmins bypass or automatic downgrade to pre-durable revocation behavior is acceptable.
+
+Record only safe deployment facts: source/artifact identifiers, applied stage/migration labels,
+definition hashes, sanitized principal/fence dispositions and scenario outcomes. Leave private packets,
+credentials, tokens, connection strings, request/response bodies and production rows private. Missing
+artifact/ACL/monitoring facts remain UNKNOWN; no production check or completed rehearsal is repeated here.
 
 ## Deployment readiness review
 

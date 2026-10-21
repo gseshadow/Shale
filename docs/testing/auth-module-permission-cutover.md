@@ -1,5 +1,26 @@
 # Authentication module permission cutover — 2026-10-15
 
+## Current operator report — 2026-10-21 reconciliation
+
+The operator reports **successful production legacy-permission retirement on October 20**, followed
+by successful API login/identity/refresh/logout and installed-desktop automatic sign-in/user-detail
+checks. This is an attributed report supplied with the reconciliation task; private operational packets
+were not inspected and no production/SQL/Windows check ran here. The exact delta removes `shale_app`
+EXECUTE on `sp_login_get_hash`, `sp_login_mark_failure`, `sp_login_mark_success` and denies those
+procedures to `shale_runtime` and `shale_runtime_role`. It does not establish separate Stage A module
+installation/fences, Stage B table/hash read restrictions, three-FILTER coverage or complete least privilege.
+
+This supersedes older retirement-BLOCKED/pending-execution language **for that reported production
+delta and checks only**. Preserve dated Linux, native Windows, source/overlay and installed-production
+evidence separately. Monitoring duration/sign-off, exact deployed module/identity/fleet state and later
+desktop/API/SQL deployment details remain unconfirmed. Do not replay attempted packets or repeat
+completed rehearsals to produce a marker. No secret, production rows or wholesale packet upload is needed.
+
+The [canonical reconciliation and tracker](../architecture/ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
+owns current cross-workstream status; the [deployment dependency matrix](../azure-app-service-deployment.md#release-dependencies-and-order--2026-10-21)
+owns SQL/API/client ordering. The one next implementation is the [local Phase 1R candidate](../architecture/ai-integration-and-mcp.md#91-ready-to-run-codex-prompt--phase-1r).
+The records below are historical acceptance/preparation evidence, not a request to restart retirement.
+
 ## Existing local sandbox authority correction — 2026-10-19
 
 The [authority continuation](../../build/local-recovery/authority-recovery.md) owns
