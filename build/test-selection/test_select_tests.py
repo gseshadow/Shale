@@ -29,6 +29,12 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertIn("com.shale.core.security.ai.AiScopeTest", result["test_patterns"])
         self.assertIn("com.shale.data.security.ai.AiSecurityContractTest", result["test_patterns"])
 
+    def test_oauth_foundation_selects_namespace_and_protocol_contracts(self):
+        result = self.selected("shale-server/src/main/java/com/shale/server/oauth/McpOAuthSecurityConfiguration.java")
+        self.assertIn("server", result["selected_areas"])
+        for name in ("OAuthConfigurationTest", "OAuthClientMappingTest", "OAuthFilterIsolationTest", "OAuthMetadataTest"):
+            self.assertIn("com.shale.server.oauth." + name, result["test_patterns"])
+
     def test_contact_change_selects_contacts_but_not_calendar(self):
         result = self.selected("shale-ui/src/main/java/com/shale/ui/controller/ContactViewController.java")
         self.assertIn("contacts", result["selected_areas"])
