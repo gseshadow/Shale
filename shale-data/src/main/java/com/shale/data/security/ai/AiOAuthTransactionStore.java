@@ -41,11 +41,19 @@ public final class AiOAuthTransactionStore {
     /** Fresh one-client snapshot under authenticated tenant RLS. ClientId is globally unique in SQL.
      * Unknown, foreign, expired or disabled clients fail closed; no client inventory API exists. */
     public Optional<Client> loadClient(String clientId) {
+        return loadClient(clientId,"AiLoadOAuthClientV1");
+    }
+    /** Revocation authenticates the client even when the credential/subject is inactive or unknown.
+     * This configuration-only seam cannot authorize issuance, refresh or business access. */
+    public Optional<Client> loadRevocationClient(String clientId) {
+        return loadClient(clientId,"AiLoadRevocationClientV1");
+    }
+    private Optional<Client> loadClient(String clientId,String procedure) {
         requireEnabled();
         if(clientId==null || !clientId.matches("[A-Za-z0-9_-]{1,64}")) return Optional.empty();
         record Row(int tenant, UUID integration, String name, String type, Set<AiScope> scopes, Instant expiry,
                 AiIntegrationSecurityService.RowVersion version, String issuer, String resource, String redirect, Key key) {}
-        var rows=AiSql.call(runtime,"AiLoadOAuthClientV1", r -> {
+        var rows=AiSql.call(runtime,procedure, r -> {
             Key key=null;
             if(r.getString("CredentialId")!=null) {
                 try {

@@ -389,6 +389,7 @@
         "com.shale.server.oauth.OAuthMetadataTest",
         "com.shale.server.oauth.ShaleOAuthHumanTest",
         "com.shale.server.oauth.OAuthCodeExchangePolicyTest",
+        "com.shale.server.oauth.OAuthRevocationPolicyTest",
         "com.shale.server.oauth.PinnedClientAssertionTest",
         "com.shale.server.oauth.OAuthAuthorizationFlowTest"
       ]
@@ -545,6 +546,7 @@
         "com.shale.data.security.ai.AiSecurityContractTest",
         "com.shale.data.security.ai.AiOAuthExchangeContractTest",
         "com.shale.data.security.ai.AiOAuthCredentialContractTest",
+        "com.shale.data.security.ai.AiOAuthRevocationContractTest",
         "com.shale.data.security.ai.AiSecurityLocalSqlServerTest"
       ]
     },

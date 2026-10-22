@@ -596,7 +596,8 @@ session authority and previously completed deployment/security records above rem
    the previous JAR. Upload with AI composition/authorization/exchange disabled.
 2. Execute accumulated, **unapplied** AI SQL migrations in order:
    [phase3b1.sql](sql/ai-integration/phase3b1.sql) → [phase3b2b.sql](sql/ai-integration/phase3b2b.sql) →
-   [phase3b2c1.sql](sql/ai-integration/phase3b2c1.sql) → [phase3b2c2.sql](sql/ai-integration/phase3b2c2.sql),
+   [phase3b2c1.sql](sql/ai-integration/phase3b2c1.sql) → [phase3b2c2.sql](sql/ai-integration/phase3b2c2.sql) →
+   [revocation.sql](sql/ai-integration/revocation.sql),
    using approved migration authority, fail-fast sessions and the [SQL operator instructions](sql/ai-integration/README.md).
    Review existing receipts to skip applied migrations; older receipts deliberately detect later catalog changes.
 3. Execute the cumulative [AI SQL verifier](sql/ai-integration/verify.sql), review effective non-bypass runtime
@@ -606,6 +607,10 @@ session authority and previously completed deployment/security records above rem
 4. **Only then** perform separately authorized live OAuth acceptance with synthetic approved identities.
    Prove code+S256 issuance, exact private_key_jwt/public profiles, rotation, response-loss retry/family revoke,
    authority clipping, resets/revokes, audit failure, restart/replicas and ordinary WEB/DESKTOP regressions.
+   RFC 7009 acceptance must cover empty 200 for unknown/repeated/foreign credentials, both credential kinds,
+   pinned RS256 endpoint-audience proofs and shared JTI replay, family races and atomic security audit.
+   The revocation extension must be installed before enabling exchange in the closeout server version;
+   metadata advertises that implemented endpoint with exchange, with no runtime migration installer.
    No protected resource accepts these access tokens yet; bearer resolution is 3B.2D, MCP/disclosure are later.
 
 Rollback disables OAuth/AI and revokes credential families while retaining all additive storage, receipts,

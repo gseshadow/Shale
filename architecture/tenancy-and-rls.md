@@ -222,6 +222,18 @@ Existing strict session/credential FILTER and AFTER INSERT/UPDATE BLOCK predicat
 denials remain unchanged. A tenant-qualified authorization FK and immutable client/issuer/resource/key
 lineage bind each hash-only credential family. New confined ResolveAiRefreshV1 accepts REFRESH only,
 returns only provisional tenant/user and requires exact client/configured identities; no ACCESS resolver
-or token-to-tenant initialization exists. Runtime rechecks all live authority under existing SQL locks.
+or token-to-tenant initialization for resource authentication exists. Runtime rechecks all live authority under existing SQL locks.
 See the [lifecycle operator record](../docs/sql/ai-integration/README.md#phase-3b2c2-opaque-credential-lifecycle-candidate).
 No global tenant-data grant, ordinary auth-pool expansion, MCP route or Case disclosure is introduced.
+
+## RFC 7009 revocation isolation candidate
+
+The manual `docs/sql/ai-integration/revocation.sql` extension adds a bootstrap-only exact digest/client/
+issuer/resource resolver for ACCESS or REFRESH revocation, including inactive history. A missing/foreign
+credential supplies only that registration's creator for configuration-only runtime setup; it never grants
+business authority. Fresh caller/RLS runtime modules revalidate client, tenant, subject membership, keys
+and exact credential-family ownership under the existing capability/tenant locks. Inactive subjects remain
+revocable without creating an existence oracle. Shared SQL assertion replay, family revocation and required
+entity-action audit commit atomically. No table, RLS predicate, direct-table grant, general inventory or
+ordinary auth-pool capability changes. See the [operator record](../docs/sql/ai-integration/README.md#rfc-7009-revocation-closeout-candidate).
+This is neither bearer authentication nor token-to-VerifiedIntegrationContext; defaults remain OFF.
