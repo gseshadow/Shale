@@ -18,6 +18,9 @@ public final class OAuthAuthorizationRequestPolicy implements Consumer<OAuth2Aut
         try {
             OAuthRedirectPolicy.validate(request.getRedirectUri(), client.getRedirectUris(),
                     !client.getClientAuthenticationMethods().contains(ClientAuthenticationMethod.NONE));
+            if(request.getState()==null || request.getState().isEmpty() || request.getState().length()>512 || request.getScopes().isEmpty())
+                throw new IllegalArgumentException("Explicit bounded state and scopes required.");
+            request.getScopes().forEach(com.shale.core.security.ai.AiScope::parse);
             var parameters = request.getAdditionalParameters();
             requireS256(parameters.get("code_challenge_method"), parameters.get("code_challenge"));
             // Spring's converter retains repeated additional values as an array/list. Never coerce these.

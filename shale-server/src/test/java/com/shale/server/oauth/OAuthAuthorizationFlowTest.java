@@ -1,0 +1,134 @@
+package com.shale.server.oauth;
+
+import com.shale.core.dto.UserSessionView;
+import com.shale.core.model.ClientType;
+import com.shale.data.security.ai.*;
+import com.shale.server.runtime.*;
+import java.net.*;
+import java.nio.file.*;
+import java.sql.*;
+import java.time.*;
+import java.util.*;
+import org.junit.jupiter.api.*;
+import org.springframework.context.annotation.*;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.mock.web.*;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.web.context.request.*;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+import static com.shale.core.security.ai.AiScope.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+/** SYNTHETIC SQL plus actual maintained servlet filters. Durable WEB store is a test identity fixture;
+ * ordinary production WEB/DESKTOP authority is separately covered by existing auth regressions. */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class OAuthAuthorizationFlowTest {
+    static final String ISSUER="https://shale.test/oauth/mcp",RESOURCE="https://shale.test/mcp",REDIRECT="https://client.test/callback",VERIFIER="v".repeat(43);
+    static ShaleAuthTokenService tokens;
+    static ShaleOAuthHumanTest.FixtureSessions sessions;
+    static RuntimeConnectionProvider runtime;
+    AnnotationConfigWebApplicationContext context;
+    String port,password,db,login,secret,webToken,client,otherClient;
+    UUID sid;
+    Connection owner(String database)throws Exception {return DriverManager.getConnection(url(database),"sa",password);}
+    String url(String database){return "jdbc:sqlserver://127.0.0.1:"+port+";databaseName="+database+";encrypt=true;trustServerCertificate=true;loginTimeout=5;socketTimeout=10000";}
+    static void sql(Connection c,String text)throws SQLException {try(var s=c.createStatement()){s.setQueryTimeout(10);s.execute(text);}}
+    @BeforeAll void setup()throws Exception {
+        Assumptions.assumeTrue("LOCAL_DISPOSABLE_AI".equals(System.getenv("SHALE_AI_SQL_OPT_IN")),"Disposable loopback SQL opt-in required; skip is not evidence");
+        port=System.getenv("SHALE_AI_SQL_PORT");password=System.getenv("SHALE_AI_SQL_PASSWORD");assertNotNull(port);assertTrue(port.matches("[0-9]{4,5}"));
+        db="AiOAuth_"+UUID.randomUUID().toString().replace("-","");login=db+"_runtime";secret=UUID.randomUUID()+"aB9!";
+        try(var c=owner("master")){sql(c,"CREATE DATABASE ["+db+"]");sql(c,"CREATE LOGIN ["+login+"] WITH PASSWORD='"+secret+"',CHECK_POLICY=OFF");}
+        try(var c=owner(db)) {
+            for(String batch:Files.readString(Path.of("../shale-data/src/test/resources/ai/synthetic-prerequisites.sql")).split("(?im)^GO\\s*$"))if(!batch.isBlank())sql(c,batch);
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b1.sql")));
+            sql(c,"CREATE TABLE dbo.UserSessions(SessionId uniqueidentifier PRIMARY KEY,ShaleClientId int,UserId int,ClientType varchar(16),ExpiresAt datetime2(7),RevokedAt datetime2(7))");
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2b.sql")));
+            sql(c,"CREATE USER ["+login+"] FOR LOGIN ["+login+"]; ALTER ROLE AiIntegrationRuntime ADD MEMBER ["+login+"]; ALTER ROLE AiCapabilityOperator ADD MEMBER ["+login+"]");
+        }
+        runtime=p->{Connection c=DriverManager.getConnection(url(db),login,secret);sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value="+p.shaleClientId()+"; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value="+p.userId());return c;};
+        new AiProductCapabilityService(()->{try{return DriverManager.getConnection(url(db),login,secret);}catch(SQLException e){throw new IllegalStateException(e);}})
+                .setEnabled(true,new AiProductCapabilityService(()->{try{return DriverManager.getConnection(url(db),login,secret);}catch(SQLException e){throw new IllegalStateException(e);}}).inspect().rowVersion());
+        var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
+        controls.setTenantEnabled(true,null);
+        client=controls.register("Synthetic client",false,Set.of(CASES_SEARCH,CASES_OVERVIEW_READ),1,List.of(URI.create(REDIRECT))).clientId();
+        otherClient=controls.register("Other synthetic client",false,Set.of(CASES_SEARCH),1,List.of(URI.create(REDIRECT))).clientId();
+        tokens=new ShaleAuthTokenService("synthetic-oauth-flow-secret-at-least-32-bytes",3600,Clock.systemUTC());
+        var principal=new ServerPrincipal(72,7,null);var prepared=tokens.prepare(principal);sid=UUID.randomUUID();webToken=tokens.issueBound(prepared,sid);
+        sessions=new ShaleOAuthHumanTest.FixtureSessions();sessions.current=new UserSessionView(1,sid,ClientType.WEB,null,prepared.tokenId(),Instant.now(),Instant.now().plusSeconds(3600),null,null,null);
+        try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,72,'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
+        context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true")));
+        context.register(McpOAuthSecurityConfiguration.class,Fixtures.class);context.refresh();
+    }
+    @Configuration static class Fixtures {
+        @Bean ShaleAuthTokenService tokens(){return tokens;}
+        @Bean DurableSessionStore sessions(){return sessions;}
+        @Bean RuntimeConnectionProvider runtime(){return runtime;}
+        @Bean ServerAuthSessionService auth(){return new ServerAuthSessionService(tokens,sessions,new DurableSessionTokenValidator(sessions),new LegacyTokenCompatibilityPolicy(Instant.EPOCH,3600,Clock.systemUTC()),new InMemoryTokenRevocationStore());}
+    }
+    @AfterAll void cleanup()throws Exception {
+        if(context!=null)context.close();
+        if(db!=null)try(var c=owner("master")){sql(c,"ALTER DATABASE ["+db+"] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE ["+db+"]");sql(c,"DROP LOGIN ["+login+"]");}
+    }
+    MockHttpServletRequest authorization()throws Exception {
+        var r=new MockHttpServletRequest("GET","/oauth/mcp/authorize");r.addParameter("response_type","code");r.addParameter("client_id",client);r.addParameter("redirect_uri",REDIRECT);r.addParameter("resource",RESOURCE);r.addParameter("scope","cases.search cases.overview.read");r.addParameter("state","exact + & = é");r.addParameter("code_challenge_method","S256");
+        r.addParameter("code_challenge",Base64.getUrlEncoder().withoutPadding().encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(VERIFIER.getBytes(java.nio.charset.StandardCharsets.US_ASCII))));return r;
+    }
+    MockHttpServletResponse send(MockHttpServletRequest r)throws Exception {
+        r.setServletPath(r.getRequestURI());
+        if(r.getMethod().equals("GET")) {
+            var encoded=new ArrayList<String>();r.getParameterMap().forEach((k,values)->{for(var value:values)encoded.add(URLEncoder.encode(k,java.nio.charset.StandardCharsets.UTF_8)+"="+URLEncoder.encode(value,java.nio.charset.StandardCharsets.UTF_8));});
+            r.setQueryString(String.join("&",encoded));
+        } else r.setContentType("application/x-www-form-urlencoded");
+        if(r.getAttribute("skipAuthorization")==null)r.addHeader("Authorization","Bearer "+webToken);r.addHeader("Host","attacker.invalid");r.addHeader("X-Forwarded-Host","attacker.invalid");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(r));
+        try {var response=new MockHttpServletResponse();context.getBean(FilterChainProxy.class).doFilter(r,response,(q,s)->fail("OAuth request escaped filters"));return response;}
+        finally {RequestContextHolder.resetRequestAttributes();}
+    }
+    static Map<String,String> query(String location){var result=new HashMap<String,String>();for(String entry:URI.create(location).getRawQuery().split("&")){var kv=entry.split("=",2);result.put(URLDecoder.decode(kv[0],java.nio.charset.StandardCharsets.UTF_8),URLDecoder.decode(kv[1],java.nio.charset.StandardCharsets.UTF_8));}return result;}
+    MockHttpServletRequest approve(String state){var r=new MockHttpServletRequest("POST","/oauth/mcp/authorize");r.addParameter("client_id",client);r.addParameter("state",state);r.addParameter("scope","cases.search");return r;}
+    @Test void maintainedAuthorizationConsentAndCodeFlowPreservesStateAndIssuerAndNeverIssuesTokens()throws Exception {
+        var begun=send(authorization());assertEquals(302,begun.getStatus(),"AS must begin explicit consent");var consent=query(begun.getRedirectedUrl());
+        String nonce=consent.get("state");assertNotEquals("exact + & = é",nonce);
+        var inspect=new MockHttpServletRequest("GET","/oauth/mcp/consent");inspect.addParameter("state",nonce);inspect.addParameter("client_id",client);
+        assertEquals(200,send(inspect).getStatus());
+        var response=send(approve(nonce));assertEquals(302,response.getStatus(),"AS must issue a code after durable self-consent");
+        assertTrue(response.getRedirectedUrl().startsWith(REDIRECT+"?"));var result=query(response.getRedirectedUrl());
+        assertEquals("exact + & = é",result.get("state"));assertEquals(ISSUER,result.get("iss"));assertTrue(result.get("code").matches("[A-Za-z0-9_-]{43}"));
+        assertEquals(400,send(approve(nonce)).getStatus(),"Reused intent must fail");
+        var store=new AiOAuthTransactionStore(()->{try{return runtime.openConnection(new ServerPrincipal(72,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
+        assertEquals(Set.of(CASES_SEARCH),store.consume(result.get("code"),sid,client,REDIRECT,VERIFIER,ISSUER,RESOURCE).scopes());
+        var token=new MockHttpServletRequest("POST","/oauth/mcp/token");token.addParameter("grant_type","authorization_code");token.addParameter("code",result.get("code"));
+        var blocked=send(token);assertEquals(404,blocked.getStatus());assertFalse(blocked.getContentAsString().contains("access_token"));
+    }
+    @Test void approvalRejectsCrossClientAndAllBindingSubstitutionsAndAllowsBothExplicitScopes()throws Exception {
+        String nonce=query(send(authorization()).getRedirectedUrl()).get("state");
+        for(String[] bad:List.of(new String[]{"client_id",otherClient},new String[]{"redirect_uri","https://evil.test/callback"},
+                new String[]{"resource",RESOURCE+"/"},new String[]{"user_id","73"},new String[]{"integration_id",UUID.randomUUID().toString()},
+                new String[]{"code_challenge","x".repeat(43)},new String[]{"issuer",ISSUER+"/"},new String[]{"scope","admin"})) {
+            var r=approve(nonce);r.setParameter(bad[0],bad[1]);var result=send(r);assertEquals(400,result.getStatus(),bad[0]);assertNull(result.getRedirectedUrl());
+        }
+        var valid=approve(nonce);valid.setParameter("scope","cases.search","cases.overview.read");assertEquals(302,send(valid).getStatus());
+        String denied=query(send(authorization()).getRedirectedUrl()).get("state");var decline=approve(denied);decline.removeParameter("scope");var declined=send(decline);assertEquals(302,declined.getStatus());
+        var error=query(declined.getRedirectedUrl());assertEquals("access_denied",error.get("error"));assertEquals("exact + & = é",error.get("state"));assertEquals(ISSUER,error.get("iss"));
+        assertEquals(400,send(approve(denied)).getStatus(),"Denied intent cannot be reused");
+    }
+    @Test void noSessionOrSpringCookieOrDesktopCredentialCanAuthorize()throws Exception {
+        var absent=authorization();absent.setAttribute("skipAuthorization",true);
+        absent.getSession().setAttribute("SPRING_SECURITY_CONTEXT",new org.springframework.security.core.context.SecurityContextImpl(
+                org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("other-user","",List.of())));
+        assertEquals(401,send(absent).getStatus());
+        var remembered=authorization();remembered.setAttribute("skipAuthorization",true);remembered.addHeader("Authorization","Bearer "+"x".repeat(43));assertEquals(401,send(remembered).getStatus());
+        var basic=authorization();basic.setAttribute("skipAuthorization",true);basic.addHeader("Authorization","Basic YTpi");assertEquals(401,send(basic).getStatus());
+    }
+    @Test void hostileAuthorizationAndConsentParametersAreRejectedWithoutRedirect()throws Exception {
+        for(String[] bad:List.of(new String[]{"response_type","token"},new String[]{"resource",RESOURCE+"/"},new String[]{"redirect_uri","https://evil.test/callback"},
+                new String[]{"code_challenge_method","plain"},new String[]{"scope","admin"},new String[]{"state",""},new String[]{"user_id","73"},new String[]{"issuer","https://evil.test"})) {
+            var r=authorization();r.setParameter(bad[0],bad[1]);var response=send(r);assertEquals(400,response.getStatus(),bad[0]);assertNull(response.getRedirectedUrl());
+        }
+        for(String missing:List.of("resource","state","scope","code_challenge","code_challenge_method")){var r=authorization();r.removeParameter(missing);assertEquals(400,send(r).getStatus(),missing);}
+        var multiple=authorization();multiple.setParameter("resource",RESOURCE,RESOURCE);assertEquals(400,send(multiple).getStatus());
+        assertEquals(400,send(approve("a".repeat(43))).getStatus(),"Unbound CSRF state must fail");
+        var substituted=authorization();substituted.setParameter("client_id","unknown");assertEquals(400,send(substituted).getStatus());
+    }
+}

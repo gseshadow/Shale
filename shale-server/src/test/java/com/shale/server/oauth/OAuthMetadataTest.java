@@ -25,6 +25,19 @@ class OAuthMetadataTest {
                 OAuthMetadataContract.protectedResource(properties));
     }
 
+    @Test void authorizationOnlyMetadataDoesNotPromiseTokenExchange() {
+        var properties=new McpOAuthProperties("https://shale.example",McpOAuthProperties.Identity.PRODUCTION,true);
+        var claims=OAuthMetadataContract.authorizationServer(properties,true);
+        assertEquals(properties.issuer()+"/authorize",claims.get("authorization_endpoint"));
+        assertEquals(List.of("code"),claims.get("response_types_supported"));
+        assertEquals(List.of("S256"),claims.get("code_challenge_methods_supported"));
+        assertEquals(true,claims.get("authorization_response_iss_parameter_supported"));
+        assertEquals(List.of(),claims.get("grant_types_supported"),"HTTP token exchange remains unavailable in 3B.2B");
+        assertEquals(List.of(),claims.get("token_endpoint_auth_methods_supported"));
+        assertFalse(claims.containsKey("token_endpoint"));
+        assertEquals(OAuthMetadataContract.authorizationServer(properties),OAuthMetadataContract.authorizationServer(properties,false));
+    }
+
     @Test void bootBindingFailsClosedForInvalidOriginOrCrossProfileIdentity() {
         var runner = new WebApplicationContextRunner().withUserConfiguration(McpOAuthSecurityConfiguration.class);
         for (String origin : List.of("http://shale.example", "https://shale.example/", "https://shale.example?host=evil"))

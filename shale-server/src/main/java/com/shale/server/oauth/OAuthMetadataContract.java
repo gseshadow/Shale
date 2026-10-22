@@ -18,6 +18,14 @@ public final class OAuthMetadataContract {
                 "token_endpoint_auth_methods_supported", List.of());
     }
 
+    public static Map<String,Object> authorizationServer(McpOAuthProperties properties,boolean authorizationEnabled) {
+        if(!authorizationEnabled) return authorizationServer(properties);
+        return Map.of("issuer",properties.issuer(),"authorization_endpoint",properties.issuer()+"/authorize",
+                "response_types_supported",List.of("code"),"grant_types_supported",List.of(),
+                "token_endpoint_auth_methods_supported",List.of(),"code_challenge_methods_supported",List.of("S256"),
+                "scopes_supported",List.of("cases.search","cases.overview.read"),"authorization_response_iss_parameter_supported",true);
+    }
+
     public static Map<String, Object> protectedResource(McpOAuthProperties properties) {
         return Map.of("resource", properties.resource(), "authorization_servers", List.of(properties.issuer()));
     }

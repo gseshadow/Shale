@@ -13,6 +13,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class AiSecurityContractTest {
     @Test void startupDefaultsOffBeforeAnyDatabaseAccess() {
         var service = new AiIntegrationSecurityService(() -> { throw new AssertionError("Default off must not open SQL."); });
+        var oauth=new AiOAuthTransactionStore(()->{throw new AssertionError("Default off must not open SQL");},false,null,null);
+        assertThrows(SecurityException.class,()->oauth.loadClient("client"));
+        assertThrows(SecurityException.class,()->oauth.consume("code",UUID.randomUUID(),"client","redirect","verifier","issuer","resource"));
         assertThrows(SecurityException.class, () -> service.verifySession(UUID.randomUUID(), AiScope.CASES_SEARCH));
         assertThrows(SecurityException.class, () -> service.beginConsent(UUID.randomUUID(),AiScope.fromMask(1),1));
     }

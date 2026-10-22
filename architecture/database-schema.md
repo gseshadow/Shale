@@ -1425,3 +1425,15 @@ CREATED/UPDATED/DEACTIVATED, metadata is ACTIVE/AI_SCOPE_MASK only. Product swit
 GlobalControlPlaneAuditLog. The [canonical implementation record](../docs/architecture/ai-integration-and-mcp.md#1013-phase-3b1-integration-persistence-and-security-foundation)
 classifies local synthetic evidence and remaining gates. These are candidate source definitions, not deployed
 facts. No OAuth/MCP endpoint or Case disclosure is installed; flags remain off outside disposable tests.
+
+## AI authorization transactions — Phase 3B.2B candidate
+
+The separate manual-only `docs/sql/ai-integration/phase3b2b.sql` adds
+`dbo.AiAuthorizationTransaction` over the unchanged 3B.1 consent/grant authority. Fixed immutable
+bindings include tenant/integration/UserId/WEB SessionId, transaction UUID, client/issuer/resource,
+exact redirect/state/S256 challenge, closed scopes, registration version and optional pinned key.
+Intent and code values are hash-only; code expiry is exactly 60 seconds with monotonic durable consume.
+Strict RLS, tenant-qualified relationships and bounded procedure permissions retain existing patterns.
+Grant creation, intent consumption, code persistence and existing grant audit commit together.
+The [canonical implementation record](../docs/architecture/ai-integration-and-mcp.md#1017-phase-3b2b-authorization-code-s256-and-self-consent--2026-10-22)
+classifies disposable synthetic verification; this is no deployed catalog or credential issuance claim.

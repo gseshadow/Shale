@@ -688,9 +688,9 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B first read-only MCP implementation | IN PROGRESS | §10.11 sequence; no endpoint or disclosure; remaining auth/audit/runtime/client gates. |
 | Phase 3B.1 integration persistence/security | COMPLETE (source/synthetic proof) | §10.13; focused/affected/critical checks pass; defaults off. |
 | Supported Spring server baseline prerequisite | COMPLETE (merged #1904; verified baseline) | §10.15; Boot 4.1.1 with focused, affected, critical and packaging proof; separate from OAuth. |
-| Phase 3B.2 credential/authentication validation | IN PROGRESS | §10.16; dependency/configuration foundation only; durable credential lifecycle is unfinished. |
+| Phase 3B.2 credential/authentication validation | IN PROGRESS | §10.16–10.17; foundation and durable authorization-code/self-consent complete; usable token lifecycle remains unfinished. |
 | Phase 3B.2A OAuth dependency/configuration/protocol foundation | COMPLETE (foundation/source/local verification) | §10.16; maintained isolated composition, canonical identities, bounded client adapter, redirect/S256 policy and truthful metadata; no usable AI credential. |
-| Phase 3B.2B authorization code + S256 PKCE + consent transaction | NOT STARTED | Next after completed 3B.2A; no usable access/refresh issuance in this slice. |
+| Phase 3B.2B authorization code + S256 PKCE + consent transaction | COMPLETE (source/local synthetic verification) | §10.17; durable self-only consent, 60-second hash-only codes, S256/state/issuer binding and atomic replay/race/restart proof. No usable access/refresh issuance. |
 | Phase 3B.2C opaque access + rotating refresh lifecycle | NOT STARTED | Durable atomic lifecycle, replay/family invalidation and expiry clipping. |
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | NOT STARTED | Exact credential bindings and authoritative live context resolution. |
 | Phase 3B.3 AI audit/shared disclosure seam | NOT STARTED | Mandatory integration access audit and final handoff gate. |
@@ -723,7 +723,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable OAuth credential lifecycle is unfinished. 3B.2A is COMPLETE at foundation scope; 3B.2B is next; 3B.2B+ remains NOT STARTED.
+durable usable OAuth credential lifecycle is unfinished. 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C/D and 3B.3+ remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -1700,7 +1700,7 @@ Completion of an increment is not permission to enable the next data surface.
 | **3B.1 Integration persistence/security foundation** | §10.2/10.8; authoritative schema inventory. Add reviewed additive migration candidates, tenant policy/registration/keys/grants/session/credential/quota foundations, confined bootstrap resolvers, typed context, global capability/control-plane audit, audited admin command/service and self-consent/revoke boundary. No MCP route. | Same-tenant admin/self checks, wrong actor/tenant/null state, exact FKs/RLS FILTER/BLOCK/non-bypass permissions, drift/repeat/concurrency, RowVer, atomic admin audit, consent CSRF/substitution, absolute expiry and quota races/restart. Complete when default-off state and revoke/rotation/admin controls are executable/tested without disclosing Case data. Build schema/authority first, then audited controls/consent, then shared quota admission as separately reviewable subincrements. | Keep flags off; additive tables may remain unused. Retain revocations/audits, no hard-delete rollback or editing historical migrations. No deployment authorized. |
 | **3B.2 Credential/authentication validation** | 3B.1; select maintained OAuth dependency with Boot compatibility proof (separate upgrade prerequisite if needed). Implement AS metadata/code+PKCE/self-consent, opaque access/refresh store, fixed issuer/resource, pinned private_key_jwt/replay and confined owner resolution/live validation. Separate route/filter composition. | Code/refresh/assertion replay, wrong issuer/audience/client/redirect/key/PKCE, expired/unbound token, all revoked layers, public clients, response loss/rotation race, REST↔MCP credential rejection including writes; existing WEB/DESKTOP/session regressions. Complete with no general data endpoint and durable lifecycle across replicas/restart. | Disable new AS surface, revoke integration families. Never fall back to WEB JWT or desktop restore; retain rows and configured token namespace. |
 | **3B.2A OAuth dependency/configuration/protocol foundation — COMPLETE (foundation/source/local verification)** | Merged prerequisite #1904; §10.16 implements typed canonical issuer/resource, isolated maintained AS composition, bounded client mapping, exact redirect and S256-only policy. No issuance. | Resolve actual dependencies, start context, prove namespace isolation and canonical configuration/redirect/PKCE rules; publish only truthful implemented metadata, otherwise leave it absent. | Keep all AI flags off and credential endpoints denied; optional metadata is informational only; preserve ordinary authentication. |
-| **3B.2B authorization code + S256 PKCE + consent transaction — NOT STARTED** | Completed 3B.2A; durable code transaction bound to current human/grant/client/redirect/resource/challenge, browser CSRF/state and RFC 9207. No usable access/refresh credentials. | Atomic single-use code consume, wrong/missing/plain PKCE, redirect/resource substitution, consent races and expiry; preserve WEB/DESKTOP regressions. | Disable authorization transactions; retain consent and security history. |
+| **3B.2B authorization code + S256 PKCE + consent transaction — COMPLETE (source/local synthetic verification)** | Completed 3B.2A; durable code transaction bound to current human/grant/client/redirect/resource/challenge, browser CSRF/state and RFC 9207. No usable access/refresh credentials. | Atomic single-use code consume, wrong/missing/plain PKCE, redirect/resource substitution, consent races and expiry; preserve WEB/DESKTOP regressions. | Disable authorization transactions; retain consent and security history. |
 | **3B.2C opaque access + rotating refresh lifecycle — NOT STARTED** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
 | **3B.2D live credential validation + VerifiedIntegrationContext — NOT STARTED** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
 | **3B.3 AI audit attribution and shared disclosure seam** | 3B.1–2. Implement narrow access parent/children/security events, protected bounded review, immutable context-aware existing worker extensions and final handoff gate. Keep original REST exemption/Overview event. | Exact actor/integration/tool/resource/correlation; empty search, unavailable/probe denial, one PHI row; real denied INSERT, zero-row append, precommit failure/lost ACK, close/encoding/final-gate failure, audit outage, privacy sentinel tests and admin/cross-tenant review. Complete when both shared reads can withhold results under every fault without a protocol adapter. | Off flag stops all integration calls; retain committed audit. Old workers remain ordinary-web only; no partial “audit later” fallback. |
@@ -2367,3 +2367,189 @@ Keep every capability default OFF and preserve existing WEB/DESKTOP auth regress
 No production/Azure SQL, SQL migration execution, tenant enablement, deployment, admin/consent UI,
 installer or version publication is included. Authoritative Case SQL and operational/client acceptance
 remain independent gates. This phase does not authorize the next data surface.
+
+### 10.17 Phase 3B.2B authorization code, S256 and self-consent — 2026-10-22
+
+**Status: COMPLETE at source/local synthetic verification scope.** Base `549584f8bcc968cb7371194149bdcc405d4a10be`
+(merged #1905) was fetched and inspected in a separate task worktree. 3B.1/3B.2A retain their recorded
+completion scopes. 3B.2C, 3B.2D and 3B.3+ remain NOT STARTED. This increment creates authorization codes
+and grants only; it does not create a usable AI access/refresh credential, MCP surface or Case disclosure.
+
+#### Maintained endpoint and existing human authority
+
+The Security 7.1.1 Authorization Server request and consent providers remain the protocol engine.
+`shale.ai.oauth.authorization-enabled=false` is a separate default-off browser transaction switch;
+composition must also be explicitly enabled. SQL global capability, tenant policy, active tenant/user,
+registration/key/grant and expiry remain independent live gates. No real tenant is enabled.
+
+Only `GET /oauth/mcp/authorize` starts a flow, with `response_type=code`, explicit closed scopes,
+bounded nonempty state, one exact configured resource, approved redirect and canonical S256 challenge.
+Only form `POST /oauth/mcp/authorize` completes approval/denial. The maintained converters/providers
+validate requests and client/consent relationships. Unknown fields (including tenant/UserId/IntegrationId/
+issuer substitution), duplicate singleton parameters, unsupported flows and absent/plain/malformed PKCE
+are rejected. Repeated POST scope fields allow explicit approval of either or both closed scopes.
+
+The human bridge reuses existing signature verification, durable session/JTI validation and stored
+`UserSessions.ClientType=WEB`; it rejects legacy unbound JWTs, DESKTOP/MOBILE sessions, remembered
+credentials, Basic/client credentials, development identity headers and generic Spring session principals.
+Subject is durable UserId; email is never authority. No Spring account, login page, session cookie,
+remembered credential or WEB JWT is persisted by OAuth. Every browser request must supply its existing
+WEB bearer header. The Spring context contains only tenant/UserId/SessionId and is cleared after the request.
+The tenant SQL lease is initialized through the existing `RuntimeConnectionProvider`, using this identity.
+
+`GET /oauth/mcp/consent` is a minimal authenticated JSON protocol surface: registered client name/ID,
+tenant, requested scopes, one-hour grant deadline and bounded disclosure notice. It is intended for the
+existing Shale browser to fetch with its own session, then submit explicitly selected scope fields and
+the server's intent state. It is not a login system or a browser UI redesign. No WEB bearer or remembered credential is placed in
+URLs. There is no ambient cookie authority: bearer authentication plus a random, durable, single-use,
+original-WEB-session-bound consent nonce protects approval; the client-supplied OAuth state is distinct.
+Denial has durable intent history and produces no grant/code; a validated denial returns `access_denied`,
+original state and canonical issuer to the approved redirect. Invalid requests fail locally without redirects.
+The future browser UX can consume this surface without changing the security authority.
+
+Canonical issuer/resource remain configuration-derived; Host/Forwarded headers cannot select them.
+The supported AS response-handler extension emits RFC 9207 `iss` with the exact original state and only
+the validated redirect. Default-off metadata remains the 3B.2A informational allowlist. Explicit browser
+composition advertises the authorization endpoint, code/S256/two scopes and issuer-response support;
+token grant and authentication lists remain explicitly empty, with no token endpoint or refresh capability. All token/revoke/introspect/
+JWKS/device/PAR/registration endpoints remain blocked before AS processing. No `/mcp` or protected-resource
+metadata route is added. No ordinary auth/controller route matches the OAuth chain.
+
+#### Confined fresh client loading and durable transaction
+
+The new [manual SQL candidate and authority inventory](../sql/ai-integration/README.md#phase-3b2b-authorization-transaction-candidate)
+adds one strict tenant table and seven bounded procedures without modifying historical migrations,
+receipts, grants or shared RLS functions. The new installer validates the old source/catalog receipt and
+refuses pre-existing OAuth objects rather than overwriting them. It is executed only in disposable fixtures.
+
+`AiLoadOAuthClientV1` resolves exactly the requested globally unique external client ID under the existing
+human's authenticated tenant context. It returns minimum identity/type/ceiling/state/expiry/redirect/key
+fields plus bounded consent display name; inactive/revoked/expired/foreign/unknown registrations fail
+closed. There is no unrestricted integration repository, positive cache or wider bootstrap/auth pool grant.
+Public clients remain secretless `none`; confidential clients remain local pinned RSA/RS256
+`private_key_jwt`. Both require S256. Full assertion signature/audience/lifetime/shared-JTI replay handling
+is deferred to 3B.2C, and no current token endpoint accepts assertions. The authorization snapshot pins a
+live local key reference; 3B.2C must reconcile that binding with its actually verified assertion key.
+
+The fixed-column transaction binds tenant, integration, user, WEB session identifier, transaction UUID,
+client, issuer, resource, exact redirect, original state, requested/approved closed scopes, S256 challenge,
+registration RowVer, optional pinned key, creation/deadline and final GrantId. No serialized authentication,
+password, WEB bearer, raw session token, desktop secret, prompts or Case data is stored. Five-minute
+intents reuse `AiConsentIntent`. Grants reuse `AiDelegationGrant` and expire one hour from intent creation;
+registration must have at least that lifetime remaining. Scope decisions are explicit per transaction;
+there is no accumulated Spring consent that silently restores a reduced or newly requested scope.
+
+Approval records only an intent decision. Completion atomically consumes the intent, creates the existing
+self-only delegation grant, appends the established security/control audit and persists the code hash.
+It rechecks startup/global/tenant/actor/registration/key authority and exact scopes under the existing
+capability/tenant application locks and held actor/tenant SQL rows. A registration version change or a
+same-user/integration grant revocation since initiation makes the intent stale. No admin may complete
+for another user, and a tenant A client cannot authorize a tenant B user. Committed disablement before
+completion prevents issuance. Failed audit rolls back grant, intent consumption and code together.
+
+#### Code lifecycle, replay and audit
+
+Codes contain 32 CSPRNG bytes (256 bits), encoded opaque base64url and returned once. SQL stores only
+SHA-256 of the presented ASCII code, with database-UTC issuance and **exactly 60 seconds** expiry.
+The unique hash record retains every transaction binding and GrantId. Immutable/monotonic triggers,
+strict RLS, tenant-qualified FKs and procedure-only permissions preserve ownership and consumed history.
+
+The internal consume seam computes S256 from the supplied verifier and atomically checks/consumes the
+exact hash/client/issuer/resource/issued redirect/challenge and live grant/registration/key/user/tenant/
+global authority. Confidential clients receive no verifier bypass. Exactly one concurrent consumer wins;
+replay and expiry fail with no retry grace. Committed consumption and grant history survive replacement
+JVMs. SQL locking serializes approval/revocation; a completion authorized first can create its fresh grant,
+while a revoke committed first makes a pre-existing intent stale. Previously revoked grants are never
+restored or edited. This is an authorization transaction boundary, not a future network disclosure claim.
+
+Consume returns only a transaction/GrantId/scope validation receipt. It cannot issue an access/refresh token,
+create an `AiDelegatedSession`, construct `VerifiedIntegrationContext` or invoke a Case operation. The seam
+currently requires the trusted original WEB runtime context; 3B.2C must implement the reviewed confined
+exchange bootstrap and client authentication before an AI client can redeem codes through HTTP.
+
+Audit compatibility uses the existing `EntityActionAuditLog` schema, `AI_DELEGATION_GRANT/CREATED`, current
+tenant/actor, stable grant entity ID, correlation UUID and `AI_SCOPE_MASK` only. Grant and code completion
+share this audited SQL transaction; any append failure aborts it. New scope approval creates a fresh audited
+grant rather than widening old consent. Intent preparation/approval/denial, code issuance and consumption
+also retain their intrinsic bounded transaction history; no new entity-action vocabulary is invented for
+these records. There are no sensitive business reads or disclosure events in this phase. Audit metadata
+contains no raw code, verifier, secret/digest, JWT, redirect/state, prompts, PHI or Case data. 3B.3 disclosure
+audit remains separate and unfinished.
+
+#### Test impact, evidence and remaining boundary
+
+Pre-edit inspection covered existing OAuth mapping/configuration/metadata/isolation tests, 3B.1 data/SQL
+contracts, existing WEB/DESKTOP session authority and selector configuration. Existing foundation tests
+retain their default-off expectations. New `ShaleOAuthHumanTest` enters affected and critical selection;
+explicitly opt-in SQL/HTTP fixtures remain separate from default checks. The changed data default-off
+contract now checks the new adapter too. Full changed-file/reference review is required before closeout.
+
+Evidence is **local source + synthetic disposable SQL + maintained servlet-filter protocol tests**.
+The SQL fixture uses actual distinct non-bypass runtime identities, strict RLS and committed transactions.
+The servlet flow uses real maintained AS filters and restricted SQL plus a synthetic WEB identity store;
+existing authentication regression tests separately exercise production session/controller adapters.
+Expiry includes explicitly labelled owner-only timestamp fault injection. Replacement-JVM replay is actual
+separate-process execution against committed SQL. This is not production, authoritative Case SQL,
+independent OAuth-client/browser UX, Azure, deployment or operational acceptance evidence.
+
+Final local verification passed. Groups overlap and must not be added as unique test counts.
+
+| Check | Result / scope |
+| --- | --- |
+| Production/test compilation | PASS through final focused, affected and critical Maven reactor stages; no dependency/version change. |
+| Full approved synthetic SQL fixture | **35 PASS**, no failures/errors/skips; includes ten OAuth transaction/code tests plus all existing foundation tests. |
+| Final OAuth config/mapping/filter/metadata/WEB bridge focus | **14 PASS**, no failures/errors/skips. |
+| Maintained servlet authorization/consent/denial/callback flow | **4 PASS**, real restricted disposable SQL, synthetic WEB identity fixture, no usable token. Included in affected execution too. |
+| WEB/DESKTOP auth/session, OAuth and full composition | **84 PASS**, including 22 desktop lifecycle/recovery/enrollment checks; no failures/errors/skips. Final metadata-only refinement additionally passed the 14-test focus above. |
+| Selector affected security-data/server suite | **126 PASS**, 22 classes, no failures/errors/skips; explicitly opted into the disposable SQL fixtures. |
+| Critical reactor | **140 PASS**, 36 classes, all seven modules BUILD SUCCESS; no failures/errors/skips. |
+| Selector Python | **27 PASS**. Full historical suite escalation was informational; `-Pall-tests` was not run or claimed. |
+| Documentation / diff | Four owning Markdown files, **56 relative links/anchors**, balanced fences, selector JSON and complete changed-file/reference review PASS; `git diff --check` PASS. |
+
+Executed commands (Maven via the environment's existing JDK21/proxy-aware wrapper; timeouts 120–180 seconds):
+
+```bash
+/workspace/.tools/bin/mvn -B -pl shale-server -am -DskipTests compile
+# Initial standalone base compile passed; final implementation compilation is also part of every test command below.
+# Only the explicit disposable SQL fixture receives SHALE_AI_SQL_PASSWORD privately; never in argv/logs.
+SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI SHALE_AI_SQL_PORT=14337 \
+  /workspace/.tools/bin/mvn -B -pl shale-server -am \
+  -Dtest=AiSecurityLocalSqlServerTest,OAuthAuthorizationFlowTest,ShaleOAuthHumanTest,OAuthClientMappingTest,OAuthFilterIsolationTest,OAuthConfigurationTest,OAuthMetadataTest,AiSecurityContractTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+/workspace/.tools/bin/mvn -B -pl shale-server -am \
+  -Dtest=OAuthMetadataTest,OAuthConfigurationTest,OAuthClientMappingTest,OAuthFilterIsolationTest,ShaleOAuthHumanTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+# With the same disposable SQL opt-in for OAuthAuthorizationFlowTest:
+/workspace/.tools/bin/mvn -B -pl shale-server,shale-desktop -am \
+  -Dtest=OAuthAuthorizationFlowTest,ShaleOAuthHumanTest,OAuthClientMappingTest,OAuthFilterIsolationTest,OAuthConfigurationTest,OAuthMetadataTest,ShaleServerServiceConfigurationTest,AuthControllerTest,DesktopSessionControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,SqlRememberCredentialStoreTest,ServerAuthSessionLogoutTest,DesktopApplicationInstanceVerifierTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest,DesktopRememberedRecoveryTest,DesktopSessionEnrollmentClientTest,DesktopSessionEnrollmentLifecycleTest,DesktopRememberedSignInDiagnosticsTest,DesktopApplicationInstanceLifecycleTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 549584f8bcc968cb7371194149bdcc405d4a10be --head HEAD --format markdown --plan-output work/selection.json
+# Execute the structured selected_maven_batches argv with -B and explicit disposable SQL opt-in, sequentially.
+/workspace/.tools/bin/mvn -B test
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+python3 work/check-docs.py
+git diff --check 549584f8bcc968cb7371194149bdcc405d4a10be HEAD
+```
+
+Initial Git/Maven/Docker sandbox network denials were diagnosed and corrected with one concrete
+permission-scoped retry per affected operation, without infrastructure retry loops. Implementation
+verification exposed and corrected adapter return-type/checked-exception compile errors, new-table RLS
+batch resolution, fixture case/session assumptions and the Security 7 authorization-filter ordering.
+An overlapping Maven invocation caused transient missing classes; subsequent runs were serialized.
+These failed checks are not counted as passes. Final review strengthened substitution tests to give
+other users valid WEB sessions and enable both disposable tenants, so ownership rejection is proven
+independently of default-off/session denials. Metadata advertises code responses while leaving token
+grant/authentication lists empty until actual token exchange exists. No required local check remains blocked.
+
+No production/Azure SQL, deployment, tenant enablement, installer/version publication, admin UI,
+MCP route or Case disclosure occurred. Existing independent production/authoritative Case SQL and
+real-client/browser UX acceptance remain outside this source/synthetic increment.
+
+**Exact next recommendation: Phase 3B.2C — opaque access-token and rotating refresh lifecycle.** First
+implement the confined exchange lookup and live owner-qualified runtime gate, exact client/redirect/resource/
+issuer/S256 verification, and pinned `private_key_jwt` assertion verification with shared JTI replay state.
+Preserve atomic one-use code consume and add a fail-closed credential-creation transaction, hash-only opaque
+five-minute access and absolute/idle-clipped rotating refresh families with reuse revocation, reset/key/
+registration/grant/disable races and response-loss/restart tests. Only then expose supported token exchange.
+Do not implement token-to-VerifiedIntegrationContext/resource-server validation (3B.2D), MCP or Case access
+in that increment. No production SQL, deployment, tenant enablement or installer/version publication.

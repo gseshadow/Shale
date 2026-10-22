@@ -180,3 +180,65 @@ runtime TLS configuration is unchanged. Tests prove actual per-table FILTER/BLOC
 runtime denials, context reuse, conditional authority, audit failure, quota races/owner dimensions and a
 replacement JVM observing committed SQL accounting. Injected failures are labelled as such. Executed results
 and remaining production/authoritative gates belong to the canonical implementation record.
+
+## Phase 3B.2B authorization transaction candidate
+
+Apply `phase3b2b.sql` only after the unchanged, receipted `phase3b1.sql` and existing durable
+`UserSessions` prerequisite, in a fresh dbo session with both context keys NULL. It verifies the
+foundation's catalog/source receipt before DDL. This is a separate manual additive candidate;
+there is no startup installer, production execution, tenant opt-in or role membership change.
+A repeat installation deliberately stops for review; it does not overwrite objects or receipts.
+
+One strict tenant table, `AiAuthorizationTransaction`, extends the existing `AiConsentIntent` and
+`AiDelegationGrant` persistence. It binds the original WEB SessionId (identifier only), immutable
+tenant/user/integration/client/issuer/resource/redirect/S256 challenge, exact bounded client state,
+requested/approved closed scope masks, registration RowVer, optional pinned-key ID, and transaction UUID.
+State is limited to 512 UTF-16 units. Intent nonce and code are SHA-256 hash-only; no Java/Spring objects,
+JWTs, verifiers, raw session tokens or arbitrary client metadata are serialized. New records have a
+five-minute consent deadline; grants expire one hour from intent creation. Registration must have
+more than one hour remaining at initiation. Code issuance uses database UTC, exactly 60 seconds, with
+no expiry extension or retry grace. The migration preserves all old schema, procedures and receipts.
+
+Seven bounded caller/RLS procedures load exactly one client under the authenticated human's tenant,
+begin/find/approve/deny an intent, complete consent/code issuance, and consume a code. The existing
+unique external ClientId establishes one owner. There is no general integration inventory or expanded
+bootstrap/auth-pool permission. Fresh loading includes only registration identity/type/state/ceiling/
+expiry, bounded consent display name, redirects and active pinned RSA public keys. Both profiles
+require PKCE. Confidential authorization pins a currently live key reference; actual assertion signature,
+exact token audience and shared JTI replay verification remain 3B.2C prerequisites. No assertion is
+accepted or authenticated by this authorization endpoint; no remote JWKS resolution exists.
+
+All transitions use existing `AiLockV1` capability/tenant locks, `AiActorV1`, `AiEnabledV1` and live
+WEB-session checks. Completion holds actor/tenant rows, requires unchanged registration version,
+current key, unconsumed intent and exact approved scope mask, and rejects a same-user/integration
+revocation committed since intent creation. Approval writes only an intent decision. Final completion
+atomically consumes that intent, inserts the existing delegation grant, appends its established
+`AI_DELEGATION_GRANT/CREATED` audit, and records the hash-only code. An audit/commit/lease-close failure
+withholds the callback. Denial records intrinsic durable intent/transaction history and creates no grant.
+No accumulated Spring consent bypasses explicit approval on a later flow, including scope re-expansion.
+
+Code consume checks exact client/issuer/resource/issued redirect and locally calculated S256 verifier
+hash, live registration/key/grant/user/tenant/global state, expiry and consumed state under the same
+SQL locks. Exactly one conditional transition wins. Its internal result is only a transaction/grant/scope
+validation receipt. It creates no delegated session, access credential or refresh credential. This phase's
+internal consume seam still requires trusted original WEB context; 3B.2C must introduce its reviewed
+confined exchange lookup and client authentication before exposing token redemption to AI clients.
+
+The table has strict existing TenantFilter FILTER/AFTER INSERT/AFTER UPDATE predicates, tenant-qualified
+registration/user/grant/key FKs, unique intent/code hashes, immutable bindings and monotonic lifecycle
+triggers. All existing AI roles are denied direct table access/DML/ALTER/CONTROL. Only runtime receives
+EXECUTE on the new bounded procedures. No global resolver or auth pool receives new access.
+Operational rollback is disable/route rollback with retained grant/code/revocation/audit history.
+
+Audit uses the existing schema and closed metadata (`AI_SCOPE_MASK` only); grant creation and authorization
+completion share one transaction. Intent approval/denial, issuance and consumption retain intrinsic bounded
+security state, without adding a separate entity-action vocabulary for these rows. There are no sensitive
+business reads or disclosure events to audit; Phase 3B.3 remains separate. No raw code, verifier, digest,
+JWT, key material, redirect/state, prompts or Case data enters entity-action audit metadata.
+
+Local verification extends `AiSecurityLocalSqlServerTest` (`#oauth*`) and the separately opt-in server
+`OAuthAuthorizationFlowTest`. Both reuse only the clearly synthetic prerequisite fixture and loopback
+SQL Server. The server fixture uses real restricted runtime SQL identity plus a synthetic WEB identity
+store; existing authentication regressions independently verify the production session adapters. The
+code-consume replay probe uses a replacement JVM and the same committed SQL record. Expiry tests
+explicitly label owner-only timestamp fault injection; this is not elapsed-wall-clock or production evidence.
