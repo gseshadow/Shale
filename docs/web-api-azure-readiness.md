@@ -1,5 +1,14 @@
 # Shale Server Azure App Service Readiness
 
+## Supported server dependency baseline — 2026-10-22
+
+The [framework prerequisite record](architecture/ai-integration-and-mcp.md#1015-supported-spring-server-baseline-prerequisite--2026-10-22)
+owns the Boot 4.1.1 / Framework 7.0.9 / Security crypto 7.1.1 migration (Java 21 retained), Tomcat 11.0.24,
+Servlet 6.1, Jackson 3.1.5 and Springdoc 3.1.1. Application JSON uses Boot's Jackson 2 compatibility defaults;
+OpenAPI stays explicitly 3.0 to preserve the nullable Case contract below. Swagger UI and bearerAuth remain.
+No routes, DTO bounds, tenant authority, audit requirements or authentication/session architecture are redesigned.
+This is a local framework migration, not Azure/deployed/SQL acceptance, and installs no OAuth/MCP/AI surface.
+
 ## Stable selected Case REST contract — Phase 2 (2026-10-21)
 
 This section owns the supported wire contract and compatibility policy for **only the three minimized

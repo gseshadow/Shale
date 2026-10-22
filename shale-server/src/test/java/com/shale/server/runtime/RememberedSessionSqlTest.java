@@ -8,7 +8,7 @@ import java.time.*;
 import java.util.*;
 import javax.sql.DataSource;
 import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
-import com.fasterxml.jackson.databind.*;
+import tools.jackson.databind.*;
 import com.shale.core.model.User;
 import com.shale.core.result.Result;
 import com.shale.core.service.AuthServicePort;
@@ -34,7 +34,7 @@ class RememberedSessionSqlTest {
             System.out.println("REPRODUCED legacy serving API/JDBC restore HTTP 500; JVM="+TimeZone.getDefault().getID());
         }
     }
-    private final ObjectMapper json=new ObjectMapper().findAndRegisterModules().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private final tools.jackson.databind.json.JsonMapper json=tools.jackson.databind.json.JsonMapper.builder().configureForJackson2().disable(tools.jackson.databind.cfg.DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS).build();
     private final ServerPrincipal owner=new ServerPrincipal(1,11,"synthetic@example.invalid");
     private boolean pinnedCompatibility;
     private DataSource admin,auth,runtime;
@@ -50,7 +50,7 @@ class RememberedSessionSqlTest {
     @org.springframework.web.servlet.config.annotation.EnableWebMvc
     static class WebConfig implements org.springframework.web.servlet.config.annotation.WebMvcConfigurer {
         @Override public void configureMessageConverters(java.util.List<org.springframework.http.converter.HttpMessageConverter<?>> converters){
-            converters.add(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(new ObjectMapper().findAndRegisterModules().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)));
+            converters.add(new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter(tools.jackson.databind.json.JsonMapper.builder().configureForJackson2().disable(tools.jackson.databind.cfg.DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS).build()));
         }
     }
 
@@ -93,7 +93,7 @@ class RememberedSessionSqlTest {
         desktopController=new DesktopSessionController(credentials,service,new DesktopApplicationInstanceVerifier(connections),remembers);
         authController=new AuthController(credentials,tokens,revocations,new ServerRuntimeSessionState(),p->Optional.empty(),Optional.of(service));
         api=MockMvcBuilders.standaloneSetup(desktopController,authController)
-                .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(json)).setControllerAdvice(new ApiExceptionHandler()).build();
+                .setMessageConverters(new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter(json)).setControllerAdvice(new ApiExceptionHandler()).build();
         System.out.println("Retained isolated SQL fixture: "+database+" JVM="+TimeZone.getDefault().getID());
     }
     private static void migration(Connection c,String name)throws Exception{
@@ -199,7 +199,7 @@ class RememberedSessionSqlTest {
         context.getBeanFactory().registerSingleton("desktopSessionController",desktopController);
         context.getBeanFactory().registerSingleton("authController",authController);
         context.getBeanFactory().registerSingleton("apiExceptionHandler",new ApiExceptionHandler());
-        var factory=new org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory(0);
+        var factory=new org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory(0);
         factory.setAddress(java.net.InetAddress.getByName("127.0.0.1"));
         Path work=Path.of("..","work");Files.createDirectories(work);
         factory.setBaseDirectory(Files.createTempDirectory(work,"session-api-").toFile());

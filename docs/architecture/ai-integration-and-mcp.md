@@ -2,7 +2,7 @@
 
 **Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); MCP inactive.
 
-**Last reviewed:** 2026-10-21
+**Last reviewed:** 2026-10-22 (supported Spring baseline; historical acceptance scopes retained)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of
@@ -687,8 +687,9 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3A MCP security/integration contract | COMPLETE (design only) | §10; no route, credential, schema or disclosure activated. |
 | Phase 3B first read-only MCP implementation | IN PROGRESS | §10.11 sequence; no endpoint or disclosure; remaining auth/audit/runtime/client gates. |
 | Phase 3B.1 integration persistence/security | COMPLETE (source/synthetic proof) | §10.13; focused/affected/critical checks pass; defaults off. |
-| Phase 3B.2 credential/authentication validation | BLOCKED at dependency gate | §10.14; separate supported Spring-stack prerequisite before runtime work. |
-| Phase 3B.2A OAuth dependency/configuration/protocol foundation | BLOCKED | Current Boot 3.3.4 baseline has no proven maintained OSS AS combination; no dependency or endpoint added. |
+| Supported Spring server baseline prerequisite | COMPLETE (source/local verification; merge acceptance pending) | §10.15; Boot 4.1.1 with focused, affected, critical and packaging proof; separate from OAuth. |
+| Phase 3B.2 credential/authentication validation | BLOCKED pending prerequisite merge/verification | §10.15; maintained framework selected, OAuth runtime work remains unfinished. |
+| Phase 3B.2A OAuth dependency/configuration/protocol foundation | BLOCKED pending prerequisite merge/verification | §10.15 satisfies the framework dependency locally; OAuth implementation is still unfinished and is the next task after merge verification. |
 | Phase 3B.2B authorization code + S256 PKCE + consent transaction | NOT STARTED | Complete the stack prerequisite and 3B.2A first; no usable token issuance in this slice. |
 | Phase 3B.2C opaque access + rotating refresh lifecycle | NOT STARTED | Durable atomic lifecycle, replay/family invalidation and expiry clipping. |
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | NOT STARTED | Exact credential bindings and authoritative live context resolution. |
@@ -720,8 +721,9 @@ Broader REST review remains IN PROGRESS. Phase 1R is merged and its three-FILTER
 synthetically validated; authoritative Case SQL remains **BLOCKED** by unavailable approved offline input.
 Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RLS and operational acceptance
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
-Phase 3B.1 is COMPLETE at its recorded scope (§10.13); 3B.2A is BLOCKED by the compatibility gate (§10.14).
-Complete its separate Spring-stack prerequisite before resuming 3B.2A. All capability/tenant flags remain off.
+Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
+3B.2A remains BLOCKED until that prerequisite is merged and verified, then becomes the next task; OAuth
+implementation is unfinished. 3B.2B+ remains NOT STARTED. All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
 
@@ -1062,7 +1064,8 @@ use `RuntimeSessionServiceConnectionProvider` and stamp both `ShaleClientId` and
 borrow, closing on either initialization failure. `GlobalControlPlaneDbSessionProvider` is not a tenant
 business-data path. MCP needs an explicit immutable invocation context, not servlet inheritance.
 
-`shale-server` uses Spring Boot 3.3.4 Web MVC, validation and Springdoc 2.6.0. The inspected POMs contain
+At Phase 3A inspection, `shale-server` used Boot 3.3.4 and Springdoc 2.6.0; §10.15 records the subsequent
+Boot 4 baseline. The inspected POMs contain
 Spring Security crypto for BCrypt but no OAuth authorization/resource server, SecurityFilterChain or MCP
 library. `OpenApiConfiguration.bearerAuth` describes ordinary JWT REST only. Reuse existing modules and
 credential verification (`AuthServicePort`/bounded V1); do not extend the regular expression JWT parser
@@ -1205,8 +1208,9 @@ Ordinary REST filters must reject MCP credentials, including mutations, auth ref
 MCP must reject WEB/DESKTOP/MOBILE, legacy unbound JWTs and remembered credentials in every profile.
 
 Dependency choice is implementation work: first evaluate maintained Spring Authorization Server/Spring
-Security and the official MCP Java SDK against the actual Boot 3.3.4/JDK21 baseline. No framework or
-version is added now. Pin maintained compatible versions in 3B.2/3B.4 and run existing REST/session regressions;
+Security and the official MCP Java SDK against the actual baseline (now Boot 4.1.1/JDK21; §10.15). No OAuth
+or MCP dependency is added by the framework prerequisite. Pin maintained compatible versions in 3B.2/3B.4
+and run existing REST/session regressions;
 if this requires a Boot upgrade, make it a separately reviewed prerequisite. Lack of library support for the
 specified profile blocks that increment; it does not permit hand-written OAuth or silent protocol downgrade.
 
@@ -1694,7 +1698,7 @@ Completion of an increment is not permission to enable the next data surface.
 | --- | --- | --- | --- |
 | **3B.1 Integration persistence/security foundation** | §10.2/10.8; authoritative schema inventory. Add reviewed additive migration candidates, tenant policy/registration/keys/grants/session/credential/quota foundations, confined bootstrap resolvers, typed context, global capability/control-plane audit, audited admin command/service and self-consent/revoke boundary. No MCP route. | Same-tenant admin/self checks, wrong actor/tenant/null state, exact FKs/RLS FILTER/BLOCK/non-bypass permissions, drift/repeat/concurrency, RowVer, atomic admin audit, consent CSRF/substitution, absolute expiry and quota races/restart. Complete when default-off state and revoke/rotation/admin controls are executable/tested without disclosing Case data. Build schema/authority first, then audited controls/consent, then shared quota admission as separately reviewable subincrements. | Keep flags off; additive tables may remain unused. Retain revocations/audits, no hard-delete rollback or editing historical migrations. No deployment authorized. |
 | **3B.2 Credential/authentication validation** | 3B.1; select maintained OAuth dependency with Boot compatibility proof (separate upgrade prerequisite if needed). Implement AS metadata/code+PKCE/self-consent, opaque access/refresh store, fixed issuer/resource, pinned private_key_jwt/replay and confined owner resolution/live validation. Separate route/filter composition. | Code/refresh/assertion replay, wrong issuer/audience/client/redirect/key/PKCE, expired/unbound token, all revoked layers, public clients, response loss/rotation race, REST↔MCP credential rejection including writes; existing WEB/DESKTOP/session regressions. Complete with no general data endpoint and durable lifecycle across replicas/restart. | Disable new AS surface, revoke integration families. Never fall back to WEB JWT or desktop restore; retain rows and configured token namespace. |
-| **3B.2A OAuth dependency/configuration/protocol foundation — BLOCKED** | Maintained library compatibility and separate stack prerequisite (§10.14); then typed canonical issuer/resource, isolated AS composition, client mapping, exact redirect and S256-only policy. No issuance. | Resolve actual dependencies, start context, prove namespace isolation and canonical configuration/redirect/PKCE rules; publish only truthful implemented metadata, otherwise leave it absent. | Keep all AI flags off and AS endpoints absent; preserve ordinary authentication. |
+| **3B.2A OAuth dependency/configuration/protocol foundation — BLOCKED pending prerequisite merge/verification** | Framework dependency satisfied locally (§10.15), OAuth implementation unfinished; then typed canonical issuer/resource, isolated AS composition, client mapping, exact redirect and S256-only policy. No issuance. | Resolve actual dependencies, start context, prove namespace isolation and canonical configuration/redirect/PKCE rules; publish only truthful implemented metadata, otherwise leave it absent. | Keep all AI flags off and AS endpoints absent; preserve ordinary authentication. |
 | **3B.2B authorization code + S256 PKCE + consent transaction — NOT STARTED** | Completed 3B.2A; durable code transaction bound to current human/grant/client/redirect/resource/challenge, browser CSRF/state and RFC 9207. No usable access/refresh credentials. | Atomic single-use code consume, wrong/missing/plain PKCE, redirect/resource substitution, consent races and expiry; preserve WEB/DESKTOP regressions. | Disable authorization transactions; retain consent and security history. |
 | **3B.2C opaque access + rotating refresh lifecycle — NOT STARTED** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
 | **3B.2D live credential validation + VerifiedIntegrationContext — NOT STARTED** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
@@ -1900,7 +1904,9 @@ informationally; that optional broad suite was not run. No required focused/affe
 
 ### 10.14 Phase 3B.2A OAuth compatibility gate — 2026-10-21
 
-**Status: BLOCKED — framework/support prerequisite; OAuth runtime implementation has not started.**
+**Historical compatibility decision: BLOCKED — framework/support prerequisite; OAuth runtime implementation has not started.**
+The separate prerequisite and current merge/verification gate are now recorded in [§10.15](#1015-supported-spring-server-baseline-prerequisite--2026-10-22);
+the inspected 7.0.7 example below is not the selected BOM version.
 3B.1 COMPLETE (source/synthetic scope); 3B.2B, 3B.2C, 3B.2D and 3B.3+ NOT STARTED.
 This follows §10.3's explicit separate-upgrade rule. It does not complete 3B.2A or permit a custom OAuth server.
 Live `codex/latest` is `41fdefd8447661a85ab8bdc26d500492d5b7cc11`; live GitHub PR metadata confirms
@@ -2022,3 +2028,150 @@ After the separate prerequisite, complete the previously unexecuted OAuth config
 PKCE, metadata and filter-isolation tests plus focused existing auth/session, selector affected and critical
 checks before marking 3B.2A COMPLETE. No runtime regression or independent OAuth client acceptance is inferred
 from this documentation-only investigation.
+
+
+### 10.15 Supported Spring server baseline prerequisite — 2026-10-22
+
+**Status: COMPLETE at source/local verification scope; merge acceptance pending.**
+Phase 3B.1 remains **COMPLETE at its existing source/synthetic scope**. Phase 3B.2A remains **BLOCKED until
+this prerequisite is merged and verified**, then is the next task. Its framework dependency is satisfied by
+the selected stack; OAuth configuration/protocol implementation is unfinished. **3B.2B+ NOT STARTED**.
+No OAuth/MCP dependency, endpoint, credential issuance or Case AI disclosure is added.
+
+Prepared from live `codex/latest` **a0ce0d856ccbf8167ae0e48ed4cac8af19670f05**, confirming #1902 and #1903
+merged, in a separate `codex/supported-spring-baseline` worktree. The original checkout is preserved.
+Before editing, live [Maven Central metadata](https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-dependencies/maven-metadata.xml)
+and the [Spring project page](https://spring.io/projects/spring-boot/) identified **4.1.1** as the current stable
+Boot release (4.2 entries are milestones). Its actual BOM/imports resolved successfully, matching the [managed dependency inventory](https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html). Java **21** is retained.
+[Springdoc's current instructions](https://springdoc.org/getting-started.html) select
+`springdoc-openapi-starter-webmvc-ui` **3.1.1**; the artifact name stays the same.
+
+#### Dependency inventory and management decision
+
+The before/after server reactor dependency trees, cached/resolved BOMs and all seven POMs were inspected.
+“Managed” does not mean every artifact is present: Security web/config/authorization server remain absent,
+and embedded Tomcat supplies the Servlet API classes rather than a separate servlet-api jar.
+
+| Component | Previous effective/managed baseline | Selected baseline |
+| --- | --- | --- |
+| Boot / repackage plugin | 3.3.4 | **4.1.1** |
+| Framework | 6.1.13 | **7.0.9**, Boot BOM |
+| Security / crypto | 6.3.3 managed; crypto 6.3.3 present | **7.1.1**, Boot BOM; only crypto present |
+| Embedded Tomcat / Servlet | 10.1.30 / 6.0.0 | **11.0.24 / 6.1.0** |
+| Application Jackson | 2.17.2 | **3.1.5** (`tools.jackson`) |
+| Swagger-internal Jackson 2 | 2.17.2 | **2.21.5**; shared annotations **2.21**, all Boot-managed |
+| Hibernate Validator / Jakarta Validation | 8.0.1.Final / 3.0.2 | **9.1.3.Final / 3.1.1** |
+| Springdoc / Swagger annotations+models | 2.6.0 / 2.2.22 | **3.1.1 / 2.2.55** |
+| SLF4J | API 2.0.12, JUL bridge 2.0.16 | **2.0.18** throughout |
+| Logback | classic 1.5.6, core 1.5.8 | **1.5.38** throughout |
+| JUnit / Surefire+Failsafe | Jupiter 5.10.2 outside server, 5.10.3 server / 3.2.5 | **6.0.3 / 3.5.6** |
+
+The parent now imports the single Boot BOM, including for shared data/desktop crypto consumers; the server's
+private Boot import and version are removed. No Framework/Security artifact is hand-pinned. Removed parent
+`spring.security.version=6.3.3` and its explicit crypto management, SLF4J/Logback properties and explicit
+management (fixing the old classic/core mismatch), and HttpClient 5.3.1 override so its client/core family
+aligns with Boot. Removed all five child Jupiter 5.10.2 pins to avoid a JUnit 5/6 platform mixture.
+
+Deliberate retained exceptions: parent Microsoft JDBC **12.6.1.jre11** and HikariCP **5.1.0** preserve the
+existing direct-JDBC pool/connection lifecycle, outside Spring JDBC auto-configuration; no JDBC starter is
+added. Parent Gson **2.11.0**, plus the existing UI/updater Gson declarations, retain independent desktop
+JSON behavior; Gson is not the MVC serializer. These were reviewed rather than blindly carried forward.
+JavaFX/RichTextFX/JNA/jBCrypt/POI/PDF and their existing pins are outside the Spring migration. Compiler
+**3.13.0**, resources **3.3.1**, dependency **3.6.1**, updater jar **3.4.1** and shade **3.5.3** stay unchanged;
+importing a BOM does not inherit Boot's parent plugin management. Surefire/Failsafe **3.5.6** match the new
+JUnit platform; the Boot repackage plugin follows **4.1.1**. No desktop release/version bump.
+
+#### Required source and compatibility adaptations
+
+- Use Boot's focused `spring-boot-starter-webmvc` and `spring-boot-starter-webmvc-test`; move MockMvc
+  auto-configuration and embedded Tomcat test factory imports to their Boot 4 modules.
+- Enable server compiler `parameters` metadata for existing unnamed MVC arguments and generated query
+  documentation. Stable Case bindings remain explicit; no route/controller redesign.
+- The bounded Case serializer injects Jackson 3 `ObjectMapper`, catches `JacksonException`, and still
+  delivers the exact checked UTF-8 bytes. Use `spring.jackson.use-jackson2-defaults=true` for Boot 3 wire
+  compatibility; retain explicit nulls, unknown-property handling, record members and ISO Java-time text.
+  Test fixtures use immutable JsonMapper builders and the renamed JSON converter/tree APIs.
+- Set `springdoc.api-docs.version=OPENAPI_3_0` explicitly: Springdoc 3's newer default must not silently
+  replace the published nullable/schema contract. Preserve `/v3/api-docs`, Swagger UI, `bearerAuth`, the
+  minimized Case descriptions and every existing Phase 2 compatibility assertion.
+- Existing admin-session invalid-timestamp coverage exposed an uncaught `DateTimeParseException` returning
+  500. Catch it alongside invalid enum arguments to retain the tested sanitized 400 rejection and never
+  broaden accepted filters. Existing error-log tests are corrected to assert sanitized copies with complete
+  stack frames, not raw exception messages; a real driver throwable replaces a mock with invalid Throwable
+  bookkeeping. Production diagnostic/audit behavior is unchanged.
+- Existing session source checks contained stale whole-file assumptions: an RLS dynamic-SQL variable was
+  mistaken for a persisted unbounded column, and a global substring count did not identify the actual three
+  account mutation paths. Scope prohibited columns to the UserSessions declaration and verify deactivation,
+  password reset and removal each revoke on the same connection before commit. SQL and DAO code are unchanged.
+
+Servlet request/session resolution, request-scoped tenant/actor connection initialization, CORS, forwarded
+headers, async/error dispatch and JDBC ownership remain in their existing seams. No custom servlet filter,
+Tomcat setting or authority redesign is needed. No SQL schema/grant/procedure/RLS/Phase 1R/3B.1 change.
+Validation retains the same DTO constraints, controller bounds and safe errors. Password verification still
+uses the existing jBCrypt verifier; the managed crypto artifact does not install Spring authentication.
+
+#### Verification and limits
+
+All counts below are from the final successful commands; groups overlap and must not be summed as unique tests.
+
+| Evidence category / check | Result and scope |
+| --- | --- |
+| Source/static inventory | All seven POMs, affected controllers/tests, servlet/auth/session/JDBC and default-off boundaries reviewed. No SQL or authority redesign. |
+| Dependency resolution | Boot 4.1.1 BOM/import probe and complete before/after/final reactor trees PASS. No unintended old/new Spring generation. Framework 7.0.9, Boot 4.1.1 and crypto 7.1.1 throughout; no Security web/config/AS or actuator. Jackson 2 for Swagger and Jackson 3 for MVC coexist intentionally. |
+| Compile | Server/core/data `compile` PASS; subsequent affected/critical builds compile all affected tests and desktop dependencies. |
+| Focused context/startup | Default embedded server, full prod composition and local/azure bean selection PASS; actual Tomcat 11 starts on ephemeral loopback ports. No startup errors/default generated password. SQL destinations are dummy loopback values; no SQL is executed. |
+| Focused existing authentication | **69 passed**, 16 classes, zero failures/errors/skips: password login/me/refresh/logout, durable and remembered-session/JTI/replay/revocation, desktop recovery/enrollment/lifecycle and pre-tenant password lookup. |
+| REST/OpenAPI/validation/errors | **136 passed**, 16 classes, zero failures/errors/skips: all controller tests, selected Case compatibility/privacy/byte bounds, OpenAPI, actual wire mapper and safe errors. |
+| Data/session/default-off | **39 passed**, 12 classes, zero failures/errors/skips: context initialization/closure faults, runtime session timing, adapter/revocation/migration source contracts, pre-tenant modules and 3B.1 AiScope/AiSecurityContract. Proxy/synthetic faults are not real SQL acceptance. |
+| Selector affected suite | **185 passed**, zero failures/errors, **6 opt-in SQL scenarios skipped** (191 discovered, 27 classes). Case/contact/security-data/server plus the selected Settings lifecycle contract pass. The six skipped Phase1R/remembered-session SQL scenarios did not execute and are not passing SQL evidence. |
+| Critical Maven reactor | **126 passed**, 31 classes, zero failures/errors/skips; all seven modules BUILD SUCCESS. |
+| Executable server package | `package -DskipTests` PASS, Boot 4.1.1 repackage and packaged-library inspection PASS; this packaging command does not itself execute tests. |
+| Selector Python | **26 passed**. Parent/module POM changes recommend historical all-tests informationally; it was not run and is not substituted for focused/affected/critical proof. |
+| Documentation/diff | Owning documents, relative links/anchors, fences, full diff and `git diff --check` reviewed/validated before commit. |
+| Real synthetic SQL / production acceptance | Real synthetic SQL scenarios were not run for this framework-only change. No production/Azure SQL, installed-desktop acceptance or deployment is claimed. Earlier 3B.1 synthetic receipts retain their original scope. |
+
+The initial sandbox-restricted fetch/download failed; one retry with explicit network access succeeded.
+No repeated infrastructure retries. A concurrent compile attempt observed disappearing shared target class
+files; subsequent Maven builds ran sequentially. That failed attempt is not a passing check. Initial OpenAPI
+schema/argument-name, validation and obsolete fixture/source assertions were resolved as described above;
+no assertion was relaxed to accept a changed Case contract.
+
+Exact Maven commands used the existing JDK 21 / Maven 3.9.11 wrapper, `-B`, and bounded process timeouts.
+The affected command comes directly from the selector's structured `selected_maven_batches` in
+`work/selection.json`; it selects the directly modified tests and required Case/contact/security/server
+smokes, with the SQL opt-ins left disabled. Intermediate logs, trees and the pre-edit test-impact inventory
+remain in `work/` and are not committed.
+
+```bash
+mvn -B -pl shale-server -am -DskipTests compile
+mvn -B -pl shale-server -am -Dtest=OpenApiDocumentationTest,ShaleServerServiceConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -pl shale-server,shale-desktop -am -Dtest=AuthControllerTest,DesktopSessionControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,SqlRememberCredentialStoreTest,ShaleAuthTokenServiceTest,ServerAuthSessionLogoutTest,DesktopApplicationInstanceVerifierTest,AdminSessionControllerTest,SessionControllerTest,SessionManagementContractTest,AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,DesktopRememberedRecoveryTest,DesktopRuntimeSessionLifecycleTest,DesktopSessionEnrollmentClientTest,DesktopSessionEnrollmentLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -pl shale-server -am '-Dtest=*ControllerTest,ContactValueApiTest,ApiExceptionHandlerTest,OpenApiDocumentationTest' -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -pl shale-server -am -Dtest=ShaleServerServiceConfigurationTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest,RuntimeSessionServiceTimingTest,PreTenantAuthenticationModuleContractTest,UserSessionDaoContractTest,UserSessionMigrationContractTest,SessionInvalidationPhase8AContractTest,SessionSecurityAuditMigrationContractTest,UserSessionServiceAdapterTest,AiScopeTest,AiSecurityContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base a0ce0d856ccbf8167ae0e48ed4cac8af19670f05 --head HEAD --format markdown --plan-output work/selection.json
+mvn -B test
+mvn -B -pl shale-server -am -DskipTests package
+mvn -B -DskipTests dependency:tree
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+git diff --check
+```
+
+Before committing, selection used `--path` for every tracked worktree change; after commit the equivalent
+`--base ... --head HEAD` command above verifies the identical path/test selection. The framework prerequisite
+has no remaining local compatibility blocker. Resume the **separate** Phase 3B.2A task after this prerequisite
+merges and its recorded checks are verified. That task still must implement and prove its maintained OAuth
+library, configuration, metadata, namespace isolation, client/redirect and S256-only contracts; none are complete here.
+
+The actual embedded server/context tests cover both the default schema-only test composition and full prod
+composition using dummy loopback DB destinations; no SQL request is made. They check existing public health,
+Swagger UI, application mapper/converter identity, null/default/date handling, and absence of generated
+passwords, SecurityFilterChain/user-details beans, default Basic/form/session authority, management, OAuth,
+RFC metadata and MCP surfaces. Existing catch-all advice returns sanitized 500 for unmapped static resources;
+that historical fallback is retained and is not treated as a new endpoint or a new 404 guarantee.
+
+Audit compatibility: no new sensitive read or domain/administrative operation exists. Existing PHI/session/
+entity-action transactions and disclosure withholding remain authoritative; no new audit row/schema is needed.
+Global AI capability remains **OFF**; absent tenant policy remains **OFF**. There are no usable AI credentials,
+MCP tools/routes or Case AI disclosure. Production/Azure SQL, authoritative Case SQL acceptance, installed
+Windows acceptance, deployment and installer/version publication are **unexecuted** and are not inferred from
+Maven. The missing approved Case artifact and later operational/client acceptance gates remain independent.

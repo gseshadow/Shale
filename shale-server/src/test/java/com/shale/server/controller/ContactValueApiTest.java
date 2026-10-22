@@ -45,7 +45,7 @@ class ContactValueApiTest {
         for(String input:new String[]{"Call: (505) 903-3568 x001","(903) 3568 x001","1-505-903-3568 x001","+49 30 901820 x001"}) {
             var parsed=ContactValues.INSTANCE.phone(input,null,true,"phone");
             mvc.perform(post("/api/validation/contact-value").contentType(MediaType.APPLICATION_JSON)
-                .content(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(new ContactValueValidationController.Request("phone",input,null))))
+                .content(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(new ContactValueValidationController.Request("phone",input,null))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.displayInput").value(parsed.displayInput()))
                 .andExpect(jsonPath("$.normalizedNumber").doesNotExist())
                 .andExpect(jsonPath("$.extension").value("001")).andExpect(jsonPath("$.kind").value(parsed.kind().name()));
