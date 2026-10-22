@@ -90,9 +90,9 @@ public final class AiOAuthTransactionStore {
     public void deny(UUID id, UUID session) {
         requireEnabled(); AiSql.call(runtime,"AiDenyOAuthV1",r->true,id,session);
     }
-    /** Internal validation seam for 3B.2C. Caller supplies the original trusted WEB context for now.
-     * Verifier is hashed locally and never persisted/logged; SQL atomically consumes only the exact binding.
-     * No HTTP token exchange is enabled, including for confidential clients. */
+    /** Original trusted-WEB consume seam retained for the 3B.2B contract. No credential is issued.
+     * HTTP exchange uses AiOAuthExchangeStore after separate client authentication and confined bootstrap.
+     * Verifier is hashed locally and never persisted/logged; SQL atomically consumes only the exact binding. */
     public Consumed consume(String code, UUID webSession, String client, String redirect, String verifier, String expectedIssuer, String expectedResource) {
         requireEnabled();
         if(client==null || !client.matches("[A-Za-z0-9_-]{1,64}") || redirect==null || redirect.length()>2048) throw new SecurityException("Invalid code binding.");

@@ -65,7 +65,7 @@ public final class DurableOAuthAuthorization implements OAuth2AuthorizationServi
         }
     }
     @Override public OAuth2Authorization findByToken(String token, OAuth2TokenType type) {
-        if(type==null || !"state".equals(type.getValue())) return null; // Token exchange stays closed.
+        if(type==null || !"state".equals(type.getValue())) return null; // Code exchange uses its separate confined owner resolver.
         var human=ShaleOAuthHuman.current();
         return store.findIntent(token,human.session()).map(intent->{
             if(intent.tenant()!=human.tenant() || intent.user()!=human.user()) throw denied();

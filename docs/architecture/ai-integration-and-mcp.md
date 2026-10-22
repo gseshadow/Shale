@@ -691,7 +691,9 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B.2 credential/authentication validation | IN PROGRESS | §10.16–10.17; foundation and durable authorization-code/self-consent complete; usable token lifecycle remains unfinished. |
 | Phase 3B.2A OAuth dependency/configuration/protocol foundation | COMPLETE (foundation/source/local verification) | §10.16; maintained isolated composition, canonical identities, bounded client adapter, redirect/S256 policy and truthful metadata; no usable AI credential. |
 | Phase 3B.2B authorization code + S256 PKCE + consent transaction | COMPLETE (source/local synthetic verification) | §10.17; durable self-only consent, 60-second hash-only codes, S256/state/issuer binding and atomic replay/race/restart proof. No usable access/refresh issuance. |
-| Phase 3B.2C opaque access + rotating refresh lifecycle | NOT STARTED | Durable atomic lifecycle, replay/family invalidation and expiry clipping. |
+| Phase 3B.2C opaque access + rotating refresh lifecycle | IN PROGRESS | §10.18; exchange validation complete, usable issuance/rotation not started. |
+| Phase 3B.2C.1 authorization-code exchange validation | COMPLETE (source/local synthetic verification) | §10.18; pinned client proof, durable replay, atomic consume/live authority; no usable credential. |
+| Phase 3B.2C.2 opaque issuance + rotating refresh | NOT STARTED | Next: atomic credential issuance/rotation/reuse-family revocation and expiry clipping. |
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | NOT STARTED | Exact credential bindings and authoritative live context resolution. |
 | Phase 3B.3 AI audit/shared disclosure seam | NOT STARTED | Mandatory integration access audit and final handoff gate. |
 | Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery in 3B.1. |
@@ -723,7 +725,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is unfinished. 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C/D and 3B.3+ remain NOT STARTED.
+durable usable OAuth credential lifecycle is unfinished. 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C is IN PROGRESS; 3B.2C.2, 3B.2D and 3B.3+ remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -1701,7 +1703,9 @@ Completion of an increment is not permission to enable the next data surface.
 | **3B.2 Credential/authentication validation** | 3B.1; select maintained OAuth dependency with Boot compatibility proof (separate upgrade prerequisite if needed). Implement AS metadata/code+PKCE/self-consent, opaque access/refresh store, fixed issuer/resource, pinned private_key_jwt/replay and confined owner resolution/live validation. Separate route/filter composition. | Code/refresh/assertion replay, wrong issuer/audience/client/redirect/key/PKCE, expired/unbound token, all revoked layers, public clients, response loss/rotation race, REST↔MCP credential rejection including writes; existing WEB/DESKTOP/session regressions. Complete with no general data endpoint and durable lifecycle across replicas/restart. | Disable new AS surface, revoke integration families. Never fall back to WEB JWT or desktop restore; retain rows and configured token namespace. |
 | **3B.2A OAuth dependency/configuration/protocol foundation — COMPLETE (foundation/source/local verification)** | Merged prerequisite #1904; §10.16 implements typed canonical issuer/resource, isolated maintained AS composition, bounded client mapping, exact redirect and S256-only policy. No issuance. | Resolve actual dependencies, start context, prove namespace isolation and canonical configuration/redirect/PKCE rules; publish only truthful implemented metadata, otherwise leave it absent. | Keep all AI flags off and credential endpoints denied; optional metadata is informational only; preserve ordinary authentication. |
 | **3B.2B authorization code + S256 PKCE + consent transaction — COMPLETE (source/local synthetic verification)** | Completed 3B.2A; durable code transaction bound to current human/grant/client/redirect/resource/challenge, browser CSRF/state and RFC 9207. No usable access/refresh credentials. | Atomic single-use code consume, wrong/missing/plain PKCE, redirect/resource substitution, consent races and expiry; preserve WEB/DESKTOP regressions. | Disable authorization transactions; retain consent and security history. |
-| **3B.2C opaque access + rotating refresh lifecycle — NOT STARTED** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
+| **3B.2C opaque access + rotating refresh lifecycle — IN PROGRESS** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
+| **3B.2C.1 authorization-code exchange validation — COMPLETE (source/local synthetic verification)** | §10.18; confined code owner, public S256, pinned RS256 assertions, shared replay, atomic consume/live authority; internal result only. | Exact bindings, client proof, revocation/expiry, real SQL races/restart/audit faults, maintained HTTP and WEB/DESKTOP regressions. | Disable validation switch; retain consume/replay/revocation/audit state. |
+| **3B.2C.2 opaque credential issuance and rotating refresh — NOT STARTED** | 3B.2C.1; atomic issuance at the validated boundary, existing session/credential structures, expiry clipping and reuse-family revoke. | Issuance/rotation/response-loss/reuse/race/restart and security-reset proof before usable metadata. | Disable issuance/refresh, revoke families, retain history. |
 | **3B.2D live credential validation + VerifiedIntegrationContext — NOT STARTED** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
 | **3B.3 AI audit attribution and shared disclosure seam** | 3B.1–2. Implement narrow access parent/children/security events, protected bounded review, immutable context-aware existing worker extensions and final handoff gate. Keep original REST exemption/Overview event. | Exact actor/integration/tool/resource/correlation; empty search, unavailable/probe denial, one PHI row; real denied INSERT, zero-row append, precommit failure/lost ACK, close/encoding/final-gate failure, audit outage, privacy sentinel tests and admin/cross-tenant review. Complete when both shared reads can withhold results under every fault without a protocol adapter. | Off flag stops all integration calls; retain committed audit. Old workers remain ordinary-web only; no partial “audit later” fallback. |
 | **3B.4 MCP transport/discovery** | 3B.2–3; SDK proves 2026-07-28 compliance. Add disabled-by-default Streamable HTTP/JSON transport, fixed metadata/Origin/TLS/filter checks, strict parsing/deadlines and distributed quota admission, explicit catalog mapping (no data handlers enabled yet). | Unauth/unregistered/revoked discovery, scope-filtered catalog, metadata header/body mismatch, duplicate keys/batches, unsupported methods/versions, no GET/session assumptions, Origin/proxy/config errors, body/byte/deadline limits. Complete with no Case response and two independent conforming clients against synthetic transport. | Unmount MCP route/metadata as appropriate; no second service or REST changes. Never substitute legacy insecure transport. |
@@ -2372,7 +2376,7 @@ remain independent gates. This phase does not authorize the next data surface.
 
 **Status: COMPLETE at source/local synthetic verification scope.** Base `549584f8bcc968cb7371194149bdcc405d4a10be`
 (merged #1905) was fetched and inspected in a separate task worktree. 3B.1/3B.2A retain their recorded
-completion scopes. 3B.2C, 3B.2D and 3B.3+ remain NOT STARTED. This increment creates authorization codes
+completion scopes. At this increment's completion, 3B.2C, 3B.2D and 3B.3+ were NOT STARTED (subsequent progress: §10.18). This increment creates authorization codes
 and grants only; it does not create a usable AI access/refresh credential, MCP surface or Case disclosure.
 
 #### Maintained endpoint and existing human authority
@@ -2556,6 +2560,8 @@ in that increment. No production SQL, deployment, tenant enablement or installer
 
 ### 10.18 Phase 3B.2C.1 authorization-code exchange boundary — 2026-10-22
 
+**Status: COMPLETE at source/local synthetic verification scope.** Aggregate 3B.2C remains IN PROGRESS.
+
 Source base: `ffe537bca1064b7e4715f35436e69a416baffc40`, merged #1906, fetched into a separate
 `codex/phase-3b2c1` worktree. The original checkout is preserved. This phase validates/consumes only;
 usable credential lifecycle remains unfinished. No MCP or Case disclosure is implemented.
@@ -2636,7 +2642,7 @@ vectors and malformed input, assertion claims/algorithms/local keys/URLs, actual
 code/assertion races, transaction-coupled audit faults, expiry, authority/revoke and replacement JVMs.
 Synthetic expiry explicitly uses test-owner timestamp fault injection; it is not wall-clock evidence.
 
-Verification results are recorded below after execution. Evidence is local source/static contracts,
+Verification results are recorded below. Evidence is local source/static contracts,
 synthetic loopback SQL with separate restricted identities, and maintained servlet filters. The HTTP WEB
 identity store is synthetic; ordinary production authentication adapters are covered separately. These
 results do not establish production/Azure, authoritative Case/RLS, independent client/browser UX,
@@ -2653,3 +2659,63 @@ usable token grants. Keep 3B.2D bearer resolution/VerifiedIntegrationContext and
 Explicitly: no usable access token, no refresh token, no bearer authentication, no MCP route, no Case
 disclosure; WEB/DESKTOP auth remains authoritative; AI defaults OFF; no production/Azure SQL, deployment,
 real tenant enablement, installer/version publication or Curtis-specific behavior.
+
+
+Local verification uses Maven 3.9.11 / JDK 21.0.12.1; `mvn` below denotes the existing
+`/workspace/.tools/bin/mvn` wrapper. SQL variables select only the explicitly approved disposable
+loopback fixture on port 14337; its generated SA password was supplied privately through the environment.
+Final groups overlap and are not additive unique-test counts:
+
+| Check | Final result |
+| --- | --- |
+| Focused core/data/OAuth contracts and protocol | 86 PASS, no failures/errors/skips |
+| Full disposable SQL fixture (included above) | 50 PASS, including 15 exchange/replay/RLS/expiry/revoke/race/restart tests |
+| Maintained servlet authorization and token boundary (included above) | 7 PASS |
+| WEB/DESKTOP server/auth/session regressions | 51 PASS |
+| Desktop enrollment/client/recovery/diagnostics plus remembered-login UI contract | 21 PASS |
+| Selector affected security-data/server suite | 152 PASS, 25 classes, SQL opt-ins explicitly enabled |
+| Critical reactor | 148 PASS, 39 classes, all seven modules BUILD SUCCESS; no failures/errors/skips |
+| Selector Python | 27 PASS |
+| Documentation/diff | 60 relative links/anchors, balanced fences, JSON and git diff --check PASS |
+
+Initial offline dependency absence was resolved through the configured network. Migration DDL ordering,
+public NULL timestamp binding, fixture expiry constraints, a test import and framework client-method/
+request-authorization composition failures were corrected during focused debugging. They are not counted
+as passing runs. No full reactor was used to debug them. The selector's all-tests escalation is
+informational; historical all-tests were not executed. No local acceptance is inferred from a skip.
+
+```bash
+mvn -o -pl shale-server -am -Dtest=AiScopeTest,AiSecurityContractTest,AiOAuthExchangeContractTest,AiSecurityLocalSqlServerTest,OAuthAuthorizationFlowTest,OAuthCodeExchangePolicyTest,PinnedClientAssertionTest,OAuthConfigurationTest,OAuthClientMappingTest,OAuthFilterIsolationTest,OAuthMetadataTest,ShaleOAuthHumanTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -o -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-server -am -Dtest=AuthControllerTest,DesktopSessionControllerTest,SessionControllerTest,AdminSessionControllerTest,DurableSessionAuthTest,ServerAuthSessionLogoutTest,RememberedDesktopSessionTest,SqlRememberCredentialStoreTest,DesktopApplicationInstanceVerifierTest,SessionManagementContractTest,OAuthFilterIsolationTest,AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-desktop -am -Dtest=DesktopSessionEnrollmentClientTest,DesktopSessionEnrollmentLifecycleTest,DesktopRememberedRecoveryTest,DesktopRememberedSignInDiagnosticsTest,LoginRememberedSignInContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base ffe537bca1064b7e4715f35436e69a416baffc40 --head HEAD --format markdown --plan-output work/selection.json
+python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+mvn -DargLine=-Djdk.attach.allowAttachSelf=true test
+git diff --check
+git diff --check ffe537bca1064b7e4715f35436e69a416baffc40 HEAD
+```
+
+Focused/affected SQL runs set `SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI`,
+`SHALE_AI_SQL_PORT=14337`, and the private `SHALE_AI_SQL_PASSWORD`.
+The exact selector `selected_maven_batches` arguments were executed unchanged with `-o` and
+`-DargLine=-Djdk.attach.allowAttachSelf=true` added, using Python `subprocess.run` argument arrays,
+`check=True` and a 240-second deadline. Other Maven runs also had 120–240-second shell deadlines.
+Documentation verification checks every relative link/anchor in the four changed Markdown documents,
+fences, selector JSON, and the complete changed-file/test mapping. Original checkout remains untouched.
+
+
+No remaining local 3B.2C.1 verification blocker. Authoritative Case/non-bypass deployed permissions/RLS,
+operational activation and independent client acceptance remain separate existing gates, not inferred passes.
+Final roadmap:
+
+```text
+3B.1     COMPLETE
+3B.2A    COMPLETE
+3B.2B    COMPLETE
+3B.2C.1  COMPLETE
+3B.2C.2  NOT STARTED
+3B.2D    NOT STARTED
+3B.3+    NOT STARTED
+```
+
+Aggregate **3B.2C remains IN PROGRESS**; usable OAuth credential lifecycle is not complete.
