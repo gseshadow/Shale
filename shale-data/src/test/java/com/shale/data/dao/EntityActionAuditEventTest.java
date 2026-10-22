@@ -8,6 +8,18 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 final class EntityActionAuditEventTest {
+    @Test
+    void aiControlsUseExistingMutationAuditWithoutCredentialOrCasePayloads() {
+        for (var type : java.util.List.of(EntityActionAuditEvent.EntityType.AI_CLIENT_KEY,
+                EntityActionAuditEvent.EntityType.AI_DELEGATION_GRANT)) {
+            assertDoesNotThrow(() -> EntityActionAuditEvent.now(7,71,type,9,EntityActionAuditEvent.Action.CREATED,
+                    null,null,Map.of(EntityActionAuditEvent.MetadataKey.AI_SCOPE_MASK,1)));
+            assertThrows(IllegalArgumentException.class, () -> EntityActionAuditEvent.now(7,71,type,9,
+                    EntityActionAuditEvent.Action.RESTORED,null,null,Map.of()));
+        }
+        assertEquals(Map.of("AI_SCOPE_MASK","1","ACTIVE","false"),
+                EntityActionAuditDao.parseSafeMetadata("{\"AI_SCOPE_MASK\":1,\"ACTIVE\":false,\"secret\":\"sentinel\"}"));
+    }
 	@Test
 	void caseOverviewAndIntakeAdministrativeActionsUseSafeEstablishedAuditContract() {
 		assertDoesNotThrow(() -> EntityActionAuditEvent.now(7, 9,

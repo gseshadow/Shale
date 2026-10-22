@@ -500,7 +500,8 @@
         "build/phase1r-verification/**",
         "docs/sql/phase1r/**",
         "**/Phase1R*.java",
-        "**/verification/CaseRead*.java"
+        "**/verification/CaseRead*.java",
+        "docs/sql/ai-integration/**"
       ],
       "reason": "Security, RLS, tenant session, or audit infrastructure changed; critical and affected data/security contracts are blocking.",
       "ownership_patterns": [
@@ -515,7 +516,9 @@
         "com.shale.data.dao.EntityActionAuditMigrationContractTest",
         "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
         "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
-        "com.shale.server.runtime.ServerSessionSkeletonTest"
+        "com.shale.server.runtime.ServerSessionSkeletonTest",
+        "com.shale.core.security.ai.*Test",
+        "com.shale.data.security.ai.*Test"
       ],
       "blocking_smoke_patterns": [
         "com.shale.data.auth.AuthUserLifecycleSecurityTest",
@@ -529,7 +532,9 @@
         "com.shale.data.dao.EntityActionAuditMigrationContractTest",
         "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
         "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
-        "com.shale.server.runtime.ServerSessionSkeletonTest"
+        "com.shale.server.runtime.ServerSessionSkeletonTest",
+        "com.shale.core.security.ai.AiScopeTest",
+        "com.shale.data.security.ai.AiSecurityContractTest"
       ]
     },
     "notifications": {
