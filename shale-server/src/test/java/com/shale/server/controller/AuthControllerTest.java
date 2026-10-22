@@ -37,8 +37,14 @@ class AuthControllerTest {
     private TokenRevocationStore revocationStore;
     private MockMvc mockMvc;
 
+    private com.shale.server.oauth.OAuthSecurityTestContext oauth;
+
+    @org.junit.jupiter.api.AfterEach
+    void closeOAuthContext() { if (oauth != null) oauth.close(); }
+
     @BeforeEach
     void setUp() {
+        oauth = new com.shale.server.oauth.OAuthSecurityTestContext();
         authServicePort = new RecordingAuthServicePort();
         tokenService = new ShaleAuthTokenService(TEST_SECRET, 3600, java.time.Clock.systemUTC());
         revocationStore = new InMemoryTokenRevocationStore();
@@ -61,6 +67,7 @@ class AuthControllerTest {
                         revocationStore,
                         new ServerRuntimeSessionState(new BearerTokenServerSessionResolver(tokenService, revocationStore), currentRequestProvider()),
                         profileService))
+                .addFilters(oauth.filter())
                 .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }

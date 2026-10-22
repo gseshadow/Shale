@@ -24,12 +24,11 @@ class OpenApiDocumentationTest {
 
     @Test
     void embeddedServerPreservesPublicHealthAndHasNoDefaultSecurityOrProtocolSurfaces() throws Exception {
-        org.junit.jupiter.api.Assertions.assertFalse(context.containsBean("springSecurityFilterChain"));
-        org.junit.jupiter.api.Assertions.assertFalse(org.springframework.util.ClassUtils.isPresent(
-                "org.springframework.security.web.FilterChainProxy", getClass().getClassLoader()),
-                "Crypto must not pull in a servlet security chain");
+        org.junit.jupiter.api.Assertions.assertTrue(context.containsBean("springSecurityFilterChain"));
+        org.junit.jupiter.api.Assertions.assertEquals(1, context.getBean(org.springframework.security.web.FilterChainProxy.class).getFilterChains().size(),
+                "Only the isolated OAuth chain may be installed");
         org.junit.jupiter.api.Assertions.assertFalse(context.containsBean("userDetailsService"));
-        org.junit.jupiter.api.Assertions.assertFalse(context.getServletContext().getFilterRegistrations()
+        org.junit.jupiter.api.Assertions.assertTrue(context.getServletContext().getFilterRegistrations()
                 .containsKey("springSecurityFilterChain"));
         try (var client = java.net.http.HttpClient.newHttpClient()) {
             for (String path : java.util.List.of("/api/health", "/swagger-ui/index.html", "/login",
@@ -43,8 +42,8 @@ class OpenApiDocumentationTest {
                 boolean existingPublicRoute = path.equals("/api/health") || path.equals("/swagger-ui/index.html");
                 // Existing generic advice handles unmapped static resources as sanitized HTTP 500.
                 // Preserve that fallback; prove absence of handlers rather than inventing a 404 contract.
-                org.junit.jupiter.api.Assertions.assertEquals(existingPublicRoute ? 200 : 500, response.statusCode(), path);
-                if (!existingPublicRoute) {
+                org.junit.jupiter.api.Assertions.assertEquals(existingPublicRoute ? 200 : (path.startsWith("/oauth/mcp/") || path.startsWith("/.well-known/oauth-authorization-server") ? 404 : 500), response.statusCode(), path);
+                if (!existingPublicRoute && response.statusCode() == 500) {
                     org.junit.jupiter.api.Assertions.assertEquals("Internal server error.",
                             wireJson.readTree(response.body()).path("message").asText(), path);
                     var handlers = context.getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);

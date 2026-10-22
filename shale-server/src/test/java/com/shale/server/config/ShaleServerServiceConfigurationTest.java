@@ -111,20 +111,41 @@ class ShaleServerServiceConfigurationTest {
 
     @Test
     @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
-    void productionCompositionStartsEmbeddedServerWithoutAdoptingSpringSecurity(
+    void productionCompositionStartsEmbeddedServerKeepingShaleAuthorityAndIssuanceOff(
             org.springframework.boot.test.system.CapturedOutput output) {
         withDatabaseProperties(() -> {
             try (var context = new org.springframework.boot.builder.SpringApplicationBuilder(
                     com.shale.server.ShaleServerApplication.class)
-                    .profiles("prod").run("--server.port=0", "--server.address=127.0.0.1")) {
+                    .profiles("prod").run("--server.port=0", "--server.address=127.0.0.1",
+                            "--shale.ai.oauth.public-origin=https://shale.example", "--shale.ai.oauth.composition-enabled=true")) {
                 assertInstanceOf(BearerTokenServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
                 assertInstanceOf(com.shale.server.runtime.SqlDurableSessionStore.class,
                         context.getBean(com.shale.server.runtime.DurableSessionStore.class));
                 assertInstanceOf(com.shale.server.runtime.SqlRememberCredentialStore.class,
                         context.getBean(com.shale.server.runtime.RememberCredentialStore.class));
                 assertInstanceOf(RequestScopedDbSessionProvider.class, context.getBean(DbSessionProvider.class));
-                org.junit.jupiter.api.Assertions.assertFalse(context.containsBean("springSecurityFilterChain"));
+                org.junit.jupiter.api.Assertions.assertTrue(context.containsBean("springSecurityFilterChain"));
                 org.junit.jupiter.api.Assertions.assertFalse(context.containsBean("userDetailsService"));
+                org.junit.jupiter.api.Assertions.assertEquals("https://shale.example/oauth/mcp",
+                        context.getBean(com.shale.server.oauth.McpOAuthProperties.class).issuer());
+                int port = ((org.springframework.boot.web.server.context.WebServerApplicationContext) context).getWebServer().getPort();
+                try (var client = java.net.http.HttpClient.newHttpClient()) {
+                    for (String path : java.util.List.of("/oauth/mcp/token", "/oauth/mcp/authorize",
+                            com.shale.server.oauth.OAuthMetadataContract.AUTHORIZATION_SERVER_PATH)) {
+                        var response = client.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:" + port + path))
+                                .timeout(java.time.Duration.ofSeconds(5)).GET().build(), java.net.http.HttpResponse.BodyHandlers.ofString());
+                        boolean metadata = path.equals(com.shale.server.oauth.OAuthMetadataContract.AUTHORIZATION_SERVER_PATH);
+                        org.junit.jupiter.api.Assertions.assertEquals(metadata ? 200 : 404, response.statusCode(), path);
+                        if (metadata) {
+                            var claims = tools.jackson.databind.json.JsonMapper.builder().build().readTree(response.body());
+                            org.junit.jupiter.api.Assertions.assertEquals("https://shale.example/oauth/mcp", claims.path("issuer").asText());
+                            org.junit.jupiter.api.Assertions.assertFalse(claims.has("token_endpoint"));
+                            org.junit.jupiter.api.Assertions.assertTrue(claims.path("grant_types_supported").isEmpty());
+                        } else org.junit.jupiter.api.Assertions.assertTrue(response.body().isEmpty());
+                        org.junit.jupiter.api.Assertions.assertTrue(response.headers().firstValue("WWW-Authenticate").isEmpty());
+                        org.junit.jupiter.api.Assertions.assertTrue(response.headers().allValues("Set-Cookie").isEmpty());
+                    }
+                } catch (Exception failure) { throw new AssertionError("Embedded OAuth gate must remain closed", failure); }
             }
         });
         org.junit.jupiter.api.Assertions.assertFalse(output.getAll().contains("Using generated security password"));

@@ -9,10 +9,13 @@ import com.shale.core.dto.UserSessionView;import com.shale.core.model.*;import c
 import com.shale.server.runtime.*;
 
 class DesktopSessionControllerTest {
+ private com.shale.server.oauth.OAuthSecurityTestContext oauth;
+ @org.junit.jupiter.api.BeforeEach void openOAuthContext(){oauth=new com.shale.server.oauth.OAuthSecurityTestContext();}
+ @org.junit.jupiter.api.AfterEach void closeOAuthContext(){if(oauth!=null)oauth.close();}
 	@Test void nullInstanceCreatesAnUnlinkedDesktopSession()throws Exception{
 		var auth=new Auth();var store=new Store();var tokens=new ShaleAuthTokenService("test-auth-token-secret-that-is-long-enough",3600,Clock.systemUTC());
 		var service=new ServerAuthSessionService(tokens,store,new DurableSessionTokenValidator(store),new LegacyTokenCompatibilityPolicy(Instant.now(),3600,Clock.systemUTC()),new InMemoryTokenRevocationStore());
-		var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,new Verifier(true))).setControllerAdvice(new ApiExceptionHandler()).build();
+		var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,new Verifier(true))).addFilters(oauth.filter()).setControllerAdvice(new ApiExceptionHandler()).build();
 		mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"secret\"}"))
 				.andExpect(status().isOk());
 		assertEquals(1,store.creates);assertNull(store.instance);
@@ -20,21 +23,21 @@ class DesktopSessionControllerTest {
  @Test void verifiedCredentialsCreateExactlyOneDesktopSessionBoundToOwnedInstance()throws Exception{
   var auth=new Auth();var store=new Store();var tokens=new ShaleAuthTokenService("test-auth-token-secret-that-is-long-enough",3600,Clock.systemUTC());
   var service=new ServerAuthSessionService(tokens,store,new DurableSessionTokenValidator(store),new LegacyTokenCompatibilityPolicy(Instant.now(),3600,Clock.systemUTC()),new InMemoryTokenRevocationStore());
-  var verifier=new Verifier(true);var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,verifier)).setControllerAdvice(new ApiExceptionHandler()).build();
+  var verifier=new Verifier(true);var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,verifier)).addFilters(oauth.filter()).setControllerAdvice(new ApiExceptionHandler()).build();
   String body=mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"secret\",\"applicationInstanceId\":44}"))
    .andExpect(status().isOk()).andExpect(jsonPath("$.sessionId").isString()).andExpect(jsonPath("$.currentJti").isString()).andReturn().getResponse().getContentAsString();
   assertEquals(1,store.creates);assertEquals(ClientType.DESKTOP,store.type);assertEquals(44L,store.instance);assertTrue(tokens.verifyToken(com.jayway.jsonpath.JsonPath.read(body,"$.accessToken")).orElseThrow().isSessionBound());
  }
  @Test void invalidCredentialsAndForeignInstanceFailWithoutSessionAndClaimsCannotBeSupplied()throws Exception{
   var auth=new Auth();var store=new Store();var tokens=new ShaleAuthTokenService("test-auth-token-secret-that-is-long-enough",3600,Clock.systemUTC());var service=new ServerAuthSessionService(tokens,store,new DurableSessionTokenValidator(store),new LegacyTokenCompatibilityPolicy(Instant.now(),3600,Clock.systemUTC()),new InMemoryTokenRevocationStore());
-  var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,new Verifier(false))).build();
+  var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,new Verifier(false))).addFilters(oauth.filter()).build();
   mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"secret\",\"applicationInstanceId\":99,\"shaleClientId\":8,\"userId\":999}")) .andExpect(status().isForbidden());assertEquals(0,store.creates);
   auth.ok=false;mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"wrong\"}")) .andExpect(status().isUnauthorized());assertEquals(0,store.creates);
  }
  @Test void unexpectedValidCredentialPathFailureUsesCentralSafeErrorHandling()throws Exception{
   var auth=new Auth();var store=new Store();var tokens=new ShaleAuthTokenService("test-auth-token-secret-that-is-long-enough",3600,Clock.systemUTC());var service=new ServerAuthSessionService(tokens,store,new DurableSessionTokenValidator(store),new LegacyTokenCompatibilityPolicy(Instant.now(),3600,Clock.systemUTC()),new InMemoryTokenRevocationStore());
   var verifier=new Verifier(true){@Override public boolean isAttachable(ServerPrincipal p,long id){throw new IllegalStateException("sensitive database detail");}};
-  var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,verifier)).setControllerAdvice(new ApiExceptionHandler()).build();
+  var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,verifier)).addFilters(oauth.filter()).setControllerAdvice(new ApiExceptionHandler()).build();
   mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"secret\",\"applicationInstanceId\":44}"))
    .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.message").value("Internal server error."));
   assertEquals(0,store.creates,"instance verification failures must not issue a durable session");

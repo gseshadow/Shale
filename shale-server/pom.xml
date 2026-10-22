@@ -21,6 +21,22 @@
     </properties>
 
     <dependencies>
+        <!-- Authorization Server is maintained within Security 7; version follows the Boot BOM.
+             Use the library, not the starter's operational endpoint auto-configuration. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-authorization-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-config</artifactId>
+        </dependency>
+        <!-- Framework 7 uses Commons Logging. Security's nearer spring-core edge excludes it;
+             preserve the existing framework runtime dependency independently of POM order. -->
+        <dependency>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.shale</groupId>
             <artifactId>shale-core</artifactId>

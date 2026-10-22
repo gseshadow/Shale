@@ -382,7 +382,11 @@
         "AuthControllerTest"
       ],
       "blocking_smoke_patterns": [
-        "com.shale.server.controller.AuthControllerTest"
+        "com.shale.server.controller.AuthControllerTest",
+        "com.shale.server.oauth.OAuthConfigurationTest",
+        "com.shale.server.oauth.OAuthClientMappingTest",
+        "com.shale.server.oauth.OAuthFilterIsolationTest",
+        "com.shale.server.oauth.OAuthMetadataTest"
       ]
     },
     "build-scripts": {
