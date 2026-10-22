@@ -15,7 +15,7 @@ class OAuthCodeExchangePolicyTest {
     }
     @Test void onlyAuthorizationCodeSingletonFormWithCanonicalResourceAndPkceIsAllowed() {
         assertDoesNotThrow(()->OAuthCodeExchange.validateRequest(request(),properties));
-        for(String grant:List.of("password","implicit","client_credentials","refresh_token","urn:ietf:params:oauth:grant-type:token-exchange","urn:ietf:params:oauth:grant-type:device_code","custom")) {
+        for(String grant:List.of("password","implicit","client_credentials","urn:ietf:params:oauth:grant-type:token-exchange","urn:ietf:params:oauth:grant-type:device_code","custom")) {
             var r=request();r.setParameter("grant_type",grant);
             assertEquals("unsupported_grant_type",assertThrows(org.springframework.security.oauth2.core.OAuth2AuthenticationException.class,()->OAuthCodeExchange.validateRequest(r,properties)).getError().getErrorCode());
         }
@@ -33,6 +33,16 @@ class OAuthCodeExchangePolicyTest {
             var r=request();r.addHeader("Authorization",header);assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties));
         }
         var query=request();query.setQueryString("client_secret=x");assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(query,properties));
+    }
+    @Test void refreshRequiresExactClientResourceAndSingleCredentialWithoutScopeOrCodeInputs() {
+        var r=request();
+        for(String k:List.of("code","redirect_uri","code_verifier"))r.removeParameter(k);
+        r.setParameter("grant_type","refresh_token");r.setParameter("refresh_token","r".repeat(43));
+        assertDoesNotThrow(()->OAuthCodeExchange.validateRequest(r,properties));
+        for(String extra:List.of("scope","code","redirect_uri","code_verifier","client_secret","tenant_id")) {
+            r.setParameter(extra,"sentinel");assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties),extra);r.removeParameter(extra);
+        }
+        r.setParameter("refresh_token","a","b");assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties));
     }
     @Test void s256UsesRfc7636VectorAndRejectsMalformedVerifiers() {
         assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",AiOAuthExchangeStore.challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"));

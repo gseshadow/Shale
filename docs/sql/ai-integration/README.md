@@ -292,3 +292,77 @@ and a **separate** `shale.ai.oauth.bootstrap.jdbc-url`, `.username`, `.password`
 confined bootstrap EXECUTE. Never substitute the ordinary auth/runtime identity. Defaults do not connect.
 No runtime fallback exists if this configuration or SQL authority is unavailable. No token metadata is
 advertised because validation cannot issue credentials. No production/Azure execution is authorized.
+
+## Phase 3B.2C.2 opaque credential lifecycle candidate
+
+Apply `phase3b2c2.sql` after the receipted 3B.1 → 3B.2B → 3B.2C.1 candidates, only with
+separately approved migration authority in a fresh dbo session with both context keys NULL.
+This task executes disposable loopback SQL only, never production/Azure SQL. Existing installations
+apply only unapplied migrations in that order: historical receipts intentionally reject a catalog
+changed by a later migration. Repeat the latest migration for its own source/catalog no-op check;
+do not overwrite old receipts or rerun historical installers against the upgraded catalog.
+
+No parallel token table is added. `AiDelegatedSession` gains nullable, immutable authorization lineage,
+exact client/issuer/resource, consent timestamp and global capability revision. Nullable columns preserve
+older foundation fixtures; newly issued families require the complete tuple. A unique transaction index
+prevents two families from one validated exchange. A tenant-qualified authorization FK binds grant,
+integration and user. Existing strict FILTER/INSERT BLOCK/UPDATE BLOCK, direct table denials and
+hash uniqueness remain authoritative. `AiOAuthCredential` binds tenant/user/integration/grant/session,
+kind, scopes, generation and UTC issue/expiry/consume/revoke. Immutable session lineage supplies exact
+client/issuer/resource/key and consent authority without duplicate mutable claims. Generation zero is
+the initial refresh; each subsequent generation uniquely identifies its parent and replacement within
+that same family. Consumed rows are never deleted by rotation, including expired replay evidence.
+
+`ResolveAiRefreshV1` alone adds confined owner bootstrap EXECUTE. It accepts one exact REFRESH digest,
+client and configured issuer/resource, including consumed/expired history to permit reuse detection;
+it returns only tenant/user. ACCESS records cannot resolve through this procedure. There is no access-token
+presentation, bearer validation, tenant initialization from an access token or resource authentication.
+Runtime gains only bounded issuance/refresh EXECUTE; direct reads/DML and general auth-pool grants do not expand.
+The cumulative receipt covers old/new tables, modules, triggers, constraints, indexes, permissions and RLS.
+
+The internal issuer takes only `ValidatedExchange`; the HTTP provider first proves PKCE/client authentication
+and creates that receipt through the existing exchange. A fresh JDBC transaction retains the global/tenant
+locks through code/JTI consumption, live lineage checks, family/token insertion and required audit. The
+exchange procedure commits only when it owns the transaction; the composed path commits after issuance.
+Any failure rolls back all of it. Raw credentials are withheld until commit acknowledgement and lease close.
+SQL never receives raw access/refresh values: Java creates independent 32-byte CSPRNG values and supplies
+SHA-256 digests only. Clients receive opaque 43-character unpadded base64url, with no claims or signing keys.
+Access is at most five minutes; refresh idle is at most eight hours. Absolute expiry is fixed at issuance,
+no later than consent+24 hours, and clipped to grant, registration, original WEB-session and pinned-key expiry.
+Every refresh recomputes the earliest live deadline; it never extends session absolute expiry. Current 3B.2B
+consent grants are deliberately one hour, so those grants normally shorten these maximum lifetimes.
+
+Refresh uses the same public `none` / confidential pinned RS256 `private_key_jwt` profile. It requires exact
+client/resource, no requested scopes, fresh confidential assertion/JTI and the original authenticating key.
+A replacement key never inherits existing families. Shared capability/tenant locks, held authority rows,
+conditional consume and unique generation enforce one winner. Rotation inserts one ACCESS and one REFRESH,
+consumes the previous REFRESH and updates last refresh/idle/generation in one audited transaction.
+
+**No retry grace:** after successful rotation, retrying the consumed token (including when the response
+was lost) revokes the complete family. The SQL procedure commits revocation and audit before returning
+a denial marker; Java converts that committed marker into `invalid_grant`. Throwing inside that transaction
+would undo revocation and is forbidden. The client must obtain fresh authorization/consent. The concurrent
+loser is reuse, so even the winner's newly created credentials become revoked. Consumed-history retention
+allows detection after restart, across replicas and after the consumed credential's expiry.
+
+Session-revoke triggers mark every family credential revoked. Grant/key/integration revocation and original
+WEB-session revocation cascade through session to credentials; user delete/remove and tenant deactivate do
+the same. UserDao's existing administrative password/security reset revokes original WEB sessions in its
+own transaction, activating that cascade without changing ordinary authentication. Automatic security
+revocations append bounded session DEACTIVATED audit in that same transaction. Actor context is used where
+present; a system-originated cascade with no actor context records the affected user as the service subject.
+First session revocation timestamp/reason and token timestamps are immutable. Global revision mismatch
+permanently denies a pre-disable family after re-enable; its next authenticated refresh durably records
+DISABLED family revocation. The global switch's existing transaction-coupled control-plane audit records
+the invalidating revision; there is no cross-tenant sweep or global tenant-data grant. Other live checks
+remain mandatory even if a cascade already marked the family revoked. No positive authorization cache.
+
+Initial creation/rotation/reuse use existing AI_DELEGATED_SESSION CREATED/UPDATED/DEACTIVATED audit and
+AI_SCOPE_MASK/ACTIVE metadata, with no audit schema change. Audit failure rolls back the coupled state;
+unknown malformed/wrong-client input has no new entity row because no verified subject exists. No token,
+digest, code, verifier, assertion, JTI, key material, PHI, prompt or Case data is audited. 3B.3 remains separate.
+
+RFC 8414 advertises code+refresh and none/private_key_jwt/RS256 only when exchange is explicitly enabled;
+S256 remains mandatory. Default switches remain OFF. RFC 7009 revocation is deferred to the smallest
+client-authenticated family-revocation follow-on before 3B.2D; no custom unauthenticated endpoint is added.
+Existing authenticated internal session revocation remains usable. No token is accepted by a Shale data resource.

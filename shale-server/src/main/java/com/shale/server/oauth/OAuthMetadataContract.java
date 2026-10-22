@@ -26,6 +26,17 @@ public final class OAuthMetadataContract {
                 "scopes_supported",List.of("cases.search","cases.overview.read"),"authorization_response_iss_parameter_supported",true);
     }
 
+    public static Map<String,Object> authorizationServer(McpOAuthProperties properties,boolean authorizationEnabled,boolean exchangeEnabled) {
+        if(!exchangeEnabled) return authorizationServer(properties,authorizationEnabled);
+        var claims=new java.util.LinkedHashMap<>(authorizationServer(properties,authorizationEnabled));
+        claims.put("token_endpoint",properties.issuer()+"/token");
+        claims.put("grant_types_supported",List.of("authorization_code","refresh_token"));
+        claims.put("token_endpoint_auth_methods_supported",List.of("none","private_key_jwt"));
+        claims.put("token_endpoint_auth_signing_alg_values_supported",List.of("RS256"));
+        claims.put("code_challenge_methods_supported",List.of("S256"));
+        return Map.copyOf(claims);
+    }
+
     public static Map<String, Object> protectedResource(McpOAuthProperties properties) {
         return Map.of("resource", properties.resource(), "authorization_servers", List.of(properties.issuer()));
     }

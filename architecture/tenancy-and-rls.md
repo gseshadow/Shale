@@ -215,3 +215,13 @@ The provisional tuple initializes a fresh normal runtime lease; caller/RLS-bound
 all live authority and bindings under existing locks before atomic replay/consume/audit.
 See the [operator review](../docs/sql/ai-integration/README.md#phase-3b2c1-exchange-validation-candidate).
 No production RLS or authoritative Case acceptance is inferred from disposable synthetic SQL.
+
+## Opaque credential lifecycle isolation — Phase 3B.2C.2 candidate
+
+Existing strict session/credential FILTER and AFTER INSERT/UPDATE BLOCK predicates and direct table
+denials remain unchanged. A tenant-qualified authorization FK and immutable client/issuer/resource/key
+lineage bind each hash-only credential family. New confined ResolveAiRefreshV1 accepts REFRESH only,
+returns only provisional tenant/user and requires exact client/configured identities; no ACCESS resolver
+or token-to-tenant initialization exists. Runtime rechecks all live authority under existing SQL locks.
+See the [lifecycle operator record](../docs/sql/ai-integration/README.md#phase-3b2c2-opaque-credential-lifecycle-candidate).
+No global tenant-data grant, ordinary auth-pool expansion, MCP route or Case disclosure is introduced.

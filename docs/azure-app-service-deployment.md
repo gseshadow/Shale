@@ -584,3 +584,30 @@ detected in approximately one minute, the application was already locked while t
 open, and OK moved to sign-in. This does not replace automated tenant/authorization coverage or claim manual
 cross-tenant/crafted-request acceptance. Normal X-button closure continues to clear local state without server
 revocation; only explicit Logout revokes the durable session. Logged-out automatic updates remain `UNSUPPORTED`.
+
+## Future AI OAuth deployment sequence — Phase 3B.2C.2
+
+This is a cumulative future operator sequence, **not authorization to deploy, run production/Azure SQL,
+enable a tenant, publish an installer/version or perform live acceptance in this task**. Keep every AI
+startup/global/tenant switch OFF until independently authorized acceptance. Existing WEB/DESKTOP
+session authority and previously completed deployment/security records above remain applicable.
+
+1. Build/upload the new server JAR from the reviewed source; record source/artifact identity and retain
+   the previous JAR. Upload with AI composition/authorization/exchange disabled.
+2. Execute accumulated, **unapplied** AI SQL migrations in order:
+   [phase3b1.sql](sql/ai-integration/phase3b1.sql) → [phase3b2b.sql](sql/ai-integration/phase3b2b.sql) →
+   [phase3b2c1.sql](sql/ai-integration/phase3b2c1.sql) → [phase3b2c2.sql](sql/ai-integration/phase3b2c2.sql),
+   using approved migration authority, fail-fast sessions and the [SQL operator instructions](sql/ai-integration/README.md).
+   Review existing receipts to skip applied migrations; older receipts deliberately detect later catalog changes.
+3. Execute the cumulative [AI SQL verifier](sql/ai-integration/verify.sql), review effective non-bypass runtime
+   and separate bootstrap permissions, RLS FILTER/INSERT BLOCK/UPDATE BLOCK, trusted tenant FKs and receipt
+   findings. Any failure blocks acceptance. Supply the separate restricted bootstrap configuration;
+   never substitute the ordinary auth identity or expand its access.
+4. **Only then** perform separately authorized live OAuth acceptance with synthetic approved identities.
+   Prove code+S256 issuance, exact private_key_jwt/public profiles, rotation, response-loss retry/family revoke,
+   authority clipping, resets/revokes, audit failure, restart/replicas and ordinary WEB/DESKTOP regressions.
+   No protected resource accepts these access tokens yet; bearer resolution is 3B.2D, MCP/disclosure are later.
+
+Rollback disables OAuth/AI and revokes credential families while retaining all additive storage, receipts,
+consumption/replay/audit/revocation history and the configured token namespace. Re-enable cannot restore
+revoked descendants. Do not drop tables or restore pre-revocation database history to make old tokens work.

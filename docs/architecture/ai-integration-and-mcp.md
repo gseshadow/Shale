@@ -2719,3 +2719,84 @@ Final roadmap:
 ```
 
 Aggregate **3B.2C remains IN PROGRESS**; usable OAuth credential lifecycle is not complete.
+
+### 10.19 Phase 3B.2C.2 opaque issuance and rotating refresh — 2026-10-22
+
+**Status: implementation candidate; SQL runtime verification pending.** Base is merged #1907,
+`6d39e01e59f1f090f9ef62a616b89f4486f1dbfd`, fetched into separate `codex/phase-3b2c2` worktree.
+The original checkout remains untouched. The [SQL lifecycle record](../sql/ai-integration/README.md#phase-3b2c2-opaque-credential-lifecycle-candidate)
+owns schema/permissions/transaction/retention detail; the [future deployment sequence](../azure-app-service-deployment.md#future-ai-oauth-deployment-sequence--phase-3b2c2)
+retains JAR → accumulated SQL → verifier → live OAuth acceptance. No deployment is authorized here.
+
+Initial issuance's sole internal input is `ValidatedExchange`, created by existing live exchange validation.
+One fresh JDBC transaction carries code/assertion consume, receipt mapping, live durable lineage revalidation,
+one delegated family and both token hashes plus required security audit to commit. Unique authorization
+transaction lineage prevents a second family. Raw access and refresh values are independently generated
+CSPRNG 256-bit values, opaque unpadded base64url (43 characters), never JWTs or claims. SQL receives/stores
+SHA-256 digests only. They are returned once, only after commit acknowledgement and successful lease close.
+
+Access maximum is five minutes. Refresh idle maximum is eight hours; delegated absolute maximum is
+24 hours from grant consent, fixed at issuance and never extended by refresh. Every deadline is clipped
+to grant, registration, original WEB session and authenticating key expiry, as applicable. Existing 3B.2B
+one-hour grants commonly produce a shorter effective session. Exact tenant/user/integration/client/grant/
+session/key/issuer/resource/scope bindings remain durable; credentials inherit immutable client/issuer/
+resource/key lineage through their tenant-qualified session FK. No caller tenant/user/grant/scope authority.
+
+Only authorization_code and refresh_token grants exist. Both keep public `none` and confidential locally
+pinned RS256 private_key_jwt client authentication, with fresh shared assertion-JTI replay protection.
+Refresh disallows scope changes, secrets, ordinary WEB/DESKTOP tokens and arbitrary authority fields.
+The original confidential key remains pinned; rotation never transfers a family to a replacement key.
+The refresh-only bootstrap resolver returns provisional tenant/user for an exact refresh digest/client/
+configured issuer/resource, including consumed history; ACCESS tokens cannot resolve through it.
+
+Each successful refresh atomically consumes the previous credential, inserts a new access/refresh pair,
+advances the durable generation/idle/activity and audits rotation. Existing transaction-owned shared-global/
+exclusive-tenant locks and conditional consume/unique generation serialize replicas. Only one refresh wins.
+The loser is consumed-token reuse, which commits full session/access/refresh descendant revocation and
+required audit before returning invalid_grant. **Response loss is intentionally unrecoverable by retry:**
+retrying the old token revokes even the replacement that the client never received. No grace interval;
+new authorization/consent is required. Generation history and consumed rows are retained, including expired
+refresh history, so reuse and family lineage survive restart.
+
+Global/tenant switches, tenant/user eligibility, active registration/integration, ceiling, grant/session,
+original WEB lineage, exact issuer/resource and pinned key are checked live with no positive authorization
+cache. Session revocation cascades to every family token. Grant/key/integration/WEB revocations and
+user delete/remove/tenant deactivate cascade to sessions with bounded transaction-coupled security audit.
+Administrative password/security reset already revokes WEB sessions in UserDao's owning transaction;
+that same durable transition now cascades to dependent families. First revocation timestamp/reason cannot
+change. Global capability revision mismatch permanently invalidates pre-disable families after re-enable;
+a subsequent authenticated refresh persists DISABLED family revocation. Existing audited global switch
+revision is authoritative without granting the global control identity tenant-table mutation access.
+
+Audit compatibility reuses existing AI_DELEGATED_SESSION CREATED/UPDATED/DEACTIVATED and closed
+AI_SCOPE_MASK/ACTIVE metadata, tenant/verified actor, numeric session entity and server correlation.
+All required audit commits with state or rolls it back. Automatic cascades use current actor context,
+or affected user as service subject when no actor context exists. Invalid/unowned attempts have no
+new entity-action row; no trusted subject exists. No raw credential, digest, code, verifier, assertion,
+JTI, key material, prompts, PHI or Case data enters audit. No schema change to the established audit model;
+3B.3 access/disclosure audit remains separate and NOT STARTED.
+
+RFC 8414 advertises token endpoint, only code/refresh, none/private_key_jwt/RS256 and S256 when exchange
+is explicitly enabled; default-off composition remains truthful. No OIDC/client-credentials/password/
+implicit/device/token-exchange/arbitrary-scope/MCP advertisement. RFC 7009 is deferred to a focused
+client-authenticated family-revocation follow-on before 3B.2D; no custom unauthenticated route exists.
+
+Evidence currently comprises compiled source/static contracts and local regression checks; final SQL,
+HTTP, affected and critical results must be recorded before completion. The first disposable SQL run
+failed on new-column DDL batching; the narrowed corrective run exposed `CreatedAt` instead of the grant's
+actual `ConsentedAt`. Both were corrected in source. Further SQL execution was blocked by automatic
+approval review interpreting the task's at-most-once retry rule; corrective-run approval is pending.
+No failed or unexecuted check is a pass. Timestamp expiry injection is synthetic owner-only evidence;
+actual SQL identities/transactions and replacement JVMs must be distinguished from production/Azure,
+authoritative Case/RLS, independent browser/client, fleet and penetration acceptance.
+
+**3B.2D recommendation:** first complete any remaining 3B.2C.2 verification and the minimal RFC 7009
+follow-on; then implement a distinct ACCESS-only confined owner resolver plus fresh runtime live full-tuple
+validation and immutable VerifiedIntegrationContext construction. Verify every revocation/deadline/scope/
+issuer/resource binding, non-bypass pooled isolation, replica/restart and ordinary WEB/DESKTOP rejection.
+Do not add MCP, resource data endpoints or Case disclosure in that increment; disclosure audit and
+handoff gates remain 3B.3. No current access token is accepted by any Shale data resource.
+
+Explicit boundaries: 3B.2D and 3B.3+ NOT STARTED; no VerifiedIntegrationContext from a token, no MCP route,
+no Case disclosure; WEB/DESKTOP remains authoritative; AI defaults OFF; no real tenant enablement,
+production/Azure SQL, deployment, installer/version publication or Curtis-specific integration.

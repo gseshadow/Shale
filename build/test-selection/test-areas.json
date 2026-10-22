@@ -544,6 +544,7 @@
         "com.shale.core.security.ai.AiScopeTest",
         "com.shale.data.security.ai.AiSecurityContractTest",
         "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+        "com.shale.data.security.ai.AiOAuthCredentialContractTest",
         "com.shale.data.security.ai.AiSecurityLocalSqlServerTest"
       ]
     },
