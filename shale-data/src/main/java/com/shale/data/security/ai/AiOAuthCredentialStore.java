@@ -34,9 +34,16 @@ public final class AiOAuthCredentialStore {
             if(!c.getAutoCommit())throw new IllegalStateException("Fresh issuance lease required.");
             c.setAutoCommit(false);
             try {
+                // SQL Server JDBC uses IMPLICIT_TRANSACTIONS for autoCommit=false. Disable implicit
+                // nesting and establish exactly one explicit transaction before entering AiLockV1.
+                try(var begin=c.createStatement()) {
+                    begin.setQueryTimeout(5);
+                    begin.execute("SET IMPLICIT_TRANSACTIONS OFF; IF @@TRANCOUNT<>0 THROW 58702,'Fresh issuance transaction required.',1; BEGIN TRANSACTION;");
+                }
                 var receipt=new AiOAuthExchangeStore(db,issuer,resource).consume(c,code,client,redirect,verifier,key,jti,issued,expires);
                 result=issue(c,receipt);
                 c.commit();
+                c.setAutoCommit(true);
             } catch(RuntimeException | SQLException failure) { c.rollback();throw failure; }
         } catch(SQLException failure) {throw new IllegalStateException("Credential issuance failed closed.",failure);}
         return result; // Includes successful lease close; never return secrets on an uncertain commit/close.

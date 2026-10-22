@@ -1057,4 +1057,39 @@ class AiSecurityLocalSqlServerTest {
         assertThrows(RuntimeException.class,()->refresh(second.refreshToken(),f.registration()));
     }
 
+    @Test void credentialRevokeHoldingAuthorityLockPreventsConcurrentRefreshCommit()throws Exception {
+        var f=credentialFixture();var first=redeem(f.code(),f.registration());
+        try(var c=owner(db);var pool=Executors.newSingleThreadExecutor()) {
+            sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=7; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=71; BEGIN TRANSACTION; EXEC dbo.AiLockV1");
+            // Synthetic owner mutation under the same production lock; no production connection or data.
+            sql(c,"UPDATE dbo.AiDelegatedSession SET RevokedAt=SYSUTCDATETIME(),RevocationReason='ADMIN'");
+            var ready=new CountDownLatch(1);
+            var pending=pool.submit(()->{ready.countDown();return credentialAttempt(()->refresh(first.refreshToken(),f.registration()));});
+            assertTrue(ready.await(5,TimeUnit.SECONDS));sql(c,"COMMIT TRANSACTION");
+            assertFalse(pending.get(15,TimeUnit.SECONDS),"Revoke committed under the authority lock must deny the pending refresh");
+        }
+        try(var c=owner(db)){assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential"));}
+    }
+    @Test void credentialEightHourIdleAndConsentAbsoluteMaximumNeverSlide()throws Exception {
+        var f=credentialFixture();
+        try(var c=owner(db)) {
+            // Explicit synthetic timestamp injection extends the existing one-hour grant up to its 24h ceiling.
+            sql(c,"DISABLE TRIGGER dbo.AiImmutable_AiDelegationGrant ON dbo.AiDelegationGrant");
+            sql(c,"UPDATE dbo.AiDelegationGrant SET ExpiresAt=DATEADD(hour,24,ConsentedAt)");
+            sql(c,"ENABLE TRIGGER dbo.AiImmutable_AiDelegationGrant ON dbo.AiDelegationGrant");
+            sql(c,"UPDATE dbo.UserSessions SET ExpiresAt=DATEADD(hour,25,SYSUTCDATETIME())");
+        }
+        var first=redeem(f.code(),f.registration());String absolute;
+        try(var c=owner(db)) {
+            assertEquals(28800,count(c,"SELECT DATEDIFF(second,IssuedAt,IdleExpiresAt) FROM dbo.AiDelegatedSession"));
+            assertEquals(86400,count(c,"SELECT DATEDIFF(second,ConsentAt,ExpiresAt) FROM dbo.AiDelegatedSession"));
+            absolute=scalar(c,"SELECT CONVERT(varchar(33),ExpiresAt,126) FROM dbo.AiDelegatedSession");
+        }
+        refresh(first.refreshToken(),f.registration());
+        try(var c=owner(db)) {
+            assertEquals(absolute,scalar(c,"SELECT CONVERT(varchar(33),ExpiresAt,126) FROM dbo.AiDelegatedSession"));
+            assertEquals(28800,count(c,"SELECT DATEDIFF(second,LastRefreshedAt,IdleExpiresAt) FROM dbo.AiDelegatedSession"));
+        }
+    }
+
 }
