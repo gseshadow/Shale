@@ -26,6 +26,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /** The only Spring security chain. Unmatched Shale routes retain their controller/service authority. */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
+@org.springframework.context.annotation.Import(OAuthCodeBootstrapConfiguration.class)
 @EnableConfigurationProperties(McpOAuthProperties.class)
 public class McpOAuthSecurityConfiguration {
     @Bean
@@ -34,9 +35,13 @@ public class McpOAuthSecurityConfiguration {
             org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.ServerAuthSessionService> auth,
             org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.DurableSessionStore> sessions,
             org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.RuntimeConnectionProvider> connections,
+            @org.springframework.beans.factory.annotation.Qualifier("oauthCodeBootstrap") org.springframework.beans.factory.ObjectProvider<com.shale.core.runtime.DbSessionProvider> bootstrap,
             org.springframework.beans.factory.ObjectProvider<HttpServletRequest> currentRequest) throws Exception {
         boolean authorizationEnabled=environment.getProperty("shale.ai.oauth.authorization-enabled",Boolean.class,false);
         if(authorizationEnabled && !properties.compositionEnabled()) throw new IllegalArgumentException("OAuth composition required.");
+        boolean exchangeEnabled=environment.getProperty("shale.ai.oauth.exchange-enabled",Boolean.class,false);
+        if(exchangeEnabled && !properties.compositionEnabled()) throw new IllegalArgumentException("OAuth composition required.");
+        var exchange=exchangeEnabled ? new OAuthCodeExchange(bootstrap.getObject(),connections.getObject(),properties,currentRequest::getObject) : null;
         DurableOAuthAuthorization durable;
         ShaleOAuthHuman humans;
         if(authorizationEnabled) {
@@ -70,6 +75,7 @@ public class McpOAuthSecurityConfiguration {
                 .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> {
+                    if(exchangeEnabled) authorize.requestMatchers("/oauth/mcp/token").authenticated();
                     if(authorizationEnabled) authorize.requestMatchers("/oauth/mcp/authorize").authenticated();
                     authorize.anyRequest().denyAll();
                 });
@@ -87,6 +93,12 @@ public class McpOAuthSecurityConfiguration {
                     .authorizationService(durable==null ? OAuthIssuanceDisabled.AUTHORIZATIONS : durable)
                     .authorizationConsentService(durable==null ? OAuthIssuanceDisabled.CONSENTS : durable.consents())
                     .tokenGenerator(OAuthIssuanceDisabled.TOKENS)
+                    .tokenEndpoint(endpoint -> endpoint
+                            .accessTokenRequestConverters(converters -> {
+                                converters.clear();
+                                converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2AuthorizationCodeAuthenticationConverter());
+                            })
+                            .authenticationProviders(providers -> { providers.clear(); if(exchange!=null) providers.add(exchange.codes()); }))
                     .clientAuthentication(authentication -> authentication
                             .authenticationConverters(converters -> {
                                 converters.clear();
@@ -94,14 +106,8 @@ public class McpOAuthSecurityConfiguration {
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.PublicClientAuthenticationConverter());
                             })
                             .authenticationProviders(providers -> {
-                                providers.removeIf(provider -> !(provider instanceof org.springframework.security.oauth2.server.authorization.authentication.JwtClientAssertionAuthenticationProvider ||
-                                        provider instanceof org.springframework.security.oauth2.server.authorization.authentication.PublicClientAuthenticationProvider));
-                                providers.forEach(provider -> {
-                                    if (provider instanceof org.springframework.security.oauth2.server.authorization.authentication.JwtClientAssertionAuthenticationProvider jwt)
-                                        jwt.setJwtDecoderFactory(client -> {
-                                            throw new UnsupportedOperationException("Pinned assertion validation/replay lifecycle is deferred.");
-                                        });
-                                });
+                                providers.clear();
+                                if(exchange!=null) providers.add(exchange.clients());
                             }))
                     .authorizationEndpoint(endpoint -> endpoint.consentPage("/oauth/mcp/consent")
                             .authorizationResponseHandler((req,res,authentication)-> {
@@ -138,18 +144,18 @@ public class McpOAuthSecurityConfiguration {
                             consent.setAuthorizationCodeGenerator(DurableOAuthAuthorization.CODES);
                     }))));
         }
-        // The gate precedes AS processing. Only explicit browser authorization is eligible; every token endpoint stays closed.
-        http.addFilterBefore(new FoundationGate(properties,authorizationEnabled), SecurityContextHolderFilter.class);
+        // The gate precedes AS processing. Explicit exchange validates and consumes only; issuance stays disabled.
+        http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled), SecurityContextHolderFilter.class);
         if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable),SecurityContextHolderFilter.class);
         return http.build();
     }
 
     private static final class FoundationGate extends OncePerRequestFilter {
         private final McpOAuthProperties properties;
-        private final boolean authorizationEnabled;
+        private final boolean authorizationEnabled,exchangeEnabled;
         private final org.springframework.http.converter.json.JacksonJsonHttpMessageConverter metadata =
                 new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter();
-        private FoundationGate(McpOAuthProperties properties,boolean authorizationEnabled) { this.properties=properties; this.authorizationEnabled=authorizationEnabled; }
+        private FoundationGate(McpOAuthProperties properties,boolean authorizationEnabled,boolean exchangeEnabled) { this.properties=properties; this.authorizationEnabled=authorizationEnabled; this.exchangeEnabled=exchangeEnabled; }
         @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
                 throws ServletException, IOException {
             response.setHeader("Cache-Control", "no-store");
@@ -160,6 +166,16 @@ public class McpOAuthSecurityConfiguration {
                 return;
             }
             String path=request.getRequestURI().substring(request.getContextPath().length());
+            if(exchangeEnabled && path.equals("/oauth/mcp/token") && "POST".equals(request.getMethod())) {
+                try { OAuthCodeExchange.validateRequest(request,properties); chain.doFilter(request,response); }
+                catch(org.springframework.security.oauth2.core.OAuth2AuthenticationException failure) {
+                    response.setStatus(400); response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\""+failure.getError().getErrorCode()+"\"}");
+                } catch(SecurityException | IllegalArgumentException invalid) {
+                    response.setStatus(400); response.setContentType("application/json"); response.getWriter().write("{\"error\":\"invalid_request\"}");
+                }
+                return;
+            }
             if(authorizationEnabled && ((path.equals("/oauth/mcp/authorize") && (request.getMethod().equals("GET") || request.getMethod().equals("POST"))) ||
                     (path.equals("/oauth/mcp/consent") && request.getMethod().equals("GET")))) {
                 response.setHeader("Referrer-Policy","no-referrer");

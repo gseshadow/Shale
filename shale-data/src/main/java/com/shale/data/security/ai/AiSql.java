@@ -9,6 +9,8 @@ import java.util.*;
 /** Procedure-owned transactions; drain completion before returning any result. */
 final class AiSql {
     private AiSql() {}
+    record TypedNull(int sqlType) {}
+    static Object nullable(Object value,int sqlType) { return value==null ? new TypedNull(sqlType) : value; }
     interface Mapper<T> { T read(ResultSet result) throws SQLException; }
 
     static <T> List<T> call(DbSessionProvider db, String procedure, Mapper<T> mapper, Object... args) {
@@ -18,7 +20,9 @@ final class AiSql {
             try (CallableStatement p = c.prepareCall("{call dbo." + procedure + "(" + markers + ")}")) {
                 p.setQueryTimeout(5);
                 for (int i = 0; i < args.length; i++) {
-                    if (args[i] == null) p.setNull(i + 1, Types.VARBINARY);
+                    if (args[i] instanceof TypedNull nil) p.setNull(i + 1, nil.sqlType());
+                    else if (args[i] == null) p.setNull(i + 1, Types.VARBINARY);
+                    else if (args[i] instanceof Instant instant) UtcJdbcTimestamp.set(p, i + 1, instant);
                     else if (args[i] instanceof byte[] bytes) p.setBytes(i + 1, bytes);
                     else p.setObject(i + 1, args[i]);
                 }

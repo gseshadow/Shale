@@ -242,3 +242,53 @@ SQL Server. The server fixture uses real restricted runtime SQL identity plus a 
 store; existing authentication regressions independently verify the production session adapters. The
 code-consume replay probe uses a replacement JVM and the same committed SQL record. Expiry tests
 explicitly label owner-only timestamp fault injection; this is not elapsed-wall-clock or production evidence.
+
+## Phase 3B.2C.1 exchange validation candidate
+
+`phase3b2c1.sql` is a separate manual, additive, transactional candidate after unchanged
+3B.1 and 3B.2B. It checks the foundation catalog/source receipt, exact 3B.2B procedure
+source, ownership and enabled RLS before installation. Its own catalog/source receipts allow
+an identical no-op repeat and stop on drift. Never change historical installers/receipts to
+make a new candidate pass. No installation, role membership or tenant enablement runs at startup.
+
+The only table added is strict tenant-owned `AiAssertionReplay`, with tenant/integration/key FK,
+SHA-256 JTI digest, acceptance/expiry times, unique tenant/integration/key/digest and expiry index.
+All three existing AI roles are denied direct reads/DML/ALTER/CONTROL. Runtime gets only
+`AiExchangeOAuthCodeV1`; bootstrap gets only `ResolveAiOAuthCodeV1` in addition to its existing
+confined modules. No auth-pool permission is expanded. Review effective deployed identity permissions
+independently before any future activation. The new resolver executes as dbo owner, accepts only
+exact code digest/client/configured issuer/resource with NULL context keys, and returns only
+ShaleClientId/UserId. It cannot enumerate clients, users, grants, sessions or credentials. The Java
+adapter opens a fresh lease through the existing runtime initializer, stamps both keys, and treats
+that owner as provisional until full SQL authority validation.
+
+The exchange procedure executes as caller, keeps RLS, takes existing shared global/exclusive tenant
+transaction locks and holds live tenant/user/WEB-session/registration/key/grant authority. It checks
+all immutable code bindings, registration version, S256, expiry and consume state. Confidential
+exchanges must use the exact authorization-pinned key; rotation never silently substitutes another
+key. Registration changes after issue fail closed and require new consent/code.
+
+Replay reservation, conditional code consumption and existing `AI_DELEGATION_GRANT/UPDATED` audit
+commit together. A duplicate JTI, failed verifier/binding/authority/expiry/audit or transaction failure
+rolls back both. Failed validation does not permanently invalidate a code/assertion; successful validation
+consumes both even though this phase deliberately returns an issuance-disabled error. Lost acknowledgement
+or lease-close failure withholds the result; committed consumption remains permanent. Do not retry as
+if that error were a successful token response: obtain a new authorization transaction.
+
+JTI digests are retained through their exact assertion expiry (at most 60 seconds from iat), without
+process-local replay authority. Each confidential exchange removes at most 256 expired rows in its own
+tenant before inserting one. Inactive tenants may retain expired digests until the next exchange; they
+never extend assertion validity. This is opportunistic bounded-batch cleanup, not a guaranteed timed purge.
+There is no cross-tenant cleanup API or deletion of audit/code/revocation history.
+
+Successful validation returns only immutable verified identities, scopes, issuer/resource, pinned-key
+reference, transaction/grant and clipped absolute deadline/correlation. No delegated session or credential
+row is inserted. Exchange audit uses only AI_SCOPE_MASK; audit append failure rolls back. Invalid attempts
+have no additional entity-action row: no trusted owner/actor may exist, existing bounded code history
+and replay facts supply security state, and raw inputs must never reach audit. Disclosure audit is 3B.3.
+
+`shale.ai.oauth.exchange-enabled=false` remains explicit. Enabling validation also requires composition
+and a **separate** `shale.ai.oauth.bootstrap.jdbc-url`, `.username`, `.password` SQL identity restricted to
+confined bootstrap EXECUTE. Never substitute the ordinary auth/runtime identity. Defaults do not connect.
+No runtime fallback exists if this configuration or SQL authority is unavailable. No token metadata is
+advertised because validation cannot issue credentials. No production/Azure execution is authorized.

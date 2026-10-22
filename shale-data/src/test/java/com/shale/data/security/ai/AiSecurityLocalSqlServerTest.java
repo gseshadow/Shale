@@ -666,6 +666,159 @@ class AiSecurityLocalSqlServerTest {
         }
     }
 
+    private void installExchange()throws Exception {
+        try(var c=owner(db)) {sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c1.sql")));}
+    }
+    private AiOAuthExchangeStore exchange(Integer tenant,Integer user) {return new AiOAuthExchangeStore(provider("runtime",tenant,user),ISSUER,RESOURCE);}
+    private AiOAuthExchangeStore bootstrapExchange() {return new AiOAuthExchangeStore(provider("bootstrap",null,null),ISSUER,RESOURCE);}
+    private AiOAuthExchangeStore.ValidatedExchange exchange(String code,Registration r,UUID key,String jti) {
+        var now=java.time.Instant.now().minusSeconds(1);
+        return exchange(7,72).consume(code,r.clientId(),CALLBACK,VERIFIER,key,jti,key==null?null:now,key==null?null:now.plusSeconds(60));
+    }
+    @Test void exchangeMigrationRepeatsRejectsDriftAndRestrictsResolverAndReplayPermissions()throws Exception {
+        installOAuth();installExchange(); installExchange();
+        try(var c=connection("runtime",7,72)) {
+            assertThrows(SQLException.class,()->sql(c,"SELECT * FROM dbo.AiAssertionReplay"));
+            assertThrows(SQLException.class,()->sql(c,"EXEC dbo.ResolveAiOAuthCodeV1 0x00,'client',N'x',N'x'"));
+        }
+        try(var c=connection("bootstrap",null,null)) {
+            assertThrows(SQLException.class,()->sql(c,"SELECT * FROM dbo.AiAssertionReplay"));
+            assertThrows(SQLException.class,()->sql(c,"SELECT * FROM dbo.AiAuthorizationTransaction"));
+            assertThrows(SQLException.class,()->sql(c,"EXEC dbo.AiExchangeOAuthCodeV1 0x00,'client',N'x',N'x',N'x','x',NULL,NULL,NULL,NULL,NEWID()"));
+        }
+        try(var c=owner(db)) {
+            assertEquals(3,count(c,"SELECT COUNT(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID('dbo.AiAssertionReplay')"));
+            sql(c,"ALTER TABLE dbo.AiAssertionReplay ADD Unexpected int NULL");
+            assertEquals(58600,assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c1.sql")))).getErrorCode());
+        }
+    }
+    @Test void exchangeReplayTableUsesActualNonBypassTenantFilterAndInsertBlock()throws Exception {
+        UUID sid=installOAuth();installExchange();enabled();Registration r=registration(true);var key=service(7,71).rotateClientKey(r.integrationId(),publicKey(),30,r.rowVersion());
+        String code=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,code);exchange(code,r,key.credentialId(),"rls-jti");
+        try(var c=owner(db)){sql(c,"GRANT SELECT,INSERT ON dbo.AiAssertionReplay TO ["+prefix+"_verifier]");}
+        for(Integer tenant:Arrays.asList(null,8,7))try(var c=connection("verifier",tenant,tenant==null?null:72)) {
+            assertEquals(tenant!=null&&tenant==7?1:0,count(c,"SELECT COUNT(*) FROM dbo.AiAssertionReplay"));
+            if(tenant==null||tenant==8)assertThrows(SQLException.class,()->sql(c,"INSERT dbo.AiAssertionReplay VALUES(7,'"+r.integrationId()+"','"+key.credentialId()+"',HASHBYTES('SHA2_256','foreign-synthetic-jti'),SYSUTCDATETIME(),DATEADD(second,30,SYSUTCDATETIME()))"),"Valid same-owner FK must still be blocked in a foreign/null runtime context");
+        }
+    }
+    @Test void exchangePublicExactBindingsFailureDoesNotConsumeAndRaceHasOneWinner()throws Exception {
+        UUID sid=installOAuth();installExchange();enabled();Registration r=registration(false);String code=opaque();UUID tx=startOAuth(r,sid,opaque());issueOAuth(tx,sid,code);
+        var owner=bootstrapExchange().resolve(code,r.clientId()).orElseThrow();assertEquals(new AiOAuthExchangeStore.Owner(7,72),owner);
+        assertTrue(bootstrapExchange().resolve(code,"wrong-client").isEmpty());
+        for(String[] bad:List.of(new String[]{"wrong",CALLBACK,VERIFIER},new String[]{r.clientId(),CALLBACK+"/",VERIFIER},new String[]{r.clientId(),CALLBACK,"w".repeat(43)}))
+            assertThrows(RuntimeException.class,()->exchange(7,72).consume(code,bad[0],bad[1],bad[2],null,null,null,null));
+        assertThrows(RuntimeException.class,()->exchange(7,73).consume(code,r.clientId(),CALLBACK,VERIFIER,null,null,null,null));
+        assertThrows(RuntimeException.class,()->exchange(8,82).consume(code,r.clientId(),CALLBACK,VERIFIER,null,null,null,null));
+        var outcomes=race(()->attempt(()->exchange(code,r,null,null)),()->attempt(()->exchange(code,r,null,null)));
+        assertEquals(1,outcomes.stream().filter(Boolean::booleanValue).count());
+        assertTrue(bootstrapExchange().resolve(code,r.clientId()).isEmpty());
+        assertThrows(RuntimeException.class,()->exchange(code,r,null,null));
+        try(var c=owner(db)){assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiDelegatedSession"));}
+    }
+    @Test void exchangeAssertionReplayRaceAcrossCodesHasOneWinnerAndFailedPkceDoesNotBurnJti()throws Exception {
+        UUID sid=installOAuth();installExchange();enabled();Registration r=registration(true);
+        var key=service(7,71).rotateClientKey(r.integrationId(),publicKey(),30,r.rowVersion());
+        String first=opaque(),second=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,first);issueOAuth(startOAuth(r,sid,opaque()),sid,second);
+        var now=java.time.Instant.now().minusSeconds(1);
+        assertThrows(RuntimeException.class,()->exchange(7,72).consume(first,r.clientId(),CALLBACK,"w".repeat(43),key.credentialId(),"same-jti",now,now.plusSeconds(60)));
+        var outcomes=race(()->attempt(()->exchange(first,r,key.credentialId(),"same-jti")),()->attempt(()->exchange(second,r,key.credentialId(),"same-jti")));
+        assertEquals(1,outcomes.stream().filter(Boolean::booleanValue).count());
+        try(var c=owner(db)){assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiAssertionReplay"));assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE ConsumedAt IS NOT NULL"));}
+        String remaining=bootstrapExchange().resolve(first,r.clientId()).isPresent()?first:second;
+        assertThrows(RuntimeException.class,()->exchange(remaining,r,key.credentialId(),"same-jti"));
+        replacementExchangeProbe(remaining,r,key.credentialId(),"same-jti");
+        assertNotNull(exchange(remaining,r,key.credentialId(),"fresh-jti"));
+        replacementExchangeProbe(first,r,key.credentialId(),"another-jti");
+    }
+    @org.junit.jupiter.params.ParameterizedTest(name="Exchange denies {0} committed before authorization")
+    @org.junit.jupiter.params.provider.ValueSource(strings={"grant-revoke","registration-revoke","registration-expiry","key-expiry","code-expiry","web-revoke","issuer","resource"})
+    void exchangeCommittedBindingExpiryOrRevocationDenies(String change)throws Exception {
+        UUID sid=installOAuth();installExchange();enabled();Registration r=registration(true);var admin=service(7,71);var key=admin.rotateClientKey(r.integrationId(),publicKey(),30,r.rowVersion());
+        String code=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,code);
+        switch(change) {
+            case "registration-revoke" -> admin.changeIntegration(r.integrationId(),AiScope.fromMask(3),true,admin.inspectRegistrations().getFirst().rowVersion());
+            case "grant-revoke" -> {
+                try(var c=owner(db);var st=c.createStatement();var row=st.executeQuery("SELECT GrantId,RowVer FROM dbo.AiDelegationGrant WHERE ShaleClientId=7")) {
+                    assertTrue(row.next());service(7,72).revokeGrant(UUID.fromString(row.getString(1)),new RowVersion(row.getBytes(2)));
+                }
+            }
+            case "web-revoke" -> {try(var c=owner(db)){sql(c,"UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME() WHERE SessionId='"+sid+"'");}}
+            case "issuer","resource" -> {
+                var wrong=new AiOAuthExchangeStore(provider("runtime",7,72),change.equals("issuer")?ISSUER+"/":ISSUER,change.equals("resource")?RESOURCE+"/":RESOURCE);
+                var now=java.time.Instant.now().minusSeconds(1);
+                assertThrows(RuntimeException.class,()->wrong.consume(code,r.clientId(),CALLBACK,VERIFIER,key.credentialId(),"binding-jti",now,now.plusSeconds(60)));
+                assertNotNull(exchange(code,r,key.credentialId(),"good-jti"));return;
+            }
+            default -> {
+                // Explicit test-owner timestamp fault injection; not elapsed-time/production evidence.
+                String table=change.equals("registration-expiry")?"AiIntegrationRegistration":change.equals("key-expiry")?"AiIntegrationClientKey":"AiAuthorizationTransaction";
+                try(var c=owner(db)) {
+                    sql(c,"DISABLE TRIGGER dbo.AiImmutable_"+table+" ON dbo."+table);
+                    if(change.equals("code-expiry")) sql(c,"UPDATE dbo.AiAuthorizationTransaction SET IssuedAt=DATEADD(second,-120,SYSUTCDATETIME()),CodeExpiresAt=DATEADD(second,-60,SYSUTCDATETIME())");
+                    else sql(c,"UPDATE dbo."+table+" SET CreatedAt=DATEADD(second,-120,SYSUTCDATETIME()),"+(change.equals("key-expiry")?"ValidFrom=DATEADD(second,-60,SYSUTCDATETIME()),":"")+"ExpiresAt=DATEADD(second,-1,SYSUTCDATETIME())");
+                    sql(c,"ENABLE TRIGGER dbo.AiImmutable_"+table+" ON dbo."+table);
+                }
+            }
+        }
+        assertThrows(RuntimeException.class,()->exchange(code,r,key.credentialId(),"expired-jti"));
+        try(var c=owner(db)){assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAssertionReplay"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE ConsumedAt IS NOT NULL"));}
+    }
+    private void replacementExchangeProbe(String code,Registration r,UUID key,String jti)throws Exception {
+        ProcessBuilder child=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-cp",System.getProperty("surefire.test.class.path"),ExchangeRestartProbe.class.getName());
+        var env=child.environment();env.put("AI_PROBE_URL",url(db));env.put("AI_PROBE_USER",prefix+"_runtime");env.put("AI_PROBE_PASSWORD",logins.get("runtime"));
+        env.put("AI_PROBE_CODE",code);env.put("AI_PROBE_CLIENT",r.clientId());env.put("AI_PROBE_KEY",key.toString());env.put("AI_PROBE_JTI",jti);
+        var process=child.redirectErrorStream(true).start();
+        try {assertTrue(process.waitFor(20,TimeUnit.SECONDS));assertEquals(0,process.exitValue(),"Replacement JVM must reject committed replay/revocation");}
+        finally {if(process.isAlive())process.destroyForcibly();}
+    }
+    public static class ExchangeRestartProbe {
+        public static void main(String[] args)throws Exception {
+            var store=new AiOAuthExchangeStore(()->{
+                try {var c=DriverManager.getConnection(System.getenv("AI_PROBE_URL"),System.getenv("AI_PROBE_USER"),System.getenv("AI_PROBE_PASSWORD"));
+                    sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=7; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=72");return c;
+                }catch(SQLException e){throw new IllegalStateException(e);}
+            },ISSUER,RESOURCE);
+            var now=java.time.Instant.now().minusSeconds(1);
+            try {store.consume(System.getenv("AI_PROBE_CODE"),System.getenv("AI_PROBE_CLIENT"),CALLBACK,VERIFIER,UUID.fromString(System.getenv("AI_PROBE_KEY")),System.getenv("AI_PROBE_JTI"),now,now.plusSeconds(60));throw new AssertionError("Replay accepted");}
+            catch(IllegalStateException expected) {
+                Throwable cause=expected;while(cause!=null && !(cause instanceof SQLException))cause=cause.getCause();
+                if(!(cause instanceof SQLException sql) || !Set.of(2627,2601,58502,58602).contains(sql.getErrorCode()))throw expected;
+            }
+        }
+    }
+    @Test void exchangeAuditFailureRollsBackBothReplayAndConsume()throws Exception {
+        UUID sid=installOAuth();installExchange();enabled();Registration r=registration(true);var key=service(7,71).rotateClientKey(r.integrationId(),publicKey(),30,r.rowVersion());
+        String code=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,code);
+        try(var c=owner(db)){sql(c,"CREATE TRIGGER dbo.DenyExchangeAudit ON dbo.EntityActionAuditLog AFTER INSERT AS THROW 58999,'Injected audit failure',1");}
+        assertThrows(RuntimeException.class,()->exchange(code,r,key.credentialId(),"audit-jti"));
+        try(var c=owner(db)){assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAssertionReplay"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE ConsumedAt IS NOT NULL"));sql(c,"DROP TRIGGER dbo.DenyExchangeAudit");}
+        var result=exchange(code,r,key.credentialId(),"audit-jti");assertEquals(72,result.actingUserId());assertEquals(key.credentialId(),result.authenticatingKeyId());assertEquals(AiScope.fromMask(1),result.approvedScopes());
+    }
+    @Test void exchangeCommittedRevocationAndEveryAuthorityDisableDenyWithoutConsumption()throws Exception {
+        UUID sid=installOAuth();installExchange();enabled();Registration r=registration(true);var key=service(7,71).rotateClientKey(r.integrationId(),publicKey(),30,r.rowVersion());
+        String code=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,code);
+        for(String change:List.of("UPDATE dbo.Users SET is_deleted=1 WHERE id=72","UPDATE dbo.Users SET IsRemoved=1 WHERE id=72","UPDATE dbo.ShaleClients SET IsActive=0 WHERE Id=7","UPDATE dbo.AiProductCapability SET Enabled=0 WHERE Id=1","UPDATE dbo.TenantAiIntegrationPolicy SET Enabled=0 WHERE ShaleClientId=7")) {
+            try(var c=owner(db)){sql(c,change);}
+            assertThrows(RuntimeException.class,()->exchange(code,r,key.credentialId(),"authority-jti"),change);
+            try(var c=owner(db)){sql(c,change.replace("is_deleted=1","is_deleted=0").replace("IsRemoved=1","IsRemoved=0").replace("IsActive=0","IsActive=1").replace("Enabled=0","Enabled=1"));}
+        }
+        // Use real administrative scope reduction: its permanent grant revoke must survive later expansion.
+        var current=service(7,71).inspectRegistrations().getFirst();
+        var reduced=service(7,71).changeIntegration(r.integrationId(),AiScope.fromMask(2),false,current.rowVersion());
+        service(7,71).changeIntegration(r.integrationId(),AiScope.fromMask(3),false,reduced.rowVersion());
+        assertThrows(RuntimeException.class,()->exchange(code,r,key.credentialId(),"authority-jti"));
+        replacementExchangeProbe(code,r,key.credentialId(),"new-jti");
+    }
+    @Test void exchangeCommittedKeyRevokePreventsOldKeyAndReplacementKeySubstitution()throws Exception {
+        UUID sid=installOAuth();installExchange();enabled();Registration r=registration(true);var admin=service(7,71);var key=admin.rotateClientKey(r.integrationId(),publicKey(),30,r.rowVersion());
+        String code=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,code);
+        var replacement=admin.rotateClientKey(r.integrationId(),publicKey(),30,admin.inspectRegistrations().getFirst().rowVersion());
+        assertThrows(RuntimeException.class,()->exchange(code,r,replacement.credentialId(),"rotation-jti"));
+        admin.revokeClientKey(r.integrationId(),key.credentialId(),admin.inspectClientKeys(r.integrationId()).stream().filter(k->k.credentialId().equals(key.credentialId())).findFirst().orElseThrow().rowVersion());
+        assertThrows(RuntimeException.class,()->exchange(code,r,key.credentialId(),"old-jti"));
+        replacementExchangeProbe(code,r,key.credentialId(),"restart-jti");
+    }
+
     private void enabled() {
         var product=product();product.setEnabled(true,product.inspect().rowVersion());service(7,71).setTenantEnabled(true,null);
     }

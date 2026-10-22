@@ -28,7 +28,7 @@ class OAuthAuthorizationFlowTest {
     static ShaleOAuthHumanTest.FixtureSessions sessions;
     static RuntimeConnectionProvider runtime;
     AnnotationConfigWebApplicationContext context;
-    String port,password,db,login,secret,webToken,client,otherClient;
+    String port,password,db,login,secret,bootstrapLogin,bootstrapSecret,webToken,client,otherClient;
     UUID sid;
     Connection owner(String database)throws Exception {return DriverManager.getConnection(url(database),"sa",password);}
     String url(String database){return "jdbc:sqlserver://127.0.0.1:"+port+";databaseName="+database+";encrypt=true;trustServerCertificate=true;loginTimeout=5;socketTimeout=10000";}
@@ -36,13 +36,16 @@ class OAuthAuthorizationFlowTest {
     @BeforeAll void setup()throws Exception {
         Assumptions.assumeTrue("LOCAL_DISPOSABLE_AI".equals(System.getenv("SHALE_AI_SQL_OPT_IN")),"Disposable loopback SQL opt-in required; skip is not evidence");
         port=System.getenv("SHALE_AI_SQL_PORT");password=System.getenv("SHALE_AI_SQL_PASSWORD");assertNotNull(port);assertTrue(port.matches("[0-9]{4,5}"));
-        db="AiOAuth_"+UUID.randomUUID().toString().replace("-","");login=db+"_runtime";secret=UUID.randomUUID()+"aB9!";
+        db="AiOAuth_"+UUID.randomUUID().toString().replace("-","");login=db+"_runtime";secret=UUID.randomUUID()+"aB9!";bootstrapLogin=db+"_bootstrap";bootstrapSecret=UUID.randomUUID()+"aB9!";
         try(var c=owner("master")){sql(c,"CREATE DATABASE ["+db+"]");sql(c,"CREATE LOGIN ["+login+"] WITH PASSWORD='"+secret+"',CHECK_POLICY=OFF");}
+        try(var c=owner("master")){sql(c,"CREATE LOGIN ["+bootstrapLogin+"] WITH PASSWORD='"+bootstrapSecret+"',CHECK_POLICY=OFF");}
         try(var c=owner(db)) {
             for(String batch:Files.readString(Path.of("../shale-data/src/test/resources/ai/synthetic-prerequisites.sql")).split("(?im)^GO\\s*$"))if(!batch.isBlank())sql(c,batch);
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b1.sql")));
             sql(c,"CREATE TABLE dbo.UserSessions(SessionId uniqueidentifier PRIMARY KEY,ShaleClientId int,UserId int,ClientType varchar(16),ExpiresAt datetime2(7),RevokedAt datetime2(7))");
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2b.sql")));
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c1.sql")));
+            sql(c,"CREATE USER ["+bootstrapLogin+"] FOR LOGIN ["+bootstrapLogin+"]; ALTER ROLE AiIntegrationBootstrap ADD MEMBER ["+bootstrapLogin+"]");
             sql(c,"CREATE USER ["+login+"] FOR LOGIN ["+login+"]; ALTER ROLE AiIntegrationRuntime ADD MEMBER ["+login+"]; ALTER ROLE AiCapabilityOperator ADD MEMBER ["+login+"]");
         }
         runtime=p->{Connection c=DriverManager.getConnection(url(db),login,secret);sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value="+p.shaleClientId()+"; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value="+p.userId());return c;};
@@ -57,7 +60,7 @@ class OAuthAuthorizationFlowTest {
         sessions=new ShaleOAuthHumanTest.FixtureSessions();sessions.current=new UserSessionView(1,sid,ClientType.WEB,null,prepared.tokenId(),Instant.now(),Instant.now().plusSeconds(3600),null,null,null);
         try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,72,'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
         context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true")));
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url",url(db),"shale.ai.oauth.bootstrap.username",bootstrapLogin,"shale.ai.oauth.bootstrap.password",bootstrapSecret)));
         context.register(McpOAuthSecurityConfiguration.class,Fixtures.class);context.refresh();
     }
     @Configuration static class Fixtures {
@@ -68,7 +71,7 @@ class OAuthAuthorizationFlowTest {
     }
     @AfterAll void cleanup()throws Exception {
         if(context!=null)context.close();
-        if(db!=null)try(var c=owner("master")){sql(c,"ALTER DATABASE ["+db+"] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE ["+db+"]");sql(c,"DROP LOGIN ["+login+"]");}
+        if(db!=null)try(var c=owner("master")){sql(c,"ALTER DATABASE ["+db+"] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE ["+db+"]");sql(c,"DROP LOGIN ["+login+"]");sql(c,"DROP LOGIN ["+bootstrapLogin+"]");}
     }
     MockHttpServletRequest authorization()throws Exception {
         var r=new MockHttpServletRequest("GET","/oauth/mcp/authorize");r.addParameter("response_type","code");r.addParameter("client_id",client);r.addParameter("redirect_uri",REDIRECT);r.addParameter("resource",RESOURCE);r.addParameter("scope","cases.search cases.overview.read");r.addParameter("state","exact + & = é");r.addParameter("code_challenge_method","S256");
@@ -99,7 +102,57 @@ class OAuthAuthorizationFlowTest {
         var store=new AiOAuthTransactionStore(()->{try{return runtime.openConnection(new ServerPrincipal(72,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
         assertEquals(Set.of(CASES_SEARCH),store.consume(result.get("code"),sid,client,REDIRECT,VERIFIER,ISSUER,RESOURCE).scopes());
         var token=new MockHttpServletRequest("POST","/oauth/mcp/token");token.addParameter("grant_type","authorization_code");token.addParameter("code",result.get("code"));
-        var blocked=send(token);assertEquals(404,blocked.getStatus());assertFalse(blocked.getContentAsString().contains("access_token"));
+        var blocked=send(token);assertEquals(400,blocked.getStatus());assertFalse(blocked.getContentAsString().contains("access_token"));
+    }
+    String freshCode()throws Exception {return query(send(approve(query(send(authorization()).getRedirectedUrl()).get("state"))).getRedirectedUrl()).get("code");}
+    MockHttpServletRequest exchangeRequest(String code) {
+        var r=new MockHttpServletRequest("POST","/oauth/mcp/token");r.setAttribute("skipAuthorization",true);
+        Map.of("grant_type","authorization_code","client_id",client,"code",code,"redirect_uri",REDIRECT,"resource",RESOURCE,"code_verifier",VERIFIER).forEach(r::setParameter);
+        return r;
+    }
+    @Test void maintainedPublicTokenEndpointConsumesOnlyExactCodePkceAndReturnsIssuanceDisabled()throws Exception {
+        String code=freshCode();
+        for(String[] bad:List.of(new String[]{"code_verifier","w".repeat(43)},new String[]{"redirect_uri",REDIRECT+"/"},new String[]{"resource",RESOURCE+"/"},new String[]{"client_id",otherClient},new String[]{"client_secret","secret"})) {
+            var r=exchangeRequest(code);r.setParameter(bad[0],bad[1]);var denied=send(r);assertTrue(denied.getStatus()>=400);assertFalse(denied.getContentAsString().contains("access_token"));
+        }
+        var success=send(exchangeRequest(code));assertEquals(400,success.getStatus());assertTrue(success.getContentAsString().contains("Credential issuance is disabled"),success.getContentAsString());
+        var replay=send(exchangeRequest(code));assertTrue(replay.getStatus()>=400);assertFalse(replay.getContentAsString().contains("Credential issuance is disabled"));
+        try(var c=owner(db);var stmt=c.createStatement();var rows=stmt.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.AiOAuthCredential)+(SELECT COUNT(*) FROM dbo.AiDelegatedSession)")){assertTrue(rows.next());assertEquals(0,rows.getInt(1));}
+        assertNull(success.getHeader("Authorization"));assertEquals(0,success.getCookies().length);
+    }
+    @Test void enabledTokenNamespaceRejectsEveryOtherGrantOrdinaryAuthAndMisleadingMetadata()throws Exception {
+        String code=freshCode();
+        for(String grant:List.of("password","implicit","client_credentials","refresh_token","urn:ietf:params:oauth:grant-type:token-exchange","urn:ietf:params:oauth:grant-type:device_code","extension")) {
+            var r=exchangeRequest(code);r.setParameter("grant_type",grant);var denied=send(r);assertEquals(400,denied.getStatus());assertTrue(denied.getContentAsString().contains("unsupported_grant_type"));
+        }
+        for(String auth:List.of("Bearer "+webToken,"Bearer "+"r".repeat(43),"Basic YTpi")) {
+            var r=exchangeRequest(code);r.addHeader("Authorization",auth);assertEquals(400,send(r).getStatus());
+        }
+        var metadata=send(new MockHttpServletRequest("GET",OAuthMetadataContract.AUTHORIZATION_SERVER_PATH));
+        assertEquals(200,metadata.getStatus());
+        var claims=new tools.jackson.databind.ObjectMapper().readTree(metadata.getContentAsString());
+        assertFalse(claims.has("token_endpoint"));assertTrue(claims.path("grant_types_supported").isEmpty());assertTrue(claims.path("token_endpoint_auth_methods_supported").isEmpty());
+        var valid=send(exchangeRequest(code));assertTrue(valid.getContentAsString().contains("Credential issuance is disabled"));
+    }
+    @Test void maintainedConfidentialEndpointRequiresPinnedJwtAndPkceAndRejectsReplayAcrossCodes()throws Exception {
+        var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
+        var g=java.security.KeyPairGenerator.getInstance("RSA");g.initialize(2048);var pair=g.generateKeyPair();
+        var reg=controls.register("Synthetic confidential",true,Set.of(CASES_SEARCH,CASES_OVERVIEW_READ),1,List.of(URI.create(REDIRECT)));
+        var key=controls.rotateClientKey(reg.integrationId(),(java.security.interfaces.RSAPublicKey)pair.getPublic(),1,reg.rowVersion());
+        String original=client;client=reg.clientId();
+        try {
+            String first=freshCode(),second=freshCode();var now=Instant.now().minusSeconds(1);
+            var jwt=new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.RS256).keyID(key.credentialId().toString()).build(),
+                    new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(client).subject(client).audience(ISSUER+"/token").issueTime(java.util.Date.from(now)).expirationTime(java.util.Date.from(now.plusSeconds(60))).jwtID(UUID.randomUUID().toString()).build());
+            jwt.sign(new com.nimbusds.jose.crypto.RSASSASigner(pair.getPrivate()));String assertion=jwt.serialize();
+            var missing=send(exchangeRequest(first));assertTrue(missing.getStatus()>=400);assertFalse(missing.getContentAsString().contains("Credential issuance is disabled"));
+            var wrong=exchangeRequest(first);wrong.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");wrong.setParameter("client_assertion",assertion);wrong.setParameter("code_verifier","w".repeat(43));
+            assertFalse(send(wrong).getContentAsString().contains("Credential issuance is disabled"));
+            var valid=exchangeRequest(first);valid.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");valid.setParameter("client_assertion",assertion);
+            var result=send(valid);assertTrue(result.getContentAsString().contains("Credential issuance is disabled"),result.getContentAsString());assertFalse(result.getContentAsString().contains("access_token"));
+            var replay=exchangeRequest(second);replay.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");replay.setParameter("client_assertion",assertion);
+            assertFalse(send(replay).getContentAsString().contains("Credential issuance is disabled"));
+        } finally {client=original;}
     }
     @Test void approvalRejectsCrossClientAndAllBindingSubstitutionsAndAllowsBothExplicitScopes()throws Exception {
         String nonce=query(send(authorization()).getRedirectedUrl()).get("state");
