@@ -42,6 +42,7 @@ public class McpOAuthSecurityConfiguration {
         boolean exchangeEnabled=environment.getProperty("shale.ai.oauth.exchange-enabled",Boolean.class,false);
         if(exchangeEnabled && !properties.compositionEnabled()) throw new IllegalArgumentException("OAuth composition required.");
         var exchange=exchangeEnabled ? new OAuthCodeExchange(bootstrap.getObject(),connections.getObject(),properties,currentRequest::getObject) : null;
+        var revocation=exchangeEnabled ? new OAuthRevocation(bootstrap.getObject(),connections.getObject(),properties,currentRequest::getObject) : null;
         DurableOAuthAuthorization durable;
         ShaleOAuthHuman humans;
         if(authorizationEnabled) {
@@ -75,7 +76,7 @@ public class McpOAuthSecurityConfiguration {
                 .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> {
-                    if(exchangeEnabled) authorize.requestMatchers("/oauth/mcp/token").authenticated();
+                    if(exchangeEnabled) authorize.requestMatchers("/oauth/mcp/token","/oauth/mcp/revoke").authenticated();
                     if(authorizationEnabled) authorize.requestMatchers("/oauth/mcp/authorize").authenticated();
                     authorize.anyRequest().denyAll();
                 });
@@ -100,17 +101,25 @@ public class McpOAuthSecurityConfiguration {
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2RefreshTokenAuthenticationConverter());
                             })
                             .authenticationProviders(providers -> { providers.clear(); if(exchange!=null) providers.add(exchange.codes()); }))
+                    .tokenRevocationEndpoint(endpoint -> endpoint
+                            .authenticationProviders(providers -> {providers.clear();if(revocation!=null)providers.add(revocation.credentials());})
+                            .errorResponseHandler((req,res,failure)-> {
+                                var error=((org.springframework.security.oauth2.core.OAuth2AuthenticationException)failure).getError().getErrorCode();
+                                res.setStatus(error.equals("server_error")?500:error.equals("invalid_client")?401:400);
+                                res.setContentType("application/json");res.getWriter().write("{\"error\":\""+error+"\"}");
+                            }))
                     .clientAuthentication(authentication -> authentication
                             .authenticationConverters(converters -> {
                                 converters.clear();
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.JwtClientAssertionAuthenticationConverter());
-                                converters.add(request -> "refresh_token".equals(request.getParameter("grant_type")) && request.getParameter("client_assertion")==null
+                                converters.add(request -> (OAuthRevocation.matches(request)||"refresh_token".equals(request.getParameter("grant_type"))) && request.getParameter("client_assertion")==null
                                         ? new org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken(
                                                 request.getParameter("client_id"),org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE,null,java.util.Map.of()) : null);
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.PublicClientAuthenticationConverter());
                             })
                             .authenticationProviders(providers -> {
                                 providers.clear();
+                                if(revocation!=null) providers.add(revocation.clients());
                                 if(exchange!=null) providers.add(exchange.clients());
                             }))
                     .authorizationEndpoint(endpoint -> endpoint.consentPage("/oauth/mcp/consent")
@@ -148,7 +157,7 @@ public class McpOAuthSecurityConfiguration {
                             consent.setAuthorizationCodeGenerator(DurableOAuthAuthorization.CODES);
                     }))));
         }
-        // The gate precedes AS processing. Explicit exchange enables only opaque code/refresh issuance.
+        // The gate precedes AS processing. Explicit exchange enables opaque code/refresh issuance and authenticated family revocation.
         http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled), SecurityContextHolderFilter.class);
         if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable),SecurityContextHolderFilter.class);
         return http.build();
@@ -170,6 +179,13 @@ public class McpOAuthSecurityConfiguration {
                 return;
             }
             String path=request.getRequestURI().substring(request.getContextPath().length());
+            if(exchangeEnabled && path.equals("/oauth/mcp/revoke") && "POST".equals(request.getMethod())) {
+                try {OAuthRevocation.validateRequest(request);chain.doFilter(request,response);}
+                catch(org.springframework.security.oauth2.core.OAuth2AuthenticationException failure) {
+                    response.setStatus(400);response.setContentType("application/json");response.getWriter().write("{\"error\":\"invalid_request\"}");
+                }
+                return;
+            }
             if(exchangeEnabled && path.equals("/oauth/mcp/token") && "POST".equals(request.getMethod())) {
                 try { OAuthCodeExchange.validateRequest(request,properties); chain.doFilter(request,response); }
                 catch(org.springframework.security.oauth2.core.OAuth2AuthenticationException failure) {

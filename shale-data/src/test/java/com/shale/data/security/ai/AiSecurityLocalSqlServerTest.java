@@ -1183,4 +1183,157 @@ class AiSecurityLocalSqlServerTest {
         try(var c=owner(db)){assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential WHERE RevokedAt IS NOT NULL"));}
     }
 
+    private void installRevocation()throws Exception {try(var c=owner(db)){sql(c,Files.readString(Path.of("../docs/sql/ai-integration/revocation.sql")));}}
+    private void revoke(String token,Registration r) {credentials().revoke(token,r.clientId(),null,null,null,null);}
+    @Test void revocationMigrationIsRepeatSafeAndDetectsDrift()throws Exception {
+        installOAuth();installCredentials();installRevocation();installRevocation();
+        try(var c=owner(db)) {
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/verify.sql")));
+            sql(c,"ALTER PROCEDURE dbo.AiRevokeOAuthCredentialV1 AS SELECT 1");
+            assertEquals(58800,assertThrows(SQLException.class,this::installRevocation).getErrorCode());
+        }
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"ACCESS","REFRESH"})
+    void revocationEitherCredentialRevokesAllDescendantsAndPreservesFirstHistory(String kind)throws Exception {
+        var f=credentialFixture();installRevocation();var first=redeem(f.code(),f.registration());var second=refresh(first.refreshToken(),f.registration());
+        String token=kind.equals("ACCESS")?first.accessToken():first.refreshToken();
+        revoke(token,f.registration());String timestamp,reason;
+        try(var c=owner(db)) {
+            assertEquals(4,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential WHERE RevokedAt IS NOT NULL"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED' AND Metadata=N'{\"ACTIVE\":false}'"));
+            timestamp=scalar(c,"SELECT CONVERT(varchar(40),RevokedAt,126) FROM dbo.AiDelegatedSession");reason=scalar(c,"SELECT RevocationReason FROM dbo.AiDelegatedSession");
+        }
+        revoke(token,f.registration());revoke(second.refreshToken(),f.registration());
+        try(var c=owner(db)) {
+            assertEquals(timestamp,scalar(c,"SELECT CONVERT(varchar(40),RevokedAt,126) FROM dbo.AiDelegatedSession"));assertEquals(reason,scalar(c,"SELECT RevocationReason FROM dbo.AiDelegatedSession"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED'"));
+        }
+        assertThrows(RuntimeException.class,()->refresh(second.refreshToken(),f.registration()));
+        replacementAccessProbe(first.accessToken(),true);replacementCredentialProbe(second.refreshToken(),f.registration(),false);
+    }
+    @Test void revocationUnknownMalformedForeignAndWrongTenantHaveNoStateOrAuditEffects()throws Exception {
+        var f=credentialFixture();installRevocation();var first=redeem(f.code(),f.registration());var other=registration(false);
+        var bootstrap=new AiOAuthCredentialStore(provider("bootstrap",null,null),ISSUER,RESOURCE);
+        assertEquals(new AiOAuthExchangeStore.Owner(7,72),bootstrap.resolveRevocation(first.accessToken(),f.registration().clientId()).orElseThrow());
+        assertEquals(new AiOAuthExchangeStore.Owner(7,71),bootstrap.resolveRevocation(first.accessToken(),other.clientId()).orElseThrow());
+        assertEquals(bootstrap.resolveRevocation("unknown",other.clientId()),bootstrap.resolveRevocation("malformed!",other.clientId()));
+        assertTrue(bootstrap.resolveRevocation(first.accessToken(),"unregistered").isEmpty());
+        for(String token:List.of("unknown","?malformed",first.accessToken(),first.refreshToken()))revoke(token,other);
+        new AiOAuthCredentialStore(provider("runtime",7,71),ISSUER,RESOURCE).revoke(first.accessToken(),f.registration().clientId(),null,null,null,null);
+        assertThrows(RuntimeException.class,()->new AiOAuthCredentialStore(provider("runtime",8,81),ISSUER,RESOURCE).revoke(first.accessToken(),f.registration().clientId(),null,null,null,null));
+        try(var c=owner(db)) {
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiDelegatedSession WHERE RevokedAt IS NOT NULL"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED'"));
+        }
+        assertNotNull(refresh(first.refreshToken(),f.registration()));
+    }
+    @Test void revocationInactiveSubjectsRemainNonOracleAndPermanent()throws Exception {
+        var f=credentialFixture();installRevocation();var first=redeem(f.code(),f.registration());
+        try(var c=owner(db)) {
+            sql(c,"UPDATE dbo.Users SET is_deleted=1 WHERE ShaleClientId=7 AND id=72");
+        }
+        var b=new AiOAuthCredentialStore(provider("bootstrap",null,null),ISSUER,RESOURCE);
+        var owner=b.resolveRevocation(first.accessToken(),f.registration().clientId()).orElseThrow();
+        assertTrue(new AiOAuthTransactionStore(provider("runtime",owner.tenantId(),owner.userId()),true,ISSUER,RESOURCE).loadRevocationClient(f.registration().clientId()).isPresent(),"Inactive subject cannot change client-auth response");
+        revoke(first.accessToken(),f.registration());
+        try(var c=owner(db)){sql(c,"UPDATE dbo.Users SET is_deleted=0 WHERE ShaleClientId=7 AND id=72");assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential WHERE RevokedAt IS NOT NULL"));}
+        assertThrows(RuntimeException.class,()->refresh(first.refreshToken(),f.registration()));
+    }
+    @Test void revocationAuditFailureRollsBackFamilyAndSharedReplayReservation()throws Exception {
+        UUID web=installOAuth();installCredentials();installRevocation();enabled();var r=registration(true);var admin=service(7,71);
+        var key=admin.rotateClientKey(r.integrationId(),publicKey(),1,r.rowVersion());String code=opaque();issueOAuth(startOAuth(r,web,opaque()),web,code);
+        var now=java.time.Instant.now().minusSeconds(1);var first=credentials().redeem(code,r.clientId(),CALLBACK,VERIFIER,key.credentialId(),"issue-before-revoke",now,now.plusSeconds(60));
+        try(var c=owner(db)){sql(c,"CREATE TRIGGER dbo.FailRevokeAudit ON dbo.EntityActionAuditLog AFTER INSERT AS IF EXISTS(SELECT 1 FROM inserted WHERE Action='DEACTIVATED') THROW 58999,'Injected revocation audit failure',1");}
+        assertThrows(IllegalStateException.class,()->credentials().revoke(first.accessToken(),r.clientId(),key.credentialId(),"retryable-revoke",now,now.plusSeconds(60)));
+        try(var c=owner(db)){assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiDelegatedSession WHERE RevokedAt IS NOT NULL"));assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiAssertionReplay"));sql(c,"DROP TRIGGER dbo.FailRevokeAudit");}
+        credentials().revoke(first.accessToken(),r.clientId(),key.credentialId(),"retryable-revoke",now,now.plusSeconds(60));
+        assertThrows(RuntimeException.class,()->credentials().revoke("unknown",r.clientId(),key.credentialId(),"retryable-revoke",now,now.plusSeconds(60)));
+    }
+    @Test void revocationUnknownConfidentialRequestConsumesSharedJtiAndCannotReplayAcrossRefresh()throws Exception {
+        UUID web=installOAuth();installCredentials();installRevocation();enabled();var r=registration(true);var key=service(7,71).rotateClientKey(r.integrationId(),publicKey(),1,r.rowVersion());
+        String code=opaque();issueOAuth(startOAuth(r,web,opaque()),web,code);var now=java.time.Instant.now().minusSeconds(1);
+        var first=credentials().redeem(code,r.clientId(),CALLBACK,VERIFIER,key.credentialId(),"issuance-jti",now,now.plusSeconds(60));
+        assertThrows(RuntimeException.class,()->credentials().revoke(first.accessToken(),r.clientId(),key.credentialId(),"issuance-jti",now,now.plusSeconds(60)));
+        credentials().revoke("unknown",r.clientId(),key.credentialId(),"unknown-jti",now,now.plusSeconds(60));
+        replacementRevocationReplayProbe(r,key.credentialId(),"unknown-jti",now,now.plusSeconds(60));
+        assertThrows(RuntimeException.class,()->credentials().refresh(first.refreshToken(),r.clientId(),key.credentialId(),"unknown-jti",now,now.plusSeconds(60)));
+        assertThrows(RuntimeException.class,()->credentials().revoke(first.accessToken(),r.clientId(),null,null,null,null));
+        assertNotNull(credentials().refresh(first.refreshToken(),r.clientId(),key.credentialId(),"fresh-refresh-jti",now,now.plusSeconds(60)));
+    }
+    @Test void revocationRaceWithRefreshAndAccessDescendantActivityAlwaysEndsRevoked()throws Exception {
+        var f=credentialFixture();installRevocation();var first=redeem(f.code(),f.registration());var second=refresh(first.refreshToken(),f.registration());
+        race(()->credentialAttempt(()->revoke(first.accessToken(),f.registration())),()->credentialAttempt(()->refresh(second.refreshToken(),f.registration())));
+        try(var c=owner(db)){assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiDelegatedSession WHERE RevokedAt IS NOT NULL"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential WHERE RevokedAt IS NULL"));}
+        assertThrows(RuntimeException.class,()->refresh(second.refreshToken(),f.registration()));
+    }
+    @Test void revocationCommittedWhileRefreshAwaitsFinalizationPreventsNewCredentials()throws Exception {
+        var f=credentialFixture();installRevocation();var first=redeem(f.code(),f.registration());var opened=new CountDownLatch(1);var resume=new CountDownLatch(1);
+        var delayed=new AiOAuthCredentialStore(()-> {
+            opened.countDown();try{if(!resume.await(5,TimeUnit.SECONDS))throw new IllegalStateException("Refresh gate timeout");}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+            return provider("runtime",7,72).requireConnection();
+        },ISSUER,RESOURCE);
+        try(var pool=Executors.newSingleThreadExecutor()) {
+            var pending=pool.submit(()->credentialAttempt(()->delayed.refresh(first.refreshToken(),f.registration().clientId(),null,null,null,null)));
+            try {assertTrue(opened.await(5,TimeUnit.SECONDS));revoke(first.refreshToken(),f.registration());}finally{resume.countDown();}
+            assertFalse(pending.get(15,TimeUnit.SECONDS),"Committed revoke must win before refresh final SQL transaction");
+        }
+        try(var c=owner(db)){assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential"));}
+    }
+    @Test void revocationRepeatedConcurrentRequestsAreIdempotentAndAuditOnce()throws Exception {
+        var f=credentialFixture();installRevocation();var first=redeem(f.code(),f.registration());
+        assertEquals(List.of(true,true),race(()->credentialAttempt(()->revoke(first.accessToken(),f.registration())),()->credentialAttempt(()->revoke(first.refreshToken(),f.registration()))));
+        try(var c=owner(db)){assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED'"));}
+    }
+
+    @Test void revocationExpiredAccessAndRefreshHistoryStillRevokeFamily()throws Exception {
+        var f=credentialFixture();installRevocation();var first=redeem(f.code(),f.registration());
+        try(var c=owner(db)) {
+            // Synthetic owner-only expiry injection; no elapsed-clock or production claim.
+            sql(c,"DISABLE TRIGGER dbo.AiImmutable_AiOAuthCredential ON dbo.AiOAuthCredential");
+            sql(c,"UPDATE dbo.AiOAuthCredential SET IssuedAt=DATEADD(minute,-65,SYSUTCDATETIME()),ExpiresAt=DATEADD(minute,-60,SYSUTCDATETIME())");
+            sql(c,"ENABLE TRIGGER dbo.AiImmutable_AiOAuthCredential ON dbo.AiOAuthCredential");
+        }
+        var b=new AiOAuthCredentialStore(provider("bootstrap",null,null),ISSUER,RESOURCE);
+        assertTrue(b.resolveRevocation(first.accessToken(),f.registration().clientId()).isPresent());
+        assertTrue(b.resolveRevocation(first.refreshToken(),f.registration().clientId()).isPresent());
+        revoke(first.refreshToken(),f.registration());revoke(first.accessToken(),f.registration());
+        try(var c=owner(db)){assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential WHERE RevokedAt IS NOT NULL"));}
+    }
+    @Test void revocationModulesRetainSeparateRestrictedSqlIdentities()throws Exception {
+        var f=credentialFixture();installRevocation();var first=redeem(f.code(),f.registration());
+        assertThrows(IllegalStateException.class,()->new AiOAuthCredentialStore(provider("runtime",7,72),ISSUER,RESOURCE).resolveRevocation(first.accessToken(),f.registration().clientId()));
+        assertThrows(IllegalStateException.class,()->new AiOAuthCredentialStore(provider("bootstrap",null,null),ISSUER,RESOURCE).revoke(first.accessToken(),f.registration().clientId(),null,null,null,null));
+        assertThrows(IllegalStateException.class,()->new AiOAuthCredentialStore(provider("bootstrap",7,72),ISSUER,RESOURCE).resolveRevocation(first.accessToken(),f.registration().clientId()));
+        try(var c=provider("runtime",7,72).requireConnection()) {
+            sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=7; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=72");
+            assertThrows(SQLException.class,()->sql(c,"SELECT CredentialHash FROM dbo.AiOAuthCredential"));
+        }
+    }
+
+    private void replacementRevocationReplayProbe(Registration r,UUID key,String jti,java.time.Instant issued,java.time.Instant expires)throws Exception {
+        var child=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-cp",System.getProperty("surefire.test.class.path"),RevocationReplayProbe.class.getName());
+        var env=child.environment();env.put("AI_PROBE_URL",url(db));env.put("AI_PROBE_USER",prefix+"_runtime");env.put("AI_PROBE_PASSWORD",logins.get("runtime"));
+        env.put("AI_PROBE_CLIENT",r.clientId());env.put("AI_PROBE_KEY",key.toString());env.put("AI_PROBE_JTI",jti);env.put("AI_PROBE_ISSUED",issued.toString());env.put("AI_PROBE_EXPIRES",expires.toString());
+        var process=child.redirectErrorStream(true).start();
+        try {assertTrue(process.waitFor(20,TimeUnit.SECONDS));assertEquals(0,process.exitValue(),"Replacement JVM must reject the committed revocation JTI");}
+        finally {if(process.isAlive())process.destroyForcibly();}
+    }
+    public static class RevocationReplayProbe {
+        public static void main(String[] args)throws Exception {
+            var store=new AiOAuthCredentialStore(()-> {
+                try {var c=DriverManager.getConnection(System.getenv("AI_PROBE_URL"),System.getenv("AI_PROBE_USER"),System.getenv("AI_PROBE_PASSWORD"));
+                    sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=7; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=72");return c;
+                }catch(SQLException e){throw new IllegalStateException(e);}
+            },ISSUER,RESOURCE);
+            try {
+                store.revoke("unknown",System.getenv("AI_PROBE_CLIENT"),UUID.fromString(System.getenv("AI_PROBE_KEY")),System.getenv("AI_PROBE_JTI"),java.time.Instant.parse(System.getenv("AI_PROBE_ISSUED")),java.time.Instant.parse(System.getenv("AI_PROBE_EXPIRES")));
+                throw new AssertionError("Committed revocation assertion replay accepted after process replacement");
+            }catch(IllegalStateException denied) {
+                Throwable cause=denied;while(cause!=null && !(cause instanceof SQLException))cause=cause.getCause();
+                if(!(cause instanceof SQLException sql)||!Set.of(2601,2627).contains(sql.getErrorCode()))throw denied;
+            }
+        }
+    }
+
 }

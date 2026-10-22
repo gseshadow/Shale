@@ -46,6 +46,7 @@ class OAuthAuthorizationFlowTest {
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2b.sql")));
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c1.sql")));
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c2.sql")));
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/revocation.sql")));
             sql(c,"CREATE USER ["+bootstrapLogin+"] FOR LOGIN ["+bootstrapLogin+"]; ALTER ROLE AiIntegrationBootstrap ADD MEMBER ["+bootstrapLogin+"]");
             sql(c,"CREATE USER ["+login+"] FOR LOGIN ["+login+"]; ALTER ROLE AiIntegrationRuntime ADD MEMBER ["+login+"]; ALTER ROLE AiCapabilityOperator ADD MEMBER ["+login+"]");
         }
@@ -202,10 +203,13 @@ class OAuthAuthorizationFlowTest {
         var substituted=authorization();substituted.setParameter("client_id","unknown");assertEquals(400,send(substituted).getStatus());
     }
     private String signedAssertion(UUID key,java.security.PrivateKey signing)throws Exception {
+        return signedAssertion(key,signing,"/token",UUID.randomUUID().toString());
+    }
+    private String signedAssertion(UUID key,java.security.PrivateKey signing,String endpoint,String jti)throws Exception {
         var now=Instant.now().minusSeconds(1);
         var jwt=new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.RS256).keyID(key.toString()).build(),
-                new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(client).subject(client).audience(ISSUER+"/token")
-                        .issueTime(java.util.Date.from(now)).expirationTime(java.util.Date.from(now.plusSeconds(60))).jwtID(UUID.randomUUID().toString()).build());
+                new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(client).subject(client).audience(ISSUER+endpoint)
+                        .issueTime(java.util.Date.from(now)).expirationTime(java.util.Date.from(now.plusSeconds(60))).jwtID(jti).build());
         jwt.sign(new com.nimbusds.jose.crypto.RSASSASigner(signing));return jwt.serialize();
     }
     private void authenticate(MockHttpServletRequest request,String assertion) {
@@ -230,6 +234,75 @@ class OAuthAuthorizationFlowTest {
             context.getBean(FilterChainProxy.class).doFilter(request,response,(q,res)->escaped.set(true));
             assertTrue(escaped.get(),"No bearer/MCP security surface may accept these credentials");
         }
+    }
+
+    MockHttpServletRequest revokeRequest(String token) {
+        var r=new MockHttpServletRequest("POST","/oauth/mcp/revoke");r.setAttribute("skipAuthorization",true);
+        r.setParameter("client_id",client);r.setParameter("token",token);return r;
+    }
+    @Test void publicRevocationIsEmpty200ForBothKindsUnknownMalformedForeignAndRepeated()throws Exception {
+        var mapper=new tools.jackson.databind.ObjectMapper();
+        for(String kind:List.of("access_token","refresh_token")) {
+            var first=mapper.readTree(send(exchangeRequest(freshCode())).getContentAsString());
+            var second=mapper.readTree(send(refreshRequest(first.path("refresh_token").asText())).getContentAsString());
+            String credential=first.path(kind).asText();
+            for(String presented:List.of("unknown","?not-an-opaque-token",credential,credential)) {
+                var r=revokeRequest(presented);r.setParameter("token_type_hint",kind.equals("access_token")?"refresh_token":"future-hint");
+                var result=send(r);assertEquals(200,result.getStatus(),result.getContentAsString());assertEquals("",result.getContentAsString());assertEquals("no-store",result.getHeader("Cache-Control"));
+            }
+            assertEquals(400,send(refreshRequest(second.path("refresh_token").asText())).getStatus(),"All descendants are revoked");
+        }
+        var live=mapper.readTree(send(exchangeRequest(freshCode())).getContentAsString());
+        var foreign=revokeRequest(live.path("access_token").asText());foreign.setParameter("client_id",otherClient);
+        var response=send(foreign);assertEquals(200,response.getStatus());assertEquals("",response.getContentAsString());
+        assertEquals(200,send(refreshRequest(live.path("refresh_token").asText())).getStatus(),"Foreign client cannot revoke");
+    }
+    @Test void revocationRejectsSecretsCallerAuthorityAndOrdinarySessionAuthentication()throws Exception {
+        for(String field:List.of("client_secret","tenant_id","user_id","integration_id")) {
+            var r=revokeRequest("unknown");r.setParameter(field,"sentinel");assertEquals(400,send(r).getStatus());
+        }
+        for(String header:List.of("Basic YTpi","Bearer "+webToken,"Bearer "+"a".repeat(43))) {
+            var r=revokeRequest("unknown");r.addHeader("Authorization",header);assertEquals(400,send(r).getStatus());
+        }
+        var missing=revokeRequest("unknown");missing.removeParameter("client_id");assertEquals(400,send(missing).getStatus());
+    }
+    @Test void confidentialRevocationRequiresEndpointAudienceAndFreshSharedJtiEvenForUnknown()throws Exception {
+        var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
+        var g=java.security.KeyPairGenerator.getInstance("RSA");g.initialize(2048);var pair=g.generateKeyPair();
+        var reg=controls.register("Synthetic revocation",true,Set.of(CASES_SEARCH,CASES_OVERVIEW_READ),1,List.of(URI.create(REDIRECT)));
+        var key=controls.rotateClientKey(reg.integrationId(),(java.security.interfaces.RSAPublicKey)pair.getPublic(),1,reg.rowVersion());
+        String original=client;client=reg.clientId();
+        try {
+            String jti=UUID.randomUUID().toString();
+            var issue=exchangeRequest(freshCode());authenticate(issue,signedAssertion(key.credentialId(),pair.getPrivate(),"/token",jti));
+            var issued=send(issue);assertEquals(200,issued.getStatus(),issued.getContentAsString());
+            var body=new tools.jackson.databind.ObjectMapper().readTree(issued.getContentAsString());String access=body.path("access_token").asText();
+            assertTrue(send(revokeRequest("unknown")).getStatus()>=400,"Confidential client always needs proof");
+            var wrongAudience=revokeRequest(access);authenticate(wrongAudience,signedAssertion(key.credentialId(),pair.getPrivate()));assertTrue(send(wrongAudience).getStatus()>=400);
+            var badSignature=revokeRequest(access);authenticate(badSignature,signedAssertion(key.credentialId(),g.generateKeyPair().getPrivate(),"/revoke",UUID.randomUUID().toString()));assertTrue(send(badSignature).getStatus()>=400);
+            var shared=revokeRequest(access);authenticate(shared,signedAssertion(key.credentialId(),pair.getPrivate(),"/revoke",jti));assertEquals(401,send(shared).getStatus(),"Issuance JTI cannot be reused with a newly signed revoke audience");
+            String assertion=signedAssertion(key.credentialId(),pair.getPrivate(),"/revoke",UUID.randomUUID().toString());
+            var unknown=revokeRequest("unknown");authenticate(unknown,assertion);assertEquals(200,send(unknown).getStatus());
+            var replay=revokeRequest(access);authenticate(replay,assertion);assertEquals(401,send(replay).getStatus(),"Unknown revocation still consumes shared JTI");
+            var valid=revokeRequest(access);authenticate(valid,signedAssertion(key.credentialId(),pair.getPrivate(),"/revoke",UUID.randomUUID().toString()));
+            var response=send(valid);assertEquals(200,response.getStatus(),response.getContentAsString());assertEquals("",response.getContentAsString());
+            var refresh=refreshRequest(body.path("refresh_token").asText());authenticate(refresh,signedAssertion(key.credentialId(),pair.getPrivate()));assertEquals(400,send(refresh).getStatus());
+            var nextIssue=exchangeRequest(freshCode());authenticate(nextIssue,signedAssertion(key.credentialId(),pair.getPrivate()));
+            var nextResponse=send(nextIssue);assertEquals(200,nextResponse.getStatus());
+            String nextRefresh=new tools.jackson.databind.ObjectMapper().readTree(nextResponse.getContentAsString()).path("refresh_token").asText();
+            var revokeRefresh=revokeRequest(nextRefresh);authenticate(revokeRefresh,signedAssertion(key.credentialId(),pair.getPrivate(),"/revoke",UUID.randomUUID().toString()));
+            assertEquals(200,send(revokeRefresh).getStatus());
+            var deniedRefresh=refreshRequest(nextRefresh);authenticate(deniedRefresh,signedAssertion(key.credentialId(),pair.getPrivate()));assertEquals(400,send(deniedRefresh).getStatus());
+            controls.revokeClientKey(reg.integrationId(),key.credentialId(),key.rowVersion());
+            var revokedKey=revokeRequest("unknown");authenticate(revokedKey,signedAssertion(key.credentialId(),pair.getPrivate(),"/revoke",UUID.randomUUID().toString()));assertTrue(send(revokedKey).getStatus()>=400);
+        } finally {client=original;}
+    }
+    @Test void revocationAuditFailureWithholdsSuccessAndRollsBackFamily()throws Exception {
+        var mapper=new tools.jackson.databind.ObjectMapper();var body=mapper.readTree(send(exchangeRequest(freshCode())).getContentAsString());
+        try(var c=owner(db)){sql(c,"CREATE TRIGGER dbo.FailRevokeAudit ON dbo.EntityActionAuditLog AFTER INSERT AS IF EXISTS(SELECT 1 FROM inserted WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED') THROW 58999,'Injected revoke audit fault',1");}
+        try {assertEquals(500,send(revokeRequest(body.path("access_token").asText())).getStatus());}
+        finally {try(var c=owner(db)){sql(c,"DROP TRIGGER dbo.FailRevokeAudit");}}
+        assertEquals(200,send(refreshRequest(body.path("refresh_token").asText())).getStatus(),"Audit failure must roll back family revocation");
     }
 
 }

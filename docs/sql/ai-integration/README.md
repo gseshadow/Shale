@@ -368,3 +368,64 @@ RFC 8414 advertises code+refresh and none/private_key_jwt/RS256 only when exchan
 S256 remains mandatory. Default switches remain OFF. RFC 7009 revocation is deferred to the smallest
 client-authenticated family-revocation follow-on before 3B.2D; no custom unauthenticated endpoint is added.
 Existing authenticated internal session revocation remains usable. No token is accepted by a Shale data resource.
+
+## RFC 7009 revocation closeout candidate
+
+Apply `revocation.sql` only after the unchanged receipted 3B.1 → 3B.2B → 3B.2C.1 → 3B.2C.2
+candidates, with separately approved migration authority in a fresh dbo session with both context keys
+NULL. This is a manual additive candidate, not startup installation or authorization for production SQL.
+It checks the cumulative credential catalog/source receipt, adds three confined procedures without new
+tables or changes to historical modules, and records a cumulative catalog/source receipt. Identical repeat
+is a no-op; drift stops for review. `verify.sql` checks the extension when installed.
+
+With composition and exchange explicitly enabled, the maintained Spring Authorization Server endpoint
+`POST /oauth/mcp/revoke` accepts singleton form fields `client_id`, `token`, optional `token_type_hint`,
+and confidential assertion fields. No resource or caller tenant/user/integration/session authority is
+accepted. Public clients use `none` with no secret. Confidential clients use a fresh pinned active RSA
+RS256 `private_key_jwt`, exact issuer/subject client and audience `<configured issuer>/revoke`, at most
+60 seconds, with the existing shared SQL JTI replay table. No Basic, secret, remote JWKS or other algorithm.
+Revocation permits any currently active pinned key of the same client: reducing a family's authority does
+not transfer issuance/refresh authority to that key. Refresh still requires the family's original key.
+
+`ResolveAiRevocationV1` is bootstrap-only, requires NULL context keys, and accepts one exact locally
+computed SHA-256 credential digest plus client/configured issuer/resource. It returns only provisional
+tenant/user for an ACCESS or REFRESH family, including consumed/expired/revoked history. Unknown or foreign
+credentials return the exact registration's creator solely as a configuration/revocation runtime subject.
+There is no credential inventory or resource-token authentication. A fresh normally initialized runtime
+lease then loads exactly that client's configuration through `AiLoadRevocationClientV1`. Unlike issuance,
+this bounded configuration seam does not require an eligible human: inactive subjects must not turn known
+versus unknown credentials into distinguishable client-authentication outcomes. It checks tenant activity,
+subject membership, capability/policy and live registration/keys. It cannot authorize business access.
+
+`AiRevokeOAuthCredentialV1` revalidates exact client/integration/tenant/configured identities, context-subject
+membership, live registration and current key under existing global/tenant transaction locks and held rows.
+Confidential replay reservation uses the existing shared `AiAssertionReplay` uniqueness and bounded cleanup,
+even for unknown credentials. The lookup repeats all credential/session/user/grant/integration/client
+bindings under caller RLS. Either credential kind revokes the entire delegated session/family; the existing
+session trigger revokes all active access credentials and the entire refresh lineage. Consumed/expired history
+remains stored. It neither requires an unexpired grant/token nor restores authority to an inactive subject.
+Concurrent refresh/family activity uses the same locks; a committed revoke prevents later finalization.
+First timestamp/reason is retained, with the existing SELF reason for client-requested family revocation.
+Re-enable cannot resurrect descendants. No partial-access revocation model is introduced.
+
+Authenticated known, unknown, malformed-presented, foreign and repeated revocations return empty HTTP 200;
+hints are advisory, including unknown/mismatched hints. Missing/duplicate/unbounded form fields are
+`invalid_request`; invalid client/proof or replay fails client authentication. SQL/audit failures withhold
+success. Success has no credential/existence details, cookies or resource capability. Enabled RFC 8414
+metadata adds only the revocation endpoint and its actual none/private_key_jwt/RS256 profile. Defaults OFF
+continue to withhold these claims.
+
+A newly revoked family appends exactly one existing `AI_DELEGATED_SESSION/DEACTIVATED` entity-action audit
+with server-derived affected subject, numeric family row, service source, correlation UUID and ACTIVE=false.
+This describes the delegated subject, not an assertion that a human initiated the client request. Revocation,
+replay reservation and required audit commit together; an audit failure rolls all back. Repeated/no-op
+requests add no entity row because no new family mutation occurred; confidential no-ops still retain replay
+state. No token/digest/assertion/JTI/key, secret, prompt, PHI or Case data enters audit. No schema change;
+3B.3 disclosure audit remains separate. Disable the endpoint/code on rollback and retain all history and
+receipts; no destructive down migration or automatic tenant enablement.
+
+Verification extends `AiOAuthRevocationContractTest`, `OAuthRevocationPolicyTest`,
+`AiSecurityLocalSqlServerTest#revocation*` and `OAuthAuthorizationFlowTest`, using only dedicated loopback
+SQL and distinct restricted identities. Replacement JVMs inspect persisted revocation and reject refresh
+and confidential JTI replay. Expiry tests label owner-only timestamp injection. Results and remaining
+acceptance limits are recorded in the canonical roadmap; skips are not acceptance.

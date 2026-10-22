@@ -8,7 +8,7 @@ import java.sql.*;
 import java.time.Instant;
 import java.util.*;
 
-/** Credential issuance/refresh only. No access-token presentation or verified resource context. */
+/** Opaque credential lifecycle only. No bearer-resource authentication or verified resource context. */
 public final class AiOAuthCredentialStore {
     private static final SecureRandom RANDOM=new SecureRandom();
     private final DbSessionProvider db;
@@ -26,6 +26,29 @@ public final class AiOAuthCredentialStore {
         var rows=AiSql.call(db,"ResolveAiRefreshV1",r->new AiOAuthExchangeStore.Owner(r.getInt("ShaleClientId"),r.getInt("UserId")),digest(token),client,issuer,resource);
         if(rows.size()>1)throw new SecurityException("Refresh unavailable.");
         return rows.stream().findFirst();
+    }
+    /** Confined exact client/digest lookup, including inactive history. Unknown/foreign input uses
+     * the registration creator solely to initialize configuration/revocation SQL, never business authority. */
+    public Optional<AiOAuthExchangeStore.Owner> resolveRevocation(String token,String client) {
+        var rows=AiSql.call(db,"ResolveAiRevocationV1",r->new AiOAuthExchangeStore.Owner(r.getInt("ShaleClientId"),r.getInt("UserId")),
+                revocationDigest(token),client,issuer,resource);
+        if(rows.size()>1)throw new SecurityException("Client unavailable.");
+        return rows.stream().findFirst();
+    }
+    /** Either credential revokes the entire family. SQL owns replay, revocation and security audit. */
+    public void revoke(String token,String client,UUID key,String jti,Instant issued,Instant expires) {
+        byte[] jtiHash=null;
+        if(key!=null) {
+            if(jti==null||jti.isBlank()||jti.length()>256)throw new SecurityException("Assertion unavailable.");
+            jtiHash=AiSql.hash(jti.getBytes(StandardCharsets.UTF_8));
+        } else if(jti!=null||issued!=null||expires!=null)throw new SecurityException("Unexpected assertion.");
+        AiSql.call(db,"AiRevokeOAuthCredentialV1",r->true,revocationDigest(token),client,issuer,resource,
+                AiSql.nullable(key,Types.VARCHAR),jtiHash,AiSql.nullable(issued,Types.TIMESTAMP),
+                AiSql.nullable(expires,Types.TIMESTAMP),UUID.randomUUID());
+    }
+    static byte[] revocationDigest(String token) {
+        if(token==null||token.length()>2048)throw new IllegalArgumentException("Bounded credential required.");
+        return AiSql.hash(token.getBytes(StandardCharsets.UTF_8));
     }
     /** One transaction owns validation, code/JTI consumption, the verified receipt, family creation and audit. */
     public Tokens redeem(String code,String client,String redirect,String verifier,UUID key,String jti,Instant issued,Instant expires) {

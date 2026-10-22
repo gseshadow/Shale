@@ -30,6 +30,9 @@ public final class OAuthMetadataContract {
         if(!exchangeEnabled) return authorizationServer(properties,authorizationEnabled);
         var claims=new java.util.LinkedHashMap<>(authorizationServer(properties,authorizationEnabled));
         claims.put("token_endpoint",properties.issuer()+"/token");
+        claims.put("revocation_endpoint",properties.issuer()+"/revoke");
+        claims.put("revocation_endpoint_auth_methods_supported",List.of("none","private_key_jwt"));
+        claims.put("revocation_endpoint_auth_signing_alg_values_supported",List.of("RS256"));
         claims.put("grant_types_supported",List.of("authorization_code","refresh_token"));
         claims.put("token_endpoint_auth_methods_supported",List.of("none","private_key_jwt"));
         claims.put("token_endpoint_auth_signing_alg_values_supported",List.of("RS256"));

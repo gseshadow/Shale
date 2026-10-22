@@ -64,7 +64,10 @@ class OAuthMetadataTest {
         assertEquals(java.util.List.of("none","private_key_jwt"),claims.get("token_endpoint_auth_methods_supported"));
         assertEquals(java.util.List.of("RS256"),claims.get("token_endpoint_auth_signing_alg_values_supported"));
         assertEquals(p.issuer()+"/token",claims.get("token_endpoint"));
-        for(String k:java.util.List.of("revocation_endpoint","jwks_uri","userinfo_endpoint","registration_endpoint"))assertFalse(claims.containsKey(k));
+        assertEquals(p.issuer()+"/revoke",claims.get("revocation_endpoint"));
+        assertEquals(List.of("none","private_key_jwt"),claims.get("revocation_endpoint_auth_methods_supported"));
+        assertEquals(List.of("RS256"),claims.get("revocation_endpoint_auth_signing_alg_values_supported"));
+        for(String k:java.util.List.of("jwks_uri","userinfo_endpoint","registration_endpoint"))assertFalse(claims.containsKey(k));
     }
 
 }
