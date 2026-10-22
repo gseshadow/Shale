@@ -466,6 +466,199 @@ class AiSecurityLocalSqlServerTest {
         }
     }
 
+    private static final String CALLBACK="https://client.test/callback";
+    private static final String VERIFIER="v".repeat(43);
+    private static String opaque() { byte[] b=new byte[32];new java.security.SecureRandom().nextBytes(b);return Base64.getUrlEncoder().withoutPadding().encodeToString(b); }
+    private static String challenge() { return Base64.getUrlEncoder().withoutPadding().encodeToString(AiSql.hash(VERIFIER.getBytes(java.nio.charset.StandardCharsets.US_ASCII))); }
+    private AiOAuthTransactionStore oauth(int tenant,int user) { return new AiOAuthTransactionStore(()->{try{return connection("runtime",tenant,user);}catch(SQLException e){throw new IllegalStateException("Synthetic connection unavailable",e);}},true,ISSUER,RESOURCE); }
+    private UUID installOAuth() throws Exception {
+        try(Connection c=owner(db)) {
+            // SYNTHETIC durable-session prerequisite only: not a production schema export.
+            sql(c,"CREATE TABLE dbo.UserSessions(SessionId uniqueidentifier PRIMARY KEY,ShaleClientId int NOT NULL,UserId int NOT NULL,ClientType varchar(16) NOT NULL,ExpiresAt datetime2(7) NOT NULL,RevokedAt datetime2(7) NULL)");
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2b.sql")));
+            UUID sid=UUID.randomUUID();
+            sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,72,'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");
+            return sid;
+        }
+    }
+    private UUID webSession(int tenant,int user)throws Exception {
+        UUID session=UUID.randomUUID();
+        try(Connection c=owner(db)) {sql(c,"INSERT dbo.UserSessions VALUES('"+session+"',"+tenant+","+user+",'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
+        return session;
+    }
+    private UUID startOAuth(Registration r,UUID sid,String nonce) {
+        UUID id=UUID.randomUUID();
+        oauth(7,72).begin(id,sid,r.clientId(),CALLBACK,challenge(),"exact + & Unicode: é",AiScope.fromMask(3),nonce);
+        return id;
+    }
+    private void issueOAuth(UUID id,UUID sid,String code) { oauth(7,72).approve(id,sid,AiScope.fromMask(1));oauth(7,72).complete(id,sid,AiScope.fromMask(1),code); }
+    private AiOAuthTransactionStore.Consumed consumeOAuth(String code,UUID sid,Registration r) { return oauth(7,72).consume(code,sid,r.clientId(),CALLBACK,VERIFIER,ISSUER,RESOURCE); }
+
+    @Test void oauthFreshClientLoaderAndSelfConsentBindEveryOwnerAndExactScopes() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(false);
+        assertEquals(r.integrationId(),oauth(7,72).loadClient(r.clientId()).orElseThrow().integration());
+        service(8,81).setTenantEnabled(true,null);
+        assertTrue(oauth(8,82).loadClient(r.clientId()).isEmpty(),"Both tenants enabled: ownership alone must reject the foreign client");
+        UUID foreignSession=webSession(8,82);
+        assertThrows(IllegalStateException.class,()->oauth(8,82).begin(UUID.randomUUID(),foreignSession,r.clientId(),CALLBACK,challenge(),"state",AiScope.fromMask(1),opaque()));
+        assertTrue(oauth(7,72).loadClient(r.clientId().toLowerCase(java.util.Locale.ROOT)).isEmpty());
+        String nonce=opaque();UUID id=startOAuth(r,sid,nonce);
+        assertEquals("exact + & Unicode: é",oauth(7,72).findIntent(nonce,sid).orElseThrow().clientState());
+        for(int user:new int[]{71,73}) {
+            UUID ownSession=webSession(7,user);
+            assertTrue(oauth(7,user).findIntent(nonce,ownSession).isEmpty(),"A valid other-user WEB session must not resolve this intent");
+            assertThrows(IllegalStateException.class,()->oauth(7,user).approve(id,ownSession,AiScope.fromMask(1)),"Even admin cannot manufacture another user's consent");
+        }
+        assertTrue(oauth(7,72).findIntent(opaque(),sid).isEmpty());
+        String code=opaque();issueOAuth(id,sid,code);
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque()));
+        assertEquals(AiScope.fromMask(1),consumeOAuth(code,sid,r).scopes());
+        try(Connection c=owner(db)) {
+            assertEquals(60,count(c,"SELECT DATEDIFF(second,IssuedAt,CodeExpiresAt) FROM dbo.AiAuthorizationTransaction"));
+            assertEquals(32,count(c,"SELECT DATALENGTH(CodeHash) FROM dbo.AiAuthorizationTransaction"));
+            assertEquals(72,count(c,"SELECT UserId FROM dbo.AiDelegationGrant"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATION_GRANT' AND Action='CREATED' AND Metadata=N'{\"AI_SCOPE_MASK\":1}'"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiDelegatedSession"));
+        }
+    }
+    @Test void oauthCodeBindingRejectsChangedClientRedirectIssuerResourceAndVerifier() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(false);String code=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,code);
+        for(String[] values:List.of(new String[]{"other",CALLBACK,VERIFIER,ISSUER,RESOURCE},new String[]{r.clientId(),CALLBACK+"/",VERIFIER,ISSUER,RESOURCE},
+                new String[]{r.clientId(),CALLBACK,"w".repeat(43),ISSUER,RESOURCE},new String[]{r.clientId(),CALLBACK,VERIFIER,ISSUER+"/",RESOURCE},
+                new String[]{r.clientId(),CALLBACK,VERIFIER,ISSUER,RESOURCE+"/"}))
+            assertThrows(RuntimeException.class,()->oauth(7,72).consume(code,sid,values[0],values[1],values[2],values[3],values[4]));
+        assertNotNull(consumeOAuth(code,sid,r));
+        assertThrows(IllegalStateException.class,()->consumeOAuth(code,sid,r));
+    }
+    @Test void oauthCodeConsumeRaceHasExactlyOneWinnerAndReplacementJvmRejectsReplay() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(false);String code=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,code);
+        var outcomes=race(()->attempt(()->consumeOAuth(code,sid,r)),()->attempt(()->consumeOAuth(code,sid,r)));
+        assertEquals(1,outcomes.stream().filter(Boolean::booleanValue).count(),"Atomic SQL consume must have one winner");
+        ProcessBuilder child=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-cp",System.getProperty("surefire.test.class.path"),OAuthRestartProbe.class.getName());
+        child.environment().put("AI_PROBE_URL",url(db));child.environment().put("AI_PROBE_USER",prefix+"_runtime");child.environment().put("AI_PROBE_PASSWORD",logins.get("runtime"));
+        child.environment().put("AI_PROBE_CODE",code);child.environment().put("AI_PROBE_SID",sid.toString());child.environment().put("AI_PROBE_CLIENT",r.clientId());
+        Process process=child.redirectErrorStream(true).start();
+        try { assertTrue(process.waitFor(20,TimeUnit.SECONDS),"Replacement JVM deadline");assertEquals(0,process.exitValue(),"Replacement JVM must reject replay"); }
+        finally { if(process.isAlive())process.destroyForcibly(); }
+        try(Connection c=owner(db)) {assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE ConsumedAt IS NOT NULL"));assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiDelegationGrant WHERE RevokedAt IS NULL"));}
+    }
+    public static class OAuthRestartProbe {
+        public static void main(String[] args) throws Exception {
+            var store=new AiOAuthTransactionStore(()->{
+                try {Connection c=DriverManager.getConnection(System.getenv("AI_PROBE_URL"),System.getenv("AI_PROBE_USER"),System.getenv("AI_PROBE_PASSWORD"));
+                    sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=7; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=72");return c;
+                }catch(SQLException e){throw new IllegalStateException("Probe unavailable");}
+            },true,ISSUER,RESOURCE);
+            if(store.loadClient(System.getenv("AI_PROBE_CLIENT")).isEmpty()) throw new AssertionError("Live database authority unavailable in replacement JVM");
+            try {store.consume(System.getenv("AI_PROBE_CODE"),UUID.fromString(System.getenv("AI_PROBE_SID")),System.getenv("AI_PROBE_CLIENT"),CALLBACK,VERIFIER,ISSUER,RESOURCE);throw new AssertionError("Replay accepted after JVM replacement");}
+            catch(IllegalStateException expected) {
+                Throwable cause=expected;
+                while(cause!=null && !(cause instanceof SQLException))cause=cause.getCause();
+                if(!(cause instanceof SQLException sql) || sql.getErrorCode()!=58502) throw expected;
+            }
+        }
+    }
+    @Test void oauthCommittedRegistrationUserTenantAndGlobalDisablePreventCompletion() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(false);
+        String nonce=opaque();UUID id=startOAuth(r,sid,nonce);oauth(7,72).approve(id,sid,AiScope.fromMask(1));
+        try(Connection c=owner(db)){sql(c,"UPDATE dbo.Users SET is_deleted=1 WHERE id=72");}
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque()));
+        try(Connection c=owner(db)){sql(c,"UPDATE dbo.Users SET is_deleted=0 WHERE id=72; UPDATE dbo.ShaleClients SET IsActive=0 WHERE Id=7");}
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque()));
+        try(Connection c=owner(db)){sql(c,"UPDATE dbo.ShaleClients SET IsActive=1 WHERE Id=7");}
+        var product=product();product.setEnabled(false,product.inspect().rowVersion());
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque()));
+        product.setEnabled(true,product.inspect().rowVersion());
+        var disabled=service(7,71).setTenantEnabled(false,tenantVersion());
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque()));
+        service(7,71).setTenantEnabled(true,disabled.rowVersion());
+        service(7,71).changeIntegration(r.integrationId(),AiScope.fromMask(3),true,r.rowVersion());
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque()));
+        try(Connection c=owner(db)){assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE CodeHash IS NOT NULL"));}
+    }
+    @Test void oauthGrantRevocationAndApprovalRaceNeverResurrectsRevokedAuthority() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(false);Grant old=grant(r,72);UUID id=startOAuth(r,sid,opaque());
+        var outcomes=race(()->attempt(()->{oauth(7,72).approve(id,sid,AiScope.fromMask(1));oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque());}),
+                ()->attempt(()->service(7,72).revokeGrant(old.grantId(),old.rowVersion())));
+        assertTrue(outcomes.get(1),"Revocation must commit");
+        try(Connection c=owner(db)){assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiDelegationGrant WHERE GrantId='"+old.grantId()+"' AND RevokedAt IS NOT NULL"));}
+        // An intent that existed before a committed revoke cannot authorize a later completion.
+        UUID stale=startOAuth(r,sid,opaque());Grant next=grant(r,72);service(7,72).revokeGrant(next.grantId(),next.rowVersion());
+        oauth(7,72).approve(stale,sid,AiScope.fromMask(1));
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(stale,sid,AiScope.fromMask(1),opaque()));
+    }
+    @Test void oauthScopeWideningDenialAndInjectedExpiryFailClosed() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(false);UUID id=UUID.randomUUID();String nonce=opaque();
+        oauth(7,72).begin(id,sid,r.clientId(),CALLBACK,challenge(),"state",AiScope.fromMask(1),nonce);
+        assertThrows(IllegalStateException.class,()->oauth(7,72).approve(id,sid,AiScope.fromMask(2)));
+        oauth(7,72).deny(id,sid);assertTrue(oauth(7,72).findIntent(nonce,sid).isEmpty());
+        assertThrows(IllegalStateException.class,()->issueOAuth(id,sid,opaque()));
+        String expired=opaque();UUID issued=startOAuth(r,sid,opaque());issueOAuth(issued,sid,expired);
+        // Test-owner fault injection simulates elapsed database time without a 60-second sleep.
+        try(Connection c=owner(db)) {
+            sql(c,"DISABLE TRIGGER dbo.AiImmutable_AiAuthorizationTransaction ON dbo.AiAuthorizationTransaction");
+            sql(c,"UPDATE dbo.AiAuthorizationTransaction SET IssuedAt=DATEADD(second,-120,SYSUTCDATETIME()),CodeExpiresAt=DATEADD(second,-60,SYSUTCDATETIME()) WHERE TransactionId='"+issued+"'");
+            sql(c,"ENABLE TRIGGER dbo.AiImmutable_AiAuthorizationTransaction ON dbo.AiAuthorizationTransaction");
+        }
+        assertThrows(IllegalStateException.class,()->consumeOAuth(expired,sid,r));
+        try(Connection c=owner(db)){assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE ConsumedAt IS NOT NULL"));}
+    }
+
+    @Test void oauthAuditFailureRollsBackCodeGrantAndIntentConsumptionTogether() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(false);String nonce=opaque();UUID id=startOAuth(r,sid,nonce);oauth(7,72).approve(id,sid,AiScope.fromMask(1));
+        try(Connection c=owner(db)){sql(c,"CREATE TRIGGER dbo.FailOAuthAudit ON dbo.EntityActionAuditLog INSTEAD OF INSERT AS THROW 58499,'Synthetic audit failure',1;");}
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque()));
+        try(Connection c=owner(db)) {assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiDelegationGrant"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiConsentIntent WHERE ConsumedAt IS NOT NULL"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE CodeHash IS NOT NULL"));sql(c,"DROP TRIGGER dbo.FailOAuthAudit");}
+        oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque());
+    }
+
+    @Test void oauthStorageIsStrictTenantOwnedAndRuntimeCannotReadOrMutateItDirectly() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(false);startOAuth(r,sid,opaque());
+        try(Connection c=connection("runtime",7,72)) {
+            assertThrows(SQLException.class,()->sql(c,"SELECT * FROM dbo.AiAuthorizationTransaction"));
+            assertThrows(SQLException.class,()->sql(c,"UPDATE dbo.AiAuthorizationTransaction SET ConsumedAt=NULL"));
+        }
+        try(Connection c=owner(db)) {
+            assertEquals(3,count(c,"SELECT COUNT(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID('dbo.AiAuthorizationTransaction')"));
+            sql(c,"GRANT SELECT,UPDATE ON dbo.AiAuthorizationTransaction TO ["+prefix+"_verifier]");
+        }
+        try(Connection c=connection("verifier",8,82)) {assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction"));}
+        try(Connection c=connection("verifier",7,72)) {
+            assertThrows(SQLException.class,()->sql(c,"UPDATE dbo.AiAuthorizationTransaction SET ShaleClientId=8"),"Immutable-owner/BLOCK defense must reject movement");
+        }
+        try(Connection c=owner(db)) {assertThrows(SQLException.class,()->sql(c,"DELETE dbo.AiAuthorizationTransaction"));}
+    }
+
+    @Test void oauthConfidentialPinnedKeyAndGrantRevocationPreventCodeUse() throws Exception {
+        UUID sid=installOAuth();enabled();Registration r=registration(true);
+        assertTrue(oauth(7,72).loadClient(r.clientId()).isEmpty(),"Confidential registration without an active pinned key is unusable");
+        var key=service(7,71).rotateClientKey(r.integrationId(),publicKey(),1,r.rowVersion());
+        assertEquals(key.credentialId(),oauth(7,72).loadClient(r.clientId()).orElseThrow().keys().getFirst().id());
+        String confidentialCode=opaque();issueOAuth(startOAuth(r,sid,opaque()),sid,confidentialCode);
+        assertThrows(IllegalStateException.class,()->oauth(7,72).consume(confidentialCode,sid,r.clientId(),CALLBACK,"w".repeat(43),ISSUER,RESOURCE));
+        assertNotNull(consumeOAuth(confidentialCode,sid,r));
+        UUID id=startOAuth(r,sid,opaque());oauth(7,72).approve(id,sid,AiScope.fromMask(1));
+        service(7,71).revokeClientKey(r.integrationId(),key.credentialId(),key.rowVersion());
+        assertThrows(IllegalStateException.class,()->oauth(7,72).complete(id,sid,AiScope.fromMask(1),opaque()));
+        Registration pub=registration(false);String code=opaque();issueOAuth(startOAuth(pub,sid,opaque()),sid,code);
+        UUID grant;RowVersion version;
+        try(Connection c=owner(db);var q=c.createStatement();var rows=q.executeQuery("SELECT GrantId,RowVer FROM dbo.AiDelegationGrant WHERE IntegrationId='"+pub.integrationId()+"'")){assertTrue(rows.next());grant=AiSql.uuid(rows,"GrantId");version=new RowVersion(rows.getBytes("RowVer"));}
+        service(7,72).revokeGrant(grant,version);
+        assertThrows(IllegalStateException.class,()->consumeOAuth(code,sid,pub));
+    }
+    @Test void oauthNativeLoopbackPortIsConfinedAndExactIssuedRedirectCannotChange() throws Exception {
+        UUID sid=installOAuth();enabled();
+        Registration r=service(7,71).register("Synthetic native",false,AiScope.fromMask(3),1,List.of(URI.create("http://127.0.0.1:3333/callback"),URI.create("http://[::1]:3333/callback")));
+        for(String target:List.of("http://127.0.0.1:49152/callback","http://[::1]:49153/callback")) {
+            UUID id=UUID.randomUUID();String code=opaque();oauth(7,72).begin(id,sid,r.clientId(),target,challenge(),"state",AiScope.fromMask(1),opaque());issueOAuth(id,sid,code);
+            assertThrows(IllegalStateException.class,()->oauth(7,72).consume(code,sid,r.clientId(),target.replace("4915","4916"),VERIFIER,ISSUER,RESOURCE));
+            assertNotNull(oauth(7,72).consume(code,sid,r.clientId(),target,VERIFIER,ISSUER,RESOURCE));
+        }
+        for(String target:List.of("http://127.0.0.2:49152/callback","http://127.0.0.1:49152/other","http://127.0.0.1:0/callback","http://localhost:49152/callback"))
+            assertThrows(IllegalStateException.class,()->oauth(7,72).begin(UUID.randomUUID(),sid,r.clientId(),target,challenge(),"state",AiScope.fromMask(1),opaque()));
+    }
+
     private void seedReservations(Registration r,int user,UUID sid,int amount,int rowCost,int secondsAgo)throws Exception {
         try(Connection c=owner(db);PreparedStatement p=c.prepareStatement("INSERT dbo.AiQuotaReservation(ShaleClientId,IntegrationId,UserId,GrantId,SessionId,InvocationId,Operation,RowCost,Admitted,AdmittedAt,LeaseExpiresAt,ReleasedAt) SELECT ShaleClientId,IntegrationId,UserId,GrantId,SessionId,NEWID(),?,?,1,DATEADD(second,-?,SYSUTCDATETIME()),DATEADD(second,-?,SYSUTCDATETIME()),SYSUTCDATETIME() FROM dbo.AiDelegatedSession WHERE SessionId=?")) {
             p.setString(1,rowCost==10?"SEARCH":"OVERVIEW");p.setInt(2,rowCost);p.setInt(3,secondsAgo);p.setInt(4,secondsAgo);p.setObject(5,sid);

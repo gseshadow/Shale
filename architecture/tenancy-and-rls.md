@@ -193,3 +193,14 @@ Confined owner resolvers return provisional references only; ordinary runtime ca
 restoration and every new table's FILTER/BLOCK are tested with actual separate non-bypass SQL identities in
 synthetic local databases. This is not production or authoritative Case RLS acceptance. The separate missing
 Case artifact/Stage A/B/deployment gates remain unchanged. Keep all capability and tenant flags off.
+
+## AI authorization transaction isolation — Phase 3B.2B candidate
+
+`docs/sql/ai-integration/phase3b2b.sql` adds strict tenant-owned `AiAuthorizationTransaction` with
+existing TenantFilter FILTER and AFTER INSERT/UPDATE BLOCK predicates. New bounded modules derive
+both context identities, recheck the original durable WEB session and current authority, and use the
+existing capability/tenant locks. Client loading is one requested ID under the authenticated human's
+tenant; there is no caller tenant selector or expanded bootstrap pool. Direct table privileges remain
+denied. Immutable bindings and durable consume state survive process replacement. The canonical
+[implementation record](../docs/architecture/ai-integration-and-mcp.md#1017-phase-3b2b-authorization-code-s256-and-self-consent--2026-10-22)
+separates synthetic SQL evidence from production/RLS/Case acceptance. Defaults remain OFF.

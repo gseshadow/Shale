@@ -29,7 +29,25 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @EnableConfigurationProperties(McpOAuthProperties.class)
 public class McpOAuthSecurityConfiguration {
     @Bean
-    SecurityFilterChain mcpOAuthFoundation(HttpSecurity http, McpOAuthProperties properties, Environment environment) throws Exception {
+    SecurityFilterChain mcpOAuthFoundation(HttpSecurity http, McpOAuthProperties properties, Environment environment,
+            org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.ShaleAuthTokenService> tokens,
+            org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.ServerAuthSessionService> auth,
+            org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.DurableSessionStore> sessions,
+            org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.RuntimeConnectionProvider> connections,
+            org.springframework.beans.factory.ObjectProvider<HttpServletRequest> currentRequest) throws Exception {
+        boolean authorizationEnabled=environment.getProperty("shale.ai.oauth.authorization-enabled",Boolean.class,false);
+        if(authorizationEnabled && !properties.compositionEnabled()) throw new IllegalArgumentException("OAuth composition required.");
+        DurableOAuthAuthorization durable;
+        ShaleOAuthHuman humans;
+        if(authorizationEnabled) {
+            humans=new ShaleOAuthHuman(tokens.getObject(),auth.getObject(),sessions.getObject());
+            var store=new com.shale.data.security.ai.AiOAuthTransactionStore(()-> {
+                var human=ShaleOAuthHuman.current();
+                try { return connections.getObject().openConnection(new com.shale.server.runtime.ServerPrincipal(human.user(),human.tenant(),null)); }
+                catch(java.sql.SQLException unavailable) { throw new IllegalStateException("OAuth runtime connection unavailable."); }
+            },true,properties.issuer(),properties.resource());
+            durable=new DurableOAuthAuthorization(store,properties,currentRequest::getObject);
+        } else { durable=null; humans=null; }
         if (properties.identity() != McpOAuthProperties.Identity.PRODUCTION &&
                 !environment.acceptsProfiles(Profiles.of("local", "dev", "test")))
             throw new IllegalArgumentException("Nonproduction OAuth identity requires an explicit dev/local/test profile.");
@@ -51,7 +69,10 @@ public class McpOAuthSecurityConfiguration {
                 .requestCache(cache -> cache.requestCache(new NullRequestCache()))
                 .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize.anyRequest().denyAll());
+                .authorizeHttpRequests(authorize -> {
+                    if(authorizationEnabled) authorize.requestMatchers("/oauth/mcp/authorize").authenticated();
+                    authorize.anyRequest().denyAll();
+                });
 
         if (properties.compositionEnabled()) {
             var settings = AuthorizationServerSettings.builder().issuer(properties.issuer()).multipleIssuersAllowed(false)
@@ -62,9 +83,9 @@ public class McpOAuthSecurityConfiguration {
                     .deviceVerificationEndpoint("/oauth/mcp/device_verification")
                     .clientRegistrationEndpoint("/oauth/mcp/register").build();
             http.with(new OAuth2AuthorizationServerConfigurer(), server -> server
-                    .authorizationServerSettings(settings).registeredClientRepository(new OAuthIssuanceDisabled())
-                    .authorizationService(OAuthIssuanceDisabled.AUTHORIZATIONS)
-                    .authorizationConsentService(OAuthIssuanceDisabled.CONSENTS)
+                    .authorizationServerSettings(settings).registeredClientRepository(durable==null ? new OAuthIssuanceDisabled() : durable.clients())
+                    .authorizationService(durable==null ? OAuthIssuanceDisabled.AUTHORIZATIONS : durable)
+                    .authorizationConsentService(durable==null ? OAuthIssuanceDisabled.CONSENTS : durable.consents())
                     .tokenGenerator(OAuthIssuanceDisabled.TOKENS)
                     .clientAuthentication(authentication -> authentication
                             .authenticationConverters(converters -> {
@@ -82,30 +103,67 @@ public class McpOAuthSecurityConfiguration {
                                         });
                                 });
                             }))
-                    .authorizationEndpoint(endpoint -> endpoint.authenticationProviders(providers -> providers.forEach(provider -> {
-                        if (provider instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider code)
+                    .authorizationEndpoint(endpoint -> endpoint.consentPage("/oauth/mcp/consent")
+                            .authorizationResponseHandler((req,res,authentication)-> {
+                                var result=(org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken)authentication;
+                                String target=org.springframework.web.util.UriComponentsBuilder.fromUriString(result.getRedirectUri())
+                                        .queryParam("code", "{code}").queryParam("state","{state}").queryParam("iss","{iss}")
+                                        .encode().buildAndExpand(result.getAuthorizationCode().getTokenValue(),result.getState(),properties.issuer()).toUriString();
+                                new org.springframework.security.web.DefaultRedirectStrategy().sendRedirect(req,res,target);
+                            })
+                            .errorResponseHandler((req,res,failure)-> {
+                                // Only maintained-provider denial of a validated consent transaction redirects.
+                                // Invalid requests/state/client substitutions always fail locally.
+                                if(durable!=null && failure instanceof org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException denied &&
+                                        "access_denied".equals(denied.getError().getErrorCode()) && denied.getAuthorizationCodeRequestAuthentication()!=null) {
+                                    var result=denied.getAuthorizationCodeRequestAuthentication();
+                                    var client=durable.findByClientId(result.getClientId());
+                                    if(client!=null && result.getRedirectUri()!=null) {
+                                        OAuthRedirectPolicy.validate(result.getRedirectUri(),client.getRedirectUris(),
+                                                !client.getClientAuthenticationMethods().contains(org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE));
+                                        String target=org.springframework.web.util.UriComponentsBuilder.fromUriString(result.getRedirectUri())
+                                                .queryParam("error","access_denied").queryParam("state","{state}").queryParam("iss","{iss}")
+                                                .encode().buildAndExpand(result.getState(),properties.issuer()).toUriString();
+                                        new org.springframework.security.web.DefaultRedirectStrategy().sendRedirect(req,res,target);return;
+                                    }
+                                }
+                                res.setStatus(400);
+                            }).authenticationProviders(providers -> providers.forEach(provider -> {
+                        if (provider instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider code) {
                             code.setAuthenticationValidator(new OAuthAuthorizationRequestPolicy(properties));
+                            code.setAuthorizationConsentRequired(context -> true);
+                            if(durable!=null) code.setAuthorizationCodeGenerator(DurableOAuthAuthorization.CODES);
+                        }
+                        if(provider instanceof org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationProvider consent && durable!=null)
+                            consent.setAuthorizationCodeGenerator(DurableOAuthAuthorization.CODES);
                     }))));
         }
-        // This phase has no enable-issuance switch. This filter precedes context, client auth and every AS filter.
-        // Only the exact, opt-in informational metadata response is allowed through this phase boundary.
-        http.addFilterBefore(new FoundationGate(properties), SecurityContextHolderFilter.class);
+        // The gate precedes AS processing. Only explicit browser authorization is eligible; every token endpoint stays closed.
+        http.addFilterBefore(new FoundationGate(properties,authorizationEnabled), SecurityContextHolderFilter.class);
+        if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable),SecurityContextHolderFilter.class);
         return http.build();
     }
 
     private static final class FoundationGate extends OncePerRequestFilter {
         private final McpOAuthProperties properties;
+        private final boolean authorizationEnabled;
         private final org.springframework.http.converter.json.JacksonJsonHttpMessageConverter metadata =
                 new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter();
-        private FoundationGate(McpOAuthProperties properties) { this.properties = properties; }
+        private FoundationGate(McpOAuthProperties properties,boolean authorizationEnabled) { this.properties=properties; this.authorizationEnabled=authorizationEnabled; }
         @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
                 throws ServletException, IOException {
             response.setHeader("Cache-Control", "no-store");
             if (properties.compositionEnabled() && "GET".equals(request.getMethod()) &&
                     request.getRequestURI().substring(request.getContextPath().length()).equals(OAuthMetadataContract.AUTHORIZATION_SERVER_PATH)) {
-                metadata.write(OAuthMetadataContract.authorizationServer(properties), org.springframework.http.MediaType.APPLICATION_JSON,
+                metadata.write(OAuthMetadataContract.authorizationServer(properties,authorizationEnabled), org.springframework.http.MediaType.APPLICATION_JSON,
                         new org.springframework.http.server.ServletServerHttpResponse(response));
                 return;
+            }
+            String path=request.getRequestURI().substring(request.getContextPath().length());
+            if(authorizationEnabled && ((path.equals("/oauth/mcp/authorize") && (request.getMethod().equals("GET") || request.getMethod().equals("POST"))) ||
+                    (path.equals("/oauth/mcp/consent") && request.getMethod().equals("GET")))) {
+                response.setHeader("Referrer-Policy","no-referrer");
+                chain.doFilter(request,response); return;
             }
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
         }
