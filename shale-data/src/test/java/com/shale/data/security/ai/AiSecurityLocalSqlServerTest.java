@@ -460,7 +460,7 @@ class AiSecurityLocalSqlServerTest {
         RowVersion revoked=service(7,72).revokeSession(sid,version);service(7,72).revokeSession(sid,revoked);
         assertThrows(IllegalStateException.class,()->service(7,72).verifySession(sid,AiScope.CASES_SEARCH));
         try(Connection c=owner(db)) {
-            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED' AND ActorUserId=72"));
             assertThrows(SQLException.class,()->sql(c,"UPDATE dbo.AiDelegatedSession SET RevokedAt=NULL,RevocationReason=NULL WHERE SessionId='"+sid+"'"));
             assertThrows(SQLException.class,()->sql(c,"DELETE dbo.AiDelegatedSession WHERE SessionId='"+sid+"'"));
         }
@@ -873,6 +873,7 @@ class AiSecurityLocalSqlServerTest {
         installOAuth();installCredentials();
         try(var c=owner(db)) {
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c2.sql")));
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/verify.sql")));
             sql(c,"ALTER TABLE dbo.AiOAuthCredential ADD Unexpected int NULL");
             assertEquals(58700,assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c2.sql")))).getErrorCode());
         }
@@ -993,8 +994,10 @@ class AiSecurityLocalSqlServerTest {
         try(var c=owner(db);var p=c.prepareStatement("SELECT COUNT(*) FROM dbo.AiOAuthCredential WHERE CredentialHash=? AND Kind='ACCESS'")) {
             p.setBytes(1,AiOAuthCredentialStore.digest(first.accessToken()));try(var rows=p.executeQuery()){rows.next();assertEquals(1,rows.getInt(1));}
         }
+        replacementAccessProbe(first.accessToken(),false);
         replacementCredentialProbe(first.refreshToken(),f.registration(),true);
         assertThrows(SecurityException.class,()->refresh(first.refreshToken(),f.registration()));
+        replacementAccessProbe(first.accessToken(),true);
         replacementCredentialProbe(first.refreshToken(),f.registration(),false);
     }
     private void replacementCredentialProbe(String token,Registration r,boolean success)throws Exception {
@@ -1014,7 +1017,37 @@ class AiSecurityLocalSqlServerTest {
             },ISSUER,RESOURCE);
             boolean expected=Boolean.parseBoolean(System.getenv("AI_PROBE_SUCCESS"));
             try {store.refresh(System.getenv("AI_PROBE_REFRESH"),System.getenv("AI_PROBE_CLIENT"),null,null,null,null);if(!expected)throw new AssertionError("Revoked family accepted");}
-            catch(SecurityException|IllegalStateException denied){if(expected)throw denied;}
+            catch(SecurityException denied){if(expected)throw denied;}
+            catch(IllegalStateException denied) {
+                if(expected)throw denied;
+                Throwable cause=denied;while(cause!=null && !(cause instanceof SQLException))cause=cause.getCause();
+                if(!(cause instanceof SQLException sql)||sql.getErrorCode()!=58702)throw denied;
+            }
+        }
+    }
+    private void replacementAccessProbe(String access,boolean revoked)throws Exception {
+        try(var c=owner(db)) {sql(c,"GRANT SELECT ON dbo.AiOAuthCredential TO ["+prefix+"_verifier]; GRANT SELECT ON dbo.AiDelegatedSession TO ["+prefix+"_verifier]");}
+        var child=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-cp",System.getProperty("surefire.test.class.path"),AccessPersistenceProbe.class.getName());
+        var env=child.environment();env.put("AI_PROBE_URL",url(db));env.put("AI_PROBE_USER",prefix+"_verifier");env.put("AI_PROBE_PASSWORD",logins.get("verifier"));
+        env.put("AI_PROBE_DIGEST",HexFormat.of().formatHex(AiOAuthCredentialStore.digest(access)));env.put("AI_PROBE_REVOKED",Boolean.toString(revoked));
+        var process=child.redirectErrorStream(true).start();
+        try {assertTrue(process.waitFor(20,TimeUnit.SECONDS));assertEquals(0,process.exitValue(),"A replacement verifier JVM must observe the persisted ACCESS digest and revocation state");}
+        finally {if(process.isAlive())process.destroyForcibly();}
+    }
+    /** Test-only verifier SQL identity, never an ACCESS resolver or runtime token validation path. */
+    public static class AccessPersistenceProbe {
+        public static void main(String[] args)throws Exception {
+            try(var c=DriverManager.getConnection(System.getenv("AI_PROBE_URL"),System.getenv("AI_PROBE_USER"),System.getenv("AI_PROBE_PASSWORD"))) {
+                sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=7; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=72");
+                try(var p=c.prepareStatement("SELECT c.RevokedAt,s.RevokedAt FROM dbo.AiOAuthCredential c JOIN dbo.AiDelegatedSession s ON s.ShaleClientId=c.ShaleClientId AND s.SessionId=c.SessionId WHERE c.CredentialHash=? AND c.Kind='ACCESS' AND c.ShaleClientId=7 AND c.UserId=72 AND s.Issuer=? AND s.Resource=?")) {
+                    p.setBytes(1,HexFormat.of().parseHex(System.getenv("AI_PROBE_DIGEST")));p.setString(2,ISSUER);p.setString(3,RESOURCE);
+                    try(var rows=p.executeQuery()) {
+                        if(!rows.next())throw new AssertionError("Access credential missing after JVM replacement");
+                        boolean expected=Boolean.parseBoolean(System.getenv("AI_PROBE_REVOKED"));
+                        if((rows.getTimestamp(1)!=null)!=expected || (rows.getTimestamp(2)!=null)!=expected || rows.next())throw new AssertionError("Persisted credential/family revocation mismatch");
+                    }
+                }
+            }
         }
     }
 
@@ -1039,12 +1072,15 @@ class AiSecurityLocalSqlServerTest {
     }
     @Test void credentialSecurityResetWebRevocationAuditsFamilyAndCannotResurrect()throws Exception {
         var f=credentialFixture();var first=redeem(f.code(),f.registration());
+        try(var c=owner(db)){sql(c,"GRANT SELECT,UPDATE ON dbo.UserSessions TO ["+prefix+"_runtime]");}
+        try(var c=connection("runtime",7,71)) {
+            // Same durable transition used by UserDao.revokeAllSessions, under real non-bypass admin context.
+            sql(c,"UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME() WHERE ShaleClientId=7 AND UserId=72 AND RevokedAt IS NULL");
+        }
         try(var c=owner(db)) {
-            // Same durable transition used by UserDao.revokeAllSessions for administrative reset.
-            sql(c,"UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME() WHERE UserId=72 AND RevokedAt IS NULL");
             assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiDelegatedSession WHERE RevocationReason='SECURITY'"));
             assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential WHERE RevokedAt IS NOT NULL"));
-            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.EntityActionAuditLog WHERE EntityType='AI_DELEGATED_SESSION' AND Action='DEACTIVATED' AND ActorUserId=71"));
         }
         assertThrows(RuntimeException.class,()->refresh(first.refreshToken(),f.registration()));
     }
@@ -1090,6 +1126,61 @@ class AiSecurityLocalSqlServerTest {
             assertEquals(absolute,scalar(c,"SELECT CONVERT(varchar(33),ExpiresAt,126) FROM dbo.AiDelegatedSession"));
             assertEquals(28800,count(c,"SELECT DATEDIFF(second,LastRefreshedAt,IdleExpiresAt) FROM dbo.AiDelegatedSession"));
         }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name="Initial credentials deny {0}")
+    @org.junit.jupiter.params.provider.ValueSource(strings={"global","tenant","user","integration","grant","scope","registration","key"})
+    void credentialInitialLiveAuthorityCannotCreateAnyFamily(String change)throws Exception {
+        UUID web=installOAuth();installCredentials();enabled();var r=registration(change.equals("key"));
+        var key=change.equals("key")?service(7,71).rotateClientKey(r.integrationId(),publicKey(),30,r.rowVersion()):null;
+        String code=opaque();issueOAuth(startOAuth(r,web,opaque()),web,code);
+        switch(change) {
+            case "tenant" -> service(7,71).setTenantEnabled(false,tenantVersion());
+            case "scope" -> service(7,71).changeIntegration(r.integrationId(),AiScope.fromMask(0),false,r.rowVersion());
+            case "key" -> service(7,71).revokeClientKey(r.integrationId(),key.credentialId(),key.rowVersion());
+            default -> {try(var c=owner(db)) {
+                String mutation=switch(change) {
+                    case "global" -> "UPDATE dbo.AiProductCapability SET Enabled=0,Revision=Revision+1";
+                    case "user" -> "UPDATE dbo.Users SET is_deleted=1 WHERE id=72";
+                    case "integration" -> "UPDATE dbo.AiIntegrationRegistration SET Status='SUSPENDED'";
+                    case "grant" -> "UPDATE dbo.AiDelegationGrant SET RevokedAt=SYSUTCDATETIME(),RevokedByUserId=71,RevocationReason='ADMIN'";
+                    case "registration" -> "DISABLE TRIGGER dbo.AiImmutable_AiIntegrationRegistration ON dbo.AiIntegrationRegistration; UPDATE dbo.AiIntegrationRegistration SET CreatedAt=DATEADD(hour,-2,SYSUTCDATETIME()),ExpiresAt=DATEADD(hour,-1,SYSUTCDATETIME()); ENABLE TRIGGER dbo.AiImmutable_AiIntegrationRegistration ON dbo.AiIntegrationRegistration";
+                    default -> throw new AssertionError();
+                };sql(c,mutation);
+            }}
+        }
+        var now=java.time.Instant.now().minusSeconds(1);
+        assertThrows(RuntimeException.class,()->credentials().redeem(code,r.clientId(),CALLBACK,VERIFIER,key==null?null:key.credentialId(),key==null?null:"initial-revoked-jti",key==null?null:now,key==null?null:now.plusSeconds(60)));
+        try(var c=owner(db)) {
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiDelegatedSession"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE ConsumedAt IS NOT NULL"));
+        }
+    }
+    @Test void credentialSameValidatedTransactionCannotIssueASecondFamily()throws Exception {
+        var f=credentialFixture();redeem(f.code(),f.registration());String tx,grant;
+        try(var c=owner(db)) {tx=scalar(c,"SELECT CONVERT(varchar(36),TransactionId) FROM dbo.AiDelegatedSession");grant=scalar(c,"SELECT CONVERT(varchar(36),GrantId) FROM dbo.AiDelegatedSession");}
+        try(var c=connection("runtime",7,72)) {
+            sql(c,"BEGIN TRANSACTION");
+            try(var p=c.prepareCall("{call dbo.AiIssueCredentialsV1(?,?,?,?,?,?,?,?,?,?)}")) {
+                p.setString(1,tx);p.setString(2,f.registration().clientId());p.setString(3,ISSUER);p.setString(4,RESOURCE);p.setString(5,grant);p.setNull(6,Types.VARCHAR);p.setInt(7,1);
+                p.setBytes(8,AiOAuthCredentialStore.digest(opaque()));p.setBytes(9,AiOAuthCredentialStore.digest(opaque()));p.setString(10,UUID.randomUUID().toString());
+                var denied=assertThrows(SQLException.class,()->{p.execute();while(p.getMoreResults()||p.getUpdateCount()!=-1) { }});
+                assertTrue(Set.of(2601,2627).contains(denied.getErrorCode()),"Unique transaction lineage must reject a second family");
+            }
+        }
+        try(var c=owner(db)){assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiDelegatedSession"));assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential"));}
+    }
+
+    @Test void credentialGlobalDisableCannotRestoreInternalSessionOrQuotaAuthority()throws Exception {
+        var f=credentialFixture();var first=redeem(f.code(),f.registration());UUID family;
+        try(var c=owner(db)){family=UUID.fromString(scalar(c,"SELECT CONVERT(varchar(36),SessionId) FROM dbo.AiDelegatedSession"));}
+        // Existing trusted internal session reference only; never token-derived VerifiedIntegrationContext.
+        var internal=service(7,72);var before=internal.verifySession(family,AiScope.CASES_SEARCH);
+        var controls=product();controls.setEnabled(false,controls.inspect().rowVersion());controls.setEnabled(true,controls.inspect().rowVersion());
+        assertThrows(RuntimeException.class,()->internal.verifySession(family,AiScope.CASES_SEARCH));
+        assertThrows(RuntimeException.class,()->internal.reserve(before));
+        assertThrows(SecurityException.class,()->refresh(first.refreshToken(),f.registration()));
+        try(var c=owner(db)){assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiOAuthCredential WHERE RevokedAt IS NOT NULL"));}
     }
 
 }

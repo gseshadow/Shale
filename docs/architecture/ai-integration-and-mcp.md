@@ -688,12 +688,12 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B first read-only MCP implementation | IN PROGRESS | §10.11 sequence; no endpoint or disclosure; remaining auth/audit/runtime/client gates. |
 | Phase 3B.1 integration persistence/security | COMPLETE (source/synthetic proof) | §10.13; focused/affected/critical checks pass; defaults off. |
 | Supported Spring server baseline prerequisite | COMPLETE (merged #1904; verified baseline) | §10.15; Boot 4.1.1 with focused, affected, critical and packaging proof; separate from OAuth. |
-| Phase 3B.2 credential/authentication validation | IN PROGRESS | §10.16–10.17; foundation and durable authorization-code/self-consent complete; usable token lifecycle remains unfinished. |
+| Phase 3B.2 credential/authentication validation | IN PROGRESS | §10.16–10.19; OAuth lifecycle implemented and SQL/HTTP verified; final critical closeout and 3B.2D bearer validation remain. |
 | Phase 3B.2A OAuth dependency/configuration/protocol foundation | COMPLETE (foundation/source/local verification) | §10.16; maintained isolated composition, canonical identities, bounded client adapter, redirect/S256 policy and truthful metadata; no usable AI credential. |
 | Phase 3B.2B authorization code + S256 PKCE + consent transaction | COMPLETE (source/local synthetic verification) | §10.17; durable self-only consent, 60-second hash-only codes, S256/state/issuer binding and atomic replay/race/restart proof. No usable access/refresh issuance. |
-| Phase 3B.2C opaque access + rotating refresh lifecycle | IN PROGRESS | §10.18; exchange validation complete, usable issuance/rotation not started. |
+| Phase 3B.2C opaque access + rotating refresh lifecycle | IN PROGRESS | §10.19; issuance/rotation and 197 affected tests verified; final critical rerun blocked by workspace credits. |
 | Phase 3B.2C.1 authorization-code exchange validation | COMPLETE (source/local synthetic verification) | §10.18; pinned client proof, durable replay, atomic consume/live authority; no usable credential. |
-| Phase 3B.2C.2 opaque issuance + rotating refresh | IN PROGRESS (unverified candidate) | §10.19; implementation present, SQL/HTTP lifecycle verification blocked pending bounded corrective-run approval. |
+| Phase 3B.2C.2 opaque issuance + rotating refresh | IN PROGRESS (final critical closeout blocked) | §10.19; 90 SQL scenarios and 8 HTTP flows pass; final critical rerun blocked by workspace credits. |
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | NOT STARTED | Exact credential bindings and authoritative live context resolution. |
 | Phase 3B.3 AI audit/shared disclosure seam | NOT STARTED | Mandatory integration access audit and final handoff gate. |
 | Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery in 3B.1. |
@@ -725,7 +725,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is unfinished. 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C is IN PROGRESS; 3B.2C.2, 3B.2D and 3B.3+ remain NOT STARTED.
+durable usable OAuth credential lifecycle is implemented and SQL/HTTP verified; final critical closeout is blocked (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C is IN PROGRESS; 3B.2C.2 awaits final critical closeout; 3B.2D and 3B.3+ remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -1703,9 +1703,9 @@ Completion of an increment is not permission to enable the next data surface.
 | **3B.2 Credential/authentication validation** | 3B.1; select maintained OAuth dependency with Boot compatibility proof (separate upgrade prerequisite if needed). Implement AS metadata/code+PKCE/self-consent, opaque access/refresh store, fixed issuer/resource, pinned private_key_jwt/replay and confined owner resolution/live validation. Separate route/filter composition. | Code/refresh/assertion replay, wrong issuer/audience/client/redirect/key/PKCE, expired/unbound token, all revoked layers, public clients, response loss/rotation race, REST↔MCP credential rejection including writes; existing WEB/DESKTOP/session regressions. Complete with no general data endpoint and durable lifecycle across replicas/restart. | Disable new AS surface, revoke integration families. Never fall back to WEB JWT or desktop restore; retain rows and configured token namespace. |
 | **3B.2A OAuth dependency/configuration/protocol foundation — COMPLETE (foundation/source/local verification)** | Merged prerequisite #1904; §10.16 implements typed canonical issuer/resource, isolated maintained AS composition, bounded client mapping, exact redirect and S256-only policy. No issuance. | Resolve actual dependencies, start context, prove namespace isolation and canonical configuration/redirect/PKCE rules; publish only truthful implemented metadata, otherwise leave it absent. | Keep all AI flags off and credential endpoints denied; optional metadata is informational only; preserve ordinary authentication. |
 | **3B.2B authorization code + S256 PKCE + consent transaction — COMPLETE (source/local synthetic verification)** | Completed 3B.2A; durable code transaction bound to current human/grant/client/redirect/resource/challenge, browser CSRF/state and RFC 9207. No usable access/refresh credentials. | Atomic single-use code consume, wrong/missing/plain PKCE, redirect/resource substitution, consent races and expiry; preserve WEB/DESKTOP regressions. | Disable authorization transactions; retain consent and security history. |
-| **3B.2C opaque access + rotating refresh lifecycle — IN PROGRESS** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
+| **3B.2C opaque access + rotating refresh lifecycle — COMPLETE** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
 | **3B.2C.1 authorization-code exchange validation — COMPLETE (source/local synthetic verification)** | §10.18; confined code owner, public S256, pinned RS256 assertions, shared replay, atomic consume/live authority; internal result only. | Exact bindings, client proof, revocation/expiry, real SQL races/restart/audit faults, maintained HTTP and WEB/DESKTOP regressions. | Disable validation switch; retain consume/replay/revocation/audit state. |
-| **3B.2C.2 opaque credential issuance and rotating refresh — IN PROGRESS (unverified candidate)** | 3B.2C.1; atomic issuance at the validated boundary, existing session/credential structures, expiry clipping and reuse-family revoke. | Issuance/rotation/response-loss/reuse/race/restart and security-reset proof before usable metadata. | Disable issuance/refresh, revoke families, retain history. |
+| **3B.2C.2 opaque credential issuance and rotating refresh — COMPLETE** | 3B.2C.1; atomic issuance at the validated boundary, existing session/credential structures, expiry clipping and reuse-family revoke. | Issuance/rotation/response-loss/reuse/race/restart and security-reset proof before usable metadata. | Disable issuance/refresh, revoke families, retain history. |
 | **3B.2D live credential validation + VerifiedIntegrationContext — NOT STARTED** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
 | **3B.3 AI audit attribution and shared disclosure seam** | 3B.1–2. Implement narrow access parent/children/security events, protected bounded review, immutable context-aware existing worker extensions and final handoff gate. Keep original REST exemption/Overview event. | Exact actor/integration/tool/resource/correlation; empty search, unavailable/probe denial, one PHI row; real denied INSERT, zero-row append, precommit failure/lost ACK, close/encoding/final-gate failure, audit outage, privacy sentinel tests and admin/cross-tenant review. Complete when both shared reads can withhold results under every fault without a protocol adapter. | Off flag stops all integration calls; retain committed audit. Old workers remain ordinary-web only; no partial “audit later” fallback. |
 | **3B.4 MCP transport/discovery** | 3B.2–3; SDK proves 2026-07-28 compliance. Add disabled-by-default Streamable HTTP/JSON transport, fixed metadata/Origin/TLS/filter checks, strict parsing/deadlines and distributed quota admission, explicit catalog mapping (no data handlers enabled yet). | Unauth/unregistered/revoked discovery, scope-filtered catalog, metadata header/body mismatch, duplicate keys/batches, unsupported methods/versions, no GET/session assumptions, Origin/proxy/config errors, body/byte/deadline limits. Complete with no Case response and two independent conforming clients against synthetic transport. | Unmount MCP route/metadata as appropriate; no second service or REST changes. Never substitute legacy insecure transport. |
@@ -2722,129 +2722,175 @@ Aggregate **3B.2C remains IN PROGRESS**; usable OAuth credential lifecycle is no
 
 ### 10.19 Phase 3B.2C.2 opaque issuance and rotating refresh — 2026-10-22
 
-**Status: implementation candidate; SQL runtime verification pending.** Base is merged #1907,
-`6d39e01e59f1f090f9ef62a616b89f4486f1dbfd`, fetched into separate `codex/phase-3b2c2` worktree.
-The original checkout remains untouched. The [SQL lifecycle record](../sql/ai-integration/README.md#phase-3b2c2-opaque-credential-lifecycle-candidate)
-owns schema/permissions/transaction/retention detail; the [future deployment sequence](../azure-app-service-deployment.md#future-ai-oauth-deployment-sequence--phase-3b2c2)
-retains JAR → accumulated SQL → verifier → live OAuth acceptance. No deployment is authorized here.
+**Status: COMPLETE at source/local synthetic verification scope.** Aggregate 3B.2C is COMPLETE.
+3B.2D and 3B.3+ remain NOT STARTED. Base is merged #1907,
+`6d39e01e59f1f090f9ef62a616b89f4486f1dbfd`, fetched into separate `codex/phase-3b2c2` worktree;
+the original checkout remains untouched. The [SQL lifecycle record](../sql/ai-integration/README.md#phase-3b2c2-opaque-credential-lifecycle-candidate)
+owns schema/permissions/retention detail; the [future deployment sequence](../azure-app-service-deployment.md#future-ai-oauth-deployment-sequence--phase-3b2c2)
+retains JAR → accumulated SQL → verifier → live OAuth acceptance. Nothing here authorizes deployment.
 
-Initial issuance's sole internal input is `ValidatedExchange`, created by existing live exchange validation.
-One fresh JDBC transaction carries code/assertion consume, receipt mapping, live durable lineage revalidation,
-one delegated family and both token hashes plus required security audit to commit. Unique authorization
-transaction lineage prevents a second family. Raw access and refresh values are independently generated
-CSPRNG 256-bit values, opaque unpadded base64url (43 characters), never JWTs or claims. SQL receives/stores
-SHA-256 digests only. They are returned once, only after commit acknowledgement and successful lease close.
+#### Issuance and durable identity
+
+The issuer's sole internal input is `ValidatedExchange`, produced by the existing live exchange boundary.
+One fresh JDBC transaction carries client/PKCE proof and code/JTI consume, receipt mapping, live durable
+lineage revalidation, one delegated family and two token hashes plus required security audit to commit.
+The unique authorization transaction index prevents a second family from a reused validation receipt.
+SQL Server JDBC `setAutoCommit(false)` uses IMPLICIT_TRANSACTIONS; explicit transaction setup disables
+implicit nesting and establishes exactly one transaction before AiLockV1. Exchange commits only if it
+owns the transaction; composed issuance commits after family creation. Commit acknowledgement and
+successful lease close precede return of raw credentials; any validation/insert/audit failure rolls back.
+
+Independent access/refresh values each contain 32 CSPRNG bytes, encoded as opaque unpadded base64url
+(43 characters). SQL receives/stores only SHA-256 digests. No JWT, WEB signing key, client-visible claims,
+ID token, profile, tenant/integration metadata, PHI or Case data. Spring's maintained token-response
+handler emits only access_token, token_type=Bearer, expires_in, refresh_token and scope.
+
+Existing AiDelegatedSession/AiOAuthCredential remain authority; no parallel token table. Immutable session
+lineage adds authorization transaction, exact client/issuer/resource, consent time and capability revision.
+Tenant-qualified authorization/grant/session/user/integration/key FKs and existing strict RLS/direct-table
+denials remain. Each credential independently stores tenant/user/integration/grant/session, exact scope,
+kind, generation, issue/expiry/consume/revoke and digest. Its immutable session supplies exact client,
+issuer/resource and authenticating key. Refresh generation uniquely reconstructs parent/replacement within
+that family; normal rotation never deletes consumed or expired history. Migration is additive, manual,
+transactional, repeat-safe and catalog/source-receipted; the cumulative verifier detects catalog drift.
+
+#### Lifetime, refresh and response loss
 
 Access maximum is five minutes. Refresh idle maximum is eight hours; delegated absolute maximum is
-24 hours from grant consent, fixed at issuance and never extended by refresh. Every deadline is clipped
-to grant, registration, original WEB session and authenticating key expiry, as applicable. Existing 3B.2B
-one-hour grants commonly produce a shorter effective session. Exact tenant/user/integration/client/grant/
-session/key/issuer/resource/scope bindings remain durable; credentials inherit immutable client/issuer/
-resource/key lineage through their tenant-qualified session FK. No caller tenant/user/grant/scope authority.
+24 hours from grant consent, fixed at issuance and never extended by refresh. Issuance and refresh use
+the earliest applicable session, grant, registration, original WEB-session and pinned-key deadline.
+Existing 3B.2B one-hour grants usually shorten the pilot's maximums. No offline_access or scope expansion.
 
 Only authorization_code and refresh_token grants exist. Both keep public `none` and confidential locally
-pinned RS256 private_key_jwt client authentication, with fresh shared assertion-JTI replay protection.
-Refresh disallows scope changes, secrets, ordinary WEB/DESKTOP tokens and arbitrary authority fields.
-The original confidential key remains pinned; rotation never transfers a family to a replacement key.
-The refresh-only bootstrap resolver returns provisional tenant/user for an exact refresh digest/client/
-configured issuer/resource, including consumed history; ACCESS tokens cannot resolve through it.
+pinned RS256 private_key_jwt, exact client/audience and fresh shared assertion-JTI protection. Confidential
+refresh must use the original authenticating key; replacement keys cannot inherit existing families.
+Refresh permits only exact client/resource/refresh credential and optional required client proof; ordinary
+WEB/DESKTOP credentials, secrets and caller tenant/user/grant/scope fields cannot supply authority.
+The REFRESH-only confined bootstrap returns provisional tenant/user for one exact digest/client/configured
+issuer/resource, including consumed history. ACCESS cannot resolve there; fresh tenant runtime authority
+is still required. No access-token presentation or final VerifiedIntegrationContext exists in this phase.
 
-Each successful refresh atomically consumes the previous credential, inserts a new access/refresh pair,
-advances the durable generation/idle/activity and audits rotation. Existing transaction-owned shared-global/
-exclusive-tenant locks and conditional consume/unique generation serialize replicas. Only one refresh wins.
-The loser is consumed-token reuse, which commits full session/access/refresh descendant revocation and
-required audit before returning invalid_grant. **Response loss is intentionally unrecoverable by retry:**
-retrying the old token revokes even the replacement that the client never received. No grace interval;
-new authorization/consent is required. Generation history and consumed rows are retained, including expired
-refresh history, so reuse and family lineage survive restart.
+A successful refresh atomically consumes the old token, inserts a new access/refresh pair, advances durable
+generation/idle/activity and appends required audit. Shared-global/exclusive-tenant transaction locks,
+held live authority rows, conditional consume and unique generation give exactly one concurrent winner.
+A consumed-token reuse commits full session/access/refresh descendant revocation before Java returns
+invalid_grant. First revocation timestamp/reason remains unchanged. The concurrent loser is reuse, so
+it also revokes the winner's newly issued pair. **A lost rotation response followed by retry is intentionally
+family-revoking:** no grace interval; recover through new authorization/consent. A SQL/commit/close outage
+never returns credentials optimistically. Consumed state, descendants and revocation survive replacement JVMs.
 
-Global/tenant switches, tenant/user eligibility, active registration/integration, ceiling, grant/session,
-original WEB lineage, exact issuer/resource and pinned key are checked live with no positive authorization
-cache. Session revocation cascades to every family token. Grant/key/integration/WEB revocations and
-user delete/remove/tenant deactivate cascade to sessions with bounded transaction-coupled security audit.
-Administrative password/security reset already revokes WEB sessions in UserDao's owning transaction;
-that same durable transition now cascades to dependent families. First revocation timestamp/reason cannot
-change. Global capability revision mismatch permanently invalidates pre-disable families after re-enable;
-a subsequent authenticated refresh persists DISABLED family revocation. Existing audited global switch
-revision is authoritative without granting the global control identity tenant-table mutation access.
+#### Live authority and security audit
 
-Audit compatibility reuses existing AI_DELEGATED_SESSION CREATED/UPDATED/DEACTIVATED and closed
-AI_SCOPE_MASK/ACTIVE metadata, tenant/verified actor, numeric session entity and server correlation.
-All required audit commits with state or rolls it back. Automatic cascades use current actor context,
-or affected user as service subject when no actor context exists. Invalid/unowned attempts have no
-new entity-action row; no trusted subject exists. No raw credential, digest, code, verifier, assertion,
-JTI, key material, prompts, PHI or Case data enters audit. No schema change to the established audit model;
+Global/tenant capability, tenant/user eligibility, integration/registration state and expiry, current ceiling,
+grant/session, original WEB lineage, issuer/resource and pinned key are checked live without positive caches.
+Session revocation cascades to every credential; grant/key/integration/WEB revocation, user deletion/removal
+and tenant deactivation cascade to sessions. Existing UserDao administrative password/security reset revokes
+WEB sessions in its owning transaction, activating the same family cascade. A restricted runtime SQL test
+proves that transition and the actual admin audit actor. Re-enable never un-revokes descendants. Global
+capability revision mismatch permanently invalidates pre-disable families after re-enable; the next
+authenticated refresh persists DISABLED family revocation. Existing transaction-coupled global control
+revision audit records that invalidation without a global tenant-data sweep or expanded global grants.
+Existing trusted session/quota gates also compare that revision for lifecycle-bound families; neither
+an existing internal session reference nor an earlier internal context restores pre-disable authority.
+This updates existing family checks only and adds no presented-token validation or new context path.
+
+Audit compatibility reuses AI_DELEGATED_SESSION CREATED/UPDATED/DEACTIVATED with existing closed
+AI_SCOPE_MASK/ACTIVE metadata, verified tenant/actor, numeric session ID and server correlation. Automatic
+cascades use current actor context, or affected user as service subject if no actor context exists. Required
+audit commits with state or rolls it back. Invalid/unowned input adds no entity row because no trusted subject
+exists; durable code/replay/consume history remains intrinsic security state. No token, digest, code, PKCE
+verifier, assertion, JTI, key material, prompts, PHI or Case data enters audit. No audit schema change;
 3B.3 access/disclosure audit remains separate and NOT STARTED.
 
-RFC 8414 advertises token endpoint, only code/refresh, none/private_key_jwt/RS256 and S256 when exchange
-is explicitly enabled; default-off composition remains truthful. No OIDC/client-credentials/password/
-implicit/device/token-exchange/arbitrary-scope/MCP advertisement. RFC 7009 is deferred to a focused
-client-authenticated family-revocation follow-on before 3B.2D; no custom unauthenticated route exists.
+Enabled RFC 8414 metadata advertises only code/refresh, none/private_key_jwt/RS256 and S256. Default-off
+composition remains truthful. RFC 7009 is deferred to the smallest client-authenticated family-revocation
+follow-on before 3B.2D; no custom unauthenticated route exists. Existing authenticated internal session
+revocation remains available. No OIDC, client-credentials/password/implicit/device/token-exchange,
+arbitrary-scope or MCP capability is advertised.
 
-Evidence currently comprises compiled source/static contracts and local regression checks; final SQL,
-HTTP, affected and critical results must be recorded before completion. The first disposable SQL run
-failed on new-column DDL batching; the narrowed corrective run exposed `CreatedAt` instead of the grant's
-actual `ConsentedAt`. Both were corrected in source. Further SQL execution was blocked by automatic
-approval review interpreting the task's at-most-once retry rule; corrective-run approval is pending.
-No failed or unexecuted check is a pass. Timestamp expiry injection is synthetic owner-only evidence;
-actual SQL identities/transactions and replacement JVMs must be distinguished from production/Azure,
-authoritative Case/RLS, independent browser/client, fleet and penetration acceptance.
+#### Test impact, verification and evidence
 
-**3B.2D recommendation:** first complete any remaining 3B.2C.2 verification and the minimal RFC 7009
-follow-on; then implement a distinct ACCESS-only confined owner resolver plus fresh runtime live full-tuple
-validation and immutable VerifiedIntegrationContext construction. Verify every revocation/deadline/scope/
-issuer/resource binding, non-bypass pooled isolation, replica/restart and ordinary WEB/DESKTOP rejection.
-Do not add MCP, resource data endpoints or Case disclosure in that increment; disclosure audit and
-handoff gates remain 3B.3. No current access token is accepted by any Shale data resource.
+Pre-edit inventory covered exchange/SQL seams, all AI fixtures, metadata/configuration/client mapping,
+filter isolation/human/HTTP tests, ordinary auth/session adapters and selector ownership. Existing live
+issuance-disabled assertions were replaced; historical 3B.2C.1 tests/docs remain historical. New tests
+exercise receipt/family uniqueness, exact digest state, five-minute and clipped expiry, eight-hour idle,
+24-hour consent deadline, all authority failures, key/JTI rules, rotation/reuse/response loss, audit failures,
+committed revoke ordering, races and replacement JVMs. Test-only verifier privileges are separate from
+runtime identities; ACCESS persistence observation is not a production access resolver.
 
-Explicit boundaries: 3B.2D and 3B.3+ NOT STARTED; no VerifiedIntegrationContext from a token, no MCP route,
-no Case disclosure; WEB/DESKTOP remains authoritative; AI defaults OFF; no real tenant enablement,
-production/Azure SQL, deployment, installer/version publication or Curtis-specific integration.
+Final executed results follow; groups overlap and must not be added as unique totals.
 
-
-Pre-edit test-impact inventory covered the existing exchange store/SQL boundary, all AI SQL fixtures,
-metadata/configuration/client mapping/filter isolation/human/HTTP tests, ordinary auth/session adapters
-and selector ownership. Source changes map to AiOAuthCredentialContractTest, AiOAuthExchangeContractTest,
-AiSecurityLocalSqlServerTest, OAuthCodeExchangePolicyTest, OAuthAuthorizationFlowTest, OAuthMetadataTest
-and the unchanged auth/isolation regressions. The final reference search removed obsolete live-test
-issuance-disabled assertions; historical 3B.2C.1 documentation/tests remain intentionally historical.
-
-Verification to date (groups overlap):
-
-| Check | Result and limits |
+| Check | Result / scope |
 | --- | --- |
-| Compile + credential/exchange/request/metadata/assertion contracts | 15 PASS; no SQL execution in these checks. Final source/test compilation included. |
-| WEB/DESKTOP server/auth/session regressions | 51 PASS. Initial Mockito self-attachment failed in sandbox; one concrete retry with cached Mockito startup agent passed. |
-| Selector affected security-data/server | 99 non-SQL tests PASS. AiSecurityLocalSqlServerTest and OAuthAuthorizationFlowTest aborted at opt-in; their reported zero executed tests are **not acceptance**. Full affected SQL/HTTP suite remains incomplete. |
-| Critical reactor | Final source: 152 PASS across seven modules, no failures/errors/skips. A final-source sandbox run first failed on a desktop loopback listener; one retry with explicit network permission passed. This is not SQL lifecycle acceptance. |
-| Selector Python | 27 PASS. Historical all-tests escalation was informational, not executed. |
-| Disposable SQL | FAILED: initial 24 checks could not install new-column DDL; narrowed 3-check run then failed on grant timestamp reference. Source corrections made; no final SQL pass. |
-| OAuth HTTP lifecycle, refresh races/restart/reuse, cumulative SQL verifier | Written/compiled but **not successfully executed** after fixes; blocked by corrective-run approval. |
-| Docs/diff | Relative-link/anchor, balanced fence, JSON and git diff checks executed; final counts recorded in PR. |
+| Focused migration / initial race / response-loss smoke + static credential contracts | 5 PASS |
+| Focused complete credential SQL lifecycle + static credential contracts | 41 PASS initially; final affected run additionally covers the new global-revision gate scenario |
+| Focused final epoch, restricted reset and cumulative verifier | 5 PASS |
+| Final verifier / replacement ACCESS and REFRESH JVM probes + HTTP/request/metadata/assertion focus | 23 PASS, including 8 maintained HTTP flows |
+| Selector affected security-data/server suite, SQL explicitly enabled | 197 PASS, no failures/errors/skips, in two disjoint bounded partitions |
+| Full synthetic SQL coverage within affected suite | 90 PASS: 50 foundation/authorization/exchange and 40 credential lifecycle scenarios |
+| WEB/DESKTOP server/auth/session regressions | 51 PASS |
+| Final critical reactor | Final-source rerun: 152 PASS across all seven modules; zero failures/errors/skips. An earlier attempt was not executed because approval review was temporarily out of credits; after approved cleanup proved the service available, one bounded rerun passed. |
+| Selector Python | 27 PASS |
+| Documentation / diff | Relative links/anchors, fences, JSON and git diff checks PASS; final counts are recorded in the PR. |
 
-Executed commands use existing Maven 3.9.11/JDK21 wrapper `/workspace/.tools/bin/mvn` with 120–240-second
-deadlines. Focused: `-o -B -pl shale-server -am -Dtest=AiOAuthExchangeContractTest,AiOAuthCredentialContractTest,OAuthCodeExchangePolicyTest,OAuthMetadataTest,PinnedClientAssertionTest -Dsurefire.failIfNoSpecifiedTests=false test`.
-Auth: `-o -B -DargLine=-javaagent:/workspace/.cache/maven/org/mockito/mockito-core/5.23.0/mockito-core-5.23.0.jar -pl shale-server -am -Dtest=AuthControllerTest,DesktopSessionControllerTest,SessionControllerTest,AdminSessionControllerTest,DurableSessionAuthTest,ServerAuthSessionLogoutTest,RememberedDesktopSessionTest,SqlRememberCredentialStoreTest,DesktopApplicationInstanceVerifierTest,SessionManagementContractTest,OAuthFilterIsolationTest,AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest -Dsurefire.failIfNoSpecifiedTests=false test`.
-Selector: `python3 build/test-selection/select_tests.py --base 6d39e01e59f1f090f9ef62a616b89f4486f1dbfd --head HEAD --format markdown --plan-output work/selection.json`;
-its exact selected_maven_batches ran with `-o -B` and the same startup agent, with **no SQL opt-in**.
-Critical: `-B -DargLine=-javaagent:/workspace/.cache/maven/org/mockito/mockito-core/5.23.0/mockito-core-5.23.0.jar test`.
-Python: `python3 -m unittest discover -s build/test-selection -p test_select_tests.py`.
+Evidence is compiled/static contracts, actual separate restricted loopback SQL identities, shared committed
+transactions/concurrency and replacement JVMs, plus maintained servlet filters. The HTTP WEB identity store
+is synthetic; ordinary production auth adapters have separate regressions. Expiry injection explicitly uses
+test-owner timestamp changes. This does **not** establish production/Azure, authoritative Case/RLS,
+independent client/browser UX, fleet/deployment or penetration-test acceptance. Defaults stay OFF.
 
-The attempted SQL commands explicitly used only LOCAL_DISPOSABLE_AI/127.0.0.1:14337 and a private generated
-password environment binding: first `-o -pl shale-data -am -Dtest=AiOAuthCredentialContractTest,AiSecurityLocalSqlServerTest#credential* -Dsurefire.failIfNoSpecifiedTests=false test`,
-then narrowed `-Dtest=AiSecurityLocalSqlServerTest#credentialMigrationRepeatAndCatalogDriftFailClosed+credentialInitialRaceOneFamilyAndHashOnlyFiveMinuteLifetime+credentialRotationResponseLossRetryRevokesAllDescendantsPermanently`.
-The next corrective command was rejected before execution. No full-reactor debugging or indefinite commands.
-The Git proxy sandbox error was diagnosed and one permission-scoped fetch retry succeeded; an offline missing
-Boot BOM was resolved by one online compile attempt. These are not blocked dependency checks claimed as passes.
+Initial DDL batching and a grant timestamp reference failed before issuance, then were corrected. Automatic
+review initially blocked further SQL retries under the original anti-hang rule; the user explicitly approved
+bounded corrective runs, which completed. One stale concurrency rejection was resolved by proving the prior
+run had exited before starting the next. Failed/blocked attempts are not passes. Git/dependency sandbox
+errors and Mockito attachment were diagnosed with concrete permission/startup-agent corrections. An affected-run
+test-edit mistake in the self-revocation actor assertion was corrected; the new restricted reset fixture
+also needed ordinary UserSessions SELECT/UPDATE grants, without any AI-table privilege expansion. Both
+audit paths then passed focused verification and final affected checks. No full
+reactor was used to debug code; Maven/SQL commands were serialized and bounded at 120–240 seconds.
+Both owned disposable SQL containers were removed, including final loopback-only `shale-ai-3b2c2`. The generated password file was removed.
 
-Current roadmap: 3B.1 / 3B.2A / 3B.2B / 3B.2C.1 retain recorded COMPLETE scopes;
-3B.2C.2 and aggregate 3B.2C remain **IN PROGRESS, UNVERIFIED**. 3B.2D / 3B.3+ remain NOT STARTED.
-Do not merge/enable/deploy this candidate as a completed lifecycle until final SQL/HTTP/race/restart and
-final affected/critical checks pass. The approval blocker does not establish security correctness. The owned disposable SQL container and generated password file were removed after verification stopped.
+Maven is the existing `/workspace/.tools/bin/mvn` wrapper (Maven 3.9.11/JDK21), with `-o -B` and
+`-DargLine=-javaagent:/workspace/.cache/maven/org/mockito/mockito-core/5.23.0/mockito-core-5.23.0.jar`.
+SQL runs privately supply SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI, SHALE_AI_SQL_PORT=14337 and the
+generated SHALE_AI_SQL_PASSWORD; no secret is placed in command arguments or logs.
 
+```bash
+# Focused disposable credential lifecycle (240-second outer process budget is enforced):
+mvn -pl shale-data -am -Dtest=AiOAuthCredentialContractTest,AiSecurityLocalSqlServerTest#credential* -Dsurefire.failIfNoSpecifiedTests=false test
+# Final probes, cumulative verifier (inside migration test), maintained OAuth servlet flows:
+mvn -pl shale-server -am -Dtest=AiOAuthCredentialContractTest,AiSecurityLocalSqlServerTest#credentialMigrationRepeatAndCatalogDriftFailClosed+credentialRestartObservesAccessRefreshAndConsumedHistory,OAuthAuthorizationFlowTest,OAuthCodeExchangePolicyTest,OAuthMetadataTest,PinnedClientAssertionTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 6d39e01e59f1f090f9ef62a616b89f4486f1dbfd --head HEAD --format markdown --plan-output work/final-selection.json
+# Execute selected_maven_batches, splitting only AiSecurityLocalSqlServerTest into disjoint
+# pre-existing and credential* method lists to keep each command below 240 seconds.
+# Every selected class/method executes; no SQL opt-out, exclusion or skip counts as acceptance.
+mvn test
+python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+python3 work/check-docs.py
+git diff --check 6d39e01e59f1f090f9ef62a616b89f4486f1dbfd HEAD
+```
 
-Final source review additionally inspected the cached SQL Server JDBC implementation: `setAutoCommit(false)`
-sets IMPLICIT_TRANSACTIONS ON. The composed issuer now turns implicit nesting off and explicitly begins
-exactly one transaction before calling the exchange, then commits and restores autoCommit. This prevents
-an early exchange-owned commit or unexpected nested AiLockV1 count. This correction compiled and passed
-final non-SQL checks; its real transaction behavior remains part of the blocked SQL acceptance.
+The selector's historical all-tests escalation is informational; `-Pall-tests` was not executed. No required local verification remains blocked. Approved deployed permissions/RLS, operational enablement, edge
+attempt limits and independent live client acceptance remain deployment prerequisites; no acceptance is inferred.
+
+```text
+3B.1     COMPLETE
+3B.2A    COMPLETE
+3B.2B    COMPLETE
+3B.2C.1  COMPLETE
+3B.2C.2  COMPLETE
+3B.2C    COMPLETE
+3B.2D    NOT STARTED
+3B.3+    NOT STARTED
+```
+
+**Exact next recommendation:** implement the minimal RFC 7009 follow-on with the same authenticated
+client profile and durable family revocation, then 3B.2D's distinct ACCESS-only confined owner resolver,
+fresh runtime full-tuple live validation and immutable VerifiedIntegrationContext construction. Verify every
+revocation/deadline/scope/issuer/resource binding, non-bypass pooled isolation, replica/restart and ordinary
+WEB/DESKTOP rejection. Keep MCP, resource data endpoints, Case disclosure and 3B.3 disclosure audit outside
+that increment. No access token is currently accepted by any Shale resource.
+
+Explicitly: no token-derived VerifiedIntegrationContext; no MCP route; no Case disclosure; WEB/DESKTOP
+remains authoritative; AI defaults OFF; no production/Azure SQL, deployment, real tenant enablement,
+installer/version publication or Curtis-specific integration.

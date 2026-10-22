@@ -44,3 +44,7 @@ DECLARE @fingerprint varbinary(32)=HASHBYTES('SHA2_256',@catalog);
 IF @fingerprint<>ISNULL((SELECT CONVERT(varbinary(32),value) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiOAuthCredential') AND minor_id=0 AND name=N'Shale.AiCredentialsV1'),0x)
  THROW 58700,'Cumulative AI credential catalog drift or migration missing.',1;
 SELECT CAST(0 AS int) AS CredentialCatalogDriftFindingCount;
+
+IF ISNULL((SELECT CONVERT(varbinary(32),value) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiOAuthCredential') AND minor_id=0 AND name=N'Shale.AiCredentialsV1.Source'),0x)<>0x4463497b7476f047263a3e6dfb3abe28c9c251633ecec19a87eb2bcf255f3ddc
+ THROW 58700,'Reviewed AI credential migration source receipt missing or changed.',1;
+SELECT CAST(0 AS int) AS CredentialSourceReceiptFindingCount;

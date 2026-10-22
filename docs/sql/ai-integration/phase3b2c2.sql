@@ -4,7 +4,7 @@ IF USER_NAME()<>N'dbo' OR SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR SESSI
  THROW 58700,'Fresh dbo migration session required.',1;
 BEGIN TRY
 BEGIN TRANSACTION;
-DECLARE @sourceHash varbinary(32)=0x8cdaa8d222b16a088c24cc25cf7715577392cdc1ed52b0af3e43dadad5fe2064;
+DECLARE @sourceHash varbinary(32)=0x4463497b7476f047263a3e6dfb3abe28c9c251633ecec19a87eb2bcf255f3ddc;
 DECLARE @rc int;
 EXEC @rc=sys.sp_getapplock @Resource=N'AiSchemaV1',@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=3000;
 IF @rc<0 THROW 58700,'AI schema lock unavailable.',1;
@@ -155,6 +155,79 @@ BEGIN TRY
  FROM dbo.AiAuthorizationTransaction WHERE TransactionId=@TransactionId AND ShaleClientId=@t AND UserId=@u;
  -- Internal validation result only. Never create a session/access/refresh credential here.
  IF @owns=1 COMMIT TRANSACTION;
+ END TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK TRANSACTION; THROW; END CATCH;
+END;');
+EXEC(N'ALTER PROCEDURE dbo.AiVerifySessionV1
+@SessionId uniqueidentifier,@RequiredScope tinyint
+AS
+BEGIN
+ SET NOCOUNT ON; SET XACT_ABORT ON;
+
+ BEGIN TRY BEGIN TRANSACTION; EXEC dbo.AiLockV1 @Exclusive=0;
+
+ EXEC dbo.AiActorV1; EXEC dbo.AiEnabledV1;
+ DECLARE @t int=CONVERT(int,SESSION_CONTEXT(N''ShaleClientId'')),@u int=CONVERT(int,SESSION_CONTEXT(N''PrincipalUserId'')),
+ @now datetime2(7)=SYSUTCDATETIME(),@integration uniqueidentifier,@grant uniqueidentifier,@mask tinyint;
+ SELECT @integration=s.IntegrationId,@grant=s.GrantId,@mask=(s.ScopeMask & g.ScopeMask & i.ScopeMask)
+ FROM dbo.AiDelegatedSession s
+ JOIN dbo.AiDelegationGrant g ON g.ShaleClientId=s.ShaleClientId AND g.GrantId=s.GrantId AND g.IntegrationId=s.IntegrationId AND g.UserId=s.UserId
+ JOIN dbo.AiIntegrationRegistration i ON i.ShaleClientId=s.ShaleClientId AND i.IntegrationId=s.IntegrationId
+ LEFT JOIN dbo.AiIntegrationClientKey k ON k.ShaleClientId=s.ShaleClientId AND k.IntegrationId=s.IntegrationId AND k.CredentialId=s.CredentialId
+ WHERE s.ShaleClientId=@t AND s.UserId=@u AND s.SessionId=@SessionId
+ AND s.RevokedAt IS NULL AND s.ExpiresAt>@now AND s.IdleExpiresAt>@now
+ AND (s.CapabilityRevision IS NULL OR s.CapabilityRevision=(SELECT Revision FROM dbo.AiProductCapability WHERE Id=1))
+ AND g.RevokedAt IS NULL AND g.ExpiresAt>@now AND i.Status=''ACTIVE'' AND i.ExpiresAt>@now
+ AND ((i.ClientType=''PUBLIC'' AND s.CredentialId IS NULL) OR (i.ClientType=''CONFIDENTIAL'' AND k.RevokedAt IS NULL AND k.CredentialId IS NOT NULL AND k.ValidFrom<=@now AND k.ExpiresAt>@now));
+ IF @mask IS NULL OR @RequiredScope IS NULL OR @RequiredScope NOT IN(1,2) OR (@mask & @RequiredScope)<>@RequiredScope
+ THROW 58408,''AI delegation unavailable.'',1;
+
+ SELECT @t ShaleClientId,@u UserId,@integration IntegrationId,@grant GrantId,@SessionId SessionId,@mask ScopeMask;
+ COMMIT TRANSACTION;
+ END TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK TRANSACTION; THROW; END CATCH;
+END;');
+EXEC(N'ALTER PROCEDURE dbo.AiReserveQuotaV1
+@SessionId uniqueidentifier,@RequiredScope tinyint,@InvocationId uniqueidentifier
+AS
+BEGIN
+ SET NOCOUNT ON; SET XACT_ABORT ON;
+
+ BEGIN TRY BEGIN TRANSACTION; EXEC dbo.AiLockV1;
+
+ EXEC dbo.AiActorV1; EXEC dbo.AiEnabledV1;
+ DECLARE @t int=CONVERT(int,SESSION_CONTEXT(N''ShaleClientId'')),@u int=CONVERT(int,SESSION_CONTEXT(N''PrincipalUserId'')),
+ @now datetime2(7)=SYSUTCDATETIME(),@integration uniqueidentifier,@grant uniqueidentifier,@mask tinyint;
+ SELECT @integration=s.IntegrationId,@grant=s.GrantId,@mask=(s.ScopeMask & g.ScopeMask & i.ScopeMask)
+ FROM dbo.AiDelegatedSession s
+ JOIN dbo.AiDelegationGrant g ON g.ShaleClientId=s.ShaleClientId AND g.GrantId=s.GrantId AND g.IntegrationId=s.IntegrationId AND g.UserId=s.UserId
+ JOIN dbo.AiIntegrationRegistration i ON i.ShaleClientId=s.ShaleClientId AND i.IntegrationId=s.IntegrationId
+ LEFT JOIN dbo.AiIntegrationClientKey k ON k.ShaleClientId=s.ShaleClientId AND k.IntegrationId=s.IntegrationId AND k.CredentialId=s.CredentialId
+ WHERE s.ShaleClientId=@t AND s.UserId=@u AND s.SessionId=@SessionId
+ AND s.RevokedAt IS NULL AND s.ExpiresAt>@now AND s.IdleExpiresAt>@now
+ AND (s.CapabilityRevision IS NULL OR s.CapabilityRevision=(SELECT Revision FROM dbo.AiProductCapability WHERE Id=1))
+ AND g.RevokedAt IS NULL AND g.ExpiresAt>@now AND i.Status=''ACTIVE'' AND i.ExpiresAt>@now
+ AND ((i.ClientType=''PUBLIC'' AND s.CredentialId IS NULL) OR (i.ClientType=''CONFIDENTIAL'' AND k.RevokedAt IS NULL AND k.CredentialId IS NOT NULL AND k.ValidFrom<=@now AND k.ExpiresAt>@now));
+ IF @mask IS NULL OR @RequiredScope IS NULL OR @RequiredScope NOT IN(1,2) OR (@mask & @RequiredScope)<>@RequiredScope
+ THROW 58408,''AI delegation unavailable.'',1;
+
+ IF @InvocationId IS NULL THROW 58406,''AI invocation required.'',1;
+ DECLARE @cost int=CASE WHEN @RequiredScope=1 THEN 10 ELSE 1 END,@admit bit=1;
+ IF EXISTS(SELECT 1 FROM dbo.AiQuotaReservation WHERE InvocationId=@InvocationId) THROW 58407,''AI reservation already accounted.'',1;
+ SELECT @admit=CASE WHEN
+  COALESCE(SUM(CONVERT(int,RowCost)),0)+@cost>1000 OR
+  COALESCE(SUM(CASE WHEN UserId=@u THEN CONVERT(int,RowCost) ELSE 0 END),0)+@cost>200 OR
+  COALESCE(SUM(CASE WHEN IntegrationId=@integration THEN CONVERT(int,RowCost) ELSE 0 END),0)+@cost>500 OR
+  COUNT(CASE WHEN AdmittedAt>DATEADD(second,-60,@now) THEN 1 END)>=60 OR
+  COUNT(CASE WHEN AdmittedAt>DATEADD(second,-60,@now) AND UserId=@u THEN 1 END)>=10 OR
+  COUNT(CASE WHEN AdmittedAt>DATEADD(second,-60,@now) AND IntegrationId=@integration THEN 1 END)>=20 OR
+  COUNT(CASE WHEN Admitted=1 AND ReleasedAt IS NULL AND LeaseExpiresAt>@now THEN 1 END)>=5 OR
+  COUNT(CASE WHEN Admitted=1 AND ReleasedAt IS NULL AND LeaseExpiresAt>@now AND UserId=@u THEN 1 END)>=1 OR
+  COUNT(CASE WHEN Admitted=1 AND ReleasedAt IS NULL AND LeaseExpiresAt>@now AND IntegrationId=@integration THEN 1 END)>=2
+ THEN 0 ELSE 1 END FROM dbo.AiQuotaReservation WHERE ShaleClientId=@t AND AdmittedAt>DATEADD(hour,-24,@now);
+ INSERT dbo.AiQuotaReservation(ShaleClientId,IntegrationId,UserId,GrantId,SessionId,InvocationId,Operation,RowCost,Admitted,AdmittedAt,LeaseExpiresAt)
+ VALUES(@t,@integration,@u,@grant,@SessionId,@InvocationId,CASE WHEN @RequiredScope=1 THEN ''SEARCH'' ELSE ''OVERVIEW'' END,
+ CASE WHEN @admit=1 THEN @cost ELSE 0 END,@admit,@now,DATEADD(second,15,@now));
+ SELECT @admit Admitted,@InvocationId InvocationId;
+ COMMIT TRANSACTION;
  END TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK TRANSACTION; THROW; END CATCH;
 END;');
 EXEC(N'CREATE PROCEDURE dbo.ResolveAiRefreshV1

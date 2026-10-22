@@ -159,6 +159,16 @@ class OAuthAuthorizationFlowTest {
             var result=send(valid);assertEquals(200,result.getStatus(),result.getContentAsString());assertTrue(result.getContentAsString().contains("access_token"));
             var replay=exchangeRequest(second);replay.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");replay.setParameter("client_assertion",assertion);
             assertFalse(send(replay).getContentAsString().contains("access_token"));
+            var mapper=new tools.jackson.databind.ObjectMapper();String refresh=mapper.readTree(result.getContentAsString()).path("refresh_token").asText();
+            assertTrue(send(refreshRequest(refresh)).getStatus()>=400,"Refresh possession cannot bypass confidential client authentication");
+            var invalid=refreshRequest(refresh);authenticate(invalid,signedAssertion(key.credentialId(),g.generateKeyPair().getPrivate()));
+            assertTrue(send(invalid).getStatus()>=400,"A wrong assertion signature must fail before refresh consumption");
+            var usedJti=refreshRequest(refresh);authenticate(usedJti,assertion);assertTrue(send(usedJti).getStatus()>=400,"Initial JTI remains shared replay authority");
+            var rotate=refreshRequest(refresh);authenticate(rotate,signedAssertion(key.credentialId(),pair.getPrivate()));
+            var rotated=send(rotate);assertEquals(200,rotated.getStatus(),rotated.getContentAsString());
+            String replacement=mapper.readTree(rotated.getContentAsString()).path("refresh_token").asText();
+            var reuse=refreshRequest(refresh);authenticate(reuse,signedAssertion(key.credentialId(),pair.getPrivate()));assertEquals(400,send(reuse).getStatus());
+            var descendant=refreshRequest(replacement);authenticate(descendant,signedAssertion(key.credentialId(),pair.getPrivate()));assertEquals(400,send(descendant).getStatus());
         } finally {client=original;}
     }
     @Test void approvalRejectsCrossClientAndAllBindingSubstitutionsAndAllowsBothExplicitScopes()throws Exception {
@@ -190,6 +200,16 @@ class OAuthAuthorizationFlowTest {
         var multiple=authorization();multiple.setParameter("resource",RESOURCE,RESOURCE);assertEquals(400,send(multiple).getStatus());
         assertEquals(400,send(approve("a".repeat(43))).getStatus(),"Unbound CSRF state must fail");
         var substituted=authorization();substituted.setParameter("client_id","unknown");assertEquals(400,send(substituted).getStatus());
+    }
+    private String signedAssertion(UUID key,java.security.PrivateKey signing)throws Exception {
+        var now=Instant.now().minusSeconds(1);
+        var jwt=new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.RS256).keyID(key.toString()).build(),
+                new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(client).subject(client).audience(ISSUER+"/token")
+                        .issueTime(java.util.Date.from(now)).expirationTime(java.util.Date.from(now.plusSeconds(60))).jwtID(UUID.randomUUID().toString()).build());
+        jwt.sign(new com.nimbusds.jose.crypto.RSASSASigner(signing));return jwt.serialize();
+    }
+    private void authenticate(MockHttpServletRequest request,String assertion) {
+        request.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");request.setParameter("client_assertion",assertion);
     }
     MockHttpServletRequest refreshRequest(String refresh) {
         var r=new MockHttpServletRequest("POST","/oauth/mcp/token");r.setAttribute("skipAuthorization",true);

@@ -353,7 +353,9 @@ revocations append bounded session DEACTIVATED audit in that same transaction. A
 present; a system-originated cascade with no actor context records the affected user as the service subject.
 First session revocation timestamp/reason and token timestamps are immutable. Global revision mismatch
 permanently denies a pre-disable family after re-enable; its next authenticated refresh durably records
-DISABLED family revocation. The global switch's existing transaction-coupled control-plane audit records
+DISABLED family revocation. Existing internal session/quota gates also compare the recorded global revision
+on lifecycle-bound families, so their trusted session references cannot restore pre-disable authority either.
+The global switch's existing transaction-coupled control-plane audit records
 the invalidating revision; there is no cross-tenant sweep or global tenant-data grant. Other live checks
 remain mandatory even if a cascade already marked the family revoked. No positive authorization cache.
 
