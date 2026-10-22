@@ -687,7 +687,11 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3A MCP security/integration contract | COMPLETE (design only) | §10; no route, credential, schema or disclosure activated. |
 | Phase 3B first read-only MCP implementation | IN PROGRESS | §10.11 sequence; no endpoint or disclosure; remaining auth/audit/runtime/client gates. |
 | Phase 3B.1 integration persistence/security | COMPLETE (source/synthetic proof) | §10.13; focused/affected/critical checks pass; defaults off. |
-| Phase 3B.2 credential/authentication validation | NOT STARTED | Maintained OAuth implementation, AS bindings/rotation and credential validation. |
+| Phase 3B.2 credential/authentication validation | BLOCKED at dependency gate | §10.14; separate supported Spring-stack prerequisite before runtime work. |
+| Phase 3B.2A OAuth dependency/configuration/protocol foundation | BLOCKED | Current Boot 3.3.4 baseline has no proven maintained OSS AS combination; no dependency or endpoint added. |
+| Phase 3B.2B authorization code + S256 PKCE + consent transaction | NOT STARTED | Complete the stack prerequisite and 3B.2A first; no usable token issuance in this slice. |
+| Phase 3B.2C opaque access + rotating refresh lifecycle | NOT STARTED | Durable atomic lifecycle, replay/family invalidation and expiry clipping. |
+| Phase 3B.2D live credential validation + VerifiedIntegrationContext | NOT STARTED | Exact credential bindings and authoritative live context resolution. |
 | Phase 3B.3 AI audit/shared disclosure seam | NOT STARTED | Mandatory integration access audit and final handoff gate. |
 | Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery in 3B.1. |
 | Phase 3B.5 search_cases | NOT STARTED | No Case tool implementation. |
@@ -716,7 +720,8 @@ Broader REST review remains IN PROGRESS. Phase 1R is merged and its three-FILTER
 synthetically validated; authoritative Case SQL remains **BLOCKED** by unavailable approved offline input.
 Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RLS and operational acceptance
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
-Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the next increment is 3B.2. All capability/tenant flags remain off.
+Phase 3B.1 is COMPLETE at its recorded scope (§10.13); 3B.2A is BLOCKED by the compatibility gate (§10.14).
+Complete its separate Spring-stack prerequisite before resuming 3B.2A. All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
 
@@ -1689,6 +1694,10 @@ Completion of an increment is not permission to enable the next data surface.
 | --- | --- | --- | --- |
 | **3B.1 Integration persistence/security foundation** | §10.2/10.8; authoritative schema inventory. Add reviewed additive migration candidates, tenant policy/registration/keys/grants/session/credential/quota foundations, confined bootstrap resolvers, typed context, global capability/control-plane audit, audited admin command/service and self-consent/revoke boundary. No MCP route. | Same-tenant admin/self checks, wrong actor/tenant/null state, exact FKs/RLS FILTER/BLOCK/non-bypass permissions, drift/repeat/concurrency, RowVer, atomic admin audit, consent CSRF/substitution, absolute expiry and quota races/restart. Complete when default-off state and revoke/rotation/admin controls are executable/tested without disclosing Case data. Build schema/authority first, then audited controls/consent, then shared quota admission as separately reviewable subincrements. | Keep flags off; additive tables may remain unused. Retain revocations/audits, no hard-delete rollback or editing historical migrations. No deployment authorized. |
 | **3B.2 Credential/authentication validation** | 3B.1; select maintained OAuth dependency with Boot compatibility proof (separate upgrade prerequisite if needed). Implement AS metadata/code+PKCE/self-consent, opaque access/refresh store, fixed issuer/resource, pinned private_key_jwt/replay and confined owner resolution/live validation. Separate route/filter composition. | Code/refresh/assertion replay, wrong issuer/audience/client/redirect/key/PKCE, expired/unbound token, all revoked layers, public clients, response loss/rotation race, REST↔MCP credential rejection including writes; existing WEB/DESKTOP/session regressions. Complete with no general data endpoint and durable lifecycle across replicas/restart. | Disable new AS surface, revoke integration families. Never fall back to WEB JWT or desktop restore; retain rows and configured token namespace. |
+| **3B.2A OAuth dependency/configuration/protocol foundation — BLOCKED** | Maintained library compatibility and separate stack prerequisite (§10.14); then typed canonical issuer/resource, isolated AS composition, client mapping, exact redirect and S256-only policy. No issuance. | Resolve actual dependencies, start context, prove namespace isolation and canonical configuration/redirect/PKCE rules; publish only truthful implemented metadata, otherwise leave it absent. | Keep all AI flags off and AS endpoints absent; preserve ordinary authentication. |
+| **3B.2B authorization code + S256 PKCE + consent transaction — NOT STARTED** | Completed 3B.2A; durable code transaction bound to current human/grant/client/redirect/resource/challenge, browser CSRF/state and RFC 9207. No usable access/refresh credentials. | Atomic single-use code consume, wrong/missing/plain PKCE, redirect/resource substitution, consent races and expiry; preserve WEB/DESKTOP regressions. | Disable authorization transactions; retain consent and security history. |
+| **3B.2C opaque access + rotating refresh lifecycle — NOT STARTED** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
+| **3B.2D live credential validation + VerifiedIntegrationContext — NOT STARTED** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
 | **3B.3 AI audit attribution and shared disclosure seam** | 3B.1–2. Implement narrow access parent/children/security events, protected bounded review, immutable context-aware existing worker extensions and final handoff gate. Keep original REST exemption/Overview event. | Exact actor/integration/tool/resource/correlation; empty search, unavailable/probe denial, one PHI row; real denied INSERT, zero-row append, precommit failure/lost ACK, close/encoding/final-gate failure, audit outage, privacy sentinel tests and admin/cross-tenant review. Complete when both shared reads can withhold results under every fault without a protocol adapter. | Off flag stops all integration calls; retain committed audit. Old workers remain ordinary-web only; no partial “audit later” fallback. |
 | **3B.4 MCP transport/discovery** | 3B.2–3; SDK proves 2026-07-28 compliance. Add disabled-by-default Streamable HTTP/JSON transport, fixed metadata/Origin/TLS/filter checks, strict parsing/deadlines and distributed quota admission, explicit catalog mapping (no data handlers enabled yet). | Unauth/unregistered/revoked discovery, scope-filtered catalog, metadata header/body mismatch, duplicate keys/batches, unsupported methods/versions, no GET/session assumptions, Origin/proxy/config errors, body/byte/deadline limits. Complete with no Case response and two independent conforming clients against synthetic transport. | Unmount MCP route/metadata as appropriate; no second service or REST changes. Never substitute legacy insecure transport. |
 | **3B.5 search_cases** | 3B.1–4; exact expanded §10.9 schema and shared search audit path. Enable handler only in isolated test configuration. | Production port delegation once, tenant/user/context/scope direct bypass denial, literal search/order/probe, exact schema/UTF-16/Unicode bounds, page9 hasMore, empty search audit, full-envelope bytes, repeated/varied query row budgets and simultaneous reservations across replicas. Complete with synthetic data only, fail-closed audit/final gate and no unbounded pagination. | Remove search from dispatch/catalog or product off; retain histories/reservations. Never expose unaudited ordinary summary method as fallback. |
@@ -1752,7 +1761,8 @@ connector's Git object/ref operations, preserving every unrelated base entry and
 ### 10.13 Phase 3B.1 integration persistence and security foundation
 
 **Status: COMPLETE — persistent security foundation and focused/affected/critical source/synthetic verification.**
-Phase 3A remains COMPLETE as design. Phase 3B.2–3B.7 are NOT STARTED. MCP is inactive.
+Phase 3A remains COMPLETE as design. At this record's completion, Phase 3B.2–3B.7 were NOT STARTED;
+§10.14 records the subsequent 3B.2A compatibility blocker. MCP is inactive.
 Live base `a97691ecb2147d9888d9f636aee8cc9e07842cdd` includes merged Phase 1R #1898,
 Phase 1S #1899, selected Phase 2 #1900 and Phase 3A #1901, confirmed using live GitHub metadata.
 The isolated task branch preserves the original checkout. Source/tree hashes were checked; a sandbox-network
@@ -1887,3 +1897,128 @@ NULL typing, zero-row trigger behavior, ordered catalog hashing, and a BLOCK fix
 unique tenant row. The final per-table test requires actual SQL error 33504, not a coincidental constraint
 failure. No failed/initial run is reported as passing. Selector changes recommend historical all-tests only
 informationally; that optional broad suite was not run. No required focused/affected/critical check is blocked.
+
+### 10.14 Phase 3B.2A OAuth compatibility gate — 2026-10-21
+
+**Status: BLOCKED — framework/support prerequisite; OAuth runtime implementation has not started.**
+3B.1 COMPLETE (source/synthetic scope); 3B.2B, 3B.2C, 3B.2D and 3B.3+ NOT STARTED.
+This follows §10.3's explicit separate-upgrade rule. It does not complete 3B.2A or permit a custom OAuth server.
+Live `codex/latest` is `41fdefd8447661a85ab8bdc26d500492d5b7cc11`; live GitHub PR metadata confirms
+#1901 merged as `a97691ec` and #1902 merged as `41fdefd8`. The original checkout is preserved.
+
+#### Dependency and support findings
+
+| Candidate/baseline | Inspected evidence | Decision |
+| --- | --- | --- |
+| Current Shale | JDK 21; server imports Boot **3.3.4** BOM: Framework **6.1.13**, Security **6.3.3**, AS **1.3.2**. Parent explicitly manages Security crypto **6.3.3**. Server has web/validation starters and springdoc **2.6.0**, no Security web/config starter or AS dependency. | Java meets the AS minimum; that alone does not establish Spring API/support compatibility. |
+| Boot-managed AS 1.3.2 / 1.3.x | [Spring's April 2026 release notice](https://spring.io/blog/2026/04/21/spring-authorization-server-1-5-7-available-now/) confirms 1.3.x and 1.4.x OSS support ended; maintained patches on those lines require a commercial subscription. | Do not add an unsupported old version merely because the BOM resolves it. No commercial entitlement/artifact access is established in this task. |
+| Standalone AS **1.5.8** | [Tagged dependency catalog](https://github.com/spring-attic/spring-authorization-server/blob/1.5.8/gradle/libs.versions.toml): Framework **6.2.19**, Security **6.5.11**, Jackson **2.18.8**, Nimbus **9.47**. [Module dependencies](https://github.com/spring-attic/spring-authorization-server/blob/1.5.8/oauth2-authorization-server/spring-security-oauth2-authorization-server.gradle) add Security config/web/OAuth2 core/JOSE/resource-server plus Nimbus/Jackson. | Not a safe drop-in on Shale's 6.1/6.3 stack; Boot mediation would retain older APIs unless deliberately upgraded. This inspected release is compatibility evidence, not a selected maintained production version. |
+| Spring Security Authorization Server **7.0.7** | [AS installation guide](https://docs.spring.io/spring-security/reference/7.0/servlet/oauth2/authorization-server/getting-started.html) and [tagged catalog](https://github.com/spring-projects/spring-security/blob/7.0.7/gradle/libs.versions.toml): Framework **7.0.9**, Servlet **6.1**, Nimbus **10.4**; AS now belongs to Spring Security 7. | Preferred maintained implementation family; requires a separately reviewed Boot 4 / Framework 7 / Security 7 stack. No runtime version is accepted or pinned here. |
+
+There is a concrete API mismatch as well as BOM drift: AS 1.5.8's
+[DPoPProofVerifier](https://github.com/spring-attic/spring-authorization-server/blob/1.5.8/oauth2-authorization-server/src/main/java/org/springframework/security/oauth2/server/authorization/authentication/DPoPProofVerifier.java)
+imports `DPoPProofContext` and `DPoPProofJwtDecoderFactory`, introduced in
+[Security 6.5](https://docs.spring.io/spring-security/site/docs/6.5.0/api/org/springframework/security/oauth2/jwt/DPoPProofJwtDecoderFactory.html).
+Its authorization-code provider invokes this verifier. Disabling DPoP in the pilot does not establish binary
+compatibility with Security 6.3.3. Do not exclude/downgrade those dependencies or invent replacement classes.
+No new transitive dependencies, framework overrides or auto-configuration have been added.
+
+#### Smallest separate prerequisite recommendation
+
+Open a dedicated **supported Spring server baseline** change before resuming OAuth. For an OSS-only path,
+evaluate Boot **4.0.x** with its BOM-aligned Framework **7.0.x** / Security **7.0.x**, retaining JDK 21;
+select and pin supported, advisory-reviewed patch versions during that change. Security AS **7.0.7** is
+the inspected example, not an instruction to override a newer BOM patch. Align the parent's crypto version
+with that Security BOM across all modules, review springdoc 2.6.0 compatibility/replacement and Jackson/
+Servlet/MVC/test API migration, and prove the complete dependency tree/context plus existing auth/session
+and critical reactor tests. Keep OAuth/MCP endpoints and credentials absent in that prerequisite PR.
+This is a substantial framework migration and is deliberately not performed in this task.
+
+A Boot 3.5 / Security 6.5 bridge is not an established maintained OSS alternative: Spring labels
+[Boot 3.5.16 the last OSS release](https://spring.io/blog/2026/06/25/spring-boot-3-5-16-available-now/).
+If the owner already has commercial support, a smaller separately reviewed supported 3.x patch alignment
+may instead be evaluated with actual entitlement and current patched AS artifacts. This task neither assumes
+that access nor purchases support. Recheck upstream support/advisories and runtime compatibility at the
+prerequisite's execution date; archive status or a documentation version list is not maintenance proof.
+
+#### Preserved protocol boundary and next increment
+
+The fixed future identities remain `${publicOrigin}/oauth/mcp` and `${publicOrigin}/mcp` from §10.3.
+No typed OAuth configuration or new environment variable is wired yet. Current deployment CORS/API-origin
+settings are not a validated server issuer authority; request Host/Forwarded headers cannot supply one.
+Resume 3B.2A after the prerequisite: validate one canonical HTTPS production origin/issuer/resource with exact
+comparison and separate dev/test identities, reject aliases/malformed/other/multiple resources, and start the
+maintained library in an isolated, issuance-incapable composition before progressing to 3B.2B.
+
+Source inspection finds **no existing Spring SecurityFilterChain**: ordinary auth uses
+`BearerTokenServerSessionResolver`, `ServerRuntimeSessionState`, `RequestScopedDbSessionProvider` and
+`ServerAuthSessionService`/`DurableSessionTokenValidator`. Adding Security web/config would introduce a new
+servlet-filter layer. The resumed 3B.2A must explicitly match only the OAuth namespace/metadata, preserve
+ordinary controller/service authorization and test the fallback composition, rather than enabling default
+form login, Basic auth or a catch-all authenticated chain. REST JWTs, development headers and desktop restore
+credentials must never supply OAuth client/delegated authority. No filter-chain isolation proof is claimed here.
+
+Client mapping remains implementation work: tenant registration/client ID and redirects to `RegisteredClient`,
+PUBLIC to `ClientAuthenticationMethod.NONE`, CONFIDENTIAL to `PRIVATE_KEY_JWT` with pinned local RSA keys/
+RS256 and no remote JWKS or client secret. The existing bounded registration projection does not yet include
+all redirect/key/type data for that adapter; do not invent an unaudited unrestricted repository. Require PKCE
+for both types **and** an S256-only request validator; `requireProofKey(true)` alone is not that policy.
+Enforce exact hosted redirects and the native-public literal-loopback IP/path exception with only the port
+variable. These are preserved requirements, not newly executed library mapping/redirect/PKCE tests.
+
+RFC 8414 and RFC 9728 routes remain **absent**, with no grants or usable endpoints advertised. The §10.3
+metadata describes the eventual profile; it is not a current response. Resumed 3B.2A may expose only truthful
+library-supported capabilities or leave metadata off with a recorded reason. No MCP data route is mounted.
+3B.2B then owns durable single-use authorization code + S256 PKCE + self-consent transaction, exact resource/
+redirect/state/issuer binding and browser CSRF, while access/refresh issuance remains blocked until 3B.2C;
+live credential/context validation belongs to 3B.2D. Do not skip 3B.2A because this investigation is recorded.
+
+**Audit compatibility:** this documentation-only stop performs no sensitive read, tenant/admin mutation,
+credential issuance or protocol request, so no new PHI/entity/security audit row or migration is appropriate.
+Phase 3B.1's transactional audit and all future §10.5 disclosure obligations remain unchanged.
+Global and tenant defaults remain OFF; no usable AI access/refresh token, MCP, Case disclosure, production/
+Azure SQL, enablement, deployment, version bump or installer publication occurred. WEB/DESKTOP auth is retained.
+
+Verification evidence for this investigation is recorded below; upstream source/API inspection is distinct
+from dependency resolution and runtime testing. No OAuth application-context or protocol test has passed
+because no compatible runtime was installed.
+
+| Check | Result / limit |
+| --- | --- |
+| Live source and upstream compatibility inspection | PASS for recorded versions/API references; not a successful resolved library build. Git fetch could not connect to the configured proxy. GitHub connector supplied the live ref, signed commit, tree and text blobs; local object hashes match. The separate sparse worktree omits only twelve unrelated historical PNG screenshots while retaining their exact tree entries. |
+| OAuth dependency resolution probe | BLOCKED: task-local POM importing Boot 3.3.4 and AS 1.5.8 cannot download the AS POM from Central (`Operation not permitted`). No application POM is changed. No transitive runtime tree or OAuth context start is claimed. |
+| Existing dependency tree | BLOCKED before server: ICU4J **78.3** and libphonenumber **9.0.40** descriptors cannot be downloaded (`Operation not permitted`). Cached Boot BOM inspection establishes managed versions only. |
+| Focused existing auth/session/default-off regressions | BLOCKED in shale-data: the same two dependencies are absent from the local cache. WEB login/me/refresh/logout, durable WEB/DESKTOP/remembered-session and server-configuration tests did not execute. |
+| Selector affected suite | Documentation only: no affected Maven areas/modules/classes and no full-suite escalation. No affected runtime suite is reported as passing. |
+| Critical cached Maven reactor | BLOCKED in shale-data by the two missing artifacts. Six core tests passed (two AiScope and four AppPaths); later modules did not execute. This is not a passing reactor. |
+| Selector Python | **26 PASS**. |
+| Documentation / diff | Two Markdown owners, **55 relative links/anchors**, balanced fences, four parseable JSON blocks and slice status checks PASS; complete two-file diff reviewed, `git diff --check` PASS. |
+
+Commands use the existing `/workspace/.tools/bin/mvn` wrapper (Maven 3.9.11, JDK 21 and system CA trust).
+Task-local probes/checkers/logs remain in `work/`, not the deliverable tree:
+
+```bash
+mvn -o -B -pl shale-server,shale-desktop -am \
+  -Dtest=AuthControllerTest,DesktopSessionControllerTest,DurableSessionAuthTest,RememberedSessionSqlTest,SqlRememberCredentialStoreTest,ShaleAuthTokenServiceTest,RequestScopedDbSessionProviderTest,ShaleServerServiceConfigurationTest,DesktopRememberedRecoveryTest,DesktopRuntimeSessionLifecycleTest,DesktopSessionEnrollmentClientTest,DesktopSessionEnrollmentLifecycleTest,AiSecurityContractTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -pl shale-server -am -DskipTests dependency:tree \
+  -Dincludes=org.springframework.security:*,org.springframework:*,org.springframework.boot:*
+mvn -B -f work/oauth-probe.xml -Dhttps.proxyHost=proxy -Dhttps.proxyPort=8080 \
+  -Dhttp.proxyHost=proxy -Dhttp.proxyPort=8080 -Dmaven.wagon.http.retryHandler.count=0 \
+  org.apache.maven.plugins:maven-dependency-plugin:3.6.1:tree
+mvn -o -B test
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+python3 build/test-selection/select_tests.py \
+  --base 41fdefd8447661a85ab8bdc26d500492d5b7cc11 --head HEAD \
+  --format markdown --plan-output work/phase3b2a-selection.json
+python3 work/check_phase3b2a_docs.py
+git diff --check
+git diff --check 41fdefd8447661a85ab8bdc26d500492d5b7cc11 HEAD
+```
+
+The dependency/cache and network failures are independent of the framework/support blocker. Restoring Maven
+access alone does not approve AS 1.3.x or make AS 1.5/7 compatible with this unchanged Boot baseline.
+After the separate prerequisite, complete the previously unexecuted OAuth configuration/library, redirect,
+PKCE, metadata and filter-isolation tests plus focused existing auth/session, selector affected and critical
+checks before marking 3B.2A COMPLETE. No runtime regression or independent OAuth client acceptance is inferred
+from this documentation-only investigation.
