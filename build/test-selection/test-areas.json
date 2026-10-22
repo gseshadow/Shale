@@ -387,7 +387,10 @@
         "com.shale.server.oauth.OAuthClientMappingTest",
         "com.shale.server.oauth.OAuthFilterIsolationTest",
         "com.shale.server.oauth.OAuthMetadataTest",
-        "com.shale.server.oauth.ShaleOAuthHumanTest"
+        "com.shale.server.oauth.ShaleOAuthHumanTest",
+        "com.shale.server.oauth.OAuthCodeExchangePolicyTest",
+        "com.shale.server.oauth.PinnedClientAssertionTest",
+        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
       ]
     },
     "build-scripts": {
@@ -539,7 +542,9 @@
         "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
         "com.shale.server.runtime.ServerSessionSkeletonTest",
         "com.shale.core.security.ai.AiScopeTest",
-        "com.shale.data.security.ai.AiSecurityContractTest"
+        "com.shale.data.security.ai.AiSecurityContractTest",
+        "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+        "com.shale.data.security.ai.AiSecurityLocalSqlServerTest"
       ]
     },
     "notifications": {

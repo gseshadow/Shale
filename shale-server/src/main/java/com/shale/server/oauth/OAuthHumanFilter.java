@@ -14,6 +14,9 @@ final class OAuthHumanFilter extends OncePerRequestFilter {
     private final DurableOAuthAuthorization authorizations;
     OAuthHumanFilter(ShaleOAuthHuman humans, DurableOAuthAuthorization authorizations) { this.humans=humans; this.authorizations=authorizations; }
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
+        if(request.getRequestURI().substring(request.getContextPath().length()).equals("/oauth/mcp/token")) {
+            chain.doFilter(request,response); return;
+        }
         try {
             if(request.getContentLengthLong()>16384 || (request.getQueryString()!=null && request.getQueryString().length()>16384)) {
                 response.setStatus(400); return;

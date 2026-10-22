@@ -1437,3 +1437,13 @@ Strict RLS, tenant-qualified relationships and bounded procedure permissions ret
 Grant creation, intent consumption, code persistence and existing grant audit commit together.
 The [canonical implementation record](../docs/architecture/ai-integration-and-mcp.md#1017-phase-3b2b-authorization-code-s256-and-self-consent--2026-10-22)
 classifies disposable synthetic verification; this is no deployed catalog or credential issuance claim.
+
+## Authorization-code exchange validation — Phase 3B.2C.1 candidate
+
+The separate manual [exchange candidate](../docs/sql/ai-integration/phase3b2c1.sql) adds only
+`AiAssertionReplay`: strict tenant/integration/key ownership, digest-only JTI uniqueness, UTC
+acceptance/expiry and bounded expired-row cleanup. It reuses the existing authorization transaction,
+grant, registration, keys and entity-action audit. No session/access/refresh row is created.
+The [operator record](../docs/sql/ai-integration/README.md#phase-3b2c1-exchange-validation-candidate)
+documents confined owner resolution, effective permissions, atomic consume/replay/audit, receipts and rollback.
+This is candidate source and disposable synthetic evidence, never a deployed catalog claim.

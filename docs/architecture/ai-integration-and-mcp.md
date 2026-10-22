@@ -2553,3 +2553,103 @@ five-minute access and absolute/idle-clipped rotating refresh families with reus
 registration/grant/disable races and response-loss/restart tests. Only then expose supported token exchange.
 Do not implement token-to-VerifiedIntegrationContext/resource-server validation (3B.2D), MCP or Case access
 in that increment. No production SQL, deployment, tenant enablement or installer/version publication.
+
+### 10.18 Phase 3B.2C.1 authorization-code exchange boundary — 2026-10-22
+
+Source base: `ffe537bca1064b7e4715f35436e69a416baffc40`, merged #1906, fetched into a separate
+`codex/phase-3b2c1` worktree. The original checkout is preserved. This phase validates/consumes only;
+usable credential lifecycle remains unfinished. No MCP or Case disclosure is implemented.
+
+#### Protocol composition and client proof
+
+An explicit default-off `shale.ai.oauth.exchange-enabled` switch enables only form POST
+`/oauth/mcp/token`, within the existing isolated maintained Spring Authorization Server chain.
+The maintained public/JWT client converters and authorization-code converter feed dedicated provider
+extensions. Default client/grant providers are removed; password, implicit, client credentials,
+token exchange, device, refresh and arbitrary extension grants have no provider or converter.
+Singleton allowlisting rejects secret attempts, caller authority fields, query parameters, duplicate
+parameters, missing/malformed PKCE, and ordinary WEB/DESKTOP/remembered/Basic bearer headers.
+No Spring cookie/session, resource-server filter, REST authentication or human login fallback is added.
+
+PUBLIC uses `none`, client ID only as identifier, exact code/client/redirect/canonical resource and
+mandatory S256. The verifier must be 43–128 RFC 7636 unreserved ASCII characters. Java computes
+base64url(SHA-256(ASCII verifier)); SQL compares the original immutable challenge. No plain challenge,
+challenge mutation or verifier persistence exists. Cross-code/client substitution cannot bypass that binding.
+
+CONFIDENTIAL additionally requires `private_key_jwt`, explicit client ID, RS256, a local pinned RSA key
+at least 2048 bits, exact client `iss` and `sub`, one exact configured token-endpoint `aud`, valid iat/exp,
+positive lifetime at most 60 seconds, and nonempty bounded jti. No skew extends that validity. Nimbus JOSE
+verifies the signature with the freshly loaded exact tenant/integration/client public key. Caller jku,
+x5u, embedded JWK/certificate chains, critical/custom headers, HS/PS/EC, unknown/expired/revoked keys and
+client-secret fallback fail closed. There is no remote decoder/key loader. SQL rechecks the same key at
+final consume and requires the original authorization-pinned key; rotation or registration version change
+requires new consent/code, rather than rebinding old code to a replacement key.
+
+#### Durable validation, replay, result and audit
+
+The [operator/schema record](../sql/ai-integration/README.md#phase-3b2c1-exchange-validation-candidate)
+is authoritative for the new additive candidate, receipts, RLS, permissions, dedicated bootstrap config,
+retention and rollback. Bootstrap hashes the raw code and selects only tenant/user identifiers from one
+exact code/client/issuer/resource. It returns no grant/session/client inventory. Fresh initialized runtime
+leases use the existing production initializer; no auth/global pool gains tenant access.
+
+`AiExchangeOAuthCodeV1` rechecks global capability, tenant policy/activity, active nondeleted/nonremoved
+user, original live WEB session, integration/registration state and expiry/version, pinned key, original
+grant tenant/user/integration/scopes/expiry/revocation, code issuer/resource/redirect/client/challenge and
+single-use expiry. Existing global capability/tenant locks serialize control changes and exchange;
+held authority rows prevent a committed revoke preceding final authorization from slipping through.
+Expiry is checked again against database UTC at consumption. Reduced ceilings permanently revoke affected
+grants under existing Phase 3B.1 rules; expansion/re-enable never un-revokes descendants.
+
+The shared SQL unique tenant/integration/key/JTI-digest key is the replay authority across replicas and
+replacement JVMs. Replay reservation, code consume and bounded existing grant UPDATED audit are one
+transaction. Failed validation/audit rolls back all three; no failed attempt burns either input. Exactly
+one valid exchange of a code or simultaneous assertion use across codes wins. Committed consume/replay
+survives restart. Expired replay digests are removed in bounded tenant batches; inactive-tenant retention
+is explicitly opportunistic, without extending validity. No process cache is security authority.
+
+`AiOAuthExchangeStore.ValidatedExchange` is an immutable, redacted internal receipt of verified tenant,
+acting user, integration/client/grant/transaction, optional authenticating key, immutable approved scopes,
+issuer/resource, minimum grant/registration/original-WEB-session/key deadline, and server correlation.
+It contains no code, verifier, assertion, raw JTI, WEB JWT, password, prompt, PHI or Case data. It is never
+serialized to the client, never a bearer, and never constructs the final `VerifiedIntegrationContext`.
+
+After successful SQL validation the maintained grant provider deliberately raises controlled
+`server_error` / `Credential issuance is disabled in this phase.` It creates no placeholder token,
+access/refresh row or delegated session. Success consumes the inputs despite that protocol error; clients
+must obtain new consent/code. Response loss/close error also withholds the result without undoing a committed
+consume. Metadata stays authorization-only: token endpoint absent and token grant/auth lists empty.
+Advertising operational token issuance would be false; framework token generation remains disabled.
+
+Audit compatibility uses the existing `AI_DELEGATION_GRANT/UPDATED`, `SHALE_SERVICE`, server correlation,
+verified actor/tenant and only AI_SCOPE_MASK. Required audit failure aborts consumption/replay. No raw
+code/verifier/assertion/JTI/signature/digest/key material/state/redirect/exception/PHI enters metadata.
+Untrusted denial/lookup has no entity-action row because no trusted actor may exist. Durable code/replay
+state provides bounded intrinsic security history. Phase 3B.3 access/disclosure audit remains separate.
+
+#### Test impact, evidence and verification
+
+Pre-edit inspection covered `AiSql`, `AiOAuthTransactionStore`, `AiSecurityContractTest`, the entire SQL
+fixture's OAuth/revoke/race/restart tests, OAuth configuration/mapping/isolation/metadata/human/HTTP tests,
+and existing ordinary auth/session regressions. New tests cover migration receipts/permissions/RLS, PKCE
+vectors and malformed input, assertion claims/algorithms/local keys/URLs, actual maintained HTTP filters,
+code/assertion races, transaction-coupled audit faults, expiry, authority/revoke and replacement JVMs.
+Synthetic expiry explicitly uses test-owner timestamp fault injection; it is not wall-clock evidence.
+
+Verification results are recorded below after execution. Evidence is local source/static contracts,
+synthetic loopback SQL with separate restricted identities, and maintained servlet filters. The HTTP WEB
+identity store is synthetic; ordinary production authentication adapters are covered separately. These
+results do not establish production/Azure, authoritative Case/RLS, independent client/browser UX,
+fleet/deployment or external penetration-test acceptance. All capability/tenant defaults remain OFF.
+
+**Next phase recommendation:** 3B.2C.2 must replace the intentional issuance-disabled terminal with atomic
+hash-only CSPRNG opaque access and refresh issuance in the same consume/replay transaction. Reuse the
+verified result and existing session/credential tables without accepting caller identities. Clip five-minute
+access, eight-hour refresh idle and at-most-24-hour consent/session absolute limits to every live deadline.
+Implement single-use refresh rotation, consumed-refresh reuse-family revoke, response-loss recovery via
+fresh consent, key/security-reset revocation and replica/race/restart/audit-fault tests before advertising
+usable token grants. Keep 3B.2D bearer resolution/VerifiedIntegrationContext and 3B.3+ disclosure separate.
+
+Explicitly: no usable access token, no refresh token, no bearer authentication, no MCP route, no Case
+disclosure; WEB/DESKTOP auth remains authoritative; AI defaults OFF; no production/Azure SQL, deployment,
+real tenant enablement, installer/version publication or Curtis-specific behavior.

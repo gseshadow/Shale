@@ -204,3 +204,14 @@ tenant; there is no caller tenant selector or expanded bootstrap pool. Direct ta
 denied. Immutable bindings and durable consume state survive process replacement. The canonical
 [implementation record](../docs/architecture/ai-integration-and-mcp.md#1017-phase-3b2b-authorization-code-s256-and-self-consent--2026-10-22)
 separates synthetic SQL evidence from production/RLS/Case acceptance. Defaults remain OFF.
+
+## Authorization-code exchange isolation — Phase 3B.2C.1 candidate
+
+`AiAssertionReplay` uses existing strict TenantFilter FILTER and AFTER INSERT/UPDATE BLOCK predicates,
+tenant-qualified key FK and explicit direct-table denials. `ResolveAiOAuthCodeV1` alone executes as
+owner for one exact code digest/client/issuer/resource and returns only tenant/user identifiers.
+A dedicated restricted bootstrap identity never supplies business access or bypass membership.
+The provisional tuple initializes a fresh normal runtime lease; caller/RLS-bound exchange then rechecks
+all live authority and bindings under existing locks before atomic replay/consume/audit.
+See the [operator review](../docs/sql/ai-integration/README.md#phase-3b2c1-exchange-validation-candidate).
+No production RLS or authoritative Case acceptance is inferred from disposable synthetic SQL.
