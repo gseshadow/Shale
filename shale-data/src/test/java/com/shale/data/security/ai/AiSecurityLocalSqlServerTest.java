@@ -1354,6 +1354,8 @@ class AiSecurityLocalSqlServerTest {
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/verify.sql")));
             sql(c,"ALTER PROCEDURE dbo.AiValidateAccessV1 AS SELECT 1");
             assertEquals(58900,assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2d.sql")))).getErrorCode());
+            sql(c,"DROP PROCEDURE dbo.AiValidateAccessV1");
+            assertEquals(58900,assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/verify.sql")))).getErrorCode(),"Receipt must detect a missing gate, even when its object is gone");
         }
     }
     @Test void accessOnlyFullBoundContextAndSafeFailures()throws Exception {
@@ -1481,10 +1483,13 @@ class AiSecurityLocalSqlServerTest {
         try(var c=owner(db)) {
             // Labelled synthetic owner timestamp injection; then a real SQL lock wait crosses expiry.
             sql(c,"UPDATE dbo.AiDelegatedSession SET IdleExpiresAt=DATEADD(second,1,SYSUTCDATETIME())");
-            sql(c,"BEGIN TRANSACTION; SELECT Id FROM dbo.AiDelegatedSession WITH(UPDLOCK,HOLDLOCK)");
+            sql(c,"BEGIN TRANSACTION; SELECT Id FROM dbo.AiDelegatedSession WITH(TABLOCKX,HOLDLOCK)");
+            assertEquals(1,count(c,"SELECT @@TRANCOUNT"),"Expiry fixture must retain its explicit lock transaction");
             try(var worker=Executors.newSingleThreadExecutor()) {
                 var result=worker.submit(()->v.recheck(before));
-                sql(c,"WAITFOR DELAY '00:00:02'; COMMIT TRANSACTION");
+                sql(c,"WAITFOR DELAY '00:00:02'");
+                assertFalse(result.isDone(),"Expiry fixture must prove the validator is blocked before releasing the table lock");
+                sql(c,"COMMIT TRANSACTION");
                 assertThrows(ExecutionException.class,()->result.get(10,TimeUnit.SECONDS));
             }
         }
@@ -1538,6 +1543,14 @@ class AiSecurityLocalSqlServerTest {
                 for(var token:tokens)futures.add(workers.submit(()->{ready.countDown();assertTrue(go.await(5,TimeUnit.SECONDS));return v.validate(token);}));
                 assertTrue(ready.await(5,TimeUnit.SECONDS));go.countDown();
                 for(int i=0;i<futures.size();i++){var c=futures.get(i).get(15,TimeUnit.SECONDS);assertEquals(users.get(i),c.actingUserId());assertEquals(tenants.get(i),c.shaleClientId());}
+            }
+            try(var queue=Executors.newSingleThreadExecutor()) {
+                var occupied=new CountDownLatch(1);var release=new CountDownLatch(1);
+                var blocker=queue.submit(()->{occupied.countDown();assertTrue(release.await(5,TimeUnit.SECONDS));return true;});
+                assertTrue(occupied.await(5,TimeUnit.SECONDS));
+                var cancelled=queue.submit(()->v.validate(b1.accessToken()));assertTrue(cancelled.cancel(false));
+                release.countDown();assertTrue(blocker.get(10,TimeUnit.SECONDS));
+                assertEquals(71,queue.submit(()->v.validate(a1.accessToken()).actingUserId()).get(10,TimeUnit.SECONDS));
             }
         }
     }

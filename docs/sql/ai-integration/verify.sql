@@ -72,7 +72,8 @@ SET @catalog=@catalog+COALESCE(OBJECT_DEFINITION(OBJECT_ID(N'sec.fn_FilterByTena
 END;
 
 /* Optional internal ACCESS extension: no data surface. */
-IF OBJECT_ID(N'dbo.AiValidateAccessV1') IS NOT NULL BEGIN
+IF OBJECT_ID(N'dbo.AiValidateAccessV1') IS NOT NULL OR OBJECT_ID(N'dbo.ResolveAiAccessV1') IS NOT NULL
+ OR EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiOAuthCredential') AND minor_id=0 AND name=N'Shale.AiAccessV1') BEGIN
 INSERT @Owned VALUES (N'ResolveAiAccessV1'),(N'AiValidateAccessV1');
 SET @catalog=N'';
 SET @catalog=@catalog+(SELECT CONCAT(o.name,N':',o.type,N':',COALESCE(CONVERT(nvarchar(20),o.principal_id),N''),N':',COALESCE(m.definition,N''),N';') AS [text()] FROM sys.objects o LEFT JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE o.schema_id=SCHEMA_ID(N'dbo') AND o.name IN(SELECT Name FROM @Owned) ORDER BY o.name FOR XML PATH(''),TYPE).value(N'.',N'nvarchar(max)');

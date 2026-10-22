@@ -695,7 +695,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B.2C.1 authorization-code exchange validation | COMPLETE (source/local synthetic verification) | §10.18; pinned client proof, durable replay, atomic consume/live authority; no usable credential. |
 | Phase 3B.2C.2 opaque issuance + rotating refresh | COMPLETE (source/local synthetic verification) | §10.19 already records the final-source critical pass. |
 | OAuth revocation closeout | COMPLETE (source/local synthetic verification) | §10.20; authenticated RFC 7009, atomic family audit, races/replay/restart and full required local verification. |
-| Phase 3B.2D live credential validation + VerifiedIntegrationContext | NOT STARTED | Exact credential bindings and authoritative live context resolution. |
+| Phase 3B.2D live credential validation + VerifiedIntegrationContext | IN PROGRESS / UNVERIFIED | §10.21; internal ACCESS implementation, pending expiry lock-wait proof after the bounded retry limit. |
 | Phase 3B.3 AI audit/shared disclosure seam | NOT STARTED | Mandatory integration access audit and final handoff gate. |
 | Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery in 3B.1. |
 | Phase 3B.5 search_cases | NOT STARTED | No Case tool implementation. |
@@ -726,7 +726,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D and 3B.3+ remain NOT STARTED.
+durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is IN PROGRESS / UNVERIFIED (§10.21); 3B.3+ remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -1707,7 +1707,7 @@ Completion of an increment is not permission to enable the next data surface.
 | **3B.2C opaque access + rotating refresh lifecycle — COMPLETE** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
 | **3B.2C.1 authorization-code exchange validation — COMPLETE (source/local synthetic verification)** | §10.18; confined code owner, public S256, pinned RS256 assertions, shared replay, atomic consume/live authority; internal result only. | Exact bindings, client proof, revocation/expiry, real SQL races/restart/audit faults, maintained HTTP and WEB/DESKTOP regressions. | Disable validation switch; retain consume/replay/revocation/audit state. |
 | **3B.2C.2 opaque credential issuance and rotating refresh — COMPLETE** | 3B.2C.1; atomic issuance at the validated boundary, existing session/credential structures, expiry clipping and reuse-family revoke. | Issuance/rotation/response-loss/reuse/race/restart and security-reset proof before usable metadata. | Disable issuance/refresh, revoke families, retain history. |
-| **3B.2D live credential validation + VerifiedIntegrationContext — NOT STARTED** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
+| **3B.2D live credential validation + VerifiedIntegrationContext — IN PROGRESS / UNVERIFIED** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
 | **3B.3 AI audit attribution and shared disclosure seam** | 3B.1–2. Implement narrow access parent/children/security events, protected bounded review, immutable context-aware existing worker extensions and final handoff gate. Keep original REST exemption/Overview event. | Exact actor/integration/tool/resource/correlation; empty search, unavailable/probe denial, one PHI row; real denied INSERT, zero-row append, precommit failure/lost ACK, close/encoding/final-gate failure, audit outage, privacy sentinel tests and admin/cross-tenant review. Complete when both shared reads can withhold results under every fault without a protocol adapter. | Off flag stops all integration calls; retain committed audit. Old workers remain ordinary-web only; no partial “audit later” fallback. |
 | **3B.4 MCP transport/discovery** | 3B.2–3; SDK proves 2026-07-28 compliance. Add disabled-by-default Streamable HTTP/JSON transport, fixed metadata/Origin/TLS/filter checks, strict parsing/deadlines and distributed quota admission, explicit catalog mapping (no data handlers enabled yet). | Unauth/unregistered/revoked discovery, scope-filtered catalog, metadata header/body mismatch, duplicate keys/batches, unsupported methods/versions, no GET/session assumptions, Origin/proxy/config errors, body/byte/deadline limits. Complete with no Case response and two independent conforming clients against synthetic transport. | Unmount MCP route/metadata as appropriate; no second service or REST changes. Never substitute legacy insecure transport. |
 | **3B.5 search_cases** | 3B.1–4; exact expanded §10.9 schema and shared search audit path. Enable handler only in isolated test configuration. | Production port delegation once, tenant/user/context/scope direct bypass denial, literal search/order/probe, exact schema/UTF-16/Unicode bounds, page9 hasMore, empty search audit, full-envelope bytes, repeated/varied query row budgets and simultaneous reservations across replicas. Complete with synthetic data only, fail-closed audit/final gate and no unbounded pagination. | Remove search from dispatch/catalog or product off; retain histories/reservations. Never expose unaudited ordinary summary method as fallback. |
@@ -2727,7 +2727,7 @@ Aggregate **3B.2C remains IN PROGRESS**; usable OAuth credential lifecycle is no
 3B.2D and 3B.3+ remain NOT STARTED. Base is merged #1907,
 `6d39e01e59f1f090f9ef62a616b89f4486f1dbfd`, fetched into separate `codex/phase-3b2c2` worktree;
 the original checkout remains untouched. The [SQL lifecycle record](../sql/ai-integration/README.md#phase-3b2c2-opaque-credential-lifecycle-candidate)
-owns schema/permissions/retention detail; the [future deployment sequence](../azure-app-service-deployment.md#future-ai-oauth-deployment-sequence--phase-3b2c2)
+owns schema/permissions/retention detail; the [future deployment sequence](../azure-app-service-deployment.md#future-ai-oauth-deployment-sequence--through-phase-3b2d)
 retains JAR → accumulated SQL → verifier → live OAuth acceptance. Nothing here authorizes deployment.
 
 #### Issuance and durable identity
@@ -3026,7 +3026,7 @@ authoritative; AI defaults remain OFF. No production/Azure SQL, deployment or in
 
 ### 10.21 Phase 3B.2D internal opaque ACCESS validation — 2026-10-22
 
-**Status: IN PROGRESS; verification running.** Base: merged #1909, `967d72638fd6f85c1e7d680d642db659cdaf4740`.
+**Status: IN PROGRESS / UNVERIFIED.** The expiry lock-wait proof remains blocked after its one permitted retry. Base: merged #1909, `967d72638fd6f85c1e7d680d642db659cdaf4740`.
 The separate `codex/phase-3b2d` worktree restores the exact live Git commit and tree through the GitHub
 connector after the configured shell proxy refused Git fetch. Every restored blob and the complete tree
 were checked by Git SHA; the signed commit reconstructs exactly. Original checkout/unrelated work is preserved.
@@ -3082,14 +3082,14 @@ OAuth filters/HTTP; ordinary WEB/DESKTOP adapters and selector ownership. Existi
 and historical resolver expectations are retained. New static, restricted SQL, pool/async, race and
 replacement-JVM tests exercise the production validator through internal seams only.
 
-Verification commands/results will be finalized after the required focused, affected and critical checks.
+Independent verification results are recorded below; required expiry-race acceptance remains unresolved.
 Maven commands use a 240-second outer budget, JDK21 and local synthetic loopback SQL on port 14338.
 No failed/unexecuted/skipped check counts as passing. Evidence is source/static, compiled unit/servlet,
 actual distinct restricted synthetic SQL identities, real shared transactions/locks and replacement JVMs.
 Owner-only timestamp/state injection is labelled synthetic. It does not establish production/Azure,
 authoritative Case RLS, independent client acceptance, fleet/deployment or penetration-test acceptance.
 
-**Exact 3B.3 recommendation:** implement the narrow IntegrationAccessAudit schema/service and extend the
+**Exact 3B.3 recommendation:** first finish 3B.2D by proving the corrected expiry lock-wait fixture and rerunning its affected check under a newly authorized verification budget. Do not start disclosure work while that acceptance gap remains. Then implement the narrow IntegrationAccessAudit schema/service and extend the
 existing shared minimized query transaction owner for verified integration context, required audit/PHI
 atomicity, quota and repeated live authority checks. Compose and prove the final short buffered handoff
 boundary with cancellation/deadline/audit/commit/close/serialization failures and committed-revoke races
@@ -3099,3 +3099,90 @@ before any Case result reaches a transport. Preserve ordinary callers. Keep MCP 
 Explicitly: no MCP route; no Case disclosure; no Shale data resource accepts AI bearer tokens;
 WEB/DESKTOP remains authoritative; AI defaults OFF; no production/Azure SQL; no deployment;
 no tenant enablement; no installer/version publication. Aggregate Phase 3B remains IN PROGRESS.
+
+#### Current blocker and bounded retry record
+
+The initial authority-state fixture omitted the required grant RevokedByUserId in direct synthetic
+revocation; its one concrete corrective retry passed. The expiry-during-gate test unexpectedly returned a context after the fixture attempted to cross expiry
+under a held lock. Its one retry changed UPDLOCK to XLOCK and failed the same expectation. Neither
+attempt asserted the actual blocking precondition, so the cause is unresolved within the allowed budget. It is **not a passing
+expiry-race proof**, and no third execution is authorized under this task's anti-hang rule.
+The final fixture uses TABLOCKX and explicit transaction/blocking assertions to make a future failure
+actionable, but that correction is **unexecuted**. Independently selected tests exclude this one blocked
+method; therefore the complete affected suite and Phase 3B.2D acceptance remain unverified even if all
+other checks pass. No production defect or successful fix is inferred from the two fixture attempts.
+
+#### Final executed independent verification
+
+| Check | Executed result |
+| --- | --- |
+| Initial migration/parser/context/ACCESS smoke | 10 PASS (early focused source) |
+| Final selected contracts and extended server/OAuth authentication regressions | 151 PASS across 38 classes, including maintained OAuth HTTP flows |
+| Independent restricted synthetic SQL partitions | 137 PASS: 50 foundation/authorization/exchange, 40 credential lifecycle, 12 revocation and 35 ACCESS; one required expiry method excluded as blocked |
+| Combined independent selected/auth checks | 288 PASS; **complete affected suite remains UNVERIFIED** because the expiry method is blocked |
+| Desktop enrollment/remembered restore regressions | 21 PASS / 5 classes |
+| One critical reactor | 161 PASS / 43 classes / all seven modules BUILD SUCCESS |
+| Selector Python | 27 PASS |
+| Documentation/static checks | 87 relative links/anchors, balanced fences, selector JSON and ACCESS source/verifier receipt checks PASS; final diff checks recorded below |
+
+All executed final passing partitions have zero failures/errors/skips; overlapping groups are not unique
+additive totals. The blocked method is excluded, not a passing skip. Two earlier expiry attempts failed;
+the final stronger fixture is compiled but unexecuted. The full affected suite and 3B.2D acceptance are
+therefore **not passing**, despite the independent critical success.
+
+The environment reconnect terminated the last independent ACCESS partition before JUnit completion.
+The stopped driver/JVMs were confirmed zombies; the task-owned SQL container remained healthy. That
+interrupted attempt is not counted. One bounded retry of that independent partition passed. The blocked
+expiry method was excluded throughout. Git fetch initially failed through the restricted shell proxy;
+one justified network-enabled retry succeeded. Baseline offline Maven lacked Boot 4.1.1; one online
+attempt populated dependencies and passed the focused contracts. No repeated full-reactor debugging.
+SQL used only the generated-password, task-owned loopback container; no production/Azure SQL.
+
+Final commands below were serialized with a 240-second outer process budget per Maven command.
+The runner privately supplied SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI, SHALE_AI_SQL_PORT=14338 and
+the generated SHALE_AI_SQL_PASSWORD; no secret was in argv/logs. SQL method partitions below cover every
+selected method except the explicitly blocked accessExpiryWhileWaitingForFinalGateUsesDatabaseUtc.
+
+```bash
+# affected-nonsql-auth.log: 151 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-server -am -Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,AuthControllerTest,DesktopSessionControllerTest,SessionControllerTest,AdminSessionControllerTest,DurableSessionAuthTest,ServerAuthSessionLogoutTest,RememberedDesktopSessionTest,SqlRememberCredentialStoreTest,DesktopApplicationInstanceVerifierTest,SessionManagementContractTest,OAuthFilterIsolationTest,OAuthAuthorizationFlowTest,OAuthClientMappingTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,OAuthConfigurationTest,OAuthMetadataTest,ShaleOAuthHumanTest,PinnedClientAssertionTest -Dsurefire.failIfNoSpecifiedTests=false test
+# affected-foundation-0.log: 18 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -o -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#migrationDefaultsOffRepeatsAndRejectsCatalogDrift+realRuntimeHasNoBypassOrDirectControlTableAuthority+tenantPolicyUsesCurrentAdminContextAndRowVersion+registrationCeilingAndForeignTenantAreEnforced+selfConsentIsOneUseBoundToActorAndCeiling+consentRacingRevokeAndScopeReductionCannotResurrectAuthority+globalTenantIntegrationAndUserRevocationAreLiveAcrossServiceInstances+typedContextRejectsSpoofedTenantUserSessionAndMissingGrant+keyRotationIsBoundedConcurrentAndRevocationInvalidatesSessions+expiredGrantFailsClosedAndDigestResolverRestoresItsCaller+rlsFiltersAndBlocksForeignRowsWithoutPrivilegedRuntime+auditFailureRollsBackMutationAndConsentConsumption+everyNewTenantTableFiltersAndBlocksAnOtherwiseValidForeignInsert+concurrentReservationsHaveOneWinnerAndReleaseNeverRefundsBudget+durableDailyRowAndSlidingMinuteBudgetsSurviveNewServiceInstances+concurrentScopeChangesAndRotationsRejectStaleVersions+dailyBudgetsApplyAcrossUsersIntegrationsAndNewProcesses+distributedConcurrencyCountsAllThreeOwners' -Dsurefire.failIfNoSpecifiedTests=false test
+# affected-foundation-1.log: 18 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -o -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#slidingMinuteLimitsApplyToIntegrationAndTenant+actualReplacementJvmSeesCommittedAccounting+sameNonceAndSameInvocationRacesCannotDoubleSpend+bootstrapDefinitionAndCallerRestorationAreExactEvenOnFailure+migrationFailureRollsBackPartialDdlAndAmbiguousAuditAllowlist+expiredKeySessionAndConsentIntentCannotAcquireLiveContext+sessionFamilyRevocationIsSelfBoundPermanentAndAudited+oauthFreshClientLoaderAndSelfConsentBindEveryOwnerAndExactScopes+oauthCodeBindingRejectsChangedClientRedirectIssuerResourceAndVerifier+oauthCodeConsumeRaceHasExactlyOneWinnerAndReplacementJvmRejectsReplay+oauthCommittedRegistrationUserTenantAndGlobalDisablePreventCompletion+oauthGrantRevocationAndApprovalRaceNeverResurrectsRevokedAuthority+oauthScopeWideningDenialAndInjectedExpiryFailClosed+oauthAuditFailureRollsBackCodeGrantAndIntentConsumptionTogether+oauthStorageIsStrictTenantOwnedAndRuntimeCannotReadOrMutateItDirectly+oauthConfidentialPinnedKeyAndGrantRevocationPreventCodeUse+oauthNativeLoopbackPortIsConfinedAndExactIssuedRedirectCannotChange+exchangeMigrationRepeatsRejectsDriftAndRestrictsResolverAndReplayPermissions' -Dsurefire.failIfNoSpecifiedTests=false test
+# affected-foundation-2.log: 14 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -o -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#exchangeReplayTableUsesActualNonBypassTenantFilterAndInsertBlock+exchangePublicExactBindingsFailureDoesNotConsumeAndRaceHasOneWinner+exchangeAssertionReplayRaceAcrossCodesHasOneWinnerAndFailedPkceDoesNotBurnJti+exchangeCommittedBindingExpiryOrRevocationDenies+exchangeAuditFailureRollsBackBothReplayAndConsume+exchangeCommittedRevocationAndEveryAuthorityDisableDenyWithoutConsumption+exchangeCommittedKeyRevokePreventsOldKeyAndReplacementKeySubstitution' -Dsurefire.failIfNoSpecifiedTests=false test
+# affected-credential-0.log: 39 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -o -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#credentialMigrationRepeatAndCatalogDriftFailClosed+credentialInitialRaceOneFamilyAndHashOnlyFiveMinuteLifetime+credentialRotationResponseLossRetryRevokesAllDescendantsPermanently+credentialConcurrentRefreshHasOneWinnerAndLoserRevokesFamily+credentialReuseRaceWithDescendantActivityLeavesNoActiveCredentials+credentialWrongClientAndAccessTokenCannotRefreshOrResolve+credentialCommittedRevocationDeniesAndReenableCannotRestore+credentialDeadlineClippingAndExpiredAuthorityFailClosed+credentialInitialAndRotationAuditFailureRollBackAllState+credentialRestartObservesAccessRefreshAndConsumedHistory+credentialConfidentialRefreshRequiresSameKeyFreshSharedJtiAndLiveKey+credentialCommittedRevokeBeforeRotationPreventsNewRows+credentialSecurityResetWebRevocationAuditsFamilyAndCannotResurrect+credentialReuseAuditFailureRollsBackRevocationAndRetriesFailClosed+credentialRevokeHoldingAuthorityLockPreventsConcurrentRefreshCommit+credentialEightHourIdleAndConsentAbsoluteMaximumNeverSlide+credentialInitialLiveAuthorityCannotCreateAnyFamily+credentialSameValidatedTransactionCannotIssueASecondFamily' -Dsurefire.failIfNoSpecifiedTests=false test
+# affected-credential-1.log: 1 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -o -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#credentialGlobalDisableCannotRestoreInternalSessionOrQuotaAuthority' -Dsurefire.failIfNoSpecifiedTests=false test
+# affected-revocation-0.log: 12 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -o -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#revocationMigrationIsRepeatSafeAndDetectsDrift+revocationEitherCredentialRevokesAllDescendantsAndPreservesFirstHistory+revocationUnknownMalformedForeignAndWrongTenantHaveNoStateOrAuditEffects+revocationInactiveSubjectsRemainNonOracleAndPermanent+revocationAuditFailureRollsBackFamilyAndSharedReplayReservation+revocationUnknownConfidentialRequestConsumesSharedJtiAndCannotReplayAcrossRefresh+revocationRaceWithRefreshAndAccessDescendantActivityAlwaysEndsRevoked+revocationCommittedWhileRefreshAwaitsFinalizationPreventsNewCredentials+revocationRepeatedConcurrentRequestsAreIdempotentAndAuditOnce+revocationExpiredAccessAndRefreshHistoryStillRevokeFamily+revocationModulesRetainSeparateRestrictedSqlIdentities' -Dsurefire.failIfNoSpecifiedTests=false test
+# affected-access-states-0.log: 15 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -o -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#accessCommittedAuthorityChangesPreventNewAndRecheckedContexts' -Dsurefire.failIfNoSpecifiedTests=false test
+# affected-access-other-0.log: 20 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -o -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#accessMigrationRepeatsAndCumulativeVerifierDetectsDrift+accessOnlyFullBoundContextAndSafeFailures+accessOwnerBindingMismatchFailsClosed+accessConfidentialKeyBoundAndRevocationIsLive+accessRecheckNarrowsAndNeverExpandsSnapshotScopes+accessCommittedRevokeBetweenBootstrapAndGatePreventsContext+accessSingleSpidPoolReuseAndConcurrentAsyncCancellation+accessScopeReductionBetweenBootstrapAndGateDeniesAndDoesNotResurrect+accessSetupMismatchAndStampFailureWithholdContextThenCleanNextBorrow+accessDistinctOwnersInterleaveThroughOnePhysicalSqlConnection+accessReplacementJvmObservesRevocationAndScopeReduction' -Dsurefire.failIfNoSpecifiedTests=false test
+# desktop-regressions.log: 21 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true -pl shale-desktop -am -Dtest=DesktopSessionEnrollmentClientTest,DesktopSessionEnrollmentLifecycleTest,DesktopRememberedRecoveryTest,DesktopRememberedSignInDiagnosticsTest,LoginRememberedSignInContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+# critical.log: 161 PASS
+mvn -B -DargLine=-Djdk.attach.allowAttachSelf=true test
+python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format json --plan-output work/final-selection.json
+python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+python3 /workspace/work/check-docs.py # scratch relative-link/anchor/fence checker
+# JSON parsing and normalized SHA-256 migration/verifier source receipt checks were also executed.
+git diff --check origin/codex/latest HEAD
+```
+
+The selector's historical all-tests escalation remains informational; no all-tests profile was run.
+
+```text
+3B.1                      COMPLETE
+3B.2A                     COMPLETE
+3B.2B                     COMPLETE
+3B.2C                     COMPLETE
+OAuth revocation closeout COMPLETE
+3B.2D                     IN PROGRESS / UNVERIFIED
+3B.3                      NOT STARTED
+3B.4+                     NOT STARTED
+Aggregate Phase 3B        IN PROGRESS
+```
