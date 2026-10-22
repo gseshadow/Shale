@@ -1447,3 +1447,13 @@ grant, registration, keys and entity-action audit. No session/access/refresh row
 The [operator record](../docs/sql/ai-integration/README.md#phase-3b2c1-exchange-validation-candidate)
 documents confined owner resolution, effective permissions, atomic consume/replay/audit, receipts and rollback.
 This is candidate source and disposable synthetic evidence, never a deployed catalog claim.
+
+## Opaque credential lifecycle — Phase 3B.2C.2 candidate
+
+The separate additive [lifecycle migration](../docs/sql/ai-integration/phase3b2c2.sql) extends existing
+AiDelegatedSession with immutable authorization/client/issuer/resource/consent/global-revision lineage,
+a unique authorization transaction and tenant-qualified FK. Existing AiOAuthCredential hash-only
+ACCESS/REFRESH records retain generation/consume/revocation history; no parallel token table.
+The [operator record](../docs/sql/ai-integration/README.md#phase-3b2c2-opaque-credential-lifecycle-candidate)
+explains cascades, receipt drift checks, restricted procedures, security audit and verification limits.
+This is candidate source, not a deployed catalog claim or bearer-resource acceptance.

@@ -97,12 +97,16 @@ public class McpOAuthSecurityConfiguration {
                             .accessTokenRequestConverters(converters -> {
                                 converters.clear();
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2AuthorizationCodeAuthenticationConverter());
+                                converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2RefreshTokenAuthenticationConverter());
                             })
                             .authenticationProviders(providers -> { providers.clear(); if(exchange!=null) providers.add(exchange.codes()); }))
                     .clientAuthentication(authentication -> authentication
                             .authenticationConverters(converters -> {
                                 converters.clear();
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.JwtClientAssertionAuthenticationConverter());
+                                converters.add(request -> "refresh_token".equals(request.getParameter("grant_type")) && request.getParameter("client_assertion")==null
+                                        ? new org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken(
+                                                request.getParameter("client_id"),org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE,null,java.util.Map.of()) : null);
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.PublicClientAuthenticationConverter());
                             })
                             .authenticationProviders(providers -> {
@@ -144,7 +148,7 @@ public class McpOAuthSecurityConfiguration {
                             consent.setAuthorizationCodeGenerator(DurableOAuthAuthorization.CODES);
                     }))));
         }
-        // The gate precedes AS processing. Explicit exchange validates and consumes only; issuance stays disabled.
+        // The gate precedes AS processing. Explicit exchange enables only opaque code/refresh issuance.
         http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled), SecurityContextHolderFilter.class);
         if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable),SecurityContextHolderFilter.class);
         return http.build();
@@ -161,7 +165,7 @@ public class McpOAuthSecurityConfiguration {
             response.setHeader("Cache-Control", "no-store");
             if (properties.compositionEnabled() && "GET".equals(request.getMethod()) &&
                     request.getRequestURI().substring(request.getContextPath().length()).equals(OAuthMetadataContract.AUTHORIZATION_SERVER_PATH)) {
-                metadata.write(OAuthMetadataContract.authorizationServer(properties,authorizationEnabled), org.springframework.http.MediaType.APPLICATION_JSON,
+                metadata.write(OAuthMetadataContract.authorizationServer(properties,authorizationEnabled,exchangeEnabled), org.springframework.http.MediaType.APPLICATION_JSON,
                         new org.springframework.http.server.ServletServerHttpResponse(response));
                 return;
             }

@@ -57,4 +57,14 @@ class OAuthMetadataTest {
             assertFalse(context.getBean(McpOAuthProperties.class).compositionEnabled());
         });
     }
+    @Test void enabledIssuanceAdvertisesOnlyCodeRefreshNoneAndPinnedJwt() {
+        var p=new McpOAuthProperties("https://shale.test",McpOAuthProperties.Identity.TEST,true);
+        var claims=OAuthMetadataContract.authorizationServer(p,true,true);
+        assertEquals(java.util.List.of("authorization_code","refresh_token"),claims.get("grant_types_supported"));
+        assertEquals(java.util.List.of("none","private_key_jwt"),claims.get("token_endpoint_auth_methods_supported"));
+        assertEquals(java.util.List.of("RS256"),claims.get("token_endpoint_auth_signing_alg_values_supported"));
+        assertEquals(p.issuer()+"/token",claims.get("token_endpoint"));
+        for(String k:java.util.List.of("revocation_endpoint","jwks_uri","userinfo_endpoint","registration_endpoint"))assertFalse(claims.containsKey(k));
+    }
+
 }

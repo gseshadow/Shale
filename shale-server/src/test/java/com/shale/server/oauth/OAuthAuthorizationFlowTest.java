@@ -45,6 +45,7 @@ class OAuthAuthorizationFlowTest {
             sql(c,"CREATE TABLE dbo.UserSessions(SessionId uniqueidentifier PRIMARY KEY,ShaleClientId int,UserId int,ClientType varchar(16),ExpiresAt datetime2(7),RevokedAt datetime2(7))");
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2b.sql")));
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c1.sql")));
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c2.sql")));
             sql(c,"CREATE USER ["+bootstrapLogin+"] FOR LOGIN ["+bootstrapLogin+"]; ALTER ROLE AiIntegrationBootstrap ADD MEMBER ["+bootstrapLogin+"]");
             sql(c,"CREATE USER ["+login+"] FOR LOGIN ["+login+"]; ALTER ROLE AiIntegrationRuntime ADD MEMBER ["+login+"]; ALTER ROLE AiCapabilityOperator ADD MEMBER ["+login+"]");
         }
@@ -110,19 +111,24 @@ class OAuthAuthorizationFlowTest {
         Map.of("grant_type","authorization_code","client_id",client,"code",code,"redirect_uri",REDIRECT,"resource",RESOURCE,"code_verifier",VERIFIER).forEach(r::setParameter);
         return r;
     }
-    @Test void maintainedPublicTokenEndpointConsumesOnlyExactCodePkceAndReturnsIssuanceDisabled()throws Exception {
+    @Test void maintainedPublicTokenEndpointIssuesOnlyBoundedOpaqueCredentials()throws Exception {
         String code=freshCode();
         for(String[] bad:List.of(new String[]{"code_verifier","w".repeat(43)},new String[]{"redirect_uri",REDIRECT+"/"},new String[]{"resource",RESOURCE+"/"},new String[]{"client_id",otherClient},new String[]{"client_secret","secret"})) {
             var r=exchangeRequest(code);r.setParameter(bad[0],bad[1]);var denied=send(r);assertTrue(denied.getStatus()>=400);assertFalse(denied.getContentAsString().contains("access_token"));
         }
-        var success=send(exchangeRequest(code));assertEquals(400,success.getStatus());assertTrue(success.getContentAsString().contains("Credential issuance is disabled"),success.getContentAsString());
-        var replay=send(exchangeRequest(code));assertTrue(replay.getStatus()>=400);assertFalse(replay.getContentAsString().contains("Credential issuance is disabled"));
-        try(var c=owner(db);var stmt=c.createStatement();var rows=stmt.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.AiOAuthCredential)+(SELECT COUNT(*) FROM dbo.AiDelegatedSession)")){assertTrue(rows.next());assertEquals(0,rows.getInt(1));}
+        var success=send(exchangeRequest(code));assertEquals(200,success.getStatus(),success.getContentAsString());
+        var body=new tools.jackson.databind.ObjectMapper().readTree(success.getContentAsString());
+        var fields=new HashSet<String>();body.propertyNames().forEach(fields::add);
+        assertEquals(Set.of("access_token","refresh_token","token_type","expires_in","scope"),fields);
+        assertEquals("Bearer",body.path("token_type").asText());assertTrue(body.path("expires_in").asInt()<=300);
+        assertTrue(body.path("access_token").asText().matches("[A-Za-z0-9_-]{43}"));assertTrue(body.path("refresh_token").asText().matches("[A-Za-z0-9_-]{43}"));
+        var replay=send(exchangeRequest(code));assertTrue(replay.getStatus()>=400);assertFalse(replay.getContentAsString().contains("access_token"));
+        try(var c=owner(db);var stmt=c.createStatement();var rows=stmt.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.AiOAuthCredential)+(SELECT COUNT(*) FROM dbo.AiDelegatedSession)")){assertTrue(rows.next());assertTrue(rows.getInt(1)>0);}
         assertNull(success.getHeader("Authorization"));assertEquals(0,success.getCookies().length);
     }
     @Test void enabledTokenNamespaceRejectsEveryOtherGrantOrdinaryAuthAndMisleadingMetadata()throws Exception {
         String code=freshCode();
-        for(String grant:List.of("password","implicit","client_credentials","refresh_token","urn:ietf:params:oauth:grant-type:token-exchange","urn:ietf:params:oauth:grant-type:device_code","extension")) {
+        for(String grant:List.of("password","implicit","client_credentials","urn:ietf:params:oauth:grant-type:token-exchange","urn:ietf:params:oauth:grant-type:device_code","extension")) {
             var r=exchangeRequest(code);r.setParameter("grant_type",grant);var denied=send(r);assertEquals(400,denied.getStatus());assertTrue(denied.getContentAsString().contains("unsupported_grant_type"));
         }
         for(String auth:List.of("Bearer "+webToken,"Bearer "+"r".repeat(43),"Basic YTpi")) {
@@ -131,8 +137,9 @@ class OAuthAuthorizationFlowTest {
         var metadata=send(new MockHttpServletRequest("GET",OAuthMetadataContract.AUTHORIZATION_SERVER_PATH));
         assertEquals(200,metadata.getStatus());
         var claims=new tools.jackson.databind.ObjectMapper().readTree(metadata.getContentAsString());
-        assertFalse(claims.has("token_endpoint"));assertTrue(claims.path("grant_types_supported").isEmpty());assertTrue(claims.path("token_endpoint_auth_methods_supported").isEmpty());
-        var valid=send(exchangeRequest(code));assertTrue(valid.getContentAsString().contains("Credential issuance is disabled"));
+        assertEquals(ISSUER+"/token",claims.path("token_endpoint").asText());
+        assertEquals(2,claims.path("grant_types_supported").size());assertEquals(2,claims.path("token_endpoint_auth_methods_supported").size());
+        var valid=send(exchangeRequest(code));assertEquals(200,valid.getStatus());
     }
     @Test void maintainedConfidentialEndpointRequiresPinnedJwtAndPkceAndRejectsReplayAcrossCodes()throws Exception {
         var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
@@ -145,13 +152,23 @@ class OAuthAuthorizationFlowTest {
             var jwt=new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.RS256).keyID(key.credentialId().toString()).build(),
                     new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(client).subject(client).audience(ISSUER+"/token").issueTime(java.util.Date.from(now)).expirationTime(java.util.Date.from(now.plusSeconds(60))).jwtID(UUID.randomUUID().toString()).build());
             jwt.sign(new com.nimbusds.jose.crypto.RSASSASigner(pair.getPrivate()));String assertion=jwt.serialize();
-            var missing=send(exchangeRequest(first));assertTrue(missing.getStatus()>=400);assertFalse(missing.getContentAsString().contains("Credential issuance is disabled"));
+            var missing=send(exchangeRequest(first));assertTrue(missing.getStatus()>=400);assertFalse(missing.getContentAsString().contains("access_token"));
             var wrong=exchangeRequest(first);wrong.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");wrong.setParameter("client_assertion",assertion);wrong.setParameter("code_verifier","w".repeat(43));
-            assertFalse(send(wrong).getContentAsString().contains("Credential issuance is disabled"));
+            assertFalse(send(wrong).getContentAsString().contains("access_token"));
             var valid=exchangeRequest(first);valid.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");valid.setParameter("client_assertion",assertion);
-            var result=send(valid);assertTrue(result.getContentAsString().contains("Credential issuance is disabled"),result.getContentAsString());assertFalse(result.getContentAsString().contains("access_token"));
+            var result=send(valid);assertEquals(200,result.getStatus(),result.getContentAsString());assertTrue(result.getContentAsString().contains("access_token"));
             var replay=exchangeRequest(second);replay.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");replay.setParameter("client_assertion",assertion);
-            assertFalse(send(replay).getContentAsString().contains("Credential issuance is disabled"));
+            assertFalse(send(replay).getContentAsString().contains("access_token"));
+            var mapper=new tools.jackson.databind.ObjectMapper();String refresh=mapper.readTree(result.getContentAsString()).path("refresh_token").asText();
+            assertTrue(send(refreshRequest(refresh)).getStatus()>=400,"Refresh possession cannot bypass confidential client authentication");
+            var invalid=refreshRequest(refresh);authenticate(invalid,signedAssertion(key.credentialId(),g.generateKeyPair().getPrivate()));
+            assertTrue(send(invalid).getStatus()>=400,"A wrong assertion signature must fail before refresh consumption");
+            var usedJti=refreshRequest(refresh);authenticate(usedJti,assertion);assertTrue(send(usedJti).getStatus()>=400,"Initial JTI remains shared replay authority");
+            var rotate=refreshRequest(refresh);authenticate(rotate,signedAssertion(key.credentialId(),pair.getPrivate()));
+            var rotated=send(rotate);assertEquals(200,rotated.getStatus(),rotated.getContentAsString());
+            String replacement=mapper.readTree(rotated.getContentAsString()).path("refresh_token").asText();
+            var reuse=refreshRequest(refresh);authenticate(reuse,signedAssertion(key.credentialId(),pair.getPrivate()));assertEquals(400,send(reuse).getStatus());
+            var descendant=refreshRequest(replacement);authenticate(descendant,signedAssertion(key.credentialId(),pair.getPrivate()));assertEquals(400,send(descendant).getStatus());
         } finally {client=original;}
     }
     @Test void approvalRejectsCrossClientAndAllBindingSubstitutionsAndAllowsBothExplicitScopes()throws Exception {
@@ -184,4 +201,35 @@ class OAuthAuthorizationFlowTest {
         assertEquals(400,send(approve("a".repeat(43))).getStatus(),"Unbound CSRF state must fail");
         var substituted=authorization();substituted.setParameter("client_id","unknown");assertEquals(400,send(substituted).getStatus());
     }
+    private String signedAssertion(UUID key,java.security.PrivateKey signing)throws Exception {
+        var now=Instant.now().minusSeconds(1);
+        var jwt=new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.RS256).keyID(key.toString()).build(),
+                new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(client).subject(client).audience(ISSUER+"/token")
+                        .issueTime(java.util.Date.from(now)).expirationTime(java.util.Date.from(now.plusSeconds(60))).jwtID(UUID.randomUUID().toString()).build());
+        jwt.sign(new com.nimbusds.jose.crypto.RSASSASigner(signing));return jwt.serialize();
+    }
+    private void authenticate(MockHttpServletRequest request,String assertion) {
+        request.setParameter("client_assertion_type","urn:ietf:params:oauth:client-assertion-type:jwt-bearer");request.setParameter("client_assertion",assertion);
+    }
+    MockHttpServletRequest refreshRequest(String refresh) {
+        var r=new MockHttpServletRequest("POST","/oauth/mcp/token");r.setAttribute("skipAuthorization",true);
+        Map.of("grant_type","refresh_token","client_id",client,"refresh_token",refresh,"resource",RESOURCE).forEach(r::setParameter);return r;
+    }
+    @Test void maintainedPublicRefreshRotatesAndLostResponseRetryRevokesReplacement()throws Exception {
+        var mapper=new tools.jackson.databind.ObjectMapper();
+        var initial=send(exchangeRequest(freshCode()));assertEquals(200,initial.getStatus(),initial.getContentAsString());
+        var first=mapper.readTree(initial.getContentAsString());String old=first.path("refresh_token").asText();
+        var rotated=send(refreshRequest(old));assertEquals(200,rotated.getStatus(),rotated.getContentAsString());
+        var second=mapper.readTree(rotated.getContentAsString());assertNotEquals(old,second.path("refresh_token").asText());
+        assertEquals(400,send(refreshRequest(old)).getStatus());
+        assertEquals(400,send(refreshRequest(second.path("refresh_token").asText())).getStatus());
+        for(String token:List.of(first.path("access_token").asText(),second.path("access_token").asText())) {
+            assertTrue(tokens.verifyToken(token).isEmpty(),"Ordinary Shale JWT authority must reject the opaque AI token");
+            var request=new MockHttpServletRequest("GET","/mcp");request.addHeader("Authorization","Bearer "+token);
+            var response=new MockHttpServletResponse();var escaped=new java.util.concurrent.atomic.AtomicBoolean();
+            context.getBean(FilterChainProxy.class).doFilter(request,response,(q,res)->escaped.set(true));
+            assertTrue(escaped.get(),"No bearer/MCP security surface may accept these credentials");
+        }
+    }
+
 }

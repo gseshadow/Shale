@@ -14,34 +14,35 @@ final class AiSql {
     interface Mapper<T> { T read(ResultSet result) throws SQLException; }
 
     static <T> List<T> call(DbSessionProvider db, String procedure, Mapper<T> mapper, Object... args) {
-        String markers = String.join(",", Collections.nCopies(args.length, "?"));
         try (Connection c = db.requireConnection()) {
             if (!c.getAutoCommit()) throw new IllegalStateException("AI procedures require a fresh transaction lease.");
-            try (CallableStatement p = c.prepareCall("{call dbo." + procedure + "(" + markers + ")}")) {
-                p.setQueryTimeout(5);
-                for (int i = 0; i < args.length; i++) {
-                    if (args[i] instanceof TypedNull nil) p.setNull(i + 1, nil.sqlType());
-                    else if (args[i] == null) p.setNull(i + 1, Types.VARBINARY);
-                    else if (args[i] instanceof Instant instant) UtcJdbcTimestamp.set(p, i + 1, instant);
-                    else if (args[i] instanceof byte[] bytes) p.setBytes(i + 1, bytes);
-                    else p.setObject(i + 1, args[i]);
-                }
-                List<T> values = new ArrayList<>();
-                boolean result = p.execute();
-                boolean mapped = false;
-                while (true) {
-                    if (result) {
-                        try (ResultSet rows = p.getResultSet()) {
-                            if (!mapped) while (rows.next()) values.add(mapper.read(rows));
-                        }
-                        mapped = true;
-                    } else if (p.getUpdateCount() == -1) break;
-                    result = p.getMoreResults(Statement.CLOSE_CURRENT_RESULT);
-                }
-                return List.copyOf(values);
-            }
+            return call(c,procedure,mapper,args);
         } catch (SQLException failure) {
             throw new IllegalStateException("AI security operation failed closed.", failure);
+        }
+    }
+
+    /** Internal transaction composition only; the owner must drain, commit and close before returning secrets. */
+    static <T> List<T> call(Connection c,String procedure,Mapper<T> mapper,Object... args) throws SQLException {
+        String markers = String.join(",", Collections.nCopies(args.length, "?"));
+        try (CallableStatement p = c.prepareCall("{call dbo." + procedure + "(" + markers + ")}")) {
+            p.setQueryTimeout(5);
+            for (int i=0;i<args.length;i++) {
+                if(args[i] instanceof TypedNull nil) p.setNull(i+1,nil.sqlType());
+                else if(args[i]==null) p.setNull(i+1,Types.VARBINARY);
+                else if(args[i] instanceof Instant instant) UtcJdbcTimestamp.set(p,i+1,instant);
+                else if(args[i] instanceof byte[] bytes) p.setBytes(i+1,bytes);
+                else p.setObject(i+1,args[i]);
+            }
+            List<T> values=new ArrayList<>(); boolean result=p.execute(),mapped=false;
+            while(true) {
+                if(result) {
+                    try(ResultSet rows=p.getResultSet()) { if(!mapped) while(rows.next()) values.add(mapper.read(rows)); }
+                    mapped=true;
+                } else if(p.getUpdateCount()==-1) break;
+                result=p.getMoreResults(Statement.CLOSE_CURRENT_RESULT);
+            }
+            return List.copyOf(values);
         }
     }
 

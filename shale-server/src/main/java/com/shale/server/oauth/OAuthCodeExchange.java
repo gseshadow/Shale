@@ -13,10 +13,11 @@ import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.server.authorization.authentication.*;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 
-/** Maintained AS client/grant provider seams. Successful SQL validation deliberately terminates without issuance. */
+/** Maintained AS client/grant provider seams. Opaque issuance and rotation; no bearer-resource authentication. */
 final class OAuthCodeExchange {
     private static final String STATE=OAuthCodeExchange.class.getName()+".state";
     private final AiOAuthExchangeStore bootstrap;
+    private final DbSessionProvider bootstrapDb;
     private final RuntimeConnectionProvider connections;
     private final McpOAuthProperties properties;
     private final Supplier<HttpServletRequest> request;
@@ -24,6 +25,7 @@ final class OAuthCodeExchange {
         @Override public String toString() { return "ExchangeState[redacted]"; }
     }
     OAuthCodeExchange(DbSessionProvider bootstrap,RuntimeConnectionProvider connections,McpOAuthProperties properties,Supplier<HttpServletRequest> request) {
+        this.bootstrapDb=bootstrap;
         this.bootstrap=new AiOAuthExchangeStore(bootstrap,properties.issuer(),properties.resource());
         this.connections=connections; this.properties=properties; this.request=request;
     }
@@ -32,7 +34,9 @@ final class OAuthCodeExchange {
         @Override public Authentication authenticate(Authentication input) {
             try {
                 var req=request.get(); validateRequest(req,properties);
-                var owner=bootstrap.resolve(req.getParameter("code"),req.getParameter("client_id")).orElseThrow(()->new SecurityException("Code unavailable."));
+                boolean refresh="refresh_token".equals(req.getParameter("grant_type"));
+                var owner=(refresh ? new AiOAuthCredentialStore(bootstrapDb,properties.issuer(),properties.resource()).resolveRefresh(req.getParameter("refresh_token"),req.getParameter("client_id"))
+                        : bootstrap.resolve(req.getParameter("code"),req.getParameter("client_id"))).orElseThrow(()->new SecurityException("Credential unavailable."));
                 DbSessionProvider runtime=()-> {
                     try { return connections.openConnection(new ServerPrincipal(owner.userId(),owner.tenantId(),null)); }
                     catch(java.sql.SQLException unavailable) { throw new IllegalStateException("Exchange runtime unavailable."); }
@@ -52,7 +56,7 @@ final class OAuthCodeExchange {
                 req.setAttribute(STATE,new State(client,runtime,proof));
                 // Only immutable client identifier/auth method/scopes; no raw assertion survives client authentication.
                 var registered=RegisteredClient.withId(client.tenant()+":"+client.integration()).clientId(client.clientId())
-                        .clientAuthenticationMethod(method).authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE);
+                        .clientAuthenticationMethod(method).authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN);
                 client.scopes().forEach(s->registered.scope(s.wireValue()));
                 client.redirects().forEach(registered::redirectUri);
                 return new OAuth2ClientAuthenticationToken(registered.build(),method,null);
@@ -61,37 +65,46 @@ final class OAuthCodeExchange {
         }
     }; }
     AuthenticationProvider codes() { return new AuthenticationProvider() {
-        @Override public boolean supports(Class<?> type) { return OAuth2AuthorizationCodeAuthenticationToken.class.isAssignableFrom(type); }
+        @Override public boolean supports(Class<?> type) { return OAuth2AuthorizationCodeAuthenticationToken.class.isAssignableFrom(type) || OAuth2RefreshTokenAuthenticationToken.class.isAssignableFrom(type); }
         @Override public Authentication authenticate(Authentication input) {
             var req=request.get();
             try {
                 var state=(State)req.getAttribute(STATE);
                 if(state==null) throw new SecurityException("Client required.");
                 var p=state.proof();
-                var result=new AiOAuthExchangeStore(state.runtime(),properties.issuer(),properties.resource()).consume(req.getParameter("code"),state.client().clientId(),
-                        req.getParameter("redirect_uri"),req.getParameter("code_verifier"),p==null?null:p.keyId(),p==null?null:p.jti(),p==null?null:p.issuedAt(),p==null?null:p.expiresAt());
-                // Internal immutable receipt intentionally has no protocol serialization or data authorization path.
-                Objects.requireNonNull(result);
+                var store=new AiOAuthCredentialStore(state.runtime(),properties.issuer(),properties.resource());
+                boolean refresh="refresh_token".equals(req.getParameter("grant_type"));
+                var result=refresh ? store.refresh(req.getParameter("refresh_token"),state.client().clientId(),
+                        p==null?null:p.keyId(),p==null?null:p.jti(),p==null?null:p.issuedAt(),p==null?null:p.expiresAt())
+                        : store.redeem(req.getParameter("code"),state.client().clientId(),req.getParameter("redirect_uri"),req.getParameter("code_verifier"),
+                        p==null?null:p.keyId(),p==null?null:p.jti(),p==null?null:p.issuedAt(),p==null?null:p.expiresAt());
+                var principal=(OAuth2ClientAuthenticationToken)input.getPrincipal();
+                var scopes=result.scopes().stream().map(com.shale.core.security.ai.AiScope::wireValue).collect(java.util.stream.Collectors.toSet());
+                var access=new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER,result.accessToken(),result.issuedAt(),result.accessExpiresAt(),scopes);
+                var replacement=new OAuth2RefreshToken(result.refreshToken(),result.issuedAt());
+                return new OAuth2AccessTokenAuthenticationToken(principal.getRegisteredClient(),principal,access,replacement);
+
             } catch(SecurityException | IllegalArgumentException denied) { throw error("invalid_grant"); }
             catch(IllegalStateException deniedOrUnavailable) { throw error("invalid_grant"); }
             finally { req.removeAttribute(STATE); }
-            throw new OAuth2AuthenticationException(new OAuth2Error("server_error","Credential issuance is disabled in this phase.",null));
+
         }
     }; }
     static void validateRequest(HttpServletRequest req,McpOAuthProperties properties) {
         if(!"POST".equals(req.getMethod()) || req.getContentType()==null ||
                 !req.getContentType().split(";",2)[0].equalsIgnoreCase("application/x-www-form-urlencoded") ||
                 req.getHeader("Authorization")!=null || req.getQueryString()!=null || req.getContentLengthLong()>16384) throw error("invalid_request");
-        if(!"authorization_code".equals(req.getParameter("grant_type"))) throw error("unsupported_grant_type");
-        var allowed=Set.of("grant_type","client_id","code","redirect_uri","resource","code_verifier","client_assertion_type","client_assertion");
+        boolean refresh="refresh_token".equals(req.getParameter("grant_type"));
+        if(!refresh && !"authorization_code".equals(req.getParameter("grant_type"))) throw error("unsupported_grant_type");
+        var allowed=refresh ? Set.of("grant_type","client_id","refresh_token","resource","client_assertion_type","client_assertion") : Set.of("grant_type","client_id","code","redirect_uri","resource","code_verifier","client_assertion_type","client_assertion");
         for(var entry:req.getParameterMap().entrySet()) {
             if(!allowed.contains(entry.getKey()) || entry.getValue().length!=1 || entry.getValue()[0]==null || entry.getValue()[0].isEmpty() ||
                     entry.getValue()[0].length()>(entry.getKey().equals("client_assertion")?8192:2048)) throw error("invalid_request");
         }
-        for(String required:List.of("client_id","code","redirect_uri","resource","code_verifier")) if(req.getParameter(required)==null) throw error("invalid_request");
-        if(!req.getParameter("client_id").matches("[A-Za-z0-9_-]{1,64}") || !req.getParameter("code").matches("[A-Za-z0-9_-]{43}")) throw error("invalid_request");
+        for(String required:refresh?List.of("client_id","refresh_token","resource"):List.of("client_id","code","redirect_uri","resource","code_verifier")) if(req.getParameter(required)==null) throw error("invalid_request");
+        if(!req.getParameter("client_id").matches("[A-Za-z0-9_-]{1,64}") || !req.getParameter(refresh?"refresh_token":"code").matches("[A-Za-z0-9_-]{43}")) throw error("invalid_request");
         properties.validateResources(List.of(req.getParameter("resource")));
-        AiOAuthExchangeStore.challenge(req.getParameter("code_verifier"));
+        if(!refresh) AiOAuthExchangeStore.challenge(req.getParameter("code_verifier"));
     }
     static OAuth2AuthenticationException error(String code) { return new OAuth2AuthenticationException(new OAuth2Error(code)); }
 }
