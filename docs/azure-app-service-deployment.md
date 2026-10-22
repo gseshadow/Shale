@@ -585,7 +585,7 @@ open, and OK moved to sign-in. This does not replace automated tenant/authorizat
 cross-tenant/crafted-request acceptance. Normal X-button closure continues to clear local state without server
 revocation; only explicit Logout revokes the durable session. Logged-out automatic updates remain `UNSUPPORTED`.
 
-## Future AI OAuth deployment sequence — Phase 3B.2C.2
+## Future AI OAuth deployment sequence — through Phase 3B.2D
 
 This is a cumulative future operator sequence, **not authorization to deploy, run production/Azure SQL,
 enable a tenant, publish an installer/version or perform live acceptance in this task**. Keep every AI
@@ -597,7 +597,7 @@ session authority and previously completed deployment/security records above rem
 2. Execute accumulated, **unapplied** AI SQL migrations in order:
    [phase3b1.sql](sql/ai-integration/phase3b1.sql) → [phase3b2b.sql](sql/ai-integration/phase3b2b.sql) →
    [phase3b2c1.sql](sql/ai-integration/phase3b2c1.sql) → [phase3b2c2.sql](sql/ai-integration/phase3b2c2.sql) →
-   [revocation.sql](sql/ai-integration/revocation.sql),
+   [revocation.sql](sql/ai-integration/revocation.sql) → [phase3b2d.sql](sql/ai-integration/phase3b2d.sql),
    using approved migration authority, fail-fast sessions and the [SQL operator instructions](sql/ai-integration/README.md).
    Review existing receipts to skip applied migrations; older receipts deliberately detect later catalog changes.
 3. Execute the cumulative [AI SQL verifier](sql/ai-integration/verify.sql), review effective non-bypass runtime
@@ -611,7 +611,8 @@ session authority and previously completed deployment/security records above rem
    pinned RS256 endpoint-audience proofs and shared JTI replay, family races and atomic security audit.
    The revocation extension must be installed before enabling exchange in the closeout server version;
    metadata advertises that implemented endpoint with exchange, with no runtime migration installer.
-   No protected resource accepts these access tokens yet; bearer resolution is 3B.2D, MCP/disclosure are later.
+   No protected resource accepts these access tokens yet. 3B.2D is internal ACCESS validation only; MCP/disclosure remain later.
+   Live OAuth acceptance starts only after SQL migrations, the cumulative verifier and server deployment all succeed.
 
 Rollback disables OAuth/AI and revokes credential families while retaining all additive storage, receipts,
 consumption/replay/audit/revocation history and the configured token namespace. Re-enable cannot restore

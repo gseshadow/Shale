@@ -547,7 +547,9 @@
         "com.shale.data.security.ai.AiOAuthExchangeContractTest",
         "com.shale.data.security.ai.AiOAuthCredentialContractTest",
         "com.shale.data.security.ai.AiOAuthRevocationContractTest",
-        "com.shale.data.security.ai.AiSecurityLocalSqlServerTest"
+        "com.shale.data.security.ai.AiSecurityLocalSqlServerTest",
+        "com.shale.data.security.ai.AiAccessContractTest",
+        "com.shale.data.runtime.RuntimeSessionServiceTimingTest"
       ]
     },
     "notifications": {

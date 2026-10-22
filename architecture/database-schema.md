@@ -1457,3 +1457,11 @@ ACCESS/REFRESH records retain generation/consume/revocation history; no parallel
 The [operator record](../docs/sql/ai-integration/README.md#phase-3b2c2-opaque-credential-lifecycle-candidate)
 explains cascades, receipt drift checks, restricted procedures, security audit and verification limits.
 This is candidate source, not a deployed catalog claim or bearer-resource acceptance.
+
+## Internal ACCESS validation — Phase 3B.2D candidate
+
+[phase3b2d.sql](../docs/sql/ai-integration/phase3b2d.sql) adds only `ResolveAiAccessV1` and
+`AiValidateAccessV1`, reusing existing credential, delegated session, grant, registration and original WEB
+lineage. No new table, SQL session-context key or credential authority. Bootstrap/runtime permissions,
+RLS review and cumulative receipts are described in the [operator record](../docs/sql/ai-integration/README.md#phase-3b2d-internal-access-validation-candidate).
+Authentication/security checks introduce no mutation/disclosure audit schema; existing mutation audits remain.

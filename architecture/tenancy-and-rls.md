@@ -237,3 +237,12 @@ revocable without creating an existence oracle. Shared SQL assertion replay, fam
 entity-action audit commit atomically. No table, RLS predicate, direct-table grant, general inventory or
 ordinary auth-pool capability changes. See the [operator record](../docs/sql/ai-integration/README.md#rfc-7009-revocation-closeout-candidate).
 This is neither bearer authentication nor token-to-VerifiedIntegrationContext; defaults remain OFF.
+
+## Internal opaque ACCESS validation — Phase 3B.2D candidate
+
+The [ACCESS operator record](../docs/sql/ai-integration/README.md#phase-3b2d-internal-access-validation-candidate)
+owns the confined digest-only owner resolver and runtime-only full tuple gate. Bootstrap receives only
+bounded provisional references, never general Users/Case data. Fresh runtime initialization stamps and
+verifies both existing keys. Explicit immutable context carries integration/grant/session identity across
+tasks; SQL connections retain no such authority. Strict tenant FILTER/BLOCK/direct denials are preserved.
+The new migration adds procedures only, with cumulative drift/source receipts. No resource route or disclosure.
