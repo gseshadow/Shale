@@ -46,6 +46,12 @@ public final class RuntimeSessionService {
 	}
 
 	public Connection getConnection() throws SQLException {
+        return getConnection(0);
+    }
+
+    /** Explicit bounded setup for internal integration leases; ordinary callers retain their contract. */
+    public Connection getConnection(int setupTimeoutSeconds) throws SQLException {
+        if (setupTimeoutSeconds < 0 || setupTimeoutSeconds > 5) throw new IllegalArgumentException("Bounded setup timeout required.");
 		if (!isInitialized()) {
 			throw new IllegalStateException("RuntimeSessionService not initialized.");
 		}
@@ -58,11 +64,13 @@ public final class RuntimeSessionService {
 		try {
 			try (PreparedStatement ps = c.prepareStatement(
 					"EXEC sys.sp_set_session_context @key=N'ShaleClientId', @value=?")) {
+				if (setupTimeoutSeconds > 0) ps.setQueryTimeout(setupTimeoutSeconds);
 				ps.setInt(1, shaleClientId);
 				ps.execute();
 			}
 			try (PreparedStatement ps = c.prepareStatement(
 					"EXEC sys.sp_set_session_context @key=N'PrincipalUserId', @value=?")) {
+				if (setupTimeoutSeconds > 0) ps.setQueryTimeout(setupTimeoutSeconds);
 				ps.setInt(1, userId);
 				ps.execute();
 			}

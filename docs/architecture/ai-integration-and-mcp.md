@@ -3023,3 +3023,79 @@ OAuth revocation closeout COMPLETE
 **Next task: 3B.2D — opaque access-token validation and immutable VerifiedIntegrationContext.**
 No Shale resource accepts an AI access token yet; no MCP route or Case disclosure. WEB/DESKTOP remains
 authoritative; AI defaults remain OFF. No production/Azure SQL, deployment or installer/version publication.
+
+### 10.21 Phase 3B.2D internal opaque ACCESS validation — 2026-10-22
+
+**Status: IN PROGRESS; verification running.** Base: merged #1909, `967d72638fd6f85c1e7d680d642db659cdaf4740`.
+The separate `codex/phase-3b2d` worktree restores the exact live Git commit and tree through the GitHub
+connector after the configured shell proxy refused Git fetch. Every restored blob and the complete tree
+were checked by Git SHA; the signed commit reconstructs exactly. Original checkout/unrelated work is preserved.
+
+#### Authority path and security boundary
+
+The [manual ACCESS migration/operator record](../sql/ai-integration/README.md#phase-3b2d-internal-access-validation-candidate)
+describes two new procedures, strict existing RLS/direct-table denial, dedicated bootstrap permissions,
+cumulative catalog/source receipts, fixed locking and audit compatibility. No new table or duplicate
+authority is created. Existing historical migrations and ordinary authentication are unchanged.
+
+AiAccessTokenValidator hashes an exact 43-character opaque token immediately. Only the digest enters
+ResolveAiAccessV1; only lifecycle-bound ACCESS can resolve. The bounded provisional tuple initializes a
+fresh production RuntimeSessionService with both existing SQL keys. Setup statements are bounded; the
+adapter independently verifies exact tenant/user before AiValidateAccessV1. Stamp/verification/SQL/close
+failure withholds context. There is no fallback user, servlet carrier, ThreadLocal or positive cache.
+
+Every admission/recheck validates global epoch and tenant policy, tenant/user eligibility, registration/
+integration/key/grant/session/ACCESS state, original consumed authorization and WEB-session lineage,
+exact client/issuer/resource and every tenant/user/integration/grant/session/key relationship. Held rows
+follow global → tenant policy → integration → grant → session → user, under existing capability/tenant
+locks conflicting with mutators. Database UTC after lock waits determines expiry, with no opaque-token skew.
+The earliest credential/session/idle/grant/registration/WEB/key deadline clips the immutable snapshot.
+
+Effective scopes intersect credential, session, grant, current registration ceiling, prior snapshot and
+exactly `cases.search` / `cases.overview.read`. Supported administrative reductions permanently revoke
+affected grants/families; expansion or re-enable never restores descendants. Recheck cannot widen a prior
+snapshot. Committed revocation before the gate denies. The recheck seam prepares/proves a short SQL gate,
+returns after commit/close, and performs no network handoff. 3B.3 still owns final buffered handoff semantics.
+
+VerifiedIntegrationContext remains final/internal, with copied immutable scopes and bounded tenant/user/
+integration/grant/session/client/key/credential identifiers, configured issuer/resource, four live authority
+revisions, clipped deadline and server correlation. ACCESS admission leaves operation/invocation unset at
+this layer. Existing trusted session-control objects retain their operation identity and cannot substitute
+for credential provenance in recheck. toString is redacted. Raw token/digest/code/assertion/refresh, email,
+secret, prompt, servlet and Case fields are absent.
+
+AiBearerParser is an unregistered header-only internal utility: exactly one Authorization field, Bearer
+scheme, one ASCII space, 43 base64url characters; malformed whitespace/control/duplicates/oversize fail.
+No query/cookie/alternate-header source enters the API. All validation failures use the same bounded
+Integration authentication failed message without nested SQL/ownership details. No WEB fallback.
+
+Audit review deliberately adds no authentication outcome to entity-action mutation vocabulary: validation
+is read-only, has no disclosure and may have no verified subject. Existing security mutations retain their
+transaction-coupled bounded audits. Any future authentication-outcome vocabulary needs scoped review;
+no token/digest/PHI/prompt is audited. IntegrationAccessAudit remains 3B.3, NOT STARTED.
+
+#### Verification and evidence
+
+Pre-edit impact inventory covered immutable constructors, resolver/store/JDBC bindings, SQL receipts/
+RLS/gates and existing foundation/lifecycle/revocation fixtures; runtime setup and pool tests; maintained
+OAuth filters/HTTP; ordinary WEB/DESKTOP adapters and selector ownership. Existing trusted-session seams
+and historical resolver expectations are retained. New static, restricted SQL, pool/async, race and
+replacement-JVM tests exercise the production validator through internal seams only.
+
+Verification commands/results will be finalized after the required focused, affected and critical checks.
+Maven commands use a 240-second outer budget, JDK21 and local synthetic loopback SQL on port 14338.
+No failed/unexecuted/skipped check counts as passing. Evidence is source/static, compiled unit/servlet,
+actual distinct restricted synthetic SQL identities, real shared transactions/locks and replacement JVMs.
+Owner-only timestamp/state injection is labelled synthetic. It does not establish production/Azure,
+authoritative Case RLS, independent client acceptance, fleet/deployment or penetration-test acceptance.
+
+**Exact 3B.3 recommendation:** implement the narrow IntegrationAccessAudit schema/service and extend the
+existing shared minimized query transaction owner for verified integration context, required audit/PHI
+atomicity, quota and repeated live authority checks. Compose and prove the final short buffered handoff
+boundary with cancellation/deadline/audit/commit/close/serialization failures and committed-revoke races
+before any Case result reaches a transport. Preserve ordinary callers. Keep MCP transport/discovery in
+3B.4+, and keep all flags OFF until separately authorized deployment/acceptance.
+
+Explicitly: no MCP route; no Case disclosure; no Shale data resource accepts AI bearer tokens;
+WEB/DESKTOP remains authoritative; AI defaults OFF; no production/Azure SQL; no deployment;
+no tenant enablement; no installer/version publication. Aggregate Phase 3B remains IN PROGRESS.

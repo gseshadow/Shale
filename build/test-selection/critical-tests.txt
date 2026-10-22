@@ -46,3 +46,5 @@ com.shale.data.security.ai.AiOAuthCredentialContractTest
 
 com.shale.data.security.ai.AiOAuthRevocationContractTest
 com.shale.server.oauth.OAuthRevocationPolicyTest
+
+com.shale.data.security.ai.AiAccessContractTest

@@ -1336,4 +1336,232 @@ class AiSecurityLocalSqlServerTest {
         }
     }
 
+    private void installAccess()throws Exception {installRevocation();try(var c=owner(db)){sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2d.sql")));}}
+    private com.microsoft.sqlserver.jdbc.SQLServerDataSource accessSource(String role) {
+        var ds=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();ds.setURL(url(db));ds.setUser(prefix+"_"+role);ds.setPassword(logins.get(role));ds.setLoginTimeout(5);return ds;
+    }
+    private AiAccessTokenValidator accessValidator(javax.sql.DataSource runtime) {return new AiAccessTokenValidator(provider("bootstrap",null,null),runtime,true,ISSUER,RESOURCE);}
+    private AiAccessTokenValidator accessValidator() {return accessValidator(accessSource("runtime"));}
+    private CredentialFixture accessFixture()throws Exception {
+        UUID web=installOAuth();installCredentials();installAccess();enabled();var r=registration(false);
+        String code=opaque();UUID tx=startOAuth(r,web,opaque());oauth(7,72).approve(tx,web,AiScope.fromMask(3));oauth(7,72).complete(tx,web,AiScope.fromMask(3),code);
+        return new CredentialFixture(r,code,web);
+    }
+    @Test void accessMigrationRepeatsAndCumulativeVerifierDetectsDrift()throws Exception {
+        accessFixture();
+        try(var c=owner(db)) {
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2d.sql")));
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/verify.sql")));
+            sql(c,"ALTER PROCEDURE dbo.AiValidateAccessV1 AS SELECT 1");
+            assertEquals(58900,assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2d.sql")))).getErrorCode());
+        }
+    }
+    @Test void accessOnlyFullBoundContextAndSafeFailures()throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());var validator=accessValidator();
+        var context=validator.validate(tokens.accessToken());
+        assertEquals(7,context.shaleClientId());assertEquals(72,context.actingUserId());assertEquals(f.registration().integrationId(),context.integrationId());
+        assertEquals(f.registration().clientId(),context.oauthClientId());assertEquals(AiScope.fromMask(3),context.effectiveScopes());
+        assertNull(context.authenticatingKeyId());assertNull(context.operationScope());assertNull(context.invocationId());
+        assertNotNull(context.credentialId());assertEquals(ISSUER,context.issuer());assertEquals(RESOURCE,context.resource());
+        assertTrue(context.deadline().compareTo(tokens.accessExpiresAt())<=0);assertEquals("VerifiedIntegrationContext[redacted]",context.toString());
+        assertThrows(UnsupportedOperationException.class,()->context.effectiveScopes().clear());
+        for(String token:List.of(tokens.refreshToken(),f.code(),opaque(),"invalid.jwt","malformed","a".repeat(4096))) {
+            var error=assertThrows(SecurityException.class,()->validator.validate(token));assertEquals("Integration authentication failed.",error.getMessage());assertNull(error.getCause());
+        }
+        assertThrows(SecurityException.class,()->validator.recheck(null));
+        assertThrows(SecurityException.class,()->new AiAccessTokenValidator(provider("bootstrap",null,null),accessSource("runtime"),false,ISSUER,RESOURCE).validate(tokens.accessToken()));
+        try(var c=connection("bootstrap",null,null)) {
+            assertThrows(SQLException.class,()->sql(c,"SELECT * FROM dbo.Users"));
+            assertThrows(SQLException.class,()->sql(c,"SELECT * FROM dbo.AiOAuthCredential"));
+            assertThrows(SQLException.class,()->sql(c,"EXEC dbo.ResolveAiAccessV1 0x00,N'x',N'y'"));
+            assertEquals(prefix+"_bootstrap",scalar(c,"SELECT USER_NAME()"));
+        }
+        try(var c=connection("runtime",7,72)) {assertThrows(SQLException.class,()->sql(c,"EXEC dbo.ResolveAiAccessV1 0x00,N'x',N'y'"));}
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"tenant","user","integration","grant","session","client","key","issuer","resource","credential"})
+    void accessOwnerBindingMismatchFailsClosed(String mismatch)throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());var v=accessValidator();var a=v.validate(tokens.accessToken());
+        var bad=new VerifiedIntegrationContext(mismatch.equals("tenant")?8:7,mismatch.equals("user")?71:72,
+                mismatch.equals("integration")?UUID.randomUUID():a.integrationId(),mismatch.equals("grant")?UUID.randomUUID():a.grantId(),
+                mismatch.equals("session")?UUID.randomUUID():a.delegatedSessionId(),a.effectiveScopes(),null,
+                mismatch.equals("client")?"wrong":a.oauthClientId(),mismatch.equals("key")?UUID.randomUUID():a.authenticatingKeyId(),
+                mismatch.equals("credential")?a.credentialId()+999:a.credentialId(),mismatch.equals("issuer")?ISSUER+"/wrong":ISSUER,
+                mismatch.equals("resource")?RESOURCE+"/wrong":RESOURCE,1,1,1,1,a.deadline(),a.correlationId(),null);
+        assertThrows(SecurityException.class,()->v.recheck(bad),mismatch);
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"user","removed","tenant","global","policy","integration","registrationExpiry","grant","session","access","accessExpiry","web","reuse","revoke","scope"})
+    void accessCommittedAuthorityChangesPreventNewAndRecheckedContexts(String change)throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());var v=accessValidator();var before=v.validate(tokens.accessToken());
+        switch(change) {
+            case "global" -> {var op=new AiProductCapabilityService(provider("operator",null,null));op.setEnabled(false,op.inspect().rowVersion());op.setEnabled(true,op.inspect().rowVersion());}
+            case "policy" -> {var admin=service(7,71);admin.setTenantEnabled(false,admin.inspectTenantPolicy().rowVersion());admin.setTenantEnabled(true,admin.inspectTenantPolicy().rowVersion());}
+            case "integration" -> service(7,71).changeIntegration(f.registration().integrationId(),AiScope.fromMask(3),true,f.registration().rowVersion());
+            case "scope" -> {var reduced=service(7,71).changeIntegration(f.registration().integrationId(),AiScope.fromMask(1),false,f.registration().rowVersion());service(7,71).changeIntegration(f.registration().integrationId(),AiScope.fromMask(3),false,reduced.rowVersion());}
+            case "revoke" -> revoke(tokens.accessToken(),f.registration());
+            case "reuse" -> {refresh(tokens.refreshToken(),f.registration());assertThrows(SecurityException.class,()->refresh(tokens.refreshToken(),f.registration()));}
+            default -> {try(var c=owner(db)) {
+                // Explicit synthetic owner timestamp/state injection, never production evidence.
+                sql(c,switch(change) {
+                    case "user" -> "UPDATE dbo.Users SET is_deleted=1 WHERE id=72";
+                    case "removed" -> "UPDATE dbo.Users SET IsRemoved=1 WHERE id=72";
+                    case "tenant" -> "UPDATE dbo.ShaleClients SET IsActive=0 WHERE Id=7";
+                    case "registrationExpiry" -> "DISABLE TRIGGER dbo.AiImmutable_AiIntegrationRegistration ON dbo.AiIntegrationRegistration; UPDATE dbo.AiIntegrationRegistration SET CreatedAt=DATEADD(day,-1,SYSUTCDATETIME()),ExpiresAt=DATEADD(second,-1,SYSUTCDATETIME()); ENABLE TRIGGER dbo.AiImmutable_AiIntegrationRegistration ON dbo.AiIntegrationRegistration";
+                    case "grant" -> "UPDATE dbo.AiDelegationGrant SET RevokedAt=SYSUTCDATETIME(),RevokedByUserId=72,RevocationReason='SELF'";
+                    case "session" -> "UPDATE dbo.AiDelegatedSession SET RevokedAt=SYSUTCDATETIME(),RevocationReason='SELF'";
+                    case "access" -> "UPDATE dbo.AiOAuthCredential SET RevokedAt=SYSUTCDATETIME() WHERE Kind='ACCESS'";
+                    case "accessExpiry" -> "DISABLE TRIGGER dbo.AiImmutable_AiOAuthCredential ON dbo.AiOAuthCredential; UPDATE dbo.AiOAuthCredential SET IssuedAt=DATEADD(minute,-5,SYSUTCDATETIME()),ExpiresAt=DATEADD(second,-1,SYSUTCDATETIME()) WHERE Kind='ACCESS'; ENABLE TRIGGER dbo.AiImmutable_AiOAuthCredential ON dbo.AiOAuthCredential";
+                    case "web" -> "UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME()";
+                    default -> throw new AssertionError(change);
+                });
+            }}
+        }
+        assertThrows(SecurityException.class,()->v.recheck(before),change);
+        assertThrows(SecurityException.class,()->accessValidator().validate(tokens.accessToken()),change);
+    }
+    @Test void accessConfidentialKeyBoundAndRevocationIsLive()throws Exception {
+        UUID web=installOAuth();installCredentials();installAccess();enabled();var r=registration(true);var admin=service(7,71);
+        var key=admin.rotateClientKey(r.integrationId(),publicKey(),1,r.rowVersion());
+        String code=opaque();issueOAuth(startOAuth(r,web,opaque()),web,code);
+        var now=java.time.Instant.now().minusSeconds(1);
+        var tokens=credentials().redeem(code,r.clientId(),CALLBACK,VERIFIER,key.credentialId(),UUID.randomUUID().toString(),now,now.plusSeconds(60));
+        var v=accessValidator();var a=v.validate(tokens.accessToken());assertEquals(key.credentialId(),a.authenticatingKeyId());
+        admin.revokeClientKey(r.integrationId(),key.credentialId(),key.rowVersion());
+        assertThrows(SecurityException.class,()->v.recheck(a));assertThrows(SecurityException.class,()->v.validate(tokens.accessToken()));
+    }
+    @Test void accessRecheckNarrowsAndNeverExpandsSnapshotScopes()throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());var v=accessValidator();var a=v.validate(tokens.accessToken());
+        // Internal narrowed snapshot represents authority already reduced upstream; recheck cannot expand it.
+        var reduced=new VerifiedIntegrationContext(7,72,a.integrationId(),a.grantId(),a.delegatedSessionId(),AiScope.fromMask(1),null,
+                a.oauthClientId(),null,a.credentialId(),ISSUER,RESOURCE,a.capabilityRevision(),a.policyRevision(),a.integrationRevision(),a.grantRevision(),a.deadline(),a.correlationId(),null);
+        assertEquals(AiScope.fromMask(1),v.recheck(reduced).effectiveScopes());
+    }
+    @Test void accessCommittedRevokeBetweenBootstrapAndGatePreventsContext()throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());
+        var ds=accessSource("runtime");
+        var delayed=(javax.sql.DataSource)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{javax.sql.DataSource.class},(o,m,a)-> {
+            if(m.getName().equals("getConnection")){revoke(tokens.accessToken(),f.registration());return ds.getConnection();}
+            return m.invoke(ds,a);
+        });
+        assertThrows(SecurityException.class,()->accessValidator(delayed).validate(tokens.accessToken()));
+    }
+    @Test void accessSingleSpidPoolReuseAndConcurrentAsyncCancellation()throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());
+        var config=new com.zaxxer.hikari.HikariConfig();config.setDataSource(accessSource("runtime"));config.setMaximumPoolSize(1);config.setMinimumIdle(1);config.setConnectionTimeout(2000);
+        try(var pool=new com.zaxxer.hikari.HikariDataSource(config)) {
+            var v=accessValidator(pool);Integer spid=null;
+            for(int[] identity:List.of(new int[]{7,71},new int[]{7,72},new int[]{8,81},new int[]{7,71})) {
+                var init=new com.shale.data.runtime.RuntimeSessionService(pool);init.initialize(identity[0],identity[1]);
+                try(var c=init.getConnection()) {int current=count(c,"SELECT @@SPID");if(spid!=null)assertEquals(spid.intValue(),current);spid=current;}
+                assertEquals(72,v.validate(tokens.accessToken()).actingUserId());
+            }
+            try(var workers=Executors.newFixedThreadPool(3)) {
+                var a=workers.submit(()->v.validate(tokens.accessToken()));var b=workers.submit(()->v.validate(tokens.accessToken()));
+                assertEquals(a.get(10,TimeUnit.SECONDS).delegatedSessionId(),b.get(10,TimeUnit.SECONDS).delegatedSessionId());
+                var cancelled=workers.submit(()-> {Thread.currentThread().interrupt();return v.validate(tokens.accessToken());});
+                assertThrows(ExecutionException.class,()->cancelled.get(10,TimeUnit.SECONDS));
+                assertEquals(72,workers.submit(()->v.validate(tokens.accessToken()).actingUserId()).get(10,TimeUnit.SECONDS));
+            }
+        }
+    }
+
+    @Test void accessScopeReductionBetweenBootstrapAndGateDeniesAndDoesNotResurrect()throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());var ds=accessSource("runtime");
+        var delayed=(javax.sql.DataSource)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{javax.sql.DataSource.class},(o,m,a)-> {
+            if(m.getName().equals("getConnection")) {
+                service(7,71).changeIntegration(f.registration().integrationId(),AiScope.fromMask(1),false,f.registration().rowVersion());return ds.getConnection();
+            }return m.invoke(ds,a);
+        });
+        assertThrows(SecurityException.class,()->accessValidator(delayed).validate(tokens.accessToken()));
+        assertThrows(SecurityException.class,()->accessValidator().validate(tokens.accessToken()));
+    }
+    @Test void accessExpiryWhileWaitingForFinalGateUsesDatabaseUtc()throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());var v=accessValidator();var before=v.validate(tokens.accessToken());
+        try(var c=owner(db)) {
+            // Labelled synthetic owner timestamp injection; then a real SQL lock wait crosses expiry.
+            sql(c,"UPDATE dbo.AiDelegatedSession SET IdleExpiresAt=DATEADD(second,1,SYSUTCDATETIME())");
+            sql(c,"BEGIN TRANSACTION; SELECT Id FROM dbo.AiDelegatedSession WITH(UPDLOCK,HOLDLOCK)");
+            try(var worker=Executors.newSingleThreadExecutor()) {
+                var result=worker.submit(()->v.recheck(before));
+                sql(c,"WAITFOR DELAY '00:00:02'; COMMIT TRANSACTION");
+                assertThrows(ExecutionException.class,()->result.get(10,TimeUnit.SECONDS));
+            }
+        }
+    }
+    @Test void accessSetupMismatchAndStampFailureWithholdContextThenCleanNextBorrow()throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());
+        var config=new com.zaxxer.hikari.HikariConfig();config.setDataSource(accessSource("runtime"));config.setMaximumPoolSize(1);config.setMinimumIdle(1);config.setConnectionTimeout(2000);
+        try(var pool=new com.zaxxer.hikari.HikariDataSource(config)) {
+            for(String mode:List.of("stamp","verify","close","cancel")) {
+                var faulty=(javax.sql.DataSource)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{javax.sql.DataSource.class},(o,m,a)-> {
+                    if(!m.getName().equals("getConnection"))return m.invoke(pool,a);
+                    Connection actual=pool.getConnection();
+                    return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{Connection.class},(co,cm,ca)-> {
+                        try {
+                            if(cm.getName().equals("close")) {actual.close();if(mode.equals("close"))throw new SQLException("Injected close failure");return null;}
+                            if(cm.getName().equals("prepareStatement") && ((String)ca[0]).contains("PrincipalUserId")) {
+                                String statement=(String)ca[0];
+                                if(mode.equals("stamp") && statement.contains("sp_set_session_context"))throw new SQLException("Injected second stamp failure");
+                                if(mode.equals("verify") && statement.startsWith("SELECT")) {
+                                    sql(actual,"EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=71");
+                                }
+                            }
+                            if(cm.getName().equals("prepareCall") && mode.equals("cancel"))Thread.currentThread().interrupt();
+                            return cm.invoke(actual,ca);
+                        }catch(java.lang.reflect.InvocationTargetException ex){throw ex.getCause();}
+                    });
+                });
+                try {assertThrows(SecurityException.class,()->accessValidator(faulty).validate(tokens.accessToken()),mode);}
+                finally {Thread.interrupted();}
+                assertEquals(72,accessValidator(pool).validate(tokens.accessToken()).actingUserId(),mode);
+            }
+        }
+    }
+    private AiOAuthCredentialStore.Tokens accessTokensFor(int tenant,int user)throws Exception {
+        if(tenant==8) {var policy=service(8,81).inspectTenantPolicy();if(!policy.enabled())service(8,81).setTenantEnabled(true,policy.rowVersion());}
+        var r=service(tenant,tenant==7?71:81).register("Synthetic access owner",false,AiScope.fromMask(3),1,List.of(URI.create(CALLBACK)));
+        UUID web=webSession(tenant,user),tx=UUID.randomUUID();String code=opaque();
+        oauth(tenant,user).begin(tx,web,r.clientId(),CALLBACK,challenge(),"bounded state",AiScope.fromMask(1),opaque());
+        oauth(tenant,user).approve(tx,web,AiScope.fromMask(1));oauth(tenant,user).complete(tx,web,AiScope.fromMask(1),code);
+        return new AiOAuthCredentialStore(provider("runtime",tenant,user),ISSUER,RESOURCE).redeem(code,r.clientId(),CALLBACK,VERIFIER,null,null,null,null);
+    }
+    @Test void accessDistinctOwnersInterleaveThroughOnePhysicalSqlConnection()throws Exception {
+        accessFixture();var a1=accessTokensFor(7,71);var a2=accessTokensFor(7,72);var b1=accessTokensFor(8,81);
+        var config=new com.zaxxer.hikari.HikariConfig();config.setDataSource(accessSource("runtime"));config.setMaximumPoolSize(1);config.setMinimumIdle(1);config.setConnectionTimeout(2000);
+        try(var pool=new com.zaxxer.hikari.HikariDataSource(config)) {
+            var v=accessValidator(pool);
+            var tokens=List.of(a1.accessToken(),a2.accessToken(),b1.accessToken(),a1.accessToken());var users=List.of(71,72,81,71);var tenants=List.of(7,7,8,7);
+            for(int i=0;i<tokens.size();i++){var c=v.validate(tokens.get(i));assertEquals(users.get(i),c.actingUserId());assertEquals(tenants.get(i),c.shaleClientId());}
+            try(var workers=Executors.newFixedThreadPool(4)) {
+                var ready=new CountDownLatch(4);var go=new CountDownLatch(1);var futures=new ArrayList<Future<VerifiedIntegrationContext>>();
+                for(var token:tokens)futures.add(workers.submit(()->{ready.countDown();assertTrue(go.await(5,TimeUnit.SECONDS));return v.validate(token);}));
+                assertTrue(ready.await(5,TimeUnit.SECONDS));go.countDown();
+                for(int i=0;i<futures.size();i++){var c=futures.get(i).get(15,TimeUnit.SECONDS);assertEquals(users.get(i),c.actingUserId());assertEquals(tenants.get(i),c.shaleClientId());}
+            }
+        }
+    }
+    @Test void accessReplacementJvmObservesRevocationAndScopeReduction()throws Exception {
+        var f=accessFixture();var tokens=redeem(f.code(),f.registration());replacementValidationProbe(tokens.accessToken(),true);
+        revoke(tokens.accessToken(),f.registration());replacementValidationProbe(tokens.accessToken(),false);
+        String code=opaque();UUID tx=startOAuth(f.registration(),f.web(),opaque());oauth(7,72).approve(tx,f.web(),AiScope.fromMask(3));oauth(7,72).complete(tx,f.web(),AiScope.fromMask(3),code);
+        var next=redeem(code,f.registration());replacementValidationProbe(next.accessToken(),true);
+        service(7,71).changeIntegration(f.registration().integrationId(),AiScope.fromMask(1),false,f.registration().rowVersion());replacementValidationProbe(next.accessToken(),false);
+    }
+    private void replacementValidationProbe(String token,boolean allowed)throws Exception {
+        var child=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-cp",System.getProperty("surefire.test.class.path"),AccessValidationProbe.class.getName());
+        var env=child.environment();env.put("AI_PROBE_URL",url(db));env.put("AI_PROBE_BOOT_USER",prefix+"_bootstrap");env.put("AI_PROBE_BOOT_PASSWORD",logins.get("bootstrap"));
+        env.put("AI_PROBE_USER",prefix+"_runtime");env.put("AI_PROBE_PASSWORD",logins.get("runtime"));env.put("AI_PROBE_ACCESS",token);env.put("AI_PROBE_SUCCESS",Boolean.toString(allowed));
+        var p=child.redirectErrorStream(true).start();try {assertTrue(p.waitFor(20,TimeUnit.SECONDS));assertEquals(0,p.exitValue(),"Replacement validator JVM must observe committed SQL state");}finally {if(p.isAlive())p.destroyForcibly();}
+    }
+    public static class AccessValidationProbe {
+        public static void main(String[] args) {
+            var runtime=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();runtime.setURL(System.getenv("AI_PROBE_URL"));runtime.setUser(System.getenv("AI_PROBE_USER"));runtime.setPassword(System.getenv("AI_PROBE_PASSWORD"));
+            var bootstrap=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();bootstrap.setURL(System.getenv("AI_PROBE_URL"));bootstrap.setUser(System.getenv("AI_PROBE_BOOT_USER"));bootstrap.setPassword(System.getenv("AI_PROBE_BOOT_PASSWORD"));
+            var validator=new AiAccessTokenValidator(()->{try{return bootstrap.getConnection();}catch(SQLException e){throw new IllegalStateException(e);}},runtime,true,ISSUER,RESOURCE);
+            boolean success;try{validator.validate(System.getenv("AI_PROBE_ACCESS"));success=true;}catch(SecurityException denied){success=false;}
+            if(success!=Boolean.parseBoolean(System.getenv("AI_PROBE_SUCCESS")))throw new AssertionError("Durable ACCESS authority mismatch");
+        }
+    }
+
 }

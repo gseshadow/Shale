@@ -429,3 +429,57 @@ Verification extends `AiOAuthRevocationContractTest`, `OAuthRevocationPolicyTest
 SQL and distinct restricted identities. Replacement JVMs inspect persisted revocation and reject refresh
 and confidential JTI replay. Expiry tests label owner-only timestamp injection. Results and remaining
 acceptance limits are recorded in the canonical roadmap; skips are not acceptance.
+
+## Phase 3B.2D internal ACCESS validation candidate
+
+Apply `phase3b2d.sql` after `revocation.sql` with the same fresh dbo, NULL-context, manual migration
+rules. No table or duplicate credential authority is introduced. The new cumulative source/catalog receipt
+includes both new procedures and all previous objects; an identical latest repeat is a no-op and drift
+fails before changes. Historical migrations remain unchanged. Run `verify.sql` after the accumulated
+migrations; older receipt stages continue to cover their original object sets. Operational rollback disables
+this internal service/code and retains history/receipts. Nothing enables a tenant or installs at startup.
+
+`ResolveAiAccessV1` is bootstrap-only EXECUTE AS OWNER, one exact SHA-256 digest and configured
+issuer/resource, requiring both context keys NULL. It accepts only unconsumed/unrevoked/unexpired ACCESS
+with durable lifecycle lineage. It returns only tenant/user/integration/grant/session, ACCESS row ID,
+OAuth client ID and optional authenticating key ID. No fallback registration owner, scopes, broad rows,
+credential hash, refresh credential, secrets, User fields or Case data. Direct table denials and strict
+RLS are unchanged; general auth and runtime identities receive no resolver permission.
+
+`AiValidateAccessV1` is runtime-only, caller/RLS and tenant/user-context bound. A fresh production
+RuntimeSessionService instance stamps both existing mutable context keys with bounded setup statements;
+the adapter verifies exact tenant/user before invoking SQL. Failed stamps/verification/SQL/close withhold
+the result and close the lease. There are no integration/grant SQL context keys or remembered pool identity.
+
+Every gate takes existing capability/tenant locks, then held rows in fixed order global → tenant policy →
+registration/integration → grant → delegated session → user. It rechecks the full durable ACCESS tuple,
+including original consumed authorization/WEB lineage, exact client/key/issuer/resource, active tenant/user,
+all revocations, capability epoch, expiry and current scope ceilings. Database UTC is sampled after lock
+waits, without expiry skew. The deadline is the earliest live credential/session/idle/grant/registration/
+WEB/key deadline. No positive cache. Effective scopes intersect credential/session/grant/registration,
+prior snapshot ceiling and the two supported scopes. Existing reduction procedures permanently revoke
+affected grant families; expansion/re-enable never restores those descendants. A recheck can only narrow
+its input snapshot.
+
+The immutable VerifiedIntegrationContext carries bounded IDs, OAuth client/key/credential reference,
+configured issuer/resource, effective scopes, capability/policy/registration/grant revisions, clipped
+deadline and server correlation. Admission does not invent an operation or invocation ID; existing trusted
+session-control construction retains its operation identities and cannot pass the credential recheck.
+All fields are final, scope sets copied, and toString redacted. No credential/digest/request object is retained.
+Pass the context explicitly between tasks; cancellation/setup/close failure fails closed.
+
+The internal `recheck` seam proves the short SQL gate and returns only after commit and successful close;
+it performs no transport handoff. 3B.3 must compose the final buffered handoff boundary and mandatory
+disclosure audit. No network transaction is held. No route/filter/bean accepts AI bearer tokens for data.
+The unregistered header parser consumes only one Authorization header and the exact issued opaque syntax;
+query/cookie/alternate sources never enter that API. All invalid credentials share one safe authentication
+error without cause/ownership details. No fallback to WEB/DESKTOP.
+
+Audit compatibility: this is a read-only authentication check with no data disclosure or domain mutation.
+Existing entity-action allowlists do not represent authentication ALLOWED/DENIED outcomes. No ad-hoc audit
+row or sensitive token/digest is emitted; lifecycle/security mutations remain transactionally audited by
+their existing owners. Any future authentication-outcome event family needs a separately scoped bounded
+schema/vocabulary review. IntegrationAccessAudit and Case PHI reads remain 3B.3 work.
+
+Evidence and exact local verification are recorded in the canonical architecture §10.21. Disposable
+synthetic SQL does not establish deployed permissions, authoritative Case RLS or independent client acceptance.
