@@ -48,7 +48,7 @@ Adjust the JDBC URLs, database names, users, and passwords for your local SQL Se
 From `C:\Eclipse\Workspace\shale-parent\shale-server`, run:
 
 ```cmd
-mvn org.springframework.boot:spring-boot-maven-plugin:3.3.4:run -Dspring-boot.run.profiles=dev
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Leave this process running while you execute the curl commands from another terminal.

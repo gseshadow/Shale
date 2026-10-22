@@ -1,7 +1,7 @@
 package com.shale.server.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.shale.core.dto.MinimizedCaseOverview;
 import com.shale.core.dto.MinimizedCasePage;
 import com.shale.core.service.CaseReadException;
@@ -97,6 +97,6 @@ public final class MinimizedCaseReadController {
             byte[] bytes = json.writeValueAsBytes(result);
             if (bytes.length > maximumBytes) throw new CaseReadException(CaseReadException.Kind.OVERSIZED);
             return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_JSON).body(bytes);
-        } catch (JsonProcessingException failure) { throw new CaseReadException(CaseReadException.Kind.READ_UNAVAILABLE, failure); }
+        } catch (JacksonException failure) { throw new CaseReadException(CaseReadException.Kind.READ_UNAVAILABLE, failure); }
     }
 }

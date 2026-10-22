@@ -60,7 +60,7 @@ class DurableSessionAuthTest {
                             : new com.shale.core.dto.MinimizedCasePage(List.of(item),0,25,false);
                 });
         var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
-                new com.shale.server.controller.MinimizedCaseReadController(port,sessions,new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()))
+                new com.shale.server.controller.MinimizedCaseReadController(port,sessions,tools.jackson.databind.json.JsonMapper.builder().configureForJackson2().build()))
                 .setControllerAdvice(new com.shale.server.controller.MinimizedCaseReadErrors()).build();
         var routes=List.of(
                 org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v2/cases/search-page")

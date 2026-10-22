@@ -252,10 +252,10 @@ class Phase1RLocalSqlServerTest {
             var auth=new com.shale.server.controller.AuthController(credentials,tokens,revoked,state,profile,Optional.of(sessions));
             var remembers=new SqlRememberCredentialStore(authPool,connections);
             var desktop=new com.shale.server.controller.DesktopSessionController(credentials,sessions,new DesktopApplicationInstanceVerifier(connections),remembers);
-            var json=new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+            var json=tools.jackson.databind.json.JsonMapper.builder().configureForJackson2().build();
             var api=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(auth,desktop)
                 .setControllerAdvice(new com.shale.server.controller.ApiExceptionHandler())
-                .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(json)).build();
+                .setMessageConverters(new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter(json)).build();
             var login=post(api,json,"/api/auth/login",Map.of("email","owner1@test","password","synthetic-password"),null,200);
             String access=login.get("accessToken").asText();
             var me=api.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/me").header("Authorization","Bearer "+access)).andReturn();
@@ -281,7 +281,7 @@ class Phase1RLocalSqlServerTest {
             try(var c=authPool.getConnection()){caller(c,"shale_app");require(context(c,"PrincipalUserId")==null);}
         }
     }
-    private static com.fasterxml.jackson.databind.JsonNode post(org.springframework.test.web.servlet.MockMvc api,com.fasterxml.jackson.databind.ObjectMapper json,String path,Object body,String token,int status)throws Exception {
+    private static tools.jackson.databind.JsonNode post(org.springframework.test.web.servlet.MockMvc api,tools.jackson.databind.ObjectMapper json,String path,Object body,String token,int status)throws Exception {
         var request=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json.writeValueAsBytes(body));
         if(token!=null)request.header("Authorization","Bearer "+token);
         var result=api.perform(request).andReturn();assertEquals(status,result.getResponse().getStatus(),"HTTP lifecycle status must match");

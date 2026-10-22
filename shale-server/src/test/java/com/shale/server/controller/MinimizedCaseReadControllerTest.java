@@ -10,7 +10,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.shale.core.dto.*;
 import com.shale.core.service.*;
 import com.shale.server.runtime.*;
@@ -18,7 +18,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 /** Synthetic HTTP/serialization outcomes; no deployed host or live session/SQL acceptance. */
 class MinimizedCaseReadControllerTest {
-    private final ObjectMapper json=new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper json=tools.jackson.databind.json.JsonMapper.builder().configureForJackson2().build();
     private final List<List<Object>> calls=new ArrayList<>();
     private Object result=new MinimizedCasePage(List.of(item("Name")),0,25,false);
     private RuntimeException failure;
@@ -262,5 +262,5 @@ class MinimizedCaseReadControllerTest {
             new MinimizedCaseOverview.CaseReadPracticeArea(1,value),
             new MinimizedCaseOverview.CaseReadUser(1,value),new MinimizedCaseOverview.CaseReadUser(2,value),null);
     }
-    private static Set<String> keys(com.fasterxml.jackson.databind.JsonNode node){Set<String> keys=new HashSet<>();node.fieldNames().forEachRemaining(keys::add);return keys;}
+    private static Set<String> keys(tools.jackson.databind.JsonNode node){Set<String> keys=new HashSet<>();node.propertyNames().forEach(keys::add);return keys;}
 }

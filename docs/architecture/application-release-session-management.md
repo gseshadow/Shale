@@ -57,6 +57,23 @@ No OAuth configuration, metadata route, token issuance, MCP route, session/audit
 changes in this compatibility record. There is no sensitive access or domain/security mutation to audit;
 the existing session and integration audit boundaries remain authoritative. All AI defaults remain off.
 
+## Supported Spring baseline prerequisite — 2026-10-22
+
+The [owning migration record](ai-integration-and-mcp.md#1015-supported-spring-server-baseline-prerequisite--2026-10-22)
+records the Boot **4.1.1** / BOM-managed Framework **7.0.9** / Security crypto **7.1.1** baseline,
+Tomcat **11.0.24** / Servlet **6.1**, Springdoc **3.1.1** and Java **21**. Status **COMPLETE at source/local verification scope**, with merge acceptance pending; the preceding 3B.2A compatibility note is historical. 3B.1 remains COMPLETE at its
+existing scope; 3B.2A stays BLOCKED until this prerequisite is merged and verified, then becomes the next
+unfinished OAuth task. 3B.2B+ remains NOT STARTED.
+
+WEB password login, `/me`, refresh/JTI rotation, logout and durable validation, DESKTOP remembered restore,
+account/session revocation, pre-tenant modules and request-scoped DB initialization remain authoritative.
+No Spring login page, Basic authentication, security filter chain, Spring session conversion or replacement
+JWT is introduced. Shared crypto and logging align through the parent Boot BOM; JDBC driver/pool versions
+are deliberately retained. JSON moves to Jackson 3 with Boot 3-compatible defaults and unchanged time/null
+contracts. The focused tests and evidence classifications are in the owning record, not production acceptance.
+No SQL/schema/audit change, AI enablement/disclosure, OAuth/MCP endpoint, production/Azure SQL, deployment or
+installer/version publication occurs.
+
 ## Current authentication/security reconciliation — 2026-10-21
 
 The [canonical API/MCP roadmap §2.5](ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)

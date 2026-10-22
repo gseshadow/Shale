@@ -3,7 +3,8 @@ package com.shale.server.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Set;
@@ -67,11 +68,12 @@ class ApiExceptionHandlerTest {
     @Test
     void sqlServerFailureLogsSafeMetadataAndCompletesWithoutReplacingOriginalFailure() throws Exception {
         var request = new MockHttpServletRequest("POST", "/api/auth/desktop-session");
-        var cause = org.mockito.Mockito.mock(com.microsoft.sqlserver.jdbc.SQLServerException.class);
-        org.mockito.Mockito.when(cause.getSQLState()).thenReturn("S0001");
-        org.mockito.Mockito.when(cause.getErrorCode()).thenReturn(229);
-        var chained = new java.sql.SQLException("credentialHash=secret", "23000", 547);
-        org.mockito.Mockito.when(cause.getNextException()).thenReturn(chained);
+        // Use an actual driver throwable: mocked Throwable bookkeeping can trigger the safe fallback.
+        var constructor = com.microsoft.sqlserver.jdbc.SQLServerException.class.getDeclaredConstructor(
+                String.class, String.class, int.class, Throwable.class);
+        constructor.setAccessible(true);
+        var cause = constructor.newInstance("credentialHash=secret", "S0001", 229, null);
+        cause.setNextException(new java.sql.SQLException("credentialHash=secret", "23000", 547));
         var exception = new IllegalStateException(
                 "password=hunter2 token=secret rememberedCredential=opaque body={secret}", cause);
         var originalStack = new StackTraceElement("com.shale.server.runtime.SqlRememberCredentialStore", "create",
@@ -150,8 +152,15 @@ class ApiExceptionHandlerTest {
                 event.getFormattedMessage(),
                 "The diagnostic must identify the exception class and request URI");
         assertNotNull(event.getThrowableProxy(), "The diagnostic must include the throwable stack trace");
-        assertSame(exception, event.getThrowableProxy() instanceof ch.qos.logback.classic.spi.ThrowableProxy proxy
-                ? proxy.getThrowable()
-                : null, "The complete handled throwable must be attached to the diagnostic");
+        var diagnostic = event.getThrowableProxy();
+        assertNotSame(exception, diagnostic instanceof ch.qos.logback.classic.spi.ThrowableProxy proxy
+                ? proxy.getThrowable() : null, "Only the sanitized throwable may enter the log");
+        assertTrue(diagnostic.getMessage().contains(exception.getClass().getName()),
+                "The sanitized diagnostic must identify the original type");
+        assertFalse(diagnostic.getMessage().contains(exception.getMessage()),
+                "Original exception messages must not enter server diagnostics");
+        assertArrayEquals(exception.getStackTrace(), java.util.Arrays.stream(diagnostic.getStackTraceElementProxyArray())
+                .map(ch.qos.logback.classic.spi.StackTraceElementProxy::getStackTraceElement).toArray(StackTraceElement[]::new),
+                "Sanitizing messages must retain every original stack frame");
     }
 }

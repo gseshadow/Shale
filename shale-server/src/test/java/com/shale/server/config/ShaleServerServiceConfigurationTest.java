@@ -109,11 +109,38 @@ class ShaleServerServiceConfigurationTest {
         }
     }
 
+    @Test
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    void productionCompositionStartsEmbeddedServerWithoutAdoptingSpringSecurity(
+            org.springframework.boot.test.system.CapturedOutput output) {
+        withDatabaseProperties(() -> {
+            try (var context = new org.springframework.boot.builder.SpringApplicationBuilder(
+                    com.shale.server.ShaleServerApplication.class)
+                    .profiles("prod").run("--server.port=0", "--server.address=127.0.0.1")) {
+                assertInstanceOf(BearerTokenServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
+                assertInstanceOf(com.shale.server.runtime.SqlDurableSessionStore.class,
+                        context.getBean(com.shale.server.runtime.DurableSessionStore.class));
+                assertInstanceOf(com.shale.server.runtime.SqlRememberCredentialStore.class,
+                        context.getBean(com.shale.server.runtime.RememberCredentialStore.class));
+                assertInstanceOf(RequestScopedDbSessionProvider.class, context.getBean(DbSessionProvider.class));
+                org.junit.jupiter.api.Assertions.assertFalse(context.containsBean("springSecurityFilterChain"));
+                org.junit.jupiter.api.Assertions.assertFalse(context.containsBean("userDetailsService"));
+            }
+        });
+        org.junit.jupiter.api.Assertions.assertFalse(output.getAll().contains("Using generated security password"));
+    }
+
     private static void withDatabaseProperties(Runnable test) {
-        System.setProperty("SHALE_APP_DB_URL", "jdbc:sqlserver://example.invalid:1433;databaseName=ShaleApp");
+        // These context tests may construct pools, but must never inherit a real database destination.
+        for (String key : java.util.List.of("SHALE_APP_DB_URL", "SHALE_APP_JDBC_URL", "SHALE_APP_DB_USER",
+                "SHALE_APP_USER", "SHALE_APP_DB_PASSWORD", "SHALE_APP_PASS", "SHALE_RT_DB_URL", "SHALE_RT_JDBC_URL",
+                "SHALE_RT_DB_USER", "SHALE_RT_USER", "SHALE_RT_DB_PASSWORD", "SHALE_RT_PASS")) {
+            org.junit.jupiter.api.Assertions.assertNull(System.getenv(key), "Context tests require isolated DB settings: " + key);
+        }
+        System.setProperty("SHALE_APP_DB_URL", "jdbc:sqlserver://127.0.0.1:9;databaseName=ShaleApp;loginTimeout=1");
         System.setProperty("SHALE_APP_DB_USER", "app_user");
         System.setProperty("SHALE_APP_DB_PASSWORD", "app_password");
-        System.setProperty("SHALE_RT_DB_URL", "jdbc:sqlserver://example.invalid:1433;databaseName=ShaleRuntime");
+        System.setProperty("SHALE_RT_DB_URL", "jdbc:sqlserver://127.0.0.1:9;databaseName=ShaleRuntime;loginTimeout=1");
         System.setProperty("SHALE_RT_DB_USER", "rt_user");
         System.setProperty("SHALE_RT_DB_PASSWORD", "rt_password");
         System.setProperty("SHALE_AUTH_TOKEN_SECRET", "test-auth-token-secret-that-is-long-enough");
