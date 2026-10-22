@@ -42,6 +42,21 @@ tenant disable revokes families/grants. Credential issuance, refresh/reuse/reset
 OAuth transaction storage remain 3B.2. There is no token issuance or endpoint, and no capability is enabled.
 The earlier Phase 3A paragraph is a historical design record, superseded only for this implemented foundation.
 
+## MCP OAuth compatibility gate — Phase 3B.2A (2026-10-21)
+
+The [canonical compatibility record](ai-integration-and-mcp.md#1014-phase-3b2a-oauth-compatibility-gate--2026-10-21)
+marks **3B.2A BLOCKED** before dependency/runtime changes. Boot 3.3.4 manages the unsupported OSS AS 1.3 line;
+the inspected AS 1.5.8 requires newer Spring APIs, and maintained authorization-server development is now in
+Spring Security 7. A separately reviewed supported Spring baseline is required; no framework upgrade occurs
+here. 3B.1 remains COMPLETE at source/synthetic scope; 3B.2B/C/D and 3B.3+ remain NOT STARTED.
+
+Existing authentication uses request/session resolvers and durable WEB/DESKTOP state, without an existing
+Spring SecurityFilterChain. A future OAuth servlet-filter composition must preserve login, `/me`, refresh,
+logout, durable JTI validation and remembered restore without adopting those credentials as OAuth authority.
+No OAuth configuration, metadata route, token issuance, MCP route, session/audit schema or auth semantics
+changes in this compatibility record. There is no sensitive access or domain/security mutation to audit;
+the existing session and integration audit boundaries remain authoritative. All AI defaults remain off.
+
 ## Current authentication/security reconciliation — 2026-10-21
 
 The [canonical API/MCP roadmap §2.5](ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
