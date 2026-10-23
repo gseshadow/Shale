@@ -336,9 +336,7 @@ class OAuthAuthorizationFlowTest {
             for(String token:List.of(refresh,freshCode(),webToken,"a".repeat(43),"malformed.jwt.like"))
                 assertTrue(mcpSend(mcp,sdk,token,"server/discover").getStatus()>=400,"Only ACCESS credentials may authenticate MCP");
             if("true".equals(System.getenv("SHALE_MCP_EXTERNAL_CLIENTS"))) {
-                var bootstrapSource=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();bootstrapSource.setURL(url(db));
-                bootstrapSource.setUser(bootstrapLogin);bootstrapSource.setPassword(bootstrapSecret);bootstrapSource.setLoginTimeout(2);bootstrapSource.setSocketTimeout(5000);
-                com.shale.server.mcp.McpClientInteropFixture.verifyClients(bootstrapSource,source,ISSUER,RESOURCE,access,temp);
+                com.shale.server.mcp.McpClientInteropFixture.verifyClients(url(db),bootstrapLogin,bootstrapSecret,source,access,temp);
             }
             var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
             var policy=controls.inspectTenantPolicy();controls.setTenantEnabled(false,policy.rowVersion());

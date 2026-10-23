@@ -17,23 +17,24 @@ import static org.mockito.Mockito.*;
 
 /** Real loopback Tomcat + Spring security + SDK transport, using the supplied real SQL ACCESS validator. */
 public final class McpClientInteropFixture {
-    public static void verifyClients(javax.sql.DataSource bootstrap,javax.sql.DataSource runtime,String issuer,String resource,String TOKEN,Path temp)throws Exception {
-        McpTransportConfiguration.DeadlineAccess access=(token,deadline)-> {
-            var bootstrapLease=new McpJdbcDeadline(bootstrap,deadline);
-            return new AiAccessTokenValidator(()-> {try{return bootstrapLease.getConnection();}catch(java.sql.SQLException failure){throw new SecurityException();}},
-                    new McpJdbcDeadline(runtime,deadline),true,issuer,resource).validate(token);
-        };
+    public static void verifyClients(String jdbcUrl,String bootstrapUser,String bootstrapPassword,javax.sql.DataSource runtime,String TOKEN,Path temp)throws Exception {
         var tomcat=new org.apache.catalina.startup.Tomcat();tomcat.setBaseDir(temp.toString());tomcat.setPort(0);
         tomcat.getConnector().setProperty("address","127.0.0.1");var tc=tomcat.addContext("",temp.toString());
-        try(var context=new org.springframework.web.context.support.GenericWebApplicationContext()) {
+        var poolConfig=new com.zaxxer.hikari.HikariConfig();poolConfig.setDataSource(runtime);poolConfig.setMinimumIdle(0);
+        poolConfig.setMaximumPoolSize(5);poolConfig.setConnectionTimeout(30000);poolConfig.setInitializationFailTimeout(-1);
+        try(var pool=new com.zaxxer.hikari.HikariDataSource(poolConfig);var context=new org.springframework.web.context.support.GenericWebApplicationContext()) {
             context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
             context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("mcp",Map.of(
                     "shale.ai.mcp.enabled",true,"shale.ai.enabled",true,"shale.ai.mcp.allowed-origins[0]","https://client.test",
-                    "shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST")));
-            context.registerBean(McpTransportConfiguration.DeadlineAccess.class,()->access);
+                    "shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST",
+                    "shale.ai.oauth.bootstrap.jdbc-url",jdbcUrl,"shale.ai.oauth.bootstrap.username",bootstrapUser,
+                    "shale.ai.oauth.bootstrap.password",bootstrapPassword)));
+            var sources=mock(com.shale.data.config.DataSources.class);when(sources.runtime()).thenReturn(pool);
+            context.registerBean(com.shale.data.config.DataSources.class,()->sources);
             new org.springframework.context.annotation.AnnotatedBeanDefinitionReader(context).register(com.shale.server.oauth.McpOAuthSecurityConfiguration.class,McpTransportConfiguration.class);
             context.refresh();
             assertTrue(context.getBeansOfType(com.shale.core.service.CaseServicePort.class).isEmpty());
+            assertTrue(context.containsBean("mcpAccessAuthenticator"),"Use the production bounded ACCESS factory, not a mock validator");
             var registration=context.getBean("mcpServlet",org.springframework.boot.web.servlet.ServletRegistrationBean.class);
             var servlet=(HttpServletMcpTransport)registration.getServlet();
             org.apache.catalina.startup.Tomcat.addServlet(tc,"mcp",servlet).setAsyncSupported(true);tc.addServletMappingDecoded("/mcp","mcp");
