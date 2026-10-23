@@ -58,7 +58,24 @@ class McpClientInteropTest {
                 Path log=evidence.resolve(command.getFirst().equals("node")?"client-ts.json":"client-python.json");
                 process.redirectErrorStream(true).redirectOutput(log.toFile());var running=process.start();
                 if(!running.waitFor(60,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();fail("External MCP client timed out");}
-                assertEquals(0,running.exitValue(),"External client failed; inspect retained "+log.getFileName());
+                assertEquals(0,running.exitValue(),"External client failed: "+Files.readString(log).replace(TOKEN,"[REDACTED]"));
+            }
+            for(String scenario:List.of("server-stateless","tools-list","dns-rebinding-protection")) {
+                var process=new ProcessBuilder("node","--import","../build/mcp-transport/conformance-auth.mjs",
+                        "../build/mcp-transport/node_modules/@modelcontextprotocol/conformance/dist/index.js","server",
+                        "--url",base+"/mcp","--scenario",scenario,"--spec-version","2026-07-28","--timeout","5000",
+                        "--output-dir","../work/mcp-evidence/conformance");
+                process.environment().put("MCP_URL",base+"/mcp");process.environment().put("MCP_TOKEN",TOKEN);
+                Path log=evidence.resolve("conformance-"+scenario+".log");process.redirectErrorStream(true).redirectOutput(log.toFile());
+                var running=process.start();
+                if(!running.waitFor(60,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();}
+                // Record individual outcomes, including unsupported fixture requirements; no full-conformance claim.
+                Files.writeString(evidence.resolve("conformance-"+scenario+".exit"),Integer.toString(running.exitValue()));
+                try(var files=Files.walk(evidence)) {
+                    for(Path file:files.filter(Files::isRegularFile).toList()) {
+                        String value=Files.readString(file);if(value.contains(TOKEN))Files.writeString(file,value.replace(TOKEN,"[REDACTED]"));
+                    }
+                }
             }
         } finally {tomcat.stop();tomcat.destroy();}
     }

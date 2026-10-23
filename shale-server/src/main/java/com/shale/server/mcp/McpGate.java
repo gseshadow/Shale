@@ -27,14 +27,19 @@ final class McpGate extends OncePerRequestFilter {
     private final boolean global;
     private final Function<String,VerifiedIntegrationContext> authenticate;
     private final Semaphore active=new Semaphore(5);
+    private final java.util.function.LongSupplier nanoTime;
     private final io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper mapper=McpTransportConfiguration.mapper();
     McpGate(McpTransportProperties properties, McpOAuthProperties identity, boolean global,
             Function<String,VerifiedIntegrationContext> authenticate) {
-        this.properties=properties;this.identity=identity;this.global=global;this.authenticate=authenticate;
+        this(properties,identity,global,authenticate,System::nanoTime);
+    }
+    McpGate(McpTransportProperties properties,McpOAuthProperties identity,boolean global,
+            Function<String,VerifiedIntegrationContext> authenticate,java.util.function.LongSupplier nanoTime) {
+        this.properties=properties;this.identity=identity;this.global=global;this.authenticate=authenticate;this.nanoTime=nanoTime;
     }
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)
             throws ServletException,IOException {
-        long deadline=System.nanoTime()+MAX_NANOS;
+        long deadline=nanoTime.getAsLong()+MAX_NANOS;
         response.setHeader("Cache-Control","no-store");
         if (!properties.enabled()) { fail(response,404,"disabled"); return; }
         String path=request.getRequestURI().substring(request.getContextPath().length());
@@ -138,14 +143,21 @@ final class McpGate extends OncePerRequestFilter {
         catch (RuntimeException invalid) { throw new Rejected(415,"media"); }
         try {
             String accept=Objects.requireNonNull(request.getHeader("Accept"));
-            if(MediaType.parseMediaTypes(accept).stream().noneMatch(t->t.isCompatibleWith(MediaType.APPLICATION_JSON) && t.getQualityValue()>0))
-                throw new Rejected(406,"accept");
+            int specificity=-1;double quality=0;
+            for(var type:MediaType.parseMediaTypes(accept)) {
+                if(!type.isCompatibleWith(MediaType.APPLICATION_JSON))continue;
+                if(type.getParameters().keySet().stream().anyMatch(p->!p.equals("q")))continue;
+                int score=type.isWildcardType()?0:type.isWildcardSubtype()?1:2;
+                if(score>specificity){specificity=score;quality=type.getQualityValue();}
+                else if(score==specificity)quality=Math.max(quality,type.getQualityValue());
+            }
+            if(quality<=0)throw new Rejected(406,"accept");
         } catch (Rejected invalid) { throw invalid; }
         catch (RuntimeException invalid) { throw new Rejected(406,"accept"); }
         if(request.getHeader("MCP-Protocol-Version")==null || request.getHeader("Mcp-Method")==null)
             throw new Rejected(400,"headers");
     }
-    private static void check(long deadline) { if(System.nanoTime()>=deadline || Thread.currentThread().isInterrupted()) throw new Rejected(504,"deadline"); }
+    private void check(long deadline) { if(nanoTime.getAsLong()>=deadline || Thread.currentThread().isInterrupted()) throw new Rejected(504,"deadline"); }
     private void rpc(HttpServletResponse response,int status,Object id,int code,String message)throws IOException {
         response.setStatus(status);response.setContentType("application/json");
         response.getOutputStream().write(mapper.writeValueAsBytes(JSONRPCResponse.error(id,new JSONRPCError(code,message))));

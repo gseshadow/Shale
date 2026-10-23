@@ -135,7 +135,7 @@ class McpTransportTest {
         for(String type:List.of("text/plain","application/json; charset=ISO-8859-1","application/octet-stream")) {
             var r=request("server/discover");r.setContentType(type);assertEquals(415,send(r).getStatus());
         }
-        for(String accept:List.of("text/event-stream","application/json;q=0","broken")) {
+        for(String accept:List.of("text/event-stream","application/json;q=0","application/json;q=0,*/*;q=1","broken")) {
             var r=request("server/discover");r.removeHeader("Accept");r.addHeader("Accept",accept);assertEquals(406,send(r).getStatus());
         }
         for(String accept:List.of("*/*","application/*","application/json, text/event-stream")) {
@@ -162,5 +162,17 @@ class McpTransportTest {
             for(var future:futures)future.get(5,TimeUnit.SECONDS);
         } finally {release.countDown();}
         assertEquals(401,send(request("server/discover")).getStatus());
+    }
+    @Test void deadlineStartsBeforeAuthenticationAndCannotBeRestartedAtDispatch()throws Exception {
+        var time=new java.util.concurrent.atomic.AtomicLong();
+        gate=new McpGate(new McpTransportProperties(true,Set.of()),identity,true,t->{time.set(10_000_000_001L);return authority;},time::get);
+        assertEquals(504,send(request("server/discover")).getStatus());
+    }
+    @Test void productionCompositionHasNoCaseReadDependencyOrAuditConsumer()throws Exception {
+        for(String source:List.of("McpTransportConfiguration","McpGate","McpCatalog")) {
+            var text=java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/server/mcp/"+source+".java"));
+            for(String forbidden:List.of("CaseServicePort","CaseServiceAdapter","IntegrationCaseReadService","CaseSummaryDao","IntegrationAccessAudit","ThreadLocal","getSession("))
+                assertFalse(text.contains(forbidden),source+" must not reach "+forbidden);
+        }
     }
 }
