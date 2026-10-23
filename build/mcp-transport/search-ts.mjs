@@ -33,7 +33,7 @@ try {
     for(const item of s.items) {
       assert.deepEqual(Object.keys(item).sort(),expected.outputSchema.$defs.Case.required.toSorted());
       assert.ok(item.caseId>=1000 && item.caseId<=1100);assert.equal(item.status,null);assert.equal(item.practiceArea,null);
-      assert.equal(item.responsibleAttorney,null);assert.equal(item.primaryLegalAssistant,null);assert.equal(item.updatedAt,'2026-10-23T11:22:33.1234567');
+      assert.equal(item.responsibleAttorney,null);assert.equal(item.primaryLegalAssistant,null);assert.equal(item.updatedAt,'2026-10-23T11:22:33.123456700');
     }
     records.push(label);
   }

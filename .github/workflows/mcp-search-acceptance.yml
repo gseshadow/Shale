@@ -71,7 +71,7 @@ jobs:
       - name: Focused OAuth ACCESS disclosure WEB DESKTOP REST and context regressions
         run: |
           set -o pipefail
-          timeout 900 mvn -B -ntp -pl shale-server -am '-Dtest=McpSearchTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,MinimizedCaseReadControllerTest,RequestScopedDbSessionProviderTest,OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,Ai*ContractTest,AiSecurityLocalSqlServerTest#access*+disclosure*,IntegrationAccessContractTest,IntegrationCaseReadTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest' -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/focused.log
+          timeout 900 mvn -B -ntp -pl shale-server -am '-Dtest=McpSearchTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,MinimizedCaseReadControllerTest,RequestScopedDbSessionProviderTest,OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,Ai*ContractTest,IntegrationAccessContractTest,IntegrationCaseReadTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest' -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/focused.log
           python3 - <<'PY'
           import glob, xml.etree.ElementTree as E
           for path in glob.glob('**/target/surefire-reports/TEST-*.xml',recursive=True):
@@ -92,15 +92,61 @@ jobs:
       - name: Affected suite
         run: |
           python3 - <<'PY'
-          import json, subprocess
+          import json, subprocess, pathlib, re, shutil, xml.etree.ElementTree as ET
           plan = json.load(open("work/mcp-evidence/selection.json"))
+          inventory = pathlib.Path("shale-data/src/test/java/com/shale/data/security/ai/AiSecurityLocalSqlServerTest.java").read_text()
+          methods = re.findall(r"@(?:[\w.]*\.)?(?:Test|ParameterizedTest)\b[\s\S]*?\bvoid\s+(\w+)\s*\(", inventory)
+          assert len(methods)==len(set(methods)) and len(methods)>90, "Complete annotated SQL method inventory required"
+          sql_class="com.shale.data.security.ai.AiSecurityLocalSqlServerTest"
+          commands=[]
+          selected_sql=False
+          for args in plan["selected_maven_batches"]:
+              args=list(args)
+              for n,arg in enumerate(args):
+                  if arg.startswith("-Dtest="):
+                      tests=arg[len("-Dtest="):].split(",")
+                      if sql_class in tests:
+                          selected_sql=True
+                          args[n]="-Dtest="+",".join(t for t in tests if t!=sql_class)
+              commands.append(args)
+          if selected_sql:
+              for offset in range(0,len(methods),20):
+                  group=methods[offset:offset+20]
+                  commands.append(["-pl","shale-data","-am","-Dtest="+sql_class+"#"+"+".join(group),"-Dsurefire.failIfNoSpecifiedTests=false","test"])
+          pathlib.Path("work/mcp-evidence/affected-partitions.json").write_text(json.dumps({"selectedSql":selected_sql,"sqlMethods":methods,"commands":commands},indent=2))
+          focused=pathlib.Path("work/mcp-evidence/focused-reports");focused.mkdir(exist_ok=True)
+          for report in pathlib.Path(".").glob("*/target/surefire-reports/TEST-*.xml"):
+              shutil.copy2(report,focused/(report.parent.parent.parent.name+"-"+report.name))
+          executed=set();sql_total=0;partition_counts=[]
           with open("work/mcp-evidence/affected.log", "w") as log:
-              for args in plan["selected_maven_batches"]:
+              for index,args in enumerate(commands):
                   command = ["xvfb-run", "-a", "mvn", "-B", "-ntp", *args]
                   print(command, flush=True)
-                  result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=900)
+                  for old in pathlib.Path(".").glob("*/target/surefire-reports"):
+                      shutil.rmtree(old)
+                  result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=360)
+                  # Keep every partition's receipts; later invocations replace Surefire reports.
+                  receipt=pathlib.Path("work/mcp-evidence/affected-reports")/str(index)
+                  receipt.mkdir(parents=True,exist_ok=True)
+                  total=0
+                  for report in pathlib.Path(".").glob("*/target/surefire-reports/TEST-*.xml"):
+                      shutil.copy2(report,receipt/(report.parent.parent.parent.name+"-"+report.name))
+                      xml=ET.parse(report).getroot()
+                      assert all(int(xml.get(k,0))==0 for k in ["failures","errors","skipped"]), str(report)
+                      total+=int(xml.get("tests",0))
+                      if xml.get("name")==sql_class:
+                          sql_total+=int(xml.get("tests",0))
+                          for case in xml.findall("testcase"):
+                              executed.add(case.get("name").split("(")[0].split("[")[0])
                   if result.returncode:
                       raise SystemExit(result.returncode)
+                  assert total>0
+                  partition_counts.append(total)
+          if selected_sql:
+              assert executed==set(methods), {"missing":sorted(set(methods)-executed),"unexpected":sorted(executed-set(methods))}
+              assert sql_total==160, sql_total
+          print("Affected partition test counts:",partition_counts,"SQL invocations:",sql_total,"annotated methods:",len(executed))
+          pathlib.Path("work/mcp-evidence/affected-summary.json").write_text(json.dumps({"partitionTests":partition_counts,"sqlTests":sql_total,"sqlMethods":len(executed)},indent=2))
           PY
       - name: Critical reactor once after candidate and focused checks pass
         run: |

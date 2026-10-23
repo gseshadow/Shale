@@ -44,7 +44,7 @@ async def main():
                 for item in s['items']:
                     assert set(item)==set(expected['outputSchema']['$defs']['Case']['required'])
                     assert 1000<=item['caseId']<=1100 and all(item[k] is None for k in ['status','practiceArea','responsibleAttorney','primaryLegalAssistant'])
-                    assert item['updatedAt']=='2026-10-23T11:22:33.1234567'
+                    assert item['updatedAt']=='2026-10-23T11:22:33.123456700'
                 records.append(label)
             for label,args,code in [('short',{'query':'ab'},'INVALID_INPUT'),('wildcard',{'query':'%_*'},'INVALID_INPUT'),
                 ('page-invalid',{'query':'MCP literal','page':10},'INVALID_INPUT'),('additional-property',{'query':'MCP literal','tenantId':8},'INVALID_INPUT'),
