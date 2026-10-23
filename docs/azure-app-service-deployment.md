@@ -591,6 +591,10 @@ This stable linked sequence includes the Phase 3B.3 internal audit/disclosure ca
 Phase 3B.4 transport/discovery now exists in source, explicitly default OFF; its source/protocol/client acceptance
 is recorded in the [canonical roadmap §10.25](architecture/ai-integration-and-mcp.md#1025-phase-3b4-default-off-transport-and-discovery--2026-10-23).
 SDK 2.2.0-M1 remains a prerelease implementation candidate, not production approval. 3B.4 adds no migration.
+Phase 3B.5 adds only synthetic/test-profile search_cases through the existing quota/audit/final-disclosure
+seam; its [source/client receipt](architecture/ai-integration-and-mcp.md#1026-phase-3b5-synthetic-only-search_cases-handler--2026-10-23)
+is separate from live acceptance. `shale.ai.mcp.search-cases-enabled=false` remains explicit, and production/
+Azure profiles cannot activate that test handler. No 3B.5 migration or production pilot enablement is added.
 
 This is a cumulative future operator sequence, **not authorization to deploy, run production/Azure SQL,
 enable a tenant, publish an installer/version or perform live acceptance in this task**. Keep every AI
@@ -598,7 +602,7 @@ startup/global/tenant switch OFF until independently authorized acceptance. Exis
 session authority and previously completed deployment/security records above remain applicable.
 
 1. Build/upload the new server JAR from the reviewed source; record source/artifact identity and retain
-   the previous JAR. Upload with AI composition/authorization/exchange and `shale.ai.mcp.enabled` disabled.
+   the previous JAR. Upload with AI composition/authorization/exchange and `shale.ai.mcp.enabled` / `shale.ai.mcp.search-cases-enabled` disabled.
 2. Execute accumulated, **unapplied** AI SQL migrations in order:
    [phase3b1.sql](sql/ai-integration/phase3b1.sql) → [phase3b2b.sql](sql/ai-integration/phase3b2b.sql) →
    [phase3b2c1.sql](sql/ai-integration/phase3b2c1.sql) → [phase3b2c2.sql](sql/ai-integration/phase3b2c2.sql) →
@@ -618,7 +622,8 @@ session authority and previously completed deployment/security records above rem
    The revocation extension must be installed before enabling exchange in the closeout server version;
    metadata advertises that implemented endpoint with exchange, with no runtime migration installer.
    3B.2D provides internal ACCESS validation; 3B.3 provides the internal audited buffered seam.
-   3B.4 adds a default-OFF protected transport/catalog only; Case data handlers remain absent.
+   3B.4 adds a default-OFF protected transport/catalog; 3B.5 adds only the explicitly test-activated search handler.
+   Overview remains absent, and production Case handlers remain disabled.
    Live OAuth acceptance starts only after SQL migrations, the cumulative verifier and server deployment all succeed.
 5. Only after server deployment, all accumulated SQL migrations/verifier/permission checks and live OAuth
    acceptance succeed, perform separately authorized MCP transport acceptance with synthetic identities.

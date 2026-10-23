@@ -72,6 +72,26 @@ class McpSearchTest {
             assertThrows(IllegalStateException.class,()->config.mcpSearchHandler(env,new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false),null,null));
         }
     }
+    @Test void duplicateTextEscapingCanExceedFullEnvelopeWhileStructuredContentFits()throws Exception {
+        var items=new ArrayList<Map<String,Object>>();
+        for(int n=1;n<=10;n++) {
+            var item=new LinkedHashMap<String,Object>();item.put("caseId",n);item.put("caseNumber","\u0001".repeat(200));item.put("caseName","literal"+"\u0001".repeat(75));
+            var status=new LinkedHashMap<String,Object>();status.put("id",1);status.put("name","\u0001".repeat(200));status.put("color",null);item.put("status",status);
+            for(String key:List.of("practiceArea","responsibleAttorney","primaryLegalAssistant","updatedAt"))item.put(key,null);items.add(item);
+        }
+        var value=Map.<String,Object>of("items",items,"page",0,"size",10,"hasMore",false,"windowExhausted",false,"correlationId",UUID.randomUUID().toString());
+        assertTrue(io.modelcontextprotocol.json.McpJsonDefaults.getSchemaValidator().validate(McpSearchHandler.TOOL.outputSchema(),value).valid());
+        byte[] json=McpTransportConfiguration.responseMapper().writeValueAsBytes(value);assertTrue(json.length<32768);
+        var buffer=mock(DisclosureBuffer.class);when(buffer.bytes()).thenAnswer(i->ByteBuffer.wrap(json).asReadOnlyBuffer());
+        var fault=mock(IntegrationReadException.class);when(fault.outcome()).thenReturn(IntegrationAccessAudit.Outcome.UNAVAILABLE);when(fault.reason()).thenReturn(IntegrationAccessAudit.Reason.OVERSIZED);
+        when(service.search(any(IntegrationInvocation.class),eq("literal"),eq(0),any())).thenAnswer(i->{
+            assertTrue(i.getArgument(3,java.util.function.ToIntFunction.class).applyAsInt(buffer)>65536,"Actual duplicate/escaping/SDK identity bytes must be counted");throw fault;
+        });
+        var result=send("tools/call","search_cases",Map.of("query","literal")).path("result");
+        assertTrue(result.path("isError").asBoolean());assertFalse(result.has("structuredContent"));
+        assertEquals("PAYLOAD_TOO_LARGE",McpTransportConfiguration.mapper().getJsonMapper().readTree(result.path("content").get(0).path("text").asText()).path("code").asText());
+        verify(service).search(any(IntegrationInvocation.class),eq("literal"),eq(0),any());
+    }
     @Test void applicationFailuresBecomeClosedToolErrorsWithoutPrivateMetadata()throws Exception {
         for(String code:List.of("INVALID_INPUT","FORBIDDEN","THROTTLED","TIMEOUT","AUDIT_UNAVAILABLE","PAYLOAD_TOO_LARGE","UNAVAILABLE")) {
             var fault=mock(IntegrationReadException.class);

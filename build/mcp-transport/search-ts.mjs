@@ -27,12 +27,13 @@ try {
     const r=await client.callTool({name:'search_cases',arguments:args});assert.equal(r.isError,false);
     const s=r.structuredContent;assert.deepEqual(Object.keys(s).sort(),['items','page','size','hasMore','windowExhausted','correlationId'].sort());
     assert.equal(s.page,page);assert.equal(s.size,10);assert.equal(s.items.length,count);assert.equal(s.hasMore,more);assert.equal(s.windowExhausted,window);
+    assert.deepEqual(s.items.map(item=>item.caseId),Array.from({length:count},(_,n)=>1000+page*10+n));
     assert.match(s.correlationId,/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/);assert.deepEqual(JSON.parse(r.content[0].text),s);
     assert.deepEqual(r._meta,{'io.modelcontextprotocol/serverInfo':{name:'shale-mcp',version:'development'}});
     for(const item of s.items) {
       assert.deepEqual(Object.keys(item).sort(),expected.outputSchema.$defs.Case.required.toSorted());
       assert.ok(item.caseId>=1000 && item.caseId<=1100);assert.equal(item.status,null);assert.equal(item.practiceArea,null);
-      assert.equal(item.responsibleAttorney,null);assert.equal(item.primaryLegalAssistant,null);assert.ok(!item.updatedAt.endsWith('Z'));
+      assert.equal(item.responsibleAttorney,null);assert.equal(item.primaryLegalAssistant,null);assert.equal(item.updatedAt,'2026-10-23T11:22:33.1234567');
     }
     records.push(label);
   }

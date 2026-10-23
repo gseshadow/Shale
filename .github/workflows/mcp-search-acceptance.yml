@@ -125,7 +125,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import glob,json,pathlib
-          for path in glob.glob('work/mcp-evidence/client*.json'):
+          for path in glob.glob('work/mcp-evidence/*client*.json') + glob.glob('work/mcp-evidence/search-operations*.json'):
               print(path, pathlib.Path(path).read_text())
           for path in glob.glob('work/mcp-evidence/conformance-*.exit'):
               print(path, pathlib.Path(path).read_text())

@@ -402,6 +402,14 @@ class OAuthAuthorizationFlowTest {
             var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();source.setURL(url(db));source.setUser(login);source.setPassword(secret);
             com.shale.server.mcp.McpSearchClientFixture.verify(url(db),bootstrapLogin,bootstrapSecret,source,access,overview,revoked,kind,temp);
             try(var c=owner(db);var s=c.createStatement()) {
+                try(var rows=s.executeQuery("SELECT Outcome,COUNT(*) Events FROM dbo.IntegrationAccessAuditLog WHERE UserId="+actor+" GROUP BY Outcome")) {
+                    var counts=new HashMap<String,Integer>();while(rows.next())counts.put(rows.getString(1),rows.getInt(2));
+                    assertEquals(Map.of("ALLOWED_READ",4,"INVALID_INPUT",5,"UNAVAILABLE",1,"THROTTLED",1),counts,"Each verified attempt has exactly one existing seam outcome");
+                }
+                try(var rows=s.executeQuery("SELECT SUM(CONVERT(int,RowCost)),COUNT(*) FROM dbo.AiQuotaReservation WHERE UserId="+actor)) {
+                    rows.next();assertEquals(50,rows.getInt(1),"Five reserved search attempts charge ten rows, including oversized failure");assertEquals(11,rows.getInt(2));
+                }
+                try(var rows=s.executeQuery("SELECT COUNT(*) FROM dbo.AuditLog WHERE UserId="+actor)) {rows.next();assertEquals(0,rows.getInt(1),"Search must not invent Overview PHI events");}
                 try(var rows=s.executeQuery("SELECT ReturnedCount,(SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource r WHERE r.EventId=a.Id AND r.Relation='RETURNED') Children FROM dbo.IntegrationAccessAuditLog a WHERE UserId="+actor+" AND Outcome='ALLOWED_READ'")) {
                     int parents=0,zero=0;while(rows.next()){parents++;assertEquals(rows.getInt(1),rows.getInt(2));if(rows.getInt(1)==0)zero++;}assertEquals(4,parents);assertEquals(1,zero);
                 }
