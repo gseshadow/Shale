@@ -73,7 +73,8 @@ public final class IntegrationCaseReadService {
             i.check();
             if (!enabled || !i.authority().effectiveScopes().contains(i.operation().scope())) throw failure(Outcome.DENIED,Reason.AUTHORITY);
             if(i.operation()==IntegrationInvocation.Operation.SEARCH) {
-                if(query==null || query.length()>100 || query.strip().length()<3
+                if(query==null || query.length()>200 || query.codePointCount(0,query.length())>100
+                        || query.strip().length()>100 || query.strip().length()<3
                         || query.codePoints().anyMatch(cp->cp>=0xd800 && cp<=0xdfff)
                         || query.strip().codePoints().filter(Character::isLetterOrDigit).count()<3 || safePage==null)
                     throw failure(Outcome.INVALID_INPUT,Reason.INPUT);

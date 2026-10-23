@@ -34,9 +34,14 @@ import java.util.Map;
 @EnableConfigurationProperties({McpTransportProperties.class,McpOAuthProperties.class})
 public class McpTransportConfiguration {
     static JacksonMcpJsonMapper mapper() {
+        return mapper(8,8192);
+    }
+    /** Trusted, bounded server output includes composed schemas deeper than request arguments. */
+    static JacksonMcpJsonMapper responseMapper() { return mapper(32,65536); }
+    private static JacksonMcpJsonMapper mapper(int depth,int stringLength) {
         McpPayloadLogFilter.install();
         var factory=JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-                .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(8).maxStringLength(8192).maxNumberLength(20).build()).build();
+                .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(depth).maxStringLength(stringLength).maxNumberLength(20).build()).build();
         return new JacksonMcpJsonMapper(JsonMapper.builder(factory).enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build());
     }
     static McpServer server(String version, JacksonMcpJsonMapper mapper) {

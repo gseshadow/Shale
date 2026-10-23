@@ -53,6 +53,7 @@ class IntegrationCaseReadTest {
             assertEquals(0,f.reads);assertEquals("INVALID_INPUT",f.auditCalls.getFirst().get(9));
         }
         Fake f=new Fake("");assertTrue(f.service(new MinimizedCaseEncoder()).search(context(7,72),"  É漢𐐀  ",1).size()>0);assertEquals(1,f.reads);
+        Fake stripped=new Fake("");assertTrue(stripped.service(new MinimizedCaseEncoder()).search(context(7,72)," "+"x".repeat(97)+"𐐀 ",0).size()>0);
     }
     @Test void originalAdmissionDeadlineAndEnvelopeFailureUseExistingFailureAudit() {
         Fake expired=new Fake("");var invocation=IntegrationInvocation.search(context(7,72),System.nanoTime()-1);

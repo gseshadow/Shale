@@ -59,7 +59,7 @@ final class McpSearchHandler {
     private static McpSchema.Tool contract() {
         try(var in=McpSearchHandler.class.getResourceAsStream("/mcp/search-cases.json")) {
             if(in==null)throw new IllegalStateException("Search contract required.");
-            return McpTransportConfiguration.mapper().readValue(in.readAllBytes(),McpSchema.Tool.class);
+            return McpTransportConfiguration.responseMapper().readValue(in.readAllBytes(),McpSchema.Tool.class);
         } catch(java.io.IOException unavailable) { throw new ExceptionInInitializerError("Search contract unavailable."); }
     }
 }

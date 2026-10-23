@@ -110,7 +110,7 @@ final class McpGate extends OncePerRequestFilter {
                 throw new Rejected(503,"unavailable");
             try {
             if (result.length>0) {
-                var parsed=mapper.readValue(result,JSONRPCResponse.class);
+                var parsed=McpTransportConfiguration.responseMapper().readValue(result,JSONRPCResponse.class);
                 if (parsed.error()!=null) {
                     // SDK error strings can contain client method/parameter names. Preserve only closed codes/data.
                     var error=parsed.error();

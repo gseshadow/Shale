@@ -35,10 +35,10 @@ class McpSearchTest {
         if(name!=null){params.put("name",name);params.put("arguments",args);}
         var mapper=McpTransportConfiguration.mapper();r.setContent(mapper.writeValueAsBytes(new io.modelcontextprotocol.modern.JsonRpc.JSONRPCRequest(method,"wire",params)));
         var response=new MockHttpServletResponse();servlet.service(r,response);
-        return mapper.getJsonMapper().readTree(response.getContentAsString());
+        return McpTransportConfiguration.responseMapper().getJsonMapper().readTree(response.getContentAsString());
     }
     @Test void advertisedWireSchemaExactlyMatchesCanonicalResourceAndScopeIsIndependent()throws Exception {
-        var mapper=McpTransportConfiguration.mapper();
+        var mapper=McpTransportConfiguration.responseMapper();
         var tools=send("tools/list",null,null).path("result").path("tools");assertEquals(1,tools.size());
         try(var in=getClass().getResourceAsStream("/mcp/search-cases.json")) {assertEquals(mapper.getJsonMapper().readTree(in),tools.get(0));}
         for(int mask:List.of(0,2)) {when(authority.effectiveScopes()).thenReturn(AiScope.fromMask(mask));assertTrue(send("tools/list",null,null).path("result").path("tools").isEmpty());}
@@ -70,6 +70,29 @@ class McpSearchTest {
         for(String profile:List.of("prod","azure","local")) {
             var env=new org.springframework.mock.env.MockEnvironment();env.setActiveProfiles(profile);
             assertThrows(IllegalStateException.class,()->config.mcpSearchHandler(env,new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false),null,null));
+        }
+    }
+    @Test void applicationFailuresBecomeClosedToolErrorsWithoutPrivateMetadata()throws Exception {
+        for(String code:List.of("INVALID_INPUT","FORBIDDEN","THROTTLED","TIMEOUT","AUDIT_UNAVAILABLE","PAYLOAD_TOO_LARGE","UNAVAILABLE")) {
+            var fault=mock(IntegrationReadException.class);
+            when(fault.outcome()).thenReturn(switch(code){
+                case "INVALID_INPUT" -> IntegrationAccessAudit.Outcome.INVALID_INPUT;
+                case "FORBIDDEN" -> IntegrationAccessAudit.Outcome.DENIED;
+                case "THROTTLED" -> IntegrationAccessAudit.Outcome.THROTTLED;
+                default -> IntegrationAccessAudit.Outcome.UNAVAILABLE;
+            });
+            when(fault.reason()).thenReturn(switch(code){
+                case "TIMEOUT" -> IntegrationAccessAudit.Reason.DEADLINE;
+                case "AUDIT_UNAVAILABLE" -> IntegrationAccessAudit.Reason.AUDIT;
+                case "PAYLOAD_TOO_LARGE" -> IntegrationAccessAudit.Reason.OVERSIZED;
+                default -> IntegrationAccessAudit.Reason.READ;
+            });
+            when(service.search(any(IntegrationInvocation.class),anyString(),anyInt(),any())).thenThrow(fault);
+            var result=send("tools/call","search_cases",Map.of("query","literal")).path("result");
+            assertTrue(result.path("isError").asBoolean());assertFalse(result.has("structuredContent"));assertFalse(result.has("_meta"));
+            var value=McpTransportConfiguration.mapper().getJsonMapper().readTree(result.path("content").get(0).path("text").asText());
+            assertEquals(code,value.path("code").asText());UUID.fromString(value.path("correlationId").asText());
+            if(code.equals("THROTTLED"))assertEquals(1,value.path("retryAfterSeconds").asInt());else assertTrue(value.path("retryAfterSeconds").isNull());
         }
     }
 }
