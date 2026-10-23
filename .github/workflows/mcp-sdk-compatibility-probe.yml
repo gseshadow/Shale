@@ -1,0 +1,125 @@
+name: Temporary MCP 2.2.0-M1 compatibility probe
+# Explicit task-authorized exception to the repository's no-Actions-testing policy.
+# Remove before merge: this branch-only workflow is execution scaffolding, not CI policy.
+on:
+  push:
+    branches: [codex/phase-3b4-sdk-actions-probe]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mcp-sdk-compatibility-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  compatibility:
+    if: github.ref == 'refs/heads/codex/phase-3b4-sdk-actions-probe'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Execution environment and fresh repository identity
+        run: |
+          mkdir -p work/mcp-evidence
+          java -version 2>&1 | tee work/mcp-evidence/java.txt
+          mvn -version 2>&1 | tee work/mcp-evidence/maven.txt
+          git rev-parse HEAD | tee work/mcp-evidence/commit.txt
+          git diff --check 71e39b863f5929022dba5b6dae9642be88dbb28a HEAD
+          curl --fail --silent --show-error https://api.github.com/repos/modelcontextprotocol/java-sdk/releases/tags/v2.2.0-M1 > work/mcp-evidence/official-release.json
+          python3 -c 'import json; r=json.load(open("work/mcp-evidence/official-release.json")); assert r["tag_name"]=="v2.2.0-M1" and r["prerelease"]'
+      - name: Resolve dependencies and compile production reactor dependencies
+        run: |
+          set -o pipefail
+          timeout 900 mvn -B -ntp -U -pl shale-server -am -Dmaven.test.skip=true install 2>&1 | tee work/mcp-evidence/compile.log
+      - name: Effective dependency graph including mediation
+        run: |
+          set -o pipefail
+          timeout 300 mvn -B -ntp -pl shale-server dependency:tree -Dverbose -DoutputFile=target/mcp-dependency-tree.txt 2>&1 | tee work/mcp-evidence/tree-command.log
+          cp shale-server/target/mcp-dependency-tree.txt work/mcp-evidence/candidate-tree.txt
+          cat work/mcp-evidence/candidate-tree.txt
+          timeout 300 mvn -B -ntp -pl shale-server help:effective-pom -Doutput=target/mcp-effective-pom.xml 2>&1 | tee work/mcp-evidence/effective-pom-command.log
+          cp shale-server/target/mcp-effective-pom.xml work/mcp-evidence/
+          git worktree add --detach work/mcp-baseline 71e39b863f5929022dba5b6dae9642be88dbb28a
+          timeout 300 mvn -B -ntp -f work/mcp-baseline/pom.xml -pl shale-server dependency:tree -Dverbose -DoutputFile=target/mcp-dependency-tree.txt 2>&1 | tee work/mcp-evidence/baseline-tree-command.log
+          cp work/mcp-baseline/shale-server/target/mcp-dependency-tree.txt work/mcp-evidence/baseline-tree.txt
+          python3 build/mcp-compatibility/check_dependency_graph.py
+      - name: Actual modern SDK, Jackson and unregistered servlet smoke tests
+        run: |
+          set -o pipefail
+          timeout 600 mvn -B -ntp -pl shale-server -am -Dtest=McpSdkCompatibilityTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/sdk-smoke.log
+      - name: Disposable loopback SQL for existing OAuth authorization through revocation tests
+        run: |
+          probe_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(30)+"aB9!")')"
+          echo "::add-mask::$probe_password"
+          echo "SHALE_AI_SQL_PASSWORD=$probe_password" >> "$GITHUB_ENV"
+          echo "SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI" >> "$GITHUB_ENV"
+          echo "SHALE_AI_SQL_PORT=14333" >> "$GITHUB_ENV"
+          export MSSQL_SA_PASSWORD="$probe_password"
+          docker run -d --name shale-mcp-probe-sql -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD -p 127.0.0.1:14333:1433 mcr.microsoft.com/mssql/server:2022-latest > work/mcp-evidence/sql-container-id.txt
+          for attempt in $(seq 1 60); do
+            if docker exec -e MSSQL_SA_PASSWORD shale-mcp-probe-sql bash -c '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -b -Q "SELECT 1"' >/dev/null 2>&1; then
+              docker inspect --format '{{.Image}}' shale-mcp-probe-sql > work/mcp-evidence/sql-image.txt
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Disposable SQL startup failed"
+          exit 1
+      - name: Focused OAuth ACCESS disclosure WEB DESKTOP REST and context regressions
+        run: |
+          set -o pipefail
+          timeout 900 mvn -B -ntp -pl shale-server -am '-Dtest=OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,Ai*ContractTest,AiSecurityLocalSqlServerTest#access*+disclosure*,IntegrationAccessContractTest,IntegrationCaseReadTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest' -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/focused.log
+          python3 build/mcp-compatibility/check_test_receipts.py
+      - name: Headless JavaFX prerequisites for selector and critical suites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgtk-3-0t64
+      - name: Selector Python and affected plan
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s build/test-selection -p test_select_tests.py 2>&1 | tee work/mcp-evidence/selector-python.log
+          python3 build/test-selection/select_tests.py --base 71e39b863f5929022dba5b6dae9642be88dbb28a --head HEAD --format markdown --plan-output work/mcp-evidence/selection.json | tee work/mcp-evidence/selection.md
+      - name: Affected suite
+        run: |
+          python3 - <<'PY'
+          import json, subprocess
+          plan = json.load(open("work/mcp-evidence/selection.json"))
+          with open("work/mcp-evidence/affected.log", "w") as log:
+              for args in plan["selected_maven_batches"]:
+                  command = ["xvfb-run", "-a", "mvn", "-B", "-ntp", *args]
+                  print(command, flush=True)
+                  result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=900)
+                  if result.returncode:
+                      raise SystemExit(result.returncode)
+          PY
+      - name: Critical reactor once after candidate and focused checks pass
+        run: |
+          set -o pipefail
+          timeout 900 xvfb-run -a mvn -B -ntp test 2>&1 | tee work/mcp-evidence/critical.log
+      - name: Documentation and whitespace
+        run: |
+          python3 build/mcp-compatibility/check_docs.py
+          git diff --check 71e39b863f5929022dba5b6dae9642be88dbb28a HEAD
+      - name: Retain evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-2.2.0-M1-compatibility-evidence
+          retention-days: 14
+          path: |
+            work/mcp-evidence/
+            **/target/surefire-reports/
+            shale-server/target/mcp-dependency-tree.txt
+            shale-server/target/mcp-effective-pom.xml
+      - name: Remove disposable SQL
+        if: always()
+        run: docker rm -f shale-mcp-probe-sql >/dev/null 2>&1 || true

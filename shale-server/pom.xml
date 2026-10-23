@@ -21,6 +21,13 @@
     </properties>
 
     <dependencies>
+        <!-- Prerelease compatibility experiment only; no production SDK adoption. -->
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp-json-jackson3</artifactId>
+            <version>2.2.0-M1</version>
+            <scope>test</scope>
+        </dependency>
         <!-- Authorization Server is maintained within Security 7; version follows the Boot BOM.
              Use the library, not the starter's operational endpoint auto-configuration. -->
         <dependency>
