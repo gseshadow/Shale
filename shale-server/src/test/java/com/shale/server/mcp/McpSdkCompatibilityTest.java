@@ -80,17 +80,24 @@ class McpSdkCompatibilityTest {
         }
     }
 
-    @Test void unregisteredModernServletInitializesOnCurrentSpringTomcatAndNeedsNoSessionOrGetStream() throws Exception {
+    @Test void unregisteredModernServletInitializesOnCurrentSpringTomcatAndNeedsNoSessionOrGetStream(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
         assertEquals("7.0.9", org.springframework.core.SpringVersion.getVersion());
         assertEquals("7.1.1", org.springframework.security.core.SpringSecurityCoreVersion.getVersion());
         assertEquals("4.1.1", org.springframework.boot.SpringBootVersion.getVersion());
         assertEquals("Apache Tomcat/11.0.24", org.apache.catalina.util.ServerInfo.getServerInfo());
-        var tomcatContext = new org.apache.catalina.core.StandardContext();
+        var tomcat = new org.apache.catalina.startup.Tomcat();
+        tomcat.setBaseDir(temp.toString());
+        tomcat.setPort(0);
+        tomcat.getConnector().setProperty("address", "127.0.0.1");
+        var tomcatContext = tomcat.addContext("", temp.toString());
+        try {
+        tomcat.start();
         assertEquals(6, tomcatContext.getServletContext().getMajorVersion());
         assertEquals(1, tomcatContext.getServletContext().getMinorVersion());
         var server = server();
         var servlet = HttpServletMcpTransport.builder(server).endpoint(TEST_PATH).build();
-        servlet.init(new MockServletConfig());
+        servlet.init(new MockServletConfig(tomcatContext.getServletContext()));
         try {
             for (boolean straySessionHeader : List.of(false, true)) {
                 var request = new MockHttpServletRequest("POST", TEST_PATH);
@@ -124,5 +131,6 @@ class McpSdkCompatibilityTest {
             assertEquals(McpSchema.ErrorCodes.PARSE_ERROR,
                     McpJsonDefaults.getMapper().readValue(response.getContentAsString(), JSONRPCResponse.class).error().code());
         } finally { servlet.destroy(); }
+        } finally { tomcat.stop(); tomcat.destroy(); }
     }
 }
