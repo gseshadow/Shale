@@ -48,8 +48,9 @@ class OAuthAuthorizationFlowTest {
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c2.sql")));
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/revocation.sql")));
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2d.sql")));
-            for(String batch:Files.readString(Path.of("../shale-data/src/test/resources/ai/synthetic-case-read.sql")).split("(?im)^GO\\s*$"))
-                if(!batch.isBlank())sql(c,batch);
+            // Existing audit shape only: deliberately no Cases table, Case rows or Case permissions.
+            sql(c,"CREATE TABLE dbo.AuditLog(Id bigint IDENTITY PRIMARY KEY,ShaleClientId int NOT NULL,UserId int,ObjectTypeId int,ObjectId bigint,FieldName varchar(64),FieldCode int,StringValue nvarchar(500),DateValue date,BooleanValue bit,IntValue int,EntryDate datetime2)");
+            sql(c,"ALTER SECURITY POLICY sec.TenantFilter ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.AuditLog");
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b3.sql")));
             sql(c,"CREATE USER ["+bootstrapLogin+"] FOR LOGIN ["+bootstrapLogin+"]; ALTER ROLE AiIntegrationBootstrap ADD MEMBER ["+bootstrapLogin+"]");
             sql(c,"CREATE USER ["+login+"] FOR LOGIN ["+login+"]; ALTER ROLE AiIntegrationRuntime ADD MEMBER ["+login+"]; ALTER ROLE AiCapabilityOperator ADD MEMBER ["+login+"]");
@@ -352,8 +353,8 @@ class OAuthAuthorizationFlowTest {
             capability.setEnabled(false,capability.inspect().rowVersion());
             try {assertEquals(401,mcpSend(mcp,sdk,freshAccess,"server/discover").getStatus());}
             finally {capability.setEnabled(true,capability.inspect().rowVersion());}
-            try(var c=owner(db);var q=c.createStatement();var rows=q.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'),(SELECT COUNT(*) FROM dbo.AuditLog)")) {
-                assertTrue(rows.next());assertEquals(0,rows.getInt(1));assertEquals(0,rows.getInt(2));
+            try(var c=owner(db);var q=c.createStatement();var rows=q.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'),(SELECT COUNT(*) FROM dbo.AuditLog),CASE WHEN OBJECT_ID(N'dbo.Cases') IS NULL THEN 1 ELSE 0 END")) {
+                assertTrue(rows.next());assertEquals(0,rows.getInt(1));assertEquals(0,rows.getInt(2));assertEquals(1,rows.getInt(3),"MCP fixture must contain no Cases table");
             }
         } finally {mcpValidator=null;}
     }
