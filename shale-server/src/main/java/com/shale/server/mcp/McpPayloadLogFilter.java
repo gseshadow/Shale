@@ -19,6 +19,14 @@ final class McpPayloadLogFilter extends TurboFilter {
         }
     }
     @Override public FilterReply decide(Marker marker,Logger logger,Level level,String format,Object[] params,Throwable failure) {
-        return logger.getName().startsWith("io.modelcontextprotocol.modern.") ? FilterReply.DENY : FilterReply.NEUTRAL;
+        if(logger.getName().startsWith("io.modelcontextprotocol.modern."))return FilterReply.DENY;
+        // Security 7's request-line DEBUG/TRACE includes the query string before the gate rejects it.
+        // Suppress MCP query lines, including a context prefix; leave ordinary OAuth operation logs alone.
+        if(logger.getName().equals("org.springframework.security.web.FilterChainProxy")) {
+            if(format!=null && format.contains("/mcp?"))return FilterReply.DENY;
+            if(params!=null)for(Object parameter:params)
+                if(String.valueOf(parameter).contains("/mcp?"))return FilterReply.DENY;
+        }
+        return FilterReply.NEUTRAL;
     }
 }

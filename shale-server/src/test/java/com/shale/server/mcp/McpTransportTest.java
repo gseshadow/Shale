@@ -186,4 +186,16 @@ class McpTransportTest {
             assertTrue(response.getContentAsString().contains("-32602"));assertFalse(response.getContentAsString().contains(name));
         }
     }
+    @Test void rejectedQueryCredentialsCannotLeakThroughSpringSecurityDebugRequestLines() {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger("org.springframework.security.web.FilterChainProxy");
+        var previous=logger.getLevel();boolean additive=logger.isAdditive();
+        var appender=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();appender.start();logger.addAppender(appender);
+        try {
+            logger.setLevel(ch.qos.logback.classic.Level.DEBUG);logger.setAdditive(false);
+            logger.debug("Securing POST /mcp?access_token={}","synthetic-sensitive");
+            logger.debug("Securing POST /context/mcp?access_token={}","synthetic-sensitive");
+            logger.debug("Securing POST /oauth/mcp/authorize?state=public");
+            assertEquals(1,appender.list.size());assertFalse(appender.list.getFirst().getFormattedMessage().contains("synthetic-sensitive"));
+        } finally {logger.detachAppender(appender);appender.stop();logger.setLevel(previous);logger.setAdditive(additive);}
+    }
 }
