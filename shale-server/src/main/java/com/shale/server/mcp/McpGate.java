@@ -99,7 +99,7 @@ final class McpGate extends OncePerRequestFilter {
                     // SDK error strings can contain client method/parameter names. Preserve only closed codes/data.
                     var error=parsed.error();
                     Object data=error.code()==io.modelcontextprotocol.modern.McpSchema.ErrorCodes.UNSUPPORTED_PROTOCOL_VERSION ?
-                            Map.of("supported",List.of(PROTOCOL)) : null;
+                            error.data() : null;
                     String safe=switch(error.code()) {
                         case -32700 -> "Parse error";
                         case -32600 -> "Invalid request";
@@ -154,8 +154,7 @@ final class McpGate extends OncePerRequestFilter {
             if(quality<=0)throw new Rejected(406,"accept");
         } catch (Rejected invalid) { throw invalid; }
         catch (RuntimeException invalid) { throw new Rejected(406,"accept"); }
-        if(request.getHeader("MCP-Protocol-Version")==null || request.getHeader("Mcp-Method")==null)
-            throw new Rejected(400,"headers");
+        if(request.getContentLengthLong()>8192)throw new Rejected(413,"body_limit");
     }
     private void check(long deadline) { if(nanoTime.getAsLong()>=deadline || Thread.currentThread().isInterrupted()) throw new Rejected(504,"deadline"); }
     private void rpc(HttpServletResponse response,int status,Object id,int code,String message)throws IOException {

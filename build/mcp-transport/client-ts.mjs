@@ -28,11 +28,13 @@ await clientTest('bad-access',{Authorization:`Bearer ${'z'.repeat(43)}`},undefin
 await clientTest('invalid-origin',{Origin:'https://attacker.test'},undefined,403);
 await clientTest('unsupported-version',{},init=>{
  const body=JSON.parse(init.body);body.params._meta['io.modelcontextprotocol/protocolVersion']='2099-01-01';
- return {...init,body:JSON.stringify(body),headers:{...Object.fromEntries(new Headers(init.headers)), 'MCP-Protocol-Version':'2099-01-01'}};
+ const headers=new Headers(init.headers);headers.set('MCP-Protocol-Version','2099-01-01');
+ return {...init,body:JSON.stringify(body),headers};
 },400);
 await clientTest('unknown-method',{},init=>{
  const body=JSON.parse(init.body);body.method='unknown/method';
- return {...init,body:JSON.stringify(body),headers:{...Object.fromEntries(new Headers(init.headers)),'Mcp-Method':'unknown/method'}};
+ const headers=new Headers(init.headers);headers.set('Mcp-Method','unknown/method');
+ return {...init,body:JSON.stringify(body),headers};
 },404);
 await clientTest('default-off',{},undefined,404,process.env.MCP_OFF_URL);
 console.log(JSON.stringify({client:'@modelcontextprotocol/client',version:'2.4.0',transport:'Streamable HTTP',protocol,records}));
