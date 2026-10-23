@@ -312,10 +312,6 @@ class OAuthAuthorizationFlowTest {
     }
 
 
-    static AiAccessTokenValidator mcpValidator;
-    @Configuration static class McpFixtures {
-        @Bean AiAccessTokenValidator mcpValidator() { return mcpValidator; }
-    }
     @Test void mountedMcpUsesRealAccessGateRejectsOtherKindsAndCreatesNoCaseAudit(@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
         var issued=new tools.jackson.databind.ObjectMapper().readTree(send(exchangeRequest(freshCode())).getContentAsString());
         String access=issued.path("access_token").asText(),refresh=issued.path("refresh_token").asText();
@@ -324,12 +320,14 @@ class OAuthAuthorizationFlowTest {
         var rejection=assertThrows(org.springframework.web.server.ResponseStatusException.class,()->new BearerTokenServerSessionResolver(tokens,new InMemoryTokenRevocationStore()).resolve(rest));
         assertEquals(401,rejection.getStatusCode().value(),"A live ACCESS credential must fail ordinary REST authority");
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();source.setURL(url(db));source.setUser(login);source.setPassword(secret);
-        mcpValidator=new AiAccessTokenValidator(()->{try{return DriverManager.getConnection(url(db),bootstrapLogin,bootstrapSecret);}catch(SQLException e){throw new IllegalStateException(e);}},source,true,ISSUER,RESOURCE);
-        try(var mcp=new AnnotationConfigWebApplicationContext()) {
+        var mcpValidator=new AiAccessTokenValidator(()->{try{return DriverManager.getConnection(url(db),bootstrapLogin,bootstrapSecret);}catch(SQLException e){throw new IllegalStateException(e);}},source,true,ISSUER,RESOURCE);
+        try(var mcp=new org.springframework.web.context.support.GenericWebApplicationContext()) {
             mcp.setServletContext(new MockServletContext());mcp.getEnvironment().setActiveProfiles("test");
             mcp.getEnvironment().getPropertySources().addFirst(new MapPropertySource("mcp",Map.of(
                     "shale.ai.mcp.enabled",true,"shale.ai.enabled",true,"shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST")));
-            mcp.register(McpFixtures.class,McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class);mcp.refresh();
+            mcp.registerBean(AiAccessTokenValidator.class,()->mcpValidator);
+            new org.springframework.context.annotation.AnnotatedBeanDefinitionReader(mcp).register(McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class);
+            mcp.refresh();
             var sdk=(jakarta.servlet.Servlet)mcp.getBean("mcpServlet",org.springframework.boot.web.servlet.ServletRegistrationBean.class).getServlet();
             for(String method:List.of("server/discover","tools/list","unknown/method")) {
                 var response=mcpSend(mcp,sdk,access,method);assertEquals(method.equals("unknown/method")?404:200,response.getStatus(),response.getContentAsString());
@@ -356,9 +354,9 @@ class OAuthAuthorizationFlowTest {
             try(var c=owner(db);var q=c.createStatement();var rows=q.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'),(SELECT COUNT(*) FROM dbo.AuditLog),CASE WHEN OBJECT_ID(N'dbo.Cases') IS NULL THEN 1 ELSE 0 END")) {
                 assertTrue(rows.next());assertEquals(0,rows.getInt(1));assertEquals(0,rows.getInt(2));assertEquals(1,rows.getInt(3),"MCP fixture must contain no Cases table");
             }
-        } finally {mcpValidator=null;}
+        }
     }
-    MockHttpServletResponse mcpSend(AnnotationConfigWebApplicationContext context,jakarta.servlet.Servlet sdk,String token,String method)throws Exception {
+    MockHttpServletResponse mcpSend(org.springframework.web.context.WebApplicationContext context,jakarta.servlet.Servlet sdk,String token,String method)throws Exception {
         var request=new MockHttpServletRequest("POST","/mcp");request.setServletPath("/mcp");request.setContentType("application/json");
         request.addHeader("Accept","application/json");request.addHeader("Authorization","Bearer "+token);
         request.addHeader("MCP-Protocol-Version","2026-07-28");request.addHeader("Mcp-Method",method);

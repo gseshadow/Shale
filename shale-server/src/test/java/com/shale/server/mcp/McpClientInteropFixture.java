@@ -17,24 +17,22 @@ import static org.mockito.Mockito.*;
 
 /** Real loopback Tomcat + Spring security + SDK transport, using the supplied real SQL ACCESS validator. */
 public final class McpClientInteropFixture {
-    static McpTransportConfiguration.DeadlineAccess suppliedAccess;
-    @Configuration static class Fixture {
-        @Bean McpTransportConfiguration.DeadlineAccess validator() {return java.util.Objects.requireNonNull(suppliedAccess);}
-    }
     public static void verifyClients(javax.sql.DataSource bootstrap,javax.sql.DataSource runtime,String issuer,String resource,String TOKEN,Path temp)throws Exception {
-        suppliedAccess=(token,deadline)-> {
+        McpTransportConfiguration.DeadlineAccess access=(token,deadline)-> {
             var bootstrapLease=new McpJdbcDeadline(bootstrap,deadline);
             return new AiAccessTokenValidator(()-> {try{return bootstrapLease.getConnection();}catch(java.sql.SQLException failure){throw new SecurityException();}},
                     new McpJdbcDeadline(runtime,deadline),true,issuer,resource).validate(token);
         };
         var tomcat=new org.apache.catalina.startup.Tomcat();tomcat.setBaseDir(temp.toString());tomcat.setPort(0);
         tomcat.getConnector().setProperty("address","127.0.0.1");var tc=tomcat.addContext("",temp.toString());
-        try(var context=new AnnotationConfigWebApplicationContext()) {
+        try(var context=new org.springframework.web.context.support.GenericWebApplicationContext()) {
             context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
             context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("mcp",Map.of(
                     "shale.ai.mcp.enabled",true,"shale.ai.enabled",true,"shale.ai.mcp.allowed-origins[0]","https://client.test",
                     "shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST")));
-            context.register(Fixture.class,com.shale.server.oauth.McpOAuthSecurityConfiguration.class,McpTransportConfiguration.class);context.refresh();
+            context.registerBean(McpTransportConfiguration.DeadlineAccess.class,()->access);
+            new org.springframework.context.annotation.AnnotatedBeanDefinitionReader(context).register(com.shale.server.oauth.McpOAuthSecurityConfiguration.class,McpTransportConfiguration.class);
+            context.refresh();
             assertTrue(context.getBeansOfType(com.shale.core.service.CaseServicePort.class).isEmpty());
             var registration=context.getBean("mcpServlet",org.springframework.boot.web.servlet.ServletRegistrationBean.class);
             var servlet=(HttpServletMcpTransport)registration.getServlet();
@@ -61,7 +59,8 @@ public final class McpClientInteropFixture {
                 Path log=evidence.resolve(command.getFirst().equals("node")?"client-ts.json":"client-python.json");
                 process.redirectErrorStream(true).redirectOutput(log.toFile());var running=process.start();
                 if(!running.waitFor(60,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();fail("External MCP client timed out");}
-                assertEquals(0,running.exitValue(),"External client failed: "+Files.readString(log).replace(TOKEN,"[REDACTED]"));
+                String output=Files.readString(log).replace(TOKEN,"[REDACTED]");Files.writeString(log,output);
+                assertEquals(0,running.exitValue(),"External client failed: "+output);
             }
             Files.writeString(evidence.resolve("conformance-not-applicable.txt"),"dns-rebinding-protection: upstream explicitly targets unauthenticated localhost servers; Shale requires ACCESS authentication and exact configured Origin. Own authenticated Origin/proxy matrix executed instead.\n");
             for(String scenario:List.of("server-stateless","tools-list")) {
@@ -82,6 +81,27 @@ public final class McpClientInteropFixture {
                     }
                 }
             }
-        } finally {tomcat.stop();tomcat.destroy();suppliedAccess=null;}
+            int passed=0,skipped=0,unavailable=0;
+            var notApplicable=Set.of("sep-2575-server-rejects-undeclared-capability","sep-2575-missing-capability-http-400",
+                    "sep-2575-http-server-no-independent-requests-on-stream","sep-2575-server-no-log-without-loglevel");
+            var reportMapper=new tools.jackson.databind.ObjectMapper();
+            try(var reports=Files.walk(evidence.resolve("conformance"))) {
+                for(Path report:reports.filter(p->p.getFileName().toString().equals("checks.json")).toList()) {
+                    for(var check:reportMapper.readTree(Files.readString(report))) {
+                        String status=check.path("status").asText();
+                        if(status.equals("SUCCESS"))passed++;
+                        if(status.equals("SKIPPED"))skipped++;
+                        if(status.equals("FAILURE")) {
+                            assertTrue(notApplicable.contains(check.path("id").asText()) && check.path("errorMessage").asText().startsWith("Not testable: server does not list the diagnostic tool"),
+                                    "Applicable upstream conformance failure: "+check.path("id").asText());unavailable++;
+                        }
+                    }
+                }
+            }
+            assertTrue(passed>0,"Upstream conformance checks must actually execute");
+            Files.writeString(evidence.resolve("conformance-applicability.json"),reportMapper.writeValueAsString(Map.of(
+                    "applicablePassed",passed,"upstreamSkipped",skipped,"missingDiagnosticFixtures",unavailable,
+                    "fullConformanceClaimed",false)));
+        } finally {tomcat.stop();tomcat.destroy();}
     }
 }

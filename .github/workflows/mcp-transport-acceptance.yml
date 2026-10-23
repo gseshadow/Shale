@@ -55,7 +55,7 @@ jobs:
       - name: Actual modern SDK, Jackson and unregistered servlet smoke tests
         run: |
           set -o pipefail
-          timeout 600 mvn -B -ntp -pl shale-server -am -Dtest=McpSdkCompatibilityTest,McpTransportTest,McpFilterIsolationTest,McpJdbcDeadlineTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/sdk-smoke.log
+          timeout 600 mvn -B -ntp -pl shale-server -am -Dtest=McpSdkCompatibilityTest,McpTransportTest,McpFilterIsolationTest,McpJdbcDeadlineTest,OpenApiDocumentationTest,ShaleServerServiceConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/sdk-smoke.log
       - name: Install pinned independent clients
         run: |
           npm install --prefix build/mcp-transport --ignore-scripts --no-audit --no-fund
