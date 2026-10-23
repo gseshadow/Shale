@@ -209,4 +209,10 @@ class McpTransportTest {
         var request=request("server/discover");request.setContent(new byte[]{(byte)0xff});
         assertEquals(400,send(request).getStatus());
     }
+    @Test void internalEncodingFailureMapsToClosedUnavailableWithoutExceptionText()throws Exception {
+        var request=request("server/discover");var response=new MockHttpServletResponse();
+        gate.doFilter(request,response,(r,s)->{throw new java.io.IOException("java.sql.SQLException sensitive sentinel");});
+        assertEquals(503,response.getStatus());assertEquals("{\"error\":\"unavailable\"}",response.getContentAsString());
+        assertNull(request.getAttribute(McpGate.AUTHORITY));
+    }
 }

@@ -100,11 +100,13 @@ final class McpGate extends OncePerRequestFilter {
             }
             request.setAttribute(AUTHORITY,authority);
             var buffered=new ContentCachingResponseWrapper(response);
-            chain.doFilter(new BodyRequest(request,body),buffered);
+            try {chain.doFilter(new BodyRequest(request,body),buffered);}
+            catch(IOException internalEncoding) {throw new Rejected(503,"unavailable");}
             check(deadline);
             byte[] result=buffered.getContentAsByteArray();
             if (result.length>4096 || buffered.getContentType()!=null && !buffered.getContentType().startsWith("application/json"))
                 throw new Rejected(503,"unavailable");
+            try {
             if (result.length>0) {
                 var parsed=mapper.readValue(result,JSONRPCResponse.class);
                 if (parsed.error()!=null) {
@@ -123,6 +125,7 @@ final class McpGate extends OncePerRequestFilter {
                     result=mapper.writeValueAsBytes(JSONRPCResponse.error(parsed.id(),new JSONRPCError(error.code(),safe,data)));
                 }
             }
+            } catch(IOException internalEncoding) {throw new Rejected(503,"unavailable");}
             response.setStatus(buffered.getStatus());response.setContentType("application/json");
             response.setHeader("Cache-Control","no-store");response.setContentLength(result.length);
             check(deadline);response.getOutputStream().write(result);
