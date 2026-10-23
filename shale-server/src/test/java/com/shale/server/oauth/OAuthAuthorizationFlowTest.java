@@ -345,9 +345,12 @@ class OAuthAuthorizationFlowTest {
             var policy=controls.inspectTenantPolicy();controls.setTenantEnabled(false,policy.rowVersion());
             try {assertEquals(401,mcpSend(mcp,sdk,access,"server/discover").getStatus());}
             finally {controls.setTenantEnabled(true,controls.inspectTenantPolicy().rowVersion());}
+            var fresh=send(exchangeRequest(freshCode()));assertEquals(200,fresh.getStatus());
+            String freshAccess=new tools.jackson.databind.ObjectMapper().readTree(fresh.getContentAsString()).path("access_token").asText();
+            assertEquals(200,mcpSend(mcp,sdk,freshAccess,"server/discover").getStatus());
             var capability=new AiProductCapabilityService(()->{try{return DriverManager.getConnection(url(db),login,secret);}catch(SQLException e){throw new IllegalStateException(e);}});
             capability.setEnabled(false,capability.inspect().rowVersion());
-            try {assertEquals(401,mcpSend(mcp,sdk,access,"server/discover").getStatus());}
+            try {assertEquals(401,mcpSend(mcp,sdk,freshAccess,"server/discover").getStatus());}
             finally {capability.setEnabled(true,capability.inspect().rowVersion());}
             try(var c=owner(db);var q=c.createStatement();var rows=q.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'),(SELECT COUNT(*) FROM dbo.AuditLog)")) {
                 assertTrue(rows.next());assertEquals(0,rows.getInt(1));assertEquals(0,rows.getInt(2));
