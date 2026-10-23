@@ -3792,7 +3792,9 @@ use its underlying httpx2 client; its positive discovery/catalog use the indepen
 No Case handler is called.
 
 Selected upstream `@modelcontextprotocol/conformance 0.2.0-alpha.12` scenarios run with
-`--spec-version 2026-07-28`: server-stateless, tools-list and dns-rebinding-protection. The upstream CLI
+`--spec-version 2026-07-28`: server-stateless and tools-list. Upstream dns-rebinding-protection explicitly
+targets unauthenticated localhost servers and is not applicable to this ACCESS-protected profile; the
+authenticated exact-Origin/proxy matrix is tested independently. The upstream CLI
 has no bearer option; a test-only fetch preload injects the fresh synthetic ACCESS token only for the exact
 task-owned loopback endpoint. The Spring/auth/Origin/body/header/SDK layers remain mounted. This is not
 an unauthenticated adapter or a production bypass. Per-check results and unsupported fixture/capability

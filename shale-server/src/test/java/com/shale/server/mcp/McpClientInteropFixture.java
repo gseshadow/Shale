@@ -63,7 +63,8 @@ public final class McpClientInteropFixture {
                 if(!running.waitFor(60,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();fail("External MCP client timed out");}
                 assertEquals(0,running.exitValue(),"External client failed: "+Files.readString(log).replace(TOKEN,"[REDACTED]"));
             }
-            for(String scenario:List.of("server-stateless","tools-list","dns-rebinding-protection")) {
+            Files.writeString(evidence.resolve("conformance-not-applicable.txt"),"dns-rebinding-protection: upstream explicitly targets unauthenticated localhost servers; Shale requires ACCESS authentication and exact configured Origin. Own authenticated Origin/proxy matrix executed instead.\n");
+            for(String scenario:List.of("server-stateless","tools-list")) {
                 var process=new ProcessBuilder("node","--import","../build/mcp-transport/conformance-auth.mjs",
                         "../build/mcp-transport/node_modules/@modelcontextprotocol/conformance/dist/index.js","server",
                         "--url",base+"/mcp","--scenario",scenario,"--spec-version","2026-07-28","--timeout","5000",

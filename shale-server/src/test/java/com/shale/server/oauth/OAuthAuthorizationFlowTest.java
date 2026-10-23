@@ -67,7 +67,7 @@ class OAuthAuthorizationFlowTest {
         try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,72,'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
         context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
         context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url",url(db),"shale.ai.oauth.bootstrap.username",bootstrapLogin,"shale.ai.oauth.bootstrap.password",bootstrapSecret)));
-        context.register(McpOAuthSecurityConfiguration.class,Fixtures.class);context.refresh();
+        context.register(McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class,Fixtures.class);context.refresh();
     }
     @Configuration static class Fixtures {
         @Bean ShaleAuthTokenService tokens(){return tokens;}
@@ -236,7 +236,8 @@ class OAuthAuthorizationFlowTest {
             var request=new MockHttpServletRequest("GET","/mcp");request.addHeader("Authorization","Bearer "+token);
             var response=new MockHttpServletResponse();var escaped=new java.util.concurrent.atomic.AtomicBoolean();
             context.getBean(FilterChainProxy.class).doFilter(request,response,(q,res)->escaped.set(true));
-            assertTrue(escaped.get(),"No bearer/MCP security surface may accept these credentials");
+            assertFalse(escaped.get(),"Default-OFF MCP must terminate without ordinary authentication fallback");
+            assertEquals(404,response.getStatus());
         }
     }
 
@@ -344,6 +345,10 @@ class OAuthAuthorizationFlowTest {
             var policy=controls.inspectTenantPolicy();controls.setTenantEnabled(false,policy.rowVersion());
             try {assertEquals(401,mcpSend(mcp,sdk,access,"server/discover").getStatus());}
             finally {controls.setTenantEnabled(true,controls.inspectTenantPolicy().rowVersion());}
+            var capability=new AiProductCapabilityService(()->{try{return DriverManager.getConnection(url(db),login,secret);}catch(SQLException e){throw new IllegalStateException(e);}});
+            capability.setEnabled(false,capability.inspect().rowVersion());
+            try {assertEquals(401,mcpSend(mcp,sdk,access,"server/discover").getStatus());}
+            finally {capability.setEnabled(true,capability.inspect().rowVersion());}
             try(var c=owner(db);var q=c.createStatement();var rows=q.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'),(SELECT COUNT(*) FROM dbo.AuditLog)")) {
                 assertTrue(rows.next());assertEquals(0,rows.getInt(1));assertEquals(0,rows.getInt(2));
             }
