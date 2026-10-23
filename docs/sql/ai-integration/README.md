@@ -483,3 +483,90 @@ schema/vocabulary review. IntegrationAccessAudit and Case PHI reads remain 3B.3 
 
 Evidence and exact local verification are recorded in the canonical architecture §10.21. Disposable
 synthetic SQL does not establish deployed permissions, authoritative Case RLS or independent client acceptance.
+
+## Phase 3B.3 internal access audit and disclosure candidate
+
+`phase3b3.sql` follows `phase3b2d.sql`. It is manual, additive, transactional, source/catalog receipted,
+repeat-safe and fail-fast on drift or missing existing Overview PHI columns; it seeds/enables nothing. Run only the accumulated **unapplied** migrations
+in order, followed by cumulative `verify.sql` and effective permission checks. Do not edit an old receipt or
+run an old installer over a newer catalog as a repair. Rollback is capability OFF and family revocation;
+retain all committed history and accounting. There is no purge, delete cascade, runtime installer or deployment.
+
+The new `IntegrationAccessAuditLog` stores a bigint internal key, server UUID InvocationId/CorrelationId,
+tenant/user/integration/grant/session/client references, database UTC, fixed MCP/case-read-v1, closed tool,
+shared operation, outcome, reason and READ/TERMINAL stage, returned count and bounded search page/fixed size.
+Unique `(InvocationId,Stage)` prevents duplicate stage writes. ALLOWED_READ means committed authorized server
+access, never receipt by an AI or human. Security lifecycle mutations retain the already implemented bounded
+entity-action events; this migration does not relabel them or add READ/FAILED to mutation vocabulary.
+
+`IntegrationAccessAuditResource` contains only `(tenant,event,CaseId,RETURNED|REQUESTED)`. Its only resource
+relationship is the non-cascading tenant-qualified parent FK; there is deliberately no Cases FK. The bounded
+append procedure accepts ten typed Case slots and one mutually exclusive requested ID, validates cardinality
+and checks parent/child persistence before returning its receipt. Search writes only returned IDs, including
+zero children for an empty page; Overview writes one RETURNED ID. Failed syntactically valid Overview IDs
+are REQUESTED without an existence lookup. Malformed IDs produce no child. Names, query/hash/filter, prompt,
+DTO, token/digest/JTI, email, SQL/exception, URL and arbitrary JSON columns are absent.
+
+Both tables use existing strict TenantFilter FILTER and AFTER INSERT/UPDATE BLOCK predicates. Runtime and
+bootstrap roles have explicit SELECT/INSERT/UPDATE/DELETE/ALTER/CONTROL denials. Public receives no table or
+procedure grant. The tenant modules retain caller/RLS execution and ownership chains; none executes as owner.
+Append-only triggers reject UPDATE/DELETE even for a direct setup-owner attempt; the parent FK also blocks
+parent deletion while children exist. No unrestricted runtime review or table INSERT is added.
+
+New bounded runtime EXECUTEs are:
+
+- `AiAppendCaseAccessV1`: one typed event and at most ten children in the caller's transaction. Retained
+  owner-tuple validation permits failure history after disable/revoke; it does not authorize data reads.
+- `AiGateCaseReadV1`: existing complete ACCESS lineage/policy checks, expected revisions and required scope,
+  plus invocation deadline and live durable reservation, in the caller's transaction. Held authority order
+  is global → tenant policy → integration → grant → session → user. Database UTC is sampled after all
+  possible authority/reservation lock waits. No positive cache or connection-level integration identity.
+- `AiOverviewPhiCountV1`: only the current tenant/actor/Case's exact existing Overview PHI-event count,
+  locked within the owning transaction. Before/after delta must be one. This detects a suppressing trigger
+  even if the driver reports one inserted row. It is not a PHI viewer or a provenance/linkage field.
+- `AiAccountCaseAttemptV1`: records zero-row-cost rejected verified calls when admission has not already
+  accounted the invocation; this includes invalid input and now-disabled owners. It does not refund credits.
+- `AiFinishCaseQuotaV1`: releases only concurrency, including for now-disabled owners; consumed facts remain.
+- `AiReviewCaseAccessV1`: active same-tenant admin revalidation, keyset cursor and at most 100 parents/1000
+  typed resource rows. `IntegrationAccessReview` maps only the closed typed projection, rejects overbounds,
+  and is independent of the known-unverified PHI viewer. No review UI or dump endpoint exists.
+
+`IntegrationCaseReadService` is an explicitly composed internal service, default OFF and not registered as a
+route/bean. It accepts only ACCESS-proven `VerifiedIntegrationContext`, creates immutable `IntegrationInvocation`,
+and uses connection-scoped overloads on the existing CaseServicePort → adapter → production gateway →
+CaseSummaryDao. Both ordinary and composed operations reuse `selectMinimized`; exactly one existing PHI
+append is shared. Ordinary search remains exempt and ordinary Overview retains its own transaction.
+The connection overloads are trusted application transaction seams, never credential authenticators or
+new public endpoints; no protocol adapter may use them to skip the integration service.
+
+Admission uses the existing independently committed durable reservation **before opening the read
+transaction**. This intentionally prevents read rollback from refunding rows/calls. Costs are 10/1 regardless
+of actual results. The 200/user, 500/integration, 1000/tenant trailing-day, sliding-minute and distributed
+concurrency limits remain the 3B.1 authority, with a process maximum of five active operations. Per-borrow
+initialization stamps both existing SQL keys. Bounded acquisition tasks can only borrow/stamp; timed-out
+late leases close and cannot start protected work. No data-work queue or detached Case read exists.
+
+The read transaction gates current authority, executes one existing operation, verifies/persists required
+PHI and integration audits, gates again, commits and closes before encoding. Failed reads/audits/commit/close
+withhold all protected output. After successful close, the encoder writes the closed minimized projection
+into a bounded private sink (32 KiB search/8 KiB Overview); only one completed immutable read-only buffer is
+eligible for handoff. Serialization/size/cancellation faults retain committed ALLOWED_READ and append a
+separate terminal failure. No partial structured output is exposed. A fresh short transaction rechecks live
+authority/reservation/deadline and completes concurrency accounting before commit/close and one internal
+buffer return. Revoke committed first denies; authorization first may complete. No network I/O holds locks.
+
+Failures append in a separate short transaction after read rollback/close. An uncertain commit requests
+TERMINAL; SQL selects READ only if no committed READ exists, preserving unique stage history without
+replaying or deleting anything. Failure-audit outage emits only `INTEGRATION_ACCESS_AUDIT_OUTAGE`; no raw
+exception or sensitive emergency spool. Cancellation is temporarily cleared only for bounded cleanup/audit
+and restored afterward. Explicit immutable contexts carry all authority; no servlet, ThreadLocal, AppState,
+shared mutable RuntimeSessionService, or remembered integration/grant SQL key is introduced.
+
+Verification receipts and remaining authoritative/deployed acceptance limits are in canonical roadmap
+§10.22. Synthetic Case shapes in the opt-in fixture are explicitly not the unavailable authoritative Case
+schema. No production/Azure SQL, external client acceptance, tenant/integration enablement or deployment.
+
+Protected audit review intentionally adds no Case PHI success or entity-action event: it returns only
+bounded history identifiers/outcomes, reads no Case projection and changes no administrative state.
+A separate audit-review access vocabulary, if required later, must be reviewed rather than misusing the
+current Case tools, PHI value fields or administrative instance-read enum.

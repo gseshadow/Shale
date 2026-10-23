@@ -516,12 +516,41 @@ public final class CaseSummaryDao {
 
     private MinimizedCasePage minimizedPage(int tenant, int actor, String query, boolean assigned, int page, int size) {
         try (Connection con = db.requireConnection()) {
-            verifyMinimizedActor(con, tenant, actor);
-            if (query != null && query.isBlank()) return new MinimizedCasePage(List.of(), page, size, false);
-            List<MinimizedCaseOverview> rows = selectMinimized(con, tenant, actor, query, assigned, null,
-                    Math.multiplyExact(page, size), size + 1);
-            return new MinimizedCasePage(rows.subList(0, Math.min(size, rows.size())), page, size, rows.size() > size);
+            return searchMinimizedCases(con, query, tenant, actor, page, size, assigned);
         } catch (SQLException e) { throw minimizedSqlFailure(e); }
+    }
+
+    /** Internal composition seam. Caller owns begin/commit/rollback/close and disclosure audits. */
+    public MinimizedCasePage searchMinimizedCases(Connection con, String query, int tenant, int actor,
+            int page, int size) throws SQLException {
+        validateMinimizedPage(page, size);
+        if (query == null || query.strip().length() > 100) throw new IllegalArgumentException("Invalid Case query.");
+        return searchMinimizedCases(con, query.strip().toLowerCase(java.util.Locale.ROOT), tenant, actor, page, size, false);
+    }
+
+    private MinimizedCasePage searchMinimizedCases(Connection con, String query, int tenant, int actor,
+            int page, int size, boolean assigned) throws SQLException {
+        verifyMinimizedActor(con, tenant, actor);
+        if (query != null && query.isBlank()) return new MinimizedCasePage(List.of(), page, size, false);
+        var rows = selectMinimized(con, tenant, actor, query, assigned, null, Math.multiplyExact(page, size), size + 1);
+        return new MinimizedCasePage(rows.subList(0, Math.min(size, rows.size())), page, size, rows.size() > size);
+    }
+
+    /** Same authoritative Overview and exactly one existing PHI append; no transaction ownership here. */
+    public java.util.Optional<MinimizedCaseOverview> readMinimizedCaseOverview(Connection con, long id,
+            int tenant, int actor) throws SQLException {
+        if (id <= 0 || id > Integer.MAX_VALUE) throw new IllegalArgumentException("Invalid Case ID.");
+        if (con.getAutoCommit()) throw new IllegalStateException("Overview requires an owning transaction.");
+        verifyMinimizedActor(con, tenant, actor);
+        var rows = selectMinimized(con, tenant, actor, null, false, id, 0, 1);
+        if (rows.isEmpty()) return java.util.Optional.empty();
+        try {
+            new AuditLogDao(db).appendPhiWriteAudit(con, actor, 1, id, "Case.Overview.Read", 4,
+                    "action=READ;screen=Case.Overview", null, 5);
+        } catch (RuntimeException failure) {
+            throw new CaseReadException(CaseReadException.Kind.AUDIT_UNAVAILABLE, failure);
+        }
+        return java.util.Optional.of(rows.getFirst());
     }
 
     /** The connection owns read, required existing PHI READ append, and commit before returning anything. */
@@ -530,18 +559,11 @@ public final class CaseSummaryDao {
         try (Connection con = db.requireConnection()) {
             con.setAutoCommit(false);
             try {
-                verifyMinimizedActor(con, tenant, actor);
-                var rows = selectMinimized(con, tenant, actor, null, false, id, 0, 1);
-                if (rows.isEmpty()) { con.rollback(); return java.util.Optional.empty(); }
-                try {
-                    new AuditLogDao(db).appendPhiWriteAudit(con, actor, 1, id, "Case.Overview.Read", 4,
-                            "action=READ;screen=Case.Overview", null, 5);
-                    con.commit();
-                } catch (RuntimeException | SQLException failure) {
-                    throw new CaseReadException(
-                            CaseReadException.Kind.AUDIT_UNAVAILABLE, failure);
-                }
-                return java.util.Optional.of(rows.getFirst());
+                var result = readMinimizedCaseOverview(con, id, tenant, actor);
+                if (result.isEmpty()) { con.rollback(); return result; }
+                try { con.commit(); }
+                catch (RuntimeException | SQLException failure) { throw new CaseReadException(CaseReadException.Kind.AUDIT_UNAVAILABLE, failure); }
+                return result;
             } catch (RuntimeException | SQLException failure) {
                 try { con.rollback(); } catch (SQLException rollbackFailure) { failure.addSuppressed(rollbackFailure); }
                 throw failure;

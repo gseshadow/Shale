@@ -189,6 +189,13 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 
     @Override
+    public MinimizedCasePage searchMinimizedCases(java.sql.Connection c, String q, int t, int a, int p, int size) throws java.sql.SQLException {
+        return caseGateway.searchMinimizedCases(c, q, t, a, p, size);
+    }
+    public Optional<MinimizedCaseOverview> readMinimizedCaseOverview(java.sql.Connection c, long id, int t, int a) throws java.sql.SQLException {
+        return caseGateway.readMinimizedCaseOverview(c, id, t, a);
+    }
+
     public MinimizedCasePage searchMinimizedCases(String query, int tenant, int actor, int page, int size) {
         return caseGateway.searchMinimizedCases(query, tenant, actor, page, size);
     }
@@ -981,6 +988,12 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	interface CaseGateway {
+        default MinimizedCasePage searchMinimizedCases(java.sql.Connection c, String q, int t, int a, int p, int size) throws java.sql.SQLException {
+            throw unsupportedCaseLinkGatewayOperation("connection-scoped minimized search");
+        }
+        default Optional<MinimizedCaseOverview> readMinimizedCaseOverview(java.sql.Connection c, long id, int t, int a) throws java.sql.SQLException {
+            throw unsupportedCaseLinkGatewayOperation("connection-scoped Overview");
+        }
         default MinimizedCasePage searchMinimizedCases(String q, int t, int a, int p, int s) {
             throw unsupportedCaseLinkGatewayOperation("searchMinimizedCases");
         }
@@ -1241,6 +1254,12 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 
         @Override
+        public MinimizedCasePage searchMinimizedCases(java.sql.Connection c, String q, int t, int a, int p, int size) throws java.sql.SQLException {
+            return caseSummaryDao.searchMinimizedCases(c, q, t, a, p, size);
+        }
+        public Optional<MinimizedCaseOverview> readMinimizedCaseOverview(java.sql.Connection c, long id, int t, int a) throws java.sql.SQLException {
+            return caseSummaryDao.readMinimizedCaseOverview(c, id, t, a);
+        }
         public MinimizedCasePage searchMinimizedCases(String q, int t, int a, int p, int s) {
             return caseSummaryDao.searchMinimizedCases(q, t, a, p, s);
         }

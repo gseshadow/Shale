@@ -246,3 +246,15 @@ bounded provisional references, never general Users/Case data. Fresh runtime ini
 verifies both existing keys. Explicit immutable context carries integration/grant/session identity across
 tasks; SQL connections retain no such authority. Strict tenant FILTER/BLOCK/direct denials are preserved.
 The new migration adds procedures only, with cumulative drift/source receipts. No resource route or disclosure.
+
+
+## Integration access history — Phase 3B.3 candidate
+
+`IntegrationAccessAuditLog` and `IntegrationAccessAuditResource` are strict tenant-owned append-only
+history. The manual [candidate and permission inventory](../docs/sql/ai-integration/README.md#phase-3b3-internal-access-audit-and-disclosure-candidate)
+uses existing TenantFilter FILTER/INSERT BLOCK/UPDATE BLOCK, tenant-qualified non-cascading owner/parent
+relationships, direct runtime/bootstrap table denials and bounded caller/RLS procedures. Resources never FK
+to Cases. Active same-tenant SQL admin revalidation gates the separate typed review (maximum 100 parents);
+no existing PHI viewer grants or authority are reused. Retained ownership permits failure append after
+revocation without restoring read eligibility. All live gates stamp/check both existing context keys and
+carry integration/grant identity only in immutable application objects. No production acceptance is inferred.

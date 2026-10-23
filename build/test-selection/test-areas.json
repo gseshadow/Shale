@@ -549,6 +549,8 @@
         "com.shale.data.security.ai.AiOAuthRevocationContractTest",
         "com.shale.data.security.ai.AiSecurityLocalSqlServerTest",
         "com.shale.data.security.ai.AiAccessContractTest",
+        "com.shale.data.security.ai.IntegrationAccessContractTest",
+        "com.shale.data.security.ai.IntegrationCaseReadTest",
         "com.shale.data.runtime.RuntimeSessionServiceTimingTest"
       ]
     },

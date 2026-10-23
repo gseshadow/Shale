@@ -1,8 +1,8 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2A COMPLETE (foundation/local proof); MCP inactive.
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); MCP inactive.
 
-**Last reviewed:** 2026-10-22 (authenticated RFC 7009 closeout; historical acceptance scopes retained)
+**Last reviewed:** 2026-10-23 (Phase 3B.3 internal audit/disclosure; historical acceptance scopes retained)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of
@@ -685,7 +685,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 1 shared secured operations | IN PROGRESS | Phase 1S proves the R2 minimized Case boundary (§9.3); wider operations, AI restrictions/attribution and runtime acceptance remain. No dependency on AI issuer/grants for ordinary web work. |
 | Phase 2 stable REST/OpenAPI foundation | SELECTED CASE FOUNDATION COMPLETE; broader REST IN PROGRESS | §9.4 and the owning API contract formalize the existing three minimized reads; broader operation review and live runtime/security/performance acceptance remain open. Independent of MCP/AI OAuth. |
 | Phase 3A MCP security/integration contract | COMPLETE (design only) | §10; no route, credential, schema or disclosure activated. |
-| Phase 3B first read-only MCP implementation | IN PROGRESS | §10.11 sequence; no endpoint or disclosure; remaining auth/audit/runtime/client gates. |
+| Phase 3B first read-only MCP implementation | IN PROGRESS | §10.11 sequence; internal seam complete through 3B.3, no public endpoint/disclosure; remaining transport/runtime/client gates. |
 | Phase 3B.1 integration persistence/security | COMPLETE (source/synthetic proof) | §10.13; focused/affected/critical checks pass; defaults off. |
 | Supported Spring server baseline prerequisite | COMPLETE (merged #1904; verified baseline) | §10.15; Boot 4.1.1 with focused, affected, critical and packaging proof; separate from OAuth. |
 | Phase 3B.2 credential/authentication validation | COMPLETE (source/local synthetic verification) | §10.16–10.21; credential lifecycle, authenticated revocation and internal ACCESS verification complete at this scope; deployed/runtime acceptance remains open. |
@@ -696,10 +696,10 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B.2C.2 opaque issuance + rotating refresh | COMPLETE (source/local synthetic verification) | §10.19 already records the final-source critical pass. |
 | OAuth revocation closeout | COMPLETE (source/local synthetic verification) | §10.20; authenticated RFC 7009, atomic family audit, races/replay/restart and full required local verification. |
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | COMPLETE (source/local synthetic verification) | §10.21 expiry closeout; observed SQL lock wait, post-release database UTC rejection, complete affected suite and critical reactor pass. |
-| Phase 3B.3 AI audit/shared disclosure seam | NOT STARTED | Mandatory integration access audit and final handoff gate. |
-| Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery in 3B.1. |
-| Phase 3B.5 search_cases | NOT STARTED | No Case tool implementation. |
-| Phase 3B.6 get_case_overview | NOT STARTED | No Case tool implementation. |
+| Phase 3B.3 AI audit/shared disclosure seam | COMPLETE (source/local synthetic verification) | §10.22; mandatory audit/PHI atomicity, bounded buffer and live final handoff; no transport. |
+| Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery through 3B.3. |
+| Phase 3B.5 search_cases | NOT STARTED | No MCP Case tool handler. |
+| Phase 3B.6 get_case_overview | NOT STARTED | No MCP Case tool handler. |
 | Phase 3B.7 adversarial/local acceptance | NOT STARTED | Authoritative Case artifact and remaining operational/security/client acceptance required. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
 | Phase 5 administration experience | NOT STARTED | Minimum controls first, then pilot feedback. |
@@ -712,10 +712,10 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Web V2 and eventual native phone clients | IN PROGRESS / native NOT STARTED | Merged R1–R3 and R4 reported hosted/iPhone browser flows; web acceptance incomplete; no native release. |
 | Live RLS coverage acceptance | BLOCKED | Non-dbo deployment evidence, including documented Contacts parent-predicate gap. |
 | Wider Case/field policy | BLOCKED for expansion | Pilot grant explicitly covers the accepted minimized active tenant Case set (§10.2); additional fields/children/directories and per-case grants require new decisions. Team membership is not an ACL. |
-| AI read/failure audit | CONTRACT COMPLETE; implementation NOT STARTED | §10.5 supplementary event; schema, transaction, protected review and fault acceptance remain activation gates. |
+| AI read/failure audit | COMPLETE (source/local synthetic verification); deployed acceptance OPEN | §10.22 supplementary parent/resources, same-transaction audits, protected review and fault/race checks; no production permission acceptance. |
 | Phase 1R three-FILTER migration / exact rollback | MERGED #1898; SYNTHETIC LOCAL acceptance | [Owning runbook](../testing/case-read-local-security-verification.md#phase-1r-candidate--2026-10-21): transactional/idempotent candidate, drift/atomic-failure tests, confined V1/V2 and real SQL session/controller compatibility; no production activation. |
 | Phase 1S shared minimized Case boundary | COMPLETE (source/synthetic proof) | §9.3: existing three JavaFX-free operations retained, direct service/context/audit/paging and REST/OpenAPI checks pass. No broad API, live SQL or MCP acceptance. |
-| Local Case-read SQL security execution | BLOCKED | Original export is absent from this task workspace; derived/candidate schema artifacts and hashes unavailable. Authoritative Case SQL, real audit denial and injected lost acknowledgement remain unexecuted. Synthetic auth passes do not close Case SQL. |
+| Local Case-read SQL security execution | BLOCKED (authoritative input) | Approved original export is absent; derived/candidate schema artifacts and hashes remain unavailable. Authoritative Case RLS/audit acceptance is unexecuted; §10.22's labelled synthetic Case seam/fault proof does not close this gate. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
 **Phase 3A COMPLETE (design); Phase 3B IN PROGRESS, with 3B.1 COMPLETE at source/synthetic scope (§10.13); MCP inactive.**
@@ -726,7 +726,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3+ remain NOT STARTED.
+durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4+ remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -1275,7 +1275,8 @@ Do not add READ/FAILED to `EntityActionAuditEvent` as if they were mutations; do
 `AdministrativeReadAuditEvent` instance-list types or session revocations. Reuse core/data audit ownership,
 strict tenant isolation, insert-only runtime API, sanitization, bounded admin review and transaction patterns.
 Keep the existing successful Overview PHI event exactly once; no extra PHI success row just for AI provenance.
-This is a proposed scoped schema/service enhancement for 3B.3, not supported by today's allowlists.
+This was the proposed scoped schema/service enhancement for 3B.3; its completed source/local synthetic
+implementation is recorded in §10.22. Existing mutation/administrative-read allowlists remain unchanged.
 
 Each verified invocation produces one bounded parent event with:
 
@@ -3243,3 +3244,110 @@ OAuth revocation closeout COMPLETE
 3B.4+                     NOT STARTED
 Aggregate Phase 3B        IN PROGRESS
 ```
+
+
+### 10.22 Phase 3B.3 AI audit attribution and internal shared disclosure — 2026-10-23
+
+**Status: COMPLETE (source/local synthetic verification).** Base is fetched live `codex/latest`,
+`d1e80d75da268596d71060fe74de2cd7f1075c62` (merged #1911), in isolated task worktree
+`codex/phase-3b3-audit-disclosure`. Original checkout/unrelated work is preserved.
+3B.1 and aggregate 3B.2 retain their completed source/local synthetic scopes. Aggregate Phase 3B remains
+IN PROGRESS; 3B.4 and 3B.5+ remain NOT STARTED. No MCP implementation/activation is claimed.
+
+The [SQL/operator record](../sql/ai-integration/README.md#phase-3b3-internal-access-audit-and-disclosure-candidate)
+owns the additive migration, permissions, immutable parent/resources, stage uniqueness, typed admin review,
+PHI-count verification, failure-attempt accounting and live gate contract. Existing audit vocabulary is
+preserved. The [cumulative future deployment sequence](../azure-app-service-deployment.md#future-ai-oauth-deployment-sequence--through-phase-3b2d)
+now includes 3B.3 after every earlier unapplied AI migration. It authorizes no deployment or enablement.
+
+One internal IntegrationCaseReadService creates an immutable invocation only from ACCESS-proven context.
+It uses the existing shared CaseServicePort/adapter/DaoCaseGateway/CaseSummaryDao transaction overloads,
+not duplicate Case queries or an outer wrapper around ordinary independently committed Overview. Ordinary
+search stays exempt; ordinary Overview still appends the existing PHI event once. Integration Overview
+verifies that exactly one such row persisted, with the integration event/returned child and final gate on
+that same connection/transaction. No exact PHI-row linkage is claimed or injected into StringValue.
+
+Quota admission is an independently durable short transaction before the read transaction so rollback,
+lost ACK, cancellation and audit/encoder failure never refund consumed credit. Existing 10/1 worst-case
+reservations and shared user/integration/tenant budgets apply across grants/tokens/repeats. Rejected verified
+attempts also count calls. Lease cleanup releases concurrency only, including after owner disablement.
+
+Read success is committed/closed before bounded encoding. Only a completed immutable buffer can pass the
+fresh short final handoff gate; SQL uses UTC after authority and quota lock waits, checks current revisions,
+scopes, expiry and lineage, then commits/closes before the one internal return. Revocation first denies;
+handoff authorization first may complete. ALLOWED_READ is server access, not confirmed delivery. Failure
+events use a separate short transaction with retained owner tuple. Commit uncertainty preserves any existing
+READ and chooses a distinct terminal stage; it never deletes, overwrites or automatically retries the read.
+Failure-event outage emits only a fixed operational signal. No transport consumes this buffer in this phase.
+
+Pre-edit inventory reviewed all shared minimized/service/JDBC tests, current ACCESS/context and quota
+contracts, complete synthetic SQL fixtures, audit DAO and migration/viewer infrastructure, runtime pool/setup,
+ordinary REST/OpenAPI and WEB/DESKTOP regressions and selector ownership. Changed connection signatures have
+explicit production delegation and default-unsupported tests. Source, maintained application/servlet tests,
+restricted synthetic SQL, injected driver/encoder faults, races and replacement-JVM evidence are classified
+separately below. The approved authoritative Case artifact remains unavailable and BLOCKED; synthetic Case
+shapes do not close deployed/authoritative RLS acceptance.
+
+[Verification receipts, exact commands, partition inventory and source hashes](../testing/phase3b3-verification.json)
+record final execution. Groups overlap and must not be added as unique test totals.
+
+| Check | Final executed result / evidence class |
+| --- | --- |
+| Ordinary/focused shared/JDBC, REST/OpenAPI and WEB/DESKTOP regressions | **185 PASS**, no failures/errors/skips; maintained application and synthetic JDBC, no native/deployed acceptance. |
+| Selector affected application + maintained OAuth HTTP + all selected SQL | **358 PASS** in disjoint partitions: 186 application, 12 maintained servlet/SQL flows, 160 restricted SQL invocations across all 98 annotated methods. No omission/failure/error/skip. |
+| Finished-source disclosure SQL | **22 PASS**, two bounded groups (8/14); actual restricted synthetic SQL, explicit injected faults and real lock waits. |
+| Final migration/source/permission closeout | **3 PASS**; prerequisite absence rolls back, repeat/verifier/drift checks, actual runtime INSERT error 229, verifier RLS INSERT error 33504. |
+| Final critical reactor | **188 PASS**, all seven modules BUILD SUCCESS, no failures/errors/skips. |
+| Selector Python | **27 PASS**; includes explicit new audit/disclosure smoke selection. |
+| Documentation/diff | Relative links/anchors, fences, JSON and migration/verifier source receipt pass; complete changed-file/test review and git diff checks pass. |
+
+Maven is JDK21/Maven3.9.11 with bounded 180–240-second commands and the configured proxy/CA trust.
+The initial missing dependency/provider and new SQL batch-binding failures were diagnosed and corrected
+with focused bounded checks; they are not passing receipts. A suppressing PHI trigger exposed a real
+row-count trust gap; the integration-only before/after count now verifies actual persistence without
+adding another PHI event or changing ordinary callers. Final review also places handoff quota release
+before SQL's final UTC sample and checks a conservative DB-time receipt across commit/close. Source
+follow-ups rechecked all 22 new SQL scenarios, the final migration assertions and critical reactor.
+No full reactor was used to debug focused failures; historical all-tests escalation was informational
+and `-Pall-tests` was not run.
+
+SQL is task-owned loopback SQL Server **16.0.4305.5**, pinned to the previously reviewed 2022 Developer
+image digest in the receipt. Actual distinct restricted identities prove tenant FILTER/BLOCK and procedure
+permissions. The final handoff expiry test positively observes a LCK wait in the unique fixture database,
+releases its explicit table lock after the injected idle expiry, and requires a DENIED terminal event;
+a lock timeout/unrelated exception is not counted as expiry proof. Lost ACK/close faults are driver
+injections around real commit/close. Owner-only timestamp/state changes are labelled synthetic.
+Actual replacement JVMs in the inherited quota/credential/ACCESS suite observe committed shared state;
+no production process/server restart is claimed. The task-owned SQL container and password file were removed.
+
+Persisted privacy checks inspect every parent/resource column/value, including requests whose search text
+contains actual synthetic access/refresh tokens and prompt/JWT/email/exception/SQL/URL/JSON sentinels.
+Exactly the returned ten Cases are audited; the eleventh probe is absent. Missing/foreign/deleted Overview
+requests are indistinguishable and only REQUESTED IDs are recorded. Single-SPID A1 → A2 → B1 → A1 and
+concurrent distinct owners retain correct results/resources and clean auto-commit/transaction/context state.
+Cancellation and failures withhold all protected output; failure-audit outage emits only the fixed signal.
+
+Authoritative Case SQL remains BLOCKED by unavailable approved offline input. No deployed permission/RLS,
+production/Azure, independent MCP client, representative production load/retention or penetration-test
+acceptance is inferred. Those are separate activation gates, not missing source/synthetic 3B.3 passes.
+
+```text
+3B.1                 COMPLETE
+3B.2                 COMPLETE
+3B.3                 COMPLETE (source/local synthetic verification)
+3B.4                 NOT STARTED
+3B.5+                NOT STARTED
+Aggregate Phase 3B   IN PROGRESS
+MCP transport        NOT IMPLEMENTED
+```
+
+**Next recommendation after this increment passes:** Phase 3B.4 only — evaluate the maintained MCP Java SDK
+against the actual 2026-07-28 revision and current Boot baseline; implement default-off transport/discovery,
+strict metadata/Origin/TLS/parser/deadline/envelope limits and scope-filtered catalog, with no enabled Case
+data handler. Exercise two independent conforming synthetic clients. Never expose ordinary Case routes to
+AI credentials or bypass the audited buffer seam. 3B.5/3B.6 own the later handlers; real-data enablement
+requires authoritative Case SQL, deployed permissions/RLS and explicit later operational acceptance.
+
+Explicitly: no `/mcp`, JSON-RPC/MCP transport, public AI data endpoint or public resource accepting AI
+bearers; no real tenant/integration enabled; WEB/DESKTOP remains authoritative; AI defaults OFF; no
+production/Azure SQL, deployment, installer/version publication or production acceptance.

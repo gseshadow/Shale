@@ -47,6 +47,8 @@ class CaseServiceAdapterTest {
             assertThrows(UnsupportedOperationException.class, () -> subject.listCaseUpdateAuthors(1,41,31));
             assertThrows(UnsupportedOperationException.class, () -> subject.updateCaseNote(new CaseServicePort.UpdateCaseNoteCommand(1,1,41,31,"draft",new byte[8])));
             assertThrows(UnsupportedOperationException.class, () -> subject.searchMinimizedCases("x",41,31,0,25));
+            assertThrows(UnsupportedOperationException.class, () -> subject.searchMinimizedCases(null,"x",41,31,0,10));
+            assertThrows(UnsupportedOperationException.class, () -> subject.readMinimizedCaseOverview(null,1,41,31));
             assertThrows(UnsupportedOperationException.class, () -> subject.listMinimizedAssignedCases(41,31,0,25));
             assertThrows(UnsupportedOperationException.class, () -> subject.readMinimizedCaseOverview(1,41,31));
         }
