@@ -198,4 +198,15 @@ class McpTransportTest {
             assertEquals(1,appender.list.size());assertFalse(appender.list.getFirst().getFormattedMessage().contains("synthetic-sensitive"));
         } finally {logger.detachAppender(appender);appender.stop();logger.setLevel(previous);logger.setAdditive(additive);}
     }
+    @Test void malformedMetadataAndInvalidUtf8AreBoundedProtocolFailures()throws Exception {
+        var mapper=McpTransportConfiguration.mapper().getJsonMapper();
+        for(String value:List.of("null","[]","\"invalid\"")) {
+            var body=mapper.readTree(body("server/discover",McpGate.PROTOCOL));
+            ((tools.jackson.databind.node.ObjectNode)body.path("params")).set("_meta",mapper.readTree(value));
+            var request=request("server/discover");request.setContent(mapper.writeValueAsBytes(body));
+            assertEquals(400,send(request).getStatus(),value);
+        }
+        var request=request("server/discover");request.setContent(new byte[]{(byte)0xff});
+        assertEquals(400,send(request).getStatus());
+    }
 }
