@@ -1,0 +1,169 @@
+{
+  "scope": "Phase 3B.2D source/local synthetic verification only",
+  "date": "2026-10-23",
+  "verified_source_commit": "c8272a8366246e380d49acdf186705ffc3bc0916",
+  "production_or_fixture_changes": false,
+  "unchanged_source_sha256": {
+    "docs/sql/ai-integration/phase3b2d.sql": "9eb9c2a16688a3c5627960b58f226c387cfa97137776082be874ae3468f81a07",
+    "shale-data/src/main/java/com/shale/data/security/ai/AiAccessTokenValidator.java": "55a854f9ee996092a28179f62d119bec0d87e69c58e05d150ac751828d67d039",
+    "shale-data/src/test/java/com/shale/data/security/ai/AiSecurityLocalSqlServerTest.java": "a2a5e5ffd77f82bf769a29fa24c523b99465f4db3369a5f9bd0e0a2dec6a8731"
+  },
+  "environment": {
+    "jdk": "Temurin 21.0.13+9",
+    "maven": "3.9.9",
+    "java_trust_store": "system /etc/ssl/certs/java/cacerts",
+    "sql_server": "2022 Developer 16.0.4305.5",
+    "sql_endpoint": "task-owned disposable 127.0.0.1:14338",
+    "required_opt_ins": [
+      "SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI",
+      "SHALE_AI_SQL_PORT=14338",
+      "SHALE_AI_SQL_PASSWORD supplied privately; no value in commands or evidence"
+    ]
+  },
+  "focused": {
+    "command": "mvn -pl shale-data -am -Dtest=AiAccessContractTest,AiSecurityLocalSqlServerTest#accessExpiryWhileWaitingForFinalGateUsesDatabaseUtc -Dsurefire.failIfNoSpecifiedTests=false test",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "observed_runs": 2,
+    "reason_for_evidence_retry": "First passing run had no usable external DMV records. One evidence-only retry captured the SQL lock wait via Extended Events; no fixture change.",
+    "sql_observation": {
+      "mechanism": "SQL Server Extended Events ring_buffer; truncated=0, droppedCount=0",
+      "events": [
+        "sqlos.wait_info",
+        "sqlserver.sql_statement_completed",
+        "sqlserver.sp_statement_completed",
+        "sqlserver.error_reported"
+      ],
+      "proof": {
+        "validatorSpid": "78",
+        "blockerSpid": "77",
+        "lock": "dbo.AiDelegatedSession WITH(TABLOCKX,HOLDLOCK)",
+        "waitType": "LCK_M_IS",
+        "waitMilliseconds": 1990,
+        "waitStartInferred": "2026-10-23T14:14:48.482000+00:00",
+        "releaseUtc": "2026-10-23T14:14:50.472Z",
+        "waitEndUtc": "2026-10-23T14:14:50.472Z",
+        "sampleUtc": "2026-10-23T14:14:50.473Z",
+        "errorUtc": "2026-10-23T14:14:50.473Z",
+        "errorNumber": "58901",
+        "timeoutErrors": 0
+      },
+      "idle_deadline_injection": "IdleExpiresAt=DATEADD(second,1,SYSUTCDATETIME()) before taking TABLOCKX and submitting validator",
+      "idle_deadline_utc_bounds_inferred": [
+        "2026-10-23T14:14:49.427Z",
+        "2026-10-23T14:14:49.482Z"
+      ],
+      "bounds_basis": "Initial successful validation samples UTC at 14:14:48.427Z; the deadline update follows it and precedes inferred lock-wait start at 14:14:48.482Z. The one-second deadline is therefore strictly inside the observed wait.",
+      "result": "Same validator SPID samples database UTC after release and rejects with 58901; no context returned and no lock-timeout error."
+    }
+  },
+  "affected": {
+    "selector_command": "python3 build/test-selection/select_tests.py --base c8272a8366246e380d49acdf186705ffc3bc0916^1 --head c8272a8366246e380d49acdf186705ffc3bc0916 --format json",
+    "area": "security-data",
+    "tests": 213,
+    "classes": 20,
+    "sql_tests": 138,
+    "sql_ordinary_methods": 79,
+    "sql_parameterized_methods": 7,
+    "sql_parameterized_cases": 59,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "expiry_included": true,
+    "bounded_retry": "Combined command exceeded the 240-second outer runner budget with no reported test failure. JVMs stopped and exact generated database/logins cleaned. One retry partitioned the full selected coverage without exclusions.",
+    "partitions": [
+      {
+        "partition": 0,
+        "tests": 75,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "mvn -pl shale-core,shale-data,shale-server -am -Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest -Dsurefire.failIfNoSpecifiedTests=false test"
+      },
+      {
+        "partition": 1,
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "mvn -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#migrationDefaultsOffRepeatsAndRejectsCatalogDrift+realRuntimeHasNoBypassOrDirectControlTableAuthority+tenantPolicyUsesCurrentAdminContextAndRowVersion+registrationCeilingAndForeignTenantAreEnforced+selfConsentIsOneUseBoundToActorAndCeiling+consentRacingRevokeAndScopeReductionCannotResurrectAuthority+globalTenantIntegrationAndUserRevocationAreLiveAcrossServiceInstances+typedContextRejectsSpoofedTenantUserSessionAndMissingGrant+keyRotationIsBoundedConcurrentAndRevocationInvalidatesSessions+expiredGrantFailsClosedAndDigestResolverRestoresItsCaller+rlsFiltersAndBlocksForeignRowsWithoutPrivilegedRuntime+auditFailureRollsBackMutationAndConsentConsumption+everyNewTenantTableFiltersAndBlocksAnOtherwiseValidForeignInsert+concurrentReservationsHaveOneWinnerAndReleaseNeverRefundsBudget+durableDailyRowAndSlidingMinuteBudgetsSurviveNewServiceInstances+concurrentScopeChangesAndRotationsRejectStaleVersions+dailyBudgetsApplyAcrossUsersIntegrationsAndNewProcesses+distributedConcurrencyCountsAllThreeOwners+slidingMinuteLimitsApplyToIntegrationAndTenant+actualReplacementJvmSeesCommittedAccounting' -Dsurefire.failIfNoSpecifiedTests=false test"
+      },
+      {
+        "partition": 2,
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "mvn -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#sameNonceAndSameInvocationRacesCannotDoubleSpend+bootstrapDefinitionAndCallerRestorationAreExactEvenOnFailure+migrationFailureRollsBackPartialDdlAndAmbiguousAuditAllowlist+expiredKeySessionAndConsentIntentCannotAcquireLiveContext+sessionFamilyRevocationIsSelfBoundPermanentAndAudited+oauthFreshClientLoaderAndSelfConsentBindEveryOwnerAndExactScopes+oauthCodeBindingRejectsChangedClientRedirectIssuerResourceAndVerifier+oauthCodeConsumeRaceHasExactlyOneWinnerAndReplacementJvmRejectsReplay+oauthCommittedRegistrationUserTenantAndGlobalDisablePreventCompletion+oauthGrantRevocationAndApprovalRaceNeverResurrectsRevokedAuthority+oauthScopeWideningDenialAndInjectedExpiryFailClosed+oauthAuditFailureRollsBackCodeGrantAndIntentConsumptionTogether+oauthStorageIsStrictTenantOwnedAndRuntimeCannotReadOrMutateItDirectly+oauthConfidentialPinnedKeyAndGrantRevocationPreventCodeUse+oauthNativeLoopbackPortIsConfinedAndExactIssuedRedirectCannotChange+exchangeMigrationRepeatsRejectsDriftAndRestrictsResolverAndReplayPermissions+exchangeReplayTableUsesActualNonBypassTenantFilterAndInsertBlock+exchangePublicExactBindingsFailureDoesNotConsumeAndRaceHasOneWinner+exchangeAssertionReplayRaceAcrossCodesHasOneWinnerAndFailedPkceDoesNotBurnJti+exchangeAuditFailureRollsBackBothReplayAndConsume' -Dsurefire.failIfNoSpecifiedTests=false test"
+      },
+      {
+        "partition": 3,
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "mvn -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#exchangeCommittedRevocationAndEveryAuthorityDisableDenyWithoutConsumption+exchangeCommittedKeyRevokePreventsOldKeyAndReplacementKeySubstitution+credentialMigrationRepeatAndCatalogDriftFailClosed+credentialInitialRaceOneFamilyAndHashOnlyFiveMinuteLifetime+credentialRotationResponseLossRetryRevokesAllDescendantsPermanently+credentialConcurrentRefreshHasOneWinnerAndLoserRevokesFamily+credentialReuseRaceWithDescendantActivityLeavesNoActiveCredentials+credentialWrongClientAndAccessTokenCannotRefreshOrResolve+credentialInitialAndRotationAuditFailureRollBackAllState+credentialRestartObservesAccessRefreshAndConsumedHistory+credentialConfidentialRefreshRequiresSameKeyFreshSharedJtiAndLiveKey+credentialCommittedRevokeBeforeRotationPreventsNewRows+credentialSecurityResetWebRevocationAuditsFamilyAndCannotResurrect+credentialReuseAuditFailureRollsBackRevocationAndRetriesFailClosed+credentialRevokeHoldingAuthorityLockPreventsConcurrentRefreshCommit+credentialEightHourIdleAndConsentAbsoluteMaximumNeverSlide+credentialSameValidatedTransactionCannotIssueASecondFamily+credentialGlobalDisableCannotRestoreInternalSessionOrQuotaAuthority+revocationMigrationIsRepeatSafeAndDetectsDrift+revocationUnknownMalformedForeignAndWrongTenantHaveNoStateOrAuditEffects' -Dsurefire.failIfNoSpecifiedTests=false test"
+      },
+      {
+        "partition": 4,
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "mvn -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#revocationInactiveSubjectsRemainNonOracleAndPermanent+revocationAuditFailureRollsBackFamilyAndSharedReplayReservation+revocationUnknownConfidentialRequestConsumesSharedJtiAndCannotReplayAcrossRefresh+revocationRaceWithRefreshAndAccessDescendantActivityAlwaysEndsRevoked+revocationCommittedWhileRefreshAwaitsFinalizationPreventsNewCredentials+revocationRepeatedConcurrentRequestsAreIdempotentAndAuditOnce+revocationExpiredAccessAndRefreshHistoryStillRevokeFamily+revocationModulesRetainSeparateRestrictedSqlIdentities+accessMigrationRepeatsAndCumulativeVerifierDetectsDrift+accessOnlyFullBoundContextAndSafeFailures+accessConfidentialKeyBoundAndRevocationIsLive+accessRecheckNarrowsAndNeverExpandsSnapshotScopes+accessCommittedRevokeBetweenBootstrapAndGatePreventsContext+accessSingleSpidPoolReuseAndConcurrentAsyncCancellation+accessScopeReductionBetweenBootstrapAndGateDeniesAndDoesNotResurrect+accessExpiryWhileWaitingForFinalGateUsesDatabaseUtc+accessSetupMismatchAndStampFailureWithholdContextThenCleanNextBorrow+accessDistinctOwnersInterleaveThroughOnePhysicalSqlConnection+accessReplacementJvmObservesRevocationAndScopeReduction' -Dsurefire.failIfNoSpecifiedTests=false test"
+      },
+      {
+        "partition": 5,
+        "tests": 24,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "mvn -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#exchangeCommittedBindingExpiryOrRevocationDenies+credentialCommittedRevocationDeniesAndReenableCannotRestore+credentialDeadlineClippingAndExpiredAuthorityFailClosed' -Dsurefire.failIfNoSpecifiedTests=false test"
+      },
+      {
+        "partition": 6,
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "mvn -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#credentialInitialLiveAuthorityCannotCreateAnyFamily+revocationEitherCredentialRevokesAllDescendantsAndPreservesFirstHistory+accessOwnerBindingMismatchFailsClosed' -Dsurefire.failIfNoSpecifiedTests=false test"
+      },
+      {
+        "partition": 7,
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "mvn -pl shale-data -am '-Dtest=AiSecurityLocalSqlServerTest#accessCommittedAuthorityChangesPreventNewAndRecheckedContexts' -Dsurefire.failIfNoSpecifiedTests=false test"
+      }
+    ]
+  },
+  "critical": {
+    "tests": 161,
+    "classes": 43,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "command": "mvn test",
+    "reactor_runs": 1
+  },
+  "selector_python": {
+    "command": "python3 -m unittest discover -s build/test-selection -p test_select_tests.py",
+    "tests": 27,
+    "failures": 0,
+    "errors": 0
+  },
+  "limitations": [
+    "No production/Azure SQL acceptance",
+    "No deployed permission/RLS acceptance",
+    "No real-client acceptance",
+    "No Phase 3B.3 work",
+    "No MCP",
+    "No Case disclosure",
+    "No data resource accepts AI bearer tokens",
+    "No deployment",
+    "No tenant enablement or installer/version changes"
+  ]
+}

@@ -688,14 +688,14 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B first read-only MCP implementation | IN PROGRESS | §10.11 sequence; no endpoint or disclosure; remaining auth/audit/runtime/client gates. |
 | Phase 3B.1 integration persistence/security | COMPLETE (source/synthetic proof) | §10.13; focused/affected/critical checks pass; defaults off. |
 | Supported Spring server baseline prerequisite | COMPLETE (merged #1904; verified baseline) | §10.15; Boot 4.1.1 with focused, affected, critical and packaging proof; separate from OAuth. |
-| Phase 3B.2 credential/authentication validation | IN PROGRESS | §10.16–10.20; 3B.2C is complete; authenticated revocation closeout precedes 3B.2D bearer validation. |
+| Phase 3B.2 credential/authentication validation | COMPLETE (source/local synthetic verification) | §10.16–10.21; credential lifecycle, authenticated revocation and internal ACCESS verification complete at this scope; deployed/runtime acceptance remains open. |
 | Phase 3B.2A OAuth dependency/configuration/protocol foundation | COMPLETE (foundation/source/local verification) | §10.16; maintained isolated composition, canonical identities, bounded client adapter, redirect/S256 policy and truthful metadata; no usable AI credential. |
 | Phase 3B.2B authorization code + S256 PKCE + consent transaction | COMPLETE (source/local synthetic verification) | §10.17; durable self-only consent, 60-second hash-only codes, S256/state/issuer binding and atomic replay/race/restart proof. No usable access/refresh issuance. |
 | Phase 3B.2C opaque access + rotating refresh lifecycle | COMPLETE (source/local synthetic verification) | §10.19 final-source verification; revocation closeout is recorded separately in §10.20. |
 | Phase 3B.2C.1 authorization-code exchange validation | COMPLETE (source/local synthetic verification) | §10.18; pinned client proof, durable replay, atomic consume/live authority; no usable credential. |
 | Phase 3B.2C.2 opaque issuance + rotating refresh | COMPLETE (source/local synthetic verification) | §10.19 already records the final-source critical pass. |
 | OAuth revocation closeout | COMPLETE (source/local synthetic verification) | §10.20; authenticated RFC 7009, atomic family audit, races/replay/restart and full required local verification. |
-| Phase 3B.2D live credential validation + VerifiedIntegrationContext | IN PROGRESS / UNVERIFIED | §10.21; internal ACCESS implementation, pending expiry lock-wait proof after the bounded retry limit. |
+| Phase 3B.2D live credential validation + VerifiedIntegrationContext | COMPLETE (source/local synthetic verification) | §10.21 expiry closeout; observed SQL lock wait, post-release database UTC rejection, complete affected suite and critical reactor pass. |
 | Phase 3B.3 AI audit/shared disclosure seam | NOT STARTED | Mandatory integration access audit and final handoff gate. |
 | Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery in 3B.1. |
 | Phase 3B.5 search_cases | NOT STARTED | No Case tool implementation. |
@@ -726,7 +726,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is IN PROGRESS / UNVERIFIED (§10.21); 3B.3+ remain NOT STARTED.
+durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3+ remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -1707,7 +1707,7 @@ Completion of an increment is not permission to enable the next data surface.
 | **3B.2C opaque access + rotating refresh lifecycle — COMPLETE** | 3B.2B; hash-only storage, conditional rotation, consumed-refresh reuse revokes family, five-minute access and absolute/idle clipping, pinned assertions/shared replay. | Cross-replica consume/rotation/replay and response-loss faults, expiry/revoke/key/reset races; no MCP endpoint. | Deny issuance/refresh and revoke families; no JWT fallback. |
 | **3B.2C.1 authorization-code exchange validation — COMPLETE (source/local synthetic verification)** | §10.18; confined code owner, public S256, pinned RS256 assertions, shared replay, atomic consume/live authority; internal result only. | Exact bindings, client proof, revocation/expiry, real SQL races/restart/audit faults, maintained HTTP and WEB/DESKTOP regressions. | Disable validation switch; retain consume/replay/revocation/audit state. |
 | **3B.2C.2 opaque credential issuance and rotating refresh — COMPLETE** | 3B.2C.1; atomic issuance at the validated boundary, existing session/credential structures, expiry clipping and reuse-family revoke. | Issuance/rotation/response-loss/reuse/race/restart and security-reset proof before usable metadata. | Disable issuance/refresh, revoke families, retain history. |
-| **3B.2D live credential validation + VerifiedIntegrationContext — IN PROGRESS / UNVERIFIED** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
+| **3B.2D live credential validation + VerifiedIntegrationContext — COMPLETE (source/local synthetic verification)** | 3B.2C; exact issuer/resource/client/owner/scope binding through confined bootstrap and fresh runtime live gates. | Invalid/revoked/expired credentials, wrong owner/audience, pooled context isolation and REST credential rejection; no data route. | Disable credential resolution; retain rows and default-off capability. |
 | **3B.3 AI audit attribution and shared disclosure seam** | 3B.1–2. Implement narrow access parent/children/security events, protected bounded review, immutable context-aware existing worker extensions and final handoff gate. Keep original REST exemption/Overview event. | Exact actor/integration/tool/resource/correlation; empty search, unavailable/probe denial, one PHI row; real denied INSERT, zero-row append, precommit failure/lost ACK, close/encoding/final-gate failure, audit outage, privacy sentinel tests and admin/cross-tenant review. Complete when both shared reads can withhold results under every fault without a protocol adapter. | Off flag stops all integration calls; retain committed audit. Old workers remain ordinary-web only; no partial “audit later” fallback. |
 | **3B.4 MCP transport/discovery** | 3B.2–3; SDK proves 2026-07-28 compliance. Add disabled-by-default Streamable HTTP/JSON transport, fixed metadata/Origin/TLS/filter checks, strict parsing/deadlines and distributed quota admission, explicit catalog mapping (no data handlers enabled yet). | Unauth/unregistered/revoked discovery, scope-filtered catalog, metadata header/body mismatch, duplicate keys/batches, unsupported methods/versions, no GET/session assumptions, Origin/proxy/config errors, body/byte/deadline limits. Complete with no Case response and two independent conforming clients against synthetic transport. | Unmount MCP route/metadata as appropriate; no second service or REST changes. Never substitute legacy insecure transport. |
 | **3B.5 search_cases** | 3B.1–4; exact expanded §10.9 schema and shared search audit path. Enable handler only in isolated test configuration. | Production port delegation once, tenant/user/context/scope direct bypass denial, literal search/order/probe, exact schema/UTF-16/Unicode bounds, page9 hasMore, empty search audit, full-envelope bytes, repeated/varied query row budgets and simultaneous reservations across replicas. Complete with synthetic data only, fail-closed audit/final gate and no unbounded pagination. | Remove search from dispatch/catalog or product off; retain histories/reservations. Never expose unaudited ordinary summary method as fallback. |
@@ -3026,7 +3026,7 @@ authoritative; AI defaults remain OFF. No production/Azure SQL, deployment or in
 
 ### 10.21 Phase 3B.2D internal opaque ACCESS validation — 2026-10-22
 
-**Status: IN PROGRESS / UNVERIFIED.** The expiry lock-wait proof remains blocked after its one permitted retry. Base: merged #1909, `967d72638fd6f85c1e7d680d642db659cdaf4740`.
+**Status: COMPLETE (source/local synthetic verification), expiry closeout 2026-10-23.** The corrected merged fixture, complete affected suite and critical reactor pass. The original implementation record below preserves the pre-closeout limits; the expiry evidence and final status are recorded at the end of this section. Implementation base: merged #1909, `967d72638fd6f85c1e7d680d642db659cdaf4740`; verified merged source: #1910, `c8272a8366246e380d49acdf186705ffc3bc0916`.
 The separate `codex/phase-3b2d` worktree restores the exact live Git commit and tree through the GitHub
 connector after the configured shell proxy refused Git fetch. Every restored blob and the complete tree
 were checked by Git SHA; the signed commit reconstructs exactly. Original checkout/unrelated work is preserved.
@@ -3082,14 +3082,14 @@ OAuth filters/HTTP; ordinary WEB/DESKTOP adapters and selector ownership. Existi
 and historical resolver expectations are retained. New static, restricted SQL, pool/async, race and
 replacement-JVM tests exercise the production validator through internal seams only.
 
-Independent verification results are recorded below; required expiry-race acceptance remains unresolved.
+Pre-closeout independent verification results are preserved below; the 2026-10-23 closeout supersedes the expiry-race blocker at source/local synthetic scope.
 Maven commands use a 240-second outer budget, JDK21 and local synthetic loopback SQL on port 14338.
 No failed/unexecuted/skipped check counts as passing. Evidence is source/static, compiled unit/servlet,
 actual distinct restricted synthetic SQL identities, real shared transactions/locks and replacement JVMs.
 Owner-only timestamp/state injection is labelled synthetic. It does not establish production/Azure,
 authoritative Case RLS, independent client acceptance, fleet/deployment or penetration-test acceptance.
 
-**Exact 3B.3 recommendation:** first finish 3B.2D by proving the corrected expiry lock-wait fixture and rerunning its affected check under a newly authorized verification budget. Do not start disclosure work while that acceptance gap remains. Then implement the narrow IntegrationAccessAudit schema/service and extend the
+**Deferred 3B.3 recommendation (NOT STARTED):** The expiry closeout below completes only 3B.2D at source/local synthetic scope. A separately scoped future task would implement the narrow IntegrationAccessAudit schema/service and extend the
 existing shared minimized query transaction owner for verified integration context, required audit/PHI
 atomicity, quota and repeated live authority checks. Compose and prove the final short buffered handoff
 boundary with cancellation/deadline/audit/commit/close/serialization failures and committed-revoke races
@@ -3100,7 +3100,9 @@ Explicitly: no MCP route; no Case disclosure; no Shale data resource accepts AI 
 WEB/DESKTOP remains authoritative; AI defaults OFF; no production/Azure SQL; no deployment;
 no tenant enablement; no installer/version publication. Aggregate Phase 3B remains IN PROGRESS.
 
-#### Current blocker and bounded retry record
+#### Historical blocker and bounded retry record before expiry closeout
+
+The following records the prior task budget and evidence, superseded by the 2026-10-23 closeout below.
 
 The initial authority-state fixture omitted the required grant RevokedByUserId in direct synthetic
 revocation; its one concrete corrective retry passed. The expiry-during-gate test unexpectedly returned a context after the fixture attempted to cross expiry
@@ -3112,7 +3114,7 @@ actionable, but that correction is **unexecuted**. Independently selected tests 
 method; therefore the complete affected suite and Phase 3B.2D acceptance remain unverified even if all
 other checks pass. No production defect or successful fix is inferred from the two fixture attempts.
 
-#### Final executed independent verification
+#### Pre-closeout executed independent verification
 
 | Check | Executed result |
 | --- | --- |
@@ -3175,13 +3177,68 @@ git diff --check origin/codex/latest HEAD
 
 The selector's historical all-tests escalation remains informational; no all-tests profile was run.
 
+#### Expiry-race verification closeout — 2026-10-23
+
+The follow-up branch starts from fetched `origin/codex/latest` at merged #1910,
+`c8272a8366246e380d49acdf186705ffc3bc0916`. Original checkout/unrelated work is preserved.
+The merged fixture was executed unchanged first, using its exact focused command. No production,
+fixture, procedure, lock-timeout, permission, installer or version change was necessary. This closeout
+changes only documentation. [Verification evidence and exact accepted commands](../testing/phase3b2d-expiry-verification.json)
+record the unchanged source SHA-256 receipts, all selected partitions and zero-skip results.
+
+The owner injects `IdleExpiresAt=DATEADD(second,1,SYSUTCDATETIME())`, then retains an explicit
+`TABLOCKX,HOLDLOCK` transaction on `dbo.AiDelegatedSession` before submitting `recheck`.
+The transaction assertion and two-second database `WAITFOR` remain unchanged. The unfinished-future
+assertion alone is not the independent blocking evidence: SQL Server Extended Events positively
+observed the conflicting SQL wait, its completion, the resumed UTC sample and authentication rejection.
+
+| Database UTC / observation | Evidence |
+| --- | --- |
+| `14:14:48.427Z` | Initial successful validation sampled UTC on SPID 74; the one-second idle-deadline injection follows it. |
+| `14:14:48.482Z` (inferred wait start) | Validator SPID 78 begins a real `LCK_M_IS` wait; duration is **1,990 ms**. The injected deadline lies approximately between `14:14:49.427Z` and `14:14:49.482Z`, inferred from fixture order and these observed times. |
+| `14:14:50.472Z` | Owner SPID 77 completes `COMMIT TRANSACTION`; SPID 78's lock wait ends. Release crosses the deadline while remaining inside the procedure's unchanged **3,000 ms** lock timeout. |
+| `14:14:50.473Z` | The same SPID 78 completes `DECLARE @now datetime2(7)=SYSUTCDATETIME()` and raises **58901**; the awaited validator fails and returns no context. |
+
+The trace ring buffer is untruncated with zero dropped events and no **1222** lock-timeout error.
+The only authority mutation between successful validation and recheck is the labelled synthetic idle
+expiry injection. The actual wait and same-SPID post-release sample/rejection establish the required
+property; a scheduling delay, timeout or unrelated SQL exception is not counted as proof. SQL is the
+task-owned loopback SQL Server 2022 Developer `16.0.4305.5` on port 14338, with generated credentials
+and actual distinct restricted synthetic identities. No Case schema or data is installed.
+
+| Closeout check | Result |
+| --- | --- |
+| Exact merged focused command | **5 PASS**, zero failures/errors/skips; one evidence-only repeat also passes after the first external DMV observer produced no usable records. Extended Events supplies the blocking proof above. |
+| Complete selector-required affected suite | **213 PASS / 20 classes**, including **all 138 SQL invocations**: 79 ordinary methods and 59 cases across seven parameterized methods. Expiry executes within acceptance. Zero failures/errors/skips; no required test excluded. |
+| One critical reactor, `mvn test` | **161 PASS / 43 classes**, all seven modules BUILD SUCCESS; zero failures/errors/skips. |
+| Selector Python | **27 PASS**. |
+| Documentation/static | Roadmap relative links/anchors and balanced fences, evidence/selector JSON, unchanged ACCESS source receipt, static UI resources and diff checks pass. |
+
+Affected selection uses #1910's first parent versus its merged source, retaining the security-data
+coverage even though the follow-up itself changes documentation only. The combined affected command
+exceeded the scratch runner's 240-second outer budget while SQL fixtures were progressing, without a
+reported test failure. After confirming the JVMs stopped and cleaning only that run's exact generated
+database/logins, its one concrete retry partitioned the complete selection: 75 non-SQL tests, four
+ordinary SQL groups (20/20/20/19), and three parameterized groups (24/20/15). JUnit reports were checked
+against every selected class, ordinary method and parameterized case count. No repeated reactor debugging.
+
+The prior environment-only Maven failures did not count as verification. This resumed task supplies the
+full JDK 21 and system session-CA trust store, with private SQL opt-ins; no credential value enters the
+commands or evidence. Overlapping focused/affected/critical results are not additive unique totals.
+
+**3B.2D COMPLETE (source/local synthetic verification); 3B.3 NOT STARTED.** No production/Azure SQL
+acceptance, no deployed permission/RLS acceptance and no real-client acceptance. No Phase 3B.3 work,
+IntegrationAccessAudit, MCP, Case disclosure, data-resource AI bearer acceptance, production/Azure SQL,
+deployment, tenant enablement or installer/version changes. Existing mutation audits remain unchanged;
+read-only authentication introduces no audit schema or disclosure event. Aggregate Phase 3B remains IN PROGRESS.
+
 ```text
 3B.1                      COMPLETE
 3B.2A                     COMPLETE
 3B.2B                     COMPLETE
 3B.2C                     COMPLETE
 OAuth revocation closeout COMPLETE
-3B.2D                     IN PROGRESS / UNVERIFIED
+3B.2D                     COMPLETE (source/local synthetic verification)
 3B.3                      NOT STARTED
 3B.4+                     NOT STARTED
 Aggregate Phase 3B        IN PROGRESS
