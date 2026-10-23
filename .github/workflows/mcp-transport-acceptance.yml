@@ -130,4 +130,3 @@ jobs:
       - name: Remove disposable SQL
         if: always()
         run: docker rm -f shale-mcp-probe-sql >/dev/null 2>&1 || true
-
