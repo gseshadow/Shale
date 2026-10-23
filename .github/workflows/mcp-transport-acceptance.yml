@@ -51,7 +51,7 @@ jobs:
           git worktree add --detach work/mcp-baseline daec1cc3e1461373029390a697d624cbf7464aca
           timeout 300 mvn -B -ntp -f work/mcp-baseline/pom.xml -pl shale-server dependency:tree -Dverbose -DoutputFile=target/mcp-dependency-tree.txt 2>&1 | tee work/mcp-evidence/baseline-tree-command.log
           cp work/mcp-baseline/shale-server/target/mcp-dependency-tree.txt work/mcp-evidence/baseline-tree.txt
-          rg 'io.modelcontextprotocol.sdk|reactor-core|spring-boot|jackson-databind|tomcat-embed-core' work/mcp-evidence/candidate-tree.txt
+          grep -E 'io.modelcontextprotocol.sdk|reactor-core|spring-boot|jackson-databind|tomcat-embed-core' work/mcp-evidence/candidate-tree.txt
       - name: Actual modern SDK, Jackson and unregistered servlet smoke tests
         run: |
           set -o pipefail
