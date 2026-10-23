@@ -62,7 +62,7 @@ public class McpTransportConfiguration {
     }
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({AiAccessTokenValidator.class,DeadlineAccess.class})
-    @ConditionalOnProperty(name="shale.ai.mcp.enabled",havingValue="true")
+    @ConditionalOnProperty(name={"shale.ai.mcp.enabled","shale.ai.enabled"},havingValue="true")
     DeadlineAccess mcpAccessAuthenticator(McpOAuthProperties identity, Environment env, ObjectProvider<DataSources> sources) {
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();
         source.setURL(env.getRequiredProperty("shale.ai.oauth.bootstrap.jdbc-url"));

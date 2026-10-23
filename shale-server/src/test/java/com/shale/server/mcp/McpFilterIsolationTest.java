@@ -40,4 +40,19 @@ class McpFilterIsolationTest {
         assertThrows(IllegalArgumentException.class,()->new com.shale.server.oauth.McpOAuthProperties("http://public.example",com.shale.server.oauth.McpOAuthProperties.Identity.PRODUCTION,true));
         assertFalse(new McpTransportProperties(false,null).enabled());
     }
+    @Test void transportOnGlobalOffStartsWithoutSqlCredentialsAndDeniesProtectedUse()throws Exception {
+        try(var context=new AnnotationConfigWebApplicationContext()) {
+            context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("mcp",Map.of(
+                    "shale.ai.mcp.enabled",true,"shale.ai.enabled",false,
+                    "shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST")));
+            context.register(McpOAuthSecurityConfiguration.class,McpTransportConfiguration.class);context.refresh();
+            assertFalse(context.containsBean("mcpAccessAuthenticator"));
+            var request=new MockHttpServletRequest("POST","/mcp");request.setContentType("application/json");
+            request.addHeader("Accept","application/json");request.addHeader("Authorization","Bearer "+"a".repeat(43));
+            request.addHeader("MCP-Protocol-Version","2026-07-28");request.addHeader("Mcp-Method","server/discover");
+            var response=new MockHttpServletResponse();context.getBean(FilterChainProxy.class).doFilter(request,response,(r,s)->fail());
+            assertEquals(401,response.getStatus());assertNull(request.getSession(false));
+        }
+    }
 }
