@@ -1,0 +1,65 @@
+package com.shale.server.mcp;
+
+import com.shale.data.security.ai.*;
+import io.modelcontextprotocol.modern.server.transport.HttpServletMcpTransport;
+import java.nio.file.*;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import org.apache.tomcat.util.descriptor.web.*;
+import org.junit.jupiter.api.*;
+import org.springframework.context.annotation.*;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.mock.web.MockServletContext;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+/** Real loopback Tomcat + composed Spring security + SDK transport; authority is explicitly synthetic. */
+class McpClientInteropTest {
+    static final String TOKEN="a".repeat(43);
+    @Configuration static class Fixture {
+        @Bean AiAccessTokenValidator validator() {
+            var validator=mock(AiAccessTokenValidator.class);
+            var context=mock(VerifiedIntegrationContext.class);
+            when(context.credentialId()).thenReturn(1L);
+            when(context.effectiveScopes()).thenReturn(com.shale.core.security.ai.AiScope.fromMask(3));
+            when(validator.validate(anyString())).thenAnswer(call->{
+                if(!TOKEN.equals(call.getArgument(0)))throw new SecurityException();return context;
+            });
+            return validator;
+        }
+    }
+    @Test void independentModernClientsUseMountedTransportWithoutAnyCaseService(@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
+        Assumptions.assumeTrue("true".equals(System.getenv("SHALE_MCP_EXTERNAL_CLIENTS")),"External client packages required; skip is not acceptance evidence");
+        var tomcat=new org.apache.catalina.startup.Tomcat();tomcat.setBaseDir(temp.toString());tomcat.setPort(0);
+        tomcat.getConnector().setProperty("address","127.0.0.1");var tc=tomcat.addContext("",temp.toString());
+        try(var context=new AnnotationConfigWebApplicationContext()) {
+            context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("mcp",Map.of(
+                    "shale.ai.mcp.enabled",true,"shale.ai.enabled",true,"shale.ai.mcp.allowed-origins[0]","https://client.test",
+                    "shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST")));
+            context.register(Fixture.class,com.shale.server.oauth.McpOAuthSecurityConfiguration.class,McpTransportConfiguration.class);context.refresh();
+            assertTrue(context.getBeansOfType(com.shale.core.service.CaseServicePort.class).isEmpty());
+            var registration=context.getBean("mcpServlet",org.springframework.boot.web.servlet.ServletRegistrationBean.class);
+            var servlet=(HttpServletMcpTransport)registration.getServlet();
+            org.apache.catalina.startup.Tomcat.addServlet(tc,"mcp",servlet);tc.addServletMappingDecoded("/mcp","mcp");
+            var definition=new FilterDef();definition.setFilterName("springMcp");definition.setFilter(context.getBean(FilterChainProxy.class));tc.addFilterDef(definition);
+            var mapping=new FilterMap();mapping.setFilterName("springMcp");mapping.addURLPattern("/mcp");tc.addFilterMap(mapping);
+            var off=new FilterDef();off.setFilterName("off");off.setFilter(new McpGate(new McpTransportProperties(false,Set.of()),
+                    new com.shale.server.oauth.McpOAuthProperties(null,null,false),false,t->{throw new AssertionError();}));tc.addFilterDef(off);
+            var offMapping=new FilterMap();offMapping.setFilterName("off");offMapping.addURLPattern("/off");tc.addFilterMap(offMapping);
+            tomcat.start();String base="http://127.0.0.1:"+tomcat.getConnector().getLocalPort();
+            Path evidence=Path.of("../work/mcp-evidence");Files.createDirectories(evidence);
+            for(var command:List.of(List.of("node","../build/mcp-transport/client-ts.mjs"),
+                    List.of("../work/mcp-clients/bin/python","../build/mcp-transport/client-python.py"))) {
+                var process=new ProcessBuilder(command);process.environment().put("MCP_URL",base+"/mcp");process.environment().put("MCP_OFF_URL",base+"/off");
+                process.environment().put("MCP_TOKEN",TOKEN);
+                Path log=evidence.resolve(command.getFirst().equals("node")?"client-ts.json":"client-python.json");
+                process.redirectErrorStream(true).redirectOutput(log.toFile());var running=process.start();
+                if(!running.waitFor(60,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();fail("External MCP client timed out");}
+                assertEquals(0,running.exitValue(),"External client failed; inspect retained "+log.getFileName());
+            }
+        } finally {tomcat.stop();tomcat.destroy();}
+    }
+}

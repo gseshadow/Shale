@@ -56,6 +56,17 @@ jobs:
         run: |
           set -o pipefail
           timeout 600 mvn -B -ntp -pl shale-server -am -Dtest=McpSdkCompatibilityTest,McpTransportTest,McpFilterIsolationTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/sdk-smoke.log
+      - name: Install pinned independent clients
+        run: |
+          npm install --prefix build/mcp-transport --ignore-scripts --no-audit --no-fund
+          python3 -m venv work/mcp-clients
+          work/mcp-clients/bin/pip install 'mcp==2.3.0'
+      - name: Two independent clients against mounted loopback transport
+        env:
+          SHALE_MCP_EXTERNAL_CLIENTS: 'true'
+        run: |
+          set -o pipefail
+          timeout 300 mvn -B -ntp -pl shale-server -am -Dtest=McpClientInteropTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/clients.log
       - name: Disposable loopback SQL for existing OAuth authorization through revocation tests
         run: |
           probe_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(30)+"aB9!")')"
