@@ -56,6 +56,17 @@ public interface CaseServicePort {
      * characters; page is 0–100 and size 1–25. SQL fetches size+1 to determine hasMore, including
      * at the window ceiling. Ordinary minimized summary pages retain their approved audit exemption.
      */
+    /** Internal transaction composition only. Caller owns required attribution, final gates and commit/close.
+     * These overloads never authorize an integration credential or release a buffer by themselves. */
+    default MinimizedCasePage searchMinimizedCases(java.sql.Connection connection, String query,
+            int tenant, int actor, int page, int size) throws java.sql.SQLException {
+        throw new UnsupportedOperationException("Implement connection-scoped minimized search.");
+    }
+    default Optional<MinimizedCaseOverview> readMinimizedCaseOverview(java.sql.Connection connection,
+            long caseId, int tenant, int actor) throws java.sql.SQLException {
+        throw new UnsupportedOperationException("Implement connection-scoped audited Overview.");
+    }
+
     default MinimizedCasePage searchMinimizedCases(String query, int tenant, int actor, int page, int size) {
         throw new UnsupportedOperationException("Implement CaseServicePort.searchMinimizedCases with authorized SQL paging.");
     }

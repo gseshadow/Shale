@@ -28,6 +28,9 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertIn("security-data", result["selected_areas"])
         self.assertIn("com.shale.core.security.ai.AiScopeTest", result["test_patterns"])
         self.assertIn("com.shale.data.security.ai.AiSecurityContractTest", result["test_patterns"])
+        disclosure = self.selected("docs/sql/ai-integration/phase3b3.sql")
+        for name in ("IntegrationAccessContractTest", "IntegrationCaseReadTest"):
+            self.assertIn("com.shale.data.security.ai." + name, disclosure["test_patterns"])
 
     def test_oauth_foundation_selects_namespace_and_protocol_contracts(self):
         result = self.selected("shale-server/src/main/java/com/shale/server/oauth/McpOAuthSecurityConfiguration.java")

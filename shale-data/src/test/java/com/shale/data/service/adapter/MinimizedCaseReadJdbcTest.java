@@ -237,16 +237,35 @@ class MinimizedCaseReadJdbcTest {
     static Map<Object,Object> row(long id,String name) {var row=new HashMap<Object,Object>();row.put("Id",id);row.put("Name",name);row.put("ShaleClientId",41);return row;}
     static Map<Object,Object> with(Map<Object,Object> row,String key,Object value){row.put(key,value);return row;}
 
+    @Test void transactionOverloadsReachProductionDaoWithoutBorrowCommitOrClose() throws Exception {
+        Jdbc db=new Jdbc(); db.rows.add(row(1,"Literal"));
+        var port=db.adapter();
+        try(Connection c=db.connection()) {
+            c.setAutoCommit(false);
+            var page=port.searchMinimizedCases(c,"Literal",41,31,0,10);
+            assertEquals(1,page.items().size()); assertEquals(0,db.audits);
+            assertEquals(11,db.bindings.get(6),"Integration-size search fetches ten results plus only one probe");
+            assertEquals(1,port.readMinimizedCaseOverview(c,1,41,31).orElseThrow().caseId());
+            assertEquals(1,db.audits); assertEquals(0,db.durableAudits);
+            assertEquals(1,db.connections,"Both production gateway calls use the supplied connection");
+            assertFalse(db.events.contains("commit"));assertFalse(db.events.contains("close"));
+            c.commit(); assertEquals(1,db.durableAudits);
+        }
+    }
+
     private static final class Jdbc {
         List<Map<Object,Object>> rows=new ArrayList<>(); List<String> events=new ArrayList<>();
         Integer sessionActor=31,sessionTenant=41;int actorId=31,actorTenant=41;
         boolean deleted,removed,failAudit,failCommit,timeout,failBegin,failRead,lostCommitAck;
         int connections,audits,returnedRows,pendingAudits,durableAudits,auditUpdateCount=1;
         String sql;Map<Integer,Object> bindings,auditBindings;
-        CaseServicePort adapter(){return new CaseServiceAdapter(new CaseDao(()->{
+        CaseServicePort adapter(){return new CaseServiceAdapter(new CaseDao(this::connection));}
+        Connection connection() {
+            boolean[] auto={true};
             connections++;return proxy(Connection.class,(p,m,a)->switch(m.getName()){
                 case "prepareStatement"->statement((String)a[0]);
-                case "setAutoCommit"->{assertEquals(false,a[0]);events.add("begin");if(failBegin)throw new SQLException("private begin failure");yield null;}
+                case "getAutoCommit"->auto[0];
+                case "setAutoCommit"->{auto[0]=(boolean)a[0];assertEquals(false,a[0]);events.add("begin");if(failBegin)throw new SQLException("private begin failure");yield null;}
                 case "commit"->{events.add("commit");if(failCommit)throw new SQLException("private failure");
                     durableAudits+=pendingAudits;pendingAudits=0;
                     if(lostCommitAck)throw new SQLException("synthetic lost acknowledgement","08007");yield null;}
@@ -255,7 +274,7 @@ class MinimizedCaseReadJdbcTest {
                 case "getCatalog"->"catalog";
                 case "getMetaData"->proxy(DatabaseMetaData.class,(pp,mm,aa)->{assertEquals("getColumns",mm.getName());return resultSet(List.of(Map.of("DATA_TYPE",Types.INTEGER)));});
                 default->throw new AssertionError(m.getName());
-            });}));}
+            });}
         PreparedStatement statement(String text){Map<Integer,Object> values=new HashMap<>();int[] timeoutSet={0};
             return proxy(PreparedStatement.class,(p,m,a)->switch(m.getName()){
                 case "setQueryTimeout"->{assertEquals(5,a[0]);timeoutSet[0]=5;yield null;}

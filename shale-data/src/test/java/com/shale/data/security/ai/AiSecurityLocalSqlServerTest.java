@@ -1336,6 +1336,307 @@ class AiSecurityLocalSqlServerTest {
         }
     }
 
+    private VerifiedIntegrationContext disclosureFixture()throws Exception {
+        var f=accessFixture(); var tokens=redeem(f.code(),f.registration());
+        var context=accessValidator().validate(tokens.accessToken());
+        try(var c=owner(db)) {
+            assertEquals(59000,assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b3.sql")))).getErrorCode(),"Missing PHI schema must fail before creating an unusable verification module");
+            assertEquals(0,count(c,"SELECT @@TRANCOUNT"));
+            for(String batch:Files.readString(Path.of("src/test/resources/ai/synthetic-case-read.sql")).split("(?im)^GO\\s*$"))
+                if(!batch.isBlank())sql(c,batch);
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b3.sql")));
+        }
+        return context;
+    }
+    private IntegrationCaseReadService disclosureService(IntegrationCaseReadService.Encoder encoder) {
+        var port=new com.shale.data.service.adapter.CaseServiceAdapter(new com.shale.data.dao.CaseDao(()->{
+            throw new AssertionError("Integration transaction must supply the sole read connection");
+        }));
+        return new IntegrationCaseReadService(accessSource("runtime"),port,encoder,true);
+    }
+    @Test void disclosureMigrationRepeatDriftAndActualPermissions()throws Exception {
+        disclosureFixture();
+        try(var c=owner(db)) {
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b3.sql")));
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/verify.sql")));
+            assertEquals(6,count(c,"SELECT COUNT(*) FROM sys.security_predicates WHERE OBJECT_NAME(target_object_id) IN('IntegrationAccessAuditLog','IntegrationAccessAuditResource')"));
+        }
+        try(var c=connection("runtime",7,72)) {
+            for(String table:List.of("IntegrationAccessAuditLog","IntegrationAccessAuditResource"))
+                for(String operation:List.of("SELECT * FROM ","DELETE FROM ","UPDATE ")) {
+                    String command=operation+"dbo."+table+(operation.startsWith("UPDATE")?" SET ShaleClientId=7":"");
+                    assertThrows(SQLException.class,()->sql(c,command));
+                }
+            assertThrows(SQLException.class,()->sql(c,"EXEC dbo.AiReviewCaseAccessV1 0,10"));
+            for(String table:List.of("IntegrationAccessAuditLog","IntegrationAccessAuditResource"))
+                assertEquals(229,assertThrows(SQLException.class,()->sql(c,"INSERT dbo."+table+" DEFAULT VALUES")).getErrorCode(),"Direct runtime INSERT must be denied, not merely rejected by a row constraint");
+        }
+        try(var c=owner(db)) {
+            sql(c,"ALTER TABLE dbo.IntegrationAccessAuditLog ADD Unexpected int NULL");
+            assertEquals(59000,assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b3.sql")))).getErrorCode());
+        }
+    }
+    @Test void disclosureSharedSearchOverviewAtomicAuditEmptyAndProtectedReview()throws Exception {
+        var context=disclosureFixture();var service=disclosureService(new MinimizedCaseEncoder());
+        try(var c=owner(db)) {
+            for(int id=102;id<=111;id++)sql(c,"INSERT dbo.Cases VALUES("+id+",7,NULL,N'SECRET_CASE patient client',NULL,0,NULL)");
+        }
+        var search=service.search(context,"SECRET_CASE",0);assertTrue(search.size()>0);
+        var overview=service.overview(context,100);assertTrue(overview.size()>0);
+        service.search(context,"no match",0);
+        try(var c=owner(db)) {
+            assertEquals(3,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource WHERE CaseId=100 AND Relation='RETURNED'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AuditLog WHERE FieldName='Case.Overview.Read'"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource WHERE CaseId=111"),"The eleventh probe is never an audit RETURNED resource");
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE ReturnedCount=10"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog a WHERE ReturnedCount<>(SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource r WHERE r.ShaleClientId=a.ShaleClientId AND r.EventId=a.Id AND r.Relation='RETURNED')"));
+            assertEquals(21,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AiQuotaReservation WHERE ReleasedAt IS NULL"));
+        }
+        var review=new IntegrationAccessReview(provider("runtime",7,71)).page(0,100);
+        assertEquals(12,review.size()); assertEquals(3,review.stream().map(IntegrationAccessReview.Entry::eventId).distinct().count());
+        assertEquals(11,review.stream().filter(v->v.caseId()!=null).count());
+        assertTrue(new IntegrationAccessReview(provider("runtime",8,81)).page(0,100).isEmpty());
+        assertThrows(IllegalStateException.class,()->new IntegrationAccessReview(provider("runtime",7,72)).page(0,100));
+    }
+    @Test void disclosurePrivacyInspectsEveryPersistedColumnAndRequestedProbeDoesNotResolveCase()throws Exception {
+        disclosureFixture(); var credentials=accessTokensFor(7,72);
+        var context=accessValidator().validate(credentials.accessToken());
+        var service=disclosureService(new MinimizedCaseEncoder());
+        service.search(context,"SECRET_CASE",0);
+        for(String query:List.of(credentials.accessToken(),credentials.refreshToken(),
+                "prompt payload email@ jwt.assertion SELECT https:// {\"metadata\"}","exception text authorization_code"))
+            service.search(context,query,0);
+        for(long id:List.of(200L,999L,101L,0L))assertThrows(IntegrationReadException.class,()->service.overview(context,id));
+        try(var c=owner(db)) {
+            assertEquals(3,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource WHERE Relation='REQUESTED'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource WHERE Relation='RETURNED'"));
+            for(String table:List.of("IntegrationAccessAuditLog","IntegrationAccessAuditResource"))
+                try(var p=c.createStatement();var rows=p.executeQuery("SELECT * FROM dbo."+table)) {
+                    while(rows.next())for(int col=1;col<=rows.getMetaData().getColumnCount();col++) {
+                        String value=String.valueOf(rows.getObject(col));
+                        for(String sentinel:List.of(credentials.accessToken(),credentials.refreshToken(),"SECRET_CASE","SECRET_NUMBER","patient","client name","SECRET_QUERY","prompt payload","access_token","refresh_token","authorization_code","jwt.assertion","email@","exception text","SELECT ","https://","{\"metadata\""))
+                            assertFalse(value.contains(sentinel),"Sensitive text in persisted column "+rows.getMetaData().getColumnName(col));
+                    }
+                }
+        }
+    }
+    @Test void disclosureActualIntegrationAndPhiAuditFailuresRollBackAndDoNotRefund()throws Exception {
+        var context=disclosureFixture();
+        try(var c=owner(db)) {sql(c,"CREATE TRIGGER dbo.FailAccess ON dbo.IntegrationAccessAuditResource AFTER INSERT AS IF EXISTS(SELECT 1 FROM inserted WHERE Relation='RETURNED') THROW 59010,'Injected child failure',1;");}
+        assertThrows(IntegrationReadException.class,()->disclosureService(new MinimizedCaseEncoder()).overview(context,100));
+        try(var c=owner(db)) {
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AuditLog"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(1,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));
+            sql(c,"DROP TRIGGER dbo.FailAccess");sql(c,"CREATE TRIGGER dbo.FailPhi ON dbo.AuditLog INSTEAD OF INSERT AS RETURN;");
+        }
+        assertThrows(IntegrationReadException.class,()->disclosureService(new MinimizedCaseEncoder()).overview(context,100));
+        try(var c=owner(db)) {
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.AuditLog"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(2,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));
+            assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='UNAVAILABLE'"));
+        }
+    }
+    @Test void disclosureRevokeBetweenCommitAndHandoffKeepsHistoryAndWithholdsBuffer()throws Exception {
+        var context=disclosureFixture();
+        var service=disclosureService((result,correlation,out)->{
+            try(var c=owner(db);var statement=c.createStatement();var rows=statement.executeQuery("SELECT RowVer FROM dbo.AiDelegatedSession WHERE SessionId='"+context.delegatedSessionId()+"'")) {
+                assertTrue(rows.next()); service(7,72).revokeSession(context.delegatedSessionId(),new RowVersion(rows.getBytes(1)));
+            }
+            catch(Exception failure){throw new java.io.IOException("Synthetic revoke failed");}
+            new MinimizedCaseEncoder().encode(result,correlation,out);
+        });
+        assertThrows(IntegrationReadException.class,()->service.search(context,"SECRET_CASE",0));
+        try(var c=owner(db)) {
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Stage='TERMINAL'"));
+        }
+    }
+
+    @Test void disclosureActualRlsBlocksAndAppendOnlyHistory()throws Exception {
+        var context=disclosureFixture(); disclosureService(new MinimizedCaseEncoder()).search(context,"SECRET_CASE",0);
+        long event;
+        try(var c=owner(db)) {
+            event=count(c,"SELECT MAX(Id) FROM dbo.IntegrationAccessAuditLog");
+            for(String table:List.of("IntegrationAccessAuditLog","IntegrationAccessAuditResource")) {
+                sql(c,"GRANT SELECT,INSERT ON dbo."+table+" TO ["+prefix+"_verifier]");
+                assertEquals(59001,assertThrows(SQLException.class,()->sql(c,"UPDATE dbo."+table+" SET ShaleClientId=ShaleClientId")).getErrorCode());
+                assertEquals(table.equals("IntegrationAccessAuditLog")?547:59001,assertThrows(SQLException.class,()->sql(c,"DELETE FROM dbo."+table)).getErrorCode());
+            }
+        }
+        try(var c=connection("verifier",8,81)) {
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog"));
+            assertEquals(33504,assertThrows(SQLException.class,()->sql(c,"INSERT dbo.IntegrationAccessAuditResource VALUES(7,"+event+",102,'REQUESTED')")).getErrorCode());
+            String parent="INSERT dbo.IntegrationAccessAuditLog(ShaleClientId,InvocationId,CorrelationId,UserId,IntegrationId,GrantId,SessionId,ClientId,Source,Contract,Tool,Operation,Outcome,Reason,Stage,ReturnedCount,SearchPage,SearchSize) VALUES(7,'"+UUID.randomUUID()+"','"+UUID.randomUUID()+"',72,'"+context.integrationId()+"','"+context.grantId()+"','"+context.delegatedSessionId()+"','"+context.oauthClientId()+"','MCP','case-read-v1','search_cases','SEARCH_MINIMIZED_CASES','ALLOWED_READ','NONE','READ',0,0,10)";
+            assertEquals(33504,assertThrows(SQLException.class,()->sql(c,parent)).getErrorCode());
+        }
+        try(var c=connection("verifier",null,null)) {assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource"));}
+    }
+    @Test void disclosureFailureForNowDisabledOwnerStillPersistsAndConsumesAttempt()throws Exception {
+        var context=disclosureFixture();
+        try(var c=owner(db)) {sql(c,"UPDATE dbo.Users SET IsRemoved=1 WHERE id=72");}
+        assertThrows(IntegrationReadException.class,()->disclosureService(new MinimizedCaseEncoder()).search(context,"SECRET_CASE",0));
+        try(var c=owner(db)) {
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='DENIED'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiQuotaReservation WHERE RowCost=0 AND Admitted=0"));
+        }
+    }
+    @Test void disclosureFinalHandoffExpiryWhileActuallyBlockedUsesDatabaseUtc()throws Exception {
+        var context=disclosureFixture(); var held=new java.util.concurrent.atomic.AtomicReference<Connection>();
+        var ready=new CountDownLatch(1);
+        var service=disclosureService((result,correlation,out)->{
+            try {
+                Connection c=owner(db);c.setAutoCommit(false);
+                sql(c,"SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION; UPDATE dbo.AiDelegatedSession SET IdleExpiresAt=DATEADD(second,1,SYSUTCDATETIME()); SELECT 1 FROM dbo.AiDelegatedSession WITH(TABLOCKX,HOLDLOCK)");
+                held.set(c);ready.countDown(); new MinimizedCaseEncoder().encode(result,correlation,out);
+            }catch(SQLException failure){throw new java.io.IOException("Synthetic blocking setup failed");}
+        });
+        try(var executor=Executors.newSingleThreadExecutor()) {
+            var future=executor.submit(()->service.search(context,"SECRET_CASE",0));
+            assertTrue(ready.await(5,TimeUnit.SECONDS));
+            try(Connection observer=owner(db)) {
+                boolean waiting=false;long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(1);
+                while(System.nanoTime()<until) {
+                    if(count(observer,"SELECT COUNT(*) FROM sys.dm_exec_requests WHERE database_id=DB_ID() AND wait_type LIKE 'LCK_M_%' AND session_id<>@@SPID")>0){waiting=true;break;}
+                    Thread.sleep(20);
+                }
+                assertTrue(waiting,"Final gate must positively wait on the synthetic SQL lock");
+                sql(observer,"WAITFOR DELAY '00:00:02'");
+            } finally { if(held.get()!=null){held.get().commit();held.get().close();} }
+            var denied=assertThrows(ExecutionException.class,()->future.get(5,TimeUnit.SECONDS));
+            assertInstanceOf(IntegrationReadException.class,denied.getCause());
+        }
+        try(var c=owner(db)) {
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Stage='TERMINAL' AND Outcome='DENIED'"));
+        }
+    }
+    private javax.sql.DataSource disclosureFaultSource(String fault,VerifiedIntegrationContext context) {
+        var source=accessSource("runtime");var leases=new java.util.concurrent.atomic.AtomicInteger();
+        return (javax.sql.DataSource)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{javax.sql.DataSource.class},(proxy,method,args)->{
+            try {
+                Object result=method.invoke(source,args);
+                if(!method.getName().equals("getConnection"))return result;
+                Connection c=(Connection)result; int lease=leases.incrementAndGet();
+                return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{Connection.class},(p,m,a)->{
+                    try {
+                        if(lease==2 && fault.equals("COMMIT") && m.getName().equals("commit"))throw new SQLException("Injected commit failure");
+                        Object value=m.invoke(c,a);
+                        if(lease==2 && fault.equals("LOSTACK") && m.getName().equals("commit"))throw new SQLException("Injected lost commit acknowledgment");
+                        if(lease==2 && fault.equals("CLOSE") && m.getName().equals("close"))throw new SQLException("Injected close failure");
+                        if(lease==3 && fault.equals("AFTER_HANDOFF") && m.getName().equals("commit")) {
+                            try(var owner=owner(db);var q=owner.createStatement();var rows=q.executeQuery("SELECT RowVer FROM dbo.AiDelegatedSession WHERE SessionId='"+context.delegatedSessionId()+"'")) {
+                                assertTrue(rows.next()); service(7,72).revokeSession(context.delegatedSessionId(),new RowVersion(rows.getBytes(1)));
+                            }
+                        }
+                        return value;
+                    }catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
+                });
+            }catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
+        });
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"COMMIT","LOSTACK","CLOSE","AFTER_HANDOFF"})
+    void disclosureCommitCloseAndAuthorizedHandoffBoundary(String fault)throws Exception {
+        var context=disclosureFixture();var source=disclosureFaultSource(fault,context);
+        var port=new com.shale.data.service.adapter.CaseServiceAdapter(new com.shale.data.dao.CaseDao(()->{throw new AssertionError("Unexpected borrow");}));
+        var service=new IntegrationCaseReadService(source,port,new MinimizedCaseEncoder(),true);
+        if(fault.equals("AFTER_HANDOFF")) {
+            assertTrue(service.overview(context,100).size()>0,"A handoff authorized before revoke may complete internally");
+            assertThrows(SecurityException.class,()->accessValidator().recheck(context));
+        } else assertThrows(IntegrationReadException.class,()->service.overview(context,100));
+        try(var c=owner(db)) {
+            int committed=fault.equals("COMMIT")?0:1;
+            assertEquals(committed,count(c,"SELECT COUNT(*) FROM dbo.AuditLog"));
+            assertEquals(committed,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AiQuotaReservation"),"No automatic read replay or credit refund");
+            assertEquals(1,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));
+            if(!fault.equals("AFTER_HANDOFF"))assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='UNAVAILABLE'"));
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"scope","user","global","policy","tenant","grant","session","integration"})
+    void disclosureCommittedAuthorityReductionAfterReadPreventsHandoff(String change)throws Exception {
+        var context=disclosureFixture();
+        var read=disclosureService((result,correlation,out)->{
+            try {
+                switch(change) {
+                    case "global" -> {var op=new AiProductCapabilityService(provider("operator",null,null));op.setEnabled(false,op.inspect().rowVersion());}
+                    case "policy" -> {var admin=service(7,71);admin.setTenantEnabled(false,admin.inspectTenantPolicy().rowVersion());}
+                    case "scope","integration" -> {
+                        var admin=service(7,71);var registration=admin.inspectRegistrations().getFirst();
+                        admin.changeIntegration(context.integrationId(),AiScope.fromMask(change.equals("scope")?2:3),change.equals("integration"),registration.rowVersion());
+                    }
+                    default -> {try(var c=owner(db)) {
+                        // Labelled synthetic owner state injection; production mutators retain their own audit rules.
+                        sql(c,switch(change) {
+                            case "user" -> "UPDATE dbo.Users SET IsRemoved=1 WHERE id=72";
+                            case "tenant" -> "UPDATE dbo.ShaleClients SET IsActive=0 WHERE Id=7";
+                            case "grant" -> "UPDATE dbo.AiDelegationGrant SET RevokedAt=SYSUTCDATETIME(),RevokedByUserId=72,RevocationReason='SELF'";
+                            case "session" -> "UPDATE dbo.AiDelegatedSession SET RevokedAt=SYSUTCDATETIME(),RevocationReason='SELF'";
+                            default -> throw new AssertionError(change);
+                        });
+                    }}
+                }
+            }catch(Exception failure){throw new java.io.IOException("Synthetic authority change failed");}
+            new MinimizedCaseEncoder().encode(result,correlation,out);
+        });
+        assertThrows(IntegrationReadException.class,()->read.search(context,"SECRET_CASE",0));
+        try(var c=owner(db)) {
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Stage='TERMINAL' AND Outcome='DENIED'"));
+        }
+    }
+
+    @Test void disclosureSuppressedParentCannotReleaseEvenEmptySearchAndNoEmergencySpool()throws Exception {
+        var context=disclosureFixture();
+        try(var c=owner(db)){sql(c,"CREATE TRIGGER dbo.SuppressAccess ON dbo.IntegrationAccessAuditLog INSTEAD OF INSERT AS RETURN;");}
+        assertThrows(IntegrationReadException.class,()->disclosureService(new MinimizedCaseEncoder()).search(context,"no matches",0));
+        try(var c=owner(db)) {
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource"));
+            assertEquals(10,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));
+        }
+    }
+
+    @Test void disclosureSingleSpidDistinctOwnersAndFaultCleanupRemainIsolated()throws Exception {
+        disclosureFixture();
+        var a1=accessValidator().validate(accessTokensFor(7,71).accessToken());
+        var a2=accessValidator().validate(accessTokensFor(7,72).accessToken());
+        var b1=accessValidator().validate(accessTokensFor(8,81).accessToken());
+        var config=new com.zaxxer.hikari.HikariConfig();config.setDataSource(accessSource("runtime"));config.setMaximumPoolSize(1);config.setMinimumIdle(1);config.setConnectionTimeout(2000);
+        var port=new com.shale.data.service.adapter.CaseServiceAdapter(new com.shale.data.dao.CaseDao(()->{throw new AssertionError("Unexpected borrow");}));
+        try(var pool=new com.zaxxer.hikari.HikariDataSource(config)) {
+            var service=new IntegrationCaseReadService(pool,port,true);Integer spid=null;
+            for(var context:List.of(a1,a2,b1,a1)) {
+                var buffer=service.search(context,"SECRET_CASE",0);byte[] bytes=new byte[buffer.size()];buffer.bytes().get(bytes);
+                String json=new String(bytes,java.nio.charset.StandardCharsets.UTF_8);
+                assertTrue(json.contains("\"caseId\":"+(context.shaleClientId()==7?100:200)),"Result must match explicit tenant, never the previous pooled owner");
+                try(var c=pool.getConnection()) {
+                    int current=count(c,"SELECT @@SPID");if(spid!=null)assertEquals(spid.intValue(),current);spid=current;
+                    assertTrue(c.getAutoCommit());assertEquals(0,count(c,"SELECT @@TRANCOUNT"));
+                    assertEquals(context.shaleClientId(),count(c,"SELECT CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))"));
+                    assertEquals(context.actingUserId(),count(c,"SELECT CONVERT(int,SESSION_CONTEXT(N'PrincipalUserId'))"));
+                    assertEquals(1,count(c,"SELECT CASE WHEN SESSION_CONTEXT(N'IntegrationId') IS NULL AND SESSION_CONTEXT(N'GrantId') IS NULL THEN 1 ELSE 0 END"));
+                }
+            }
+            try(var workers=Executors.newFixedThreadPool(3)) {
+                var futures=new ArrayList<Future<DisclosureBuffer>>();
+                for(var context:List.of(a1,a2,b1))futures.add(workers.submit(()->service.search(context,"SECRET_CASE",0)));
+                for(var result:futures)assertTrue(result.get(10,TimeUnit.SECONDS).size()>0);
+            }
+            var broken=new IntegrationCaseReadService(pool,port,(result,correlation,out)->{throw new java.io.IOException("Synthetic serialization failure");},true);
+            assertThrows(IntegrationReadException.class,()->broken.search(a1,"SECRET_CASE",0));
+            assertTrue(service.search(a1,"SECRET_CASE",0).size()>0,"Failed encoding must release/discard every transient carrier");
+        }
+        try(var c=owner(db)) {
+            assertEquals(9,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog a JOIN dbo.IntegrationAccessAuditResource r ON r.ShaleClientId=a.ShaleClientId AND r.EventId=a.Id WHERE (a.ShaleClientId=7 AND r.CaseId<>100) OR (a.ShaleClientId=8 AND r.CaseId<>200)"));
+        }
+    }
+
     private void installAccess()throws Exception {installRevocation();try(var c=owner(db)){sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2d.sql")));}}
     private com.microsoft.sqlserver.jdbc.SQLServerDataSource accessSource(String role) {
         var ds=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();ds.setURL(url(db));ds.setUser(prefix+"_"+role);ds.setPassword(logins.get(role));ds.setLoginTimeout(5);return ds;
