@@ -14,7 +14,7 @@ final class McpSearchHandler {
     private final LongFunction<IntegrationCaseReadService> services;
     McpSearchHandler(LongFunction<IntegrationCaseReadService> services) { this.services=Objects.requireNonNull(services); }
 
-    McpSchema.CallToolResult call(VerifiedIntegrationContext authority,long deadline,Object requestId,Object params) {
+    McpSchema.CallToolResult call(VerifiedIntegrationContext authority,long deadline,Object requestId,Object params,McpSchema.Implementation serverInfo) {
         var invocation=IntegrationInvocation.search(authority,deadline);
         try {
             Map<?,?> request=params instanceof Map<?,?> m?m:Map.of();
@@ -26,7 +26,12 @@ final class McpSearchHandler {
             Integer page=valid?(args.containsKey("page")?((Number)args.get("page")).intValue():0):null;
             var mapper=McpTransportConfiguration.mapper();
             DisclosureBuffer buffer=services.apply(deadline).search(invocation,query,page,completed->{
-                try { return mapper.writeValueAsBytes(JSONRPCResponse.result(requestId,success(completed))).length; }
+                try {
+                    var envelope=new LinkedHashMap<String,Object>(mapper.getJsonMapper().convertValue(success(completed),Map.class));
+                    // Modern SDK stamps this fixed public identity on every result. Include its actual bytes.
+                    envelope.put("_meta",Map.of(McpSchema.MetaKeys.SERVER_INFO,serverInfo));
+                    return mapper.writeValueAsBytes(JSONRPCResponse.result(requestId,envelope)).length;
+                }
                 catch(java.io.IOException encoding) { throw new IllegalStateException("Bounded response unavailable."); }
             });
             return success(buffer);

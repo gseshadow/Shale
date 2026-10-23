@@ -61,7 +61,7 @@ class McpSearchTest {
             var measure=i.getArgument(3,java.util.function.ToIntFunction.class);assertTrue(measure.applyAsInt(buffer)<65536);return buffer;
         });
         var result=send("tools/call","search_cases",Map.of("query","  literal  ")).path("result");
-        assertFalse(result.path("isError").asBoolean());assertEquals("complete",result.path("resultType").asText());assertFalse(result.has("_meta"));
+        assertFalse(result.path("isError").asBoolean(),result.toString());assertEquals("complete",result.path("resultType").asText());publicMetadataOnly(result);
         assertEquals(result.path("structuredContent"),McpTransportConfiguration.mapper().getJsonMapper().readTree(result.path("content").get(0).path("text").asText()));
         verify(service).search(any(IntegrationInvocation.class),eq("  literal  "),eq(0),any());verifyNoMoreInteractions(service);
     }
@@ -89,10 +89,15 @@ class McpSearchTest {
             });
             when(service.search(any(IntegrationInvocation.class),anyString(),anyInt(),any())).thenThrow(fault);
             var result=send("tools/call","search_cases",Map.of("query","literal")).path("result");
-            assertTrue(result.path("isError").asBoolean());assertFalse(result.has("structuredContent"));assertFalse(result.has("_meta"));
+            assertTrue(result.path("isError").asBoolean(),result.toString());assertFalse(result.has("structuredContent"));publicMetadataOnly(result);
             var value=McpTransportConfiguration.mapper().getJsonMapper().readTree(result.path("content").get(0).path("text").asText());
             assertEquals(code,value.path("code").asText());UUID.fromString(value.path("correlationId").asText());
             if(code.equals("THROTTLED"))assertEquals(1,value.path("retryAfterSeconds").asInt());else assertTrue(value.path("retryAfterSeconds").isNull());
         }
+    }
+    private static void publicMetadataOnly(tools.jackson.databind.JsonNode result) {
+        var meta=result.path("_meta");assertEquals(1,meta.size());
+        assertEquals("shale-mcp",meta.path(McpSchema.MetaKeys.SERVER_INFO).path("name").asText());
+        assertEquals("test",meta.path(McpSchema.MetaKeys.SERVER_INFO).path("version").asText());
     }
 }

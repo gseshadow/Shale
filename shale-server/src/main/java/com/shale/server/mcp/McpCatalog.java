@@ -11,8 +11,10 @@ import java.util.Set;
 /** Closed server-defined catalog. Only the explicitly activated search handler can be callable. */
 final class McpCatalog implements McpFeature {
     private final McpSearchHandler search;
+    private final McpSchema.Implementation serverInfo;
     McpCatalog() { this(null); }
-    McpCatalog(McpSearchHandler search) { this.search=search; }
+    McpCatalog(McpSearchHandler search) { this(search,McpSchema.Implementation.builder("shale-mcp","development").build()); }
+    McpCatalog(McpSearchHandler search,McpSchema.Implementation serverInfo) { this.search=search;this.serverInfo=serverInfo; }
     static List<McpSchema.Tool> visible(VerifiedIntegrationContext authority) {
         return new McpCatalog().tools(authority);
     }
@@ -29,7 +31,7 @@ final class McpCatalog implements McpFeature {
             if(search==null || !(params instanceof java.util.Map<?,?> request) || !"search_cases".equals(request.get("name")) || tools(authority).isEmpty())
                 return Mono.error(io.modelcontextprotocol.modern.McpException.invalidParams("Unknown or disabled tool"));
             long deadline=(Long)context.transportContext().get(McpGate.DEADLINE);
-            return Mono.fromCallable(()->McpAsyncResponse.result(search.call(authority,deadline,context.requestId(),params)));
+            return Mono.fromCallable(()->McpAsyncResponse.result(search.call(authority,deadline,context.requestId(),params,serverInfo)));
         }
         return Mono.just(McpAsyncResponse.result(McpSchema.ListToolsResult.builder(tools(authority)).ttlMs(0L).build()));
     }

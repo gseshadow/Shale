@@ -49,7 +49,8 @@ public class McpTransportConfiguration {
     }
     static McpServer server(String version,JacksonMcpJsonMapper mapper,McpSearchHandler search) {
         return McpServer.builder().serverInfo(McpSchema.Implementation.builder("shale-mcp",version).build())
-                .supportedVersions(List.of(McpGate.PROTOCOL)).jsonMapper(mapper).feature(new McpCatalog(search)).build();
+                .supportedVersions(List.of(McpGate.PROTOCOL)).jsonMapper(mapper)
+                .feature(new McpCatalog(search,McpSchema.Implementation.builder("shale-mcp",version).build())).build();
     }
     @Bean @Order(0)
     SecurityFilterChain mcpTransportChain(HttpSecurity http, McpTransportProperties transport, McpOAuthProperties identity,

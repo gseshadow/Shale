@@ -39,7 +39,7 @@ async def main():
                 assert not value['isError'] and set(s)=={'items','page','size','hasMore','windowExhausted','correlationId'}
                 assert (s['page'],s['size'],len(s['items']),s['hasMore'],s['windowExhausted'])==(page,10,count,more,window)
                 uuid.UUID(s['correlationId']);assert json.loads(value['content'][0]['text'])==s
-                assert '_meta' not in value
+                assert value['_meta']=={'io.modelcontextprotocol/serverInfo':{'name':'shale-mcp','version':'development'}}
                 for item in s['items']:
                     assert set(item)==set(expected['outputSchema']['$defs']['Case']['required'])
                     assert 1000<=item['caseId']<=1100 and all(item[k] is None for k in ['status','practiceArea','responsibleAttorney','primaryLegalAssistant'])

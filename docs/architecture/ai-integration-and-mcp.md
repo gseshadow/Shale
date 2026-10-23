@@ -698,7 +698,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | COMPLETE (source/local synthetic verification) | §10.21 expiry closeout; observed SQL lock wait, post-release database UTC rejection, complete affected suite and critical reactor pass. |
 | Phase 3B.3 AI audit/shared disclosure seam | COMPLETE (source/local synthetic verification) | §10.22; mandatory audit/PHI atomicity, bounded buffer and live final handoff; no transport. |
 | Phase 3B.4 MCP transport/discovery | COMPLETE (source/local protocol/client verification) | §10.25: default-OFF modern transport, empty catalog, real synthetic ACCESS/two-client proof and applicable conformance/regressions. Prerelease SDK remains a production-acceptance item; no Case handler. |
-| Phase 3B.5 search_cases | NOT STARTED | No MCP Case tool handler. |
+| Phase 3B.5 search_cases | IN PROGRESS | §10.26; sole synthetic-only search handler; verification in progress. |
 | Phase 3B.6 get_case_overview | NOT STARTED | No MCP Case tool handler. |
 | Phase 3B.7 adversarial/local acceptance | NOT STARTED | Authoritative Case artifact and remaining operational/security/client acceptance required. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
@@ -3913,3 +3913,94 @@ Case handler/tenant enablement after 3B.5–3B.7 acceptance. No deployment occur
 Explicitly: **search_cases is not an MCP handler; get_case_overview is not an MCP handler; MCP cannot
 disclose Case data.** No real tenant/integration is enabled; no production/Azure SQL, deployment,
 installer/version publication or production approval is performed.
+
+### 10.26 Phase 3B.5 synthetic-only search_cases handler — 2026-10-23
+
+**Status: IN PROGRESS; runtime verification pending.** Base is merged #1915,
+`e595fb0bec56ec74e3bdd33f341893469f67f00a`, reconstructed from GitHub commit/tree/blob objects into
+`codex/phase-3b5-search`; each text blob, tree and signed commit hash was verified. Original checkout and
+unrelated historical binary tree entries are preserved. Shell Git fetch could not reach its configured proxy.
+Local Maven 3.9.11/JDK21 exists, but the offline cache lacks Boot 4.1.1 and one bounded online attempt
+failed at network access. The owner explicitly authorized temporary GitHub Actions compilation/tests;
+this does not change the standing repository automation policy.
+
+The only handler is `search_cases`. Its fixed description, annotations, input schema and fully composed
+output schema are copied exactly from §10.9 into
+[the canonical tool resource](../../shale-server/src/main/resources/mcp/search-cases.json), including local
+`$defs.Case` and `$defs.CaseUser`. No tenant/user/integration/grant identity, size, condition or sort argument
+exists. Page defaults to zero only when absent; null, unknown members, wrong types and out-of-range values
+fail validation. The existing application seam strips query whitespace, enforces 3–100 UTF-16 units and
+three Unicode letters/digits, rejects malformed surrogate text, and never truncates or browses blank input.
+Raw input is schema-bounded before normalization. SQL lowercase/collation and literal LIKE escaping stay
+in the existing worker; no MCP search SQL or natural-language behavior is introduced.
+
+Activation requires all of `shale.ai.mcp.enabled=true`, `shale.ai.enabled=true`,
+`shale.ai.mcp.search-cases-enabled=true`, active `test` profile, and canonical TEST identity. An attempted
+handler activation in prod/azure or without the isolated test profile fails startup. Each request still
+requires fresh live ACCESS authentication plus every existing global/tenant/registration/grant/session/user
+SQL gate. Transport and handler defaults are explicitly false. `tools/list` advertises the sole search
+contract only when that handler exists and effective scope contains `cases.search`; TTL is zero. Neither
+`cases.overview.read` nor any other scope implies search. `get_case_overview` is absent and uninvokable.
+No additional domain tool, resources, prompts, mutations or generic gateway is registered.
+
+Mapping is MCP adapter → ACCESS-derived IntegrationInvocation → IntegrationCaseReadService → existing
+CaseServicePort transaction overload → production adapter/gateway → existing minimized Case query, exactly
+once. No independent lease/read, per-result hydration or automatic continuation is allowed. Page size is
+10, pages 0–9, authorized size+1 probe at most 11, Case name/ID ascending, and
+`windowExhausted = (page == 9 && hasMore)` including the page-9 probe. Null members and stored local date-time
+text are preserved; no Z/Instant conversion or DTO/field expansion occurs.
+
+The 3B.3 seam owns all accounting and audit: each reservation charges ten rows against unchanged trailing
+24-hour 200/user, 500/integration and 1000/tenant budgets; consumed credit is not refunded. Zero results
+commit one success parent and zero children. Successful returned counts match at most ten typed RETURNED
+children, excluding the probe. Invalid/throttled/failed/cancelled verified attempts use its existing separate
+failure transaction; the adapter never writes audits. Raw/normalized query, query hashes, arguments, client
+metadata, protocol IDs and bearer credentials are not logged or persisted. Ordinary summary searches retain
+their existing audit exemption; ordinary Overview keeps its existing PHI transaction.
+
+One original admission deadline now reaches IntegrationInvocation and bounded pool/JDBC leases, without a
+new handler clock. Failure audit/concurrency cleanup retains 3B.3's independent short budget on separately
+bounded leases; it cannot disclose data after the request deadline. The completed private structured buffer
+is measured inside the seam as an actual MCP envelope with both identical JSON text and structured copies,
+including escaping and request ID, before final authorization. Structured bytes remain ≤32768 and full
+response ≤65536; excess produces a closed error and no partial payload. The transport rechecks actual final
+bytes and original deadline before network handoff. The final SQL gate/commit/lease close remains mandatory;
+post-gate adapter decoding consumes only the immutable authorized buffer and performs no second read.
+Revocation first denies; handoff authorization first may complete under the existing 3B.3 boundary.
+
+Application outcomes map to exactly INVALID_INPUT, FORBIDDEN, THROTTLED, TIMEOUT, AUDIT_UNAVAILABLE,
+PAYLOAD_TOO_LARGE or UNAVAILABLE. Errors contain only a server correlation UUID and bounded retry-after
+(null except throttling), no structured Case content, exception messages or private metadata. Protocol/auth
+failures remain in the existing transport. Trusted composed schema/response parsing has a separate finite
+depth bound; the incoming request parser remains depth eight with all prior body/header/media checks.
+
+Pre-edit test impact covered catalog/transport/SDK/filter/JDBC, 3B.3 invocation/buffer/encoder/audit/quota,
+ACCESS/OAuth fixtures, production minimized worker/adapter/JDBC, ordinary REST/OpenAPI and WEB/DESKTOP.
+The old no-Case-dependency assertion now forbids raw DAO/SQL/hydration while allowing the mandatory audited
+seam. Default-OFF/empty-catalog tests remain. New adapter tests cover exact wire schema, independent scopes,
+strict arguments, one shared invocation, completed-buffer output and closed errors; data tests cover semantic
+Unicode/UTF-16 bounds, the original deadline and envelope failure before final handoff. Independent clients
+use the existing pinned TypeScript 2.4.0 and Python 2.3.0 implementations, newly issued synthetic OAuth ACCESS,
+restricted SQL identities, production Hikari/runtime initialization and the existing synthetic Case fixture.
+This is synthetic source/protocol/client evidence, never authoritative Case SQL or production acceptance.
+
+Verification receipts will be recorded after execution. Local selector Python: 27 PASS. Canonical schema,
+description, annotations and composed definitions compare equal to §10.9; Python/JavaScript syntax and diff
+checks pass. The initial hosted attempt failed workflow whitespace before tests; the next compiled production
+and passed inherited focused checks but exposed trusted-schema parsing using the request depth ceiling.
+That parser separation is corrected; those failed attempts are not a complete verification receipt.
+
+**Next after 3B.5 acceptance: 3B.6 only.** Implement the sole synthetic-only `get_case_overview` handler
+using exact §10.9 schema and independent `cases.overview.read`, through the existing audited/quota/final-buffer
+seam. Preserve one existing minimized Overview operation, exactly one existing PHI event plus integration
+parent/RETURNED child in its transaction, local timestamp/null/field/byte limits, safe unavailable outcomes,
+independent-client and revocation/scope/deadline/fault proof. Keep search unchanged, every handler/transport
+and real tenant/integration default OFF, and aggregate Phase 3B IN PROGRESS; 3B.7 remains NOT STARTED.
+The missing approved authoritative Case artifact, deployed non-bypass RLS/permissions, SDK prerelease
+production acceptance and live/tenant/legal/operational gates remain open. No production pilot readiness.
+
+No new SQL migration/state/table; no real tenant/integration enablement; no production/Azure SQL;
+no deployment; no installer/version publication. Future deployment order remains:
+(1) build/upload new shale-server JAR with flags OFF; (2) all accumulated unapplied AI migrations in documented
+order; (3) cumulative verifier/permission checks; (4) live OAuth acceptance; (5) live MCP transport acceptance;
+(6) only after 3B.5–3B.7 acceptance consider enabling Case handlers/tenant.
