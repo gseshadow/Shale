@@ -318,6 +318,9 @@ class OAuthAuthorizationFlowTest {
         var issued=new tools.jackson.databind.ObjectMapper().readTree(send(exchangeRequest(freshCode())).getContentAsString());
         String access=issued.path("access_token").asText(),refresh=issued.path("refresh_token").asText();
         assertEquals(43,access.length());
+        var rest=new MockHttpServletRequest("GET","/api/cases/search");rest.addHeader("Authorization","Bearer "+access);
+        var rejection=assertThrows(org.springframework.web.server.ResponseStatusException.class,()->new BearerTokenServerSessionResolver(tokens,new InMemoryTokenRevocationStore()).resolve(rest));
+        assertEquals(401,rejection.getStatusCode().value(),"A live ACCESS credential must fail ordinary REST authority");
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();source.setURL(url(db));source.setUser(login);source.setPassword(secret);
         mcpValidator=new AiAccessTokenValidator(()->{try{return DriverManager.getConnection(url(db),bootstrapLogin,bootstrapSecret);}catch(SQLException e){throw new IllegalStateException(e);}},source,true,ISSUER,RESOURCE);
         try(var mcp=new AnnotationConfigWebApplicationContext()) {
@@ -332,8 +335,11 @@ class OAuthAuthorizationFlowTest {
             }
             for(String token:List.of(refresh,freshCode(),webToken,"a".repeat(43),"malformed.jwt.like"))
                 assertTrue(mcpSend(mcp,sdk,token,"server/discover").getStatus()>=400,"Only ACCESS credentials may authenticate MCP");
-            if("true".equals(System.getenv("SHALE_MCP_EXTERNAL_CLIENTS")))
-                com.shale.server.mcp.McpClientInteropFixture.verifyClients(mcpValidator,access,temp);
+            if("true".equals(System.getenv("SHALE_MCP_EXTERNAL_CLIENTS"))) {
+                var bootstrapSource=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();bootstrapSource.setURL(url(db));
+                bootstrapSource.setUser(bootstrapLogin);bootstrapSource.setPassword(bootstrapSecret);bootstrapSource.setLoginTimeout(2);bootstrapSource.setSocketTimeout(5000);
+                com.shale.server.mcp.McpClientInteropFixture.verifyClients(bootstrapSource,source,ISSUER,RESOURCE,access,temp);
+            }
             var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
             var policy=controls.inspectTenantPolicy();controls.setTenantEnabled(false,policy.rowVersion());
             try {assertEquals(401,mcpSend(mcp,sdk,access,"server/discover").getStatus());}

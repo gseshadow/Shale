@@ -61,7 +61,7 @@ public class McpTransportConfiguration {
         return http.build();
     }
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(AiAccessTokenValidator.class)
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({AiAccessTokenValidator.class,DeadlineAccess.class})
     @ConditionalOnProperty(name="shale.ai.mcp.enabled",havingValue="true")
     DeadlineAccess mcpAccessAuthenticator(McpOAuthProperties identity, Environment env, ObjectProvider<DataSources> sources) {
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();

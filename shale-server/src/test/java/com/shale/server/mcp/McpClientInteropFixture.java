@@ -17,12 +17,16 @@ import static org.mockito.Mockito.*;
 
 /** Real loopback Tomcat + Spring security + SDK transport, using the supplied real SQL ACCESS validator. */
 public final class McpClientInteropFixture {
-    static AiAccessTokenValidator suppliedValidator;
+    static McpTransportConfiguration.DeadlineAccess suppliedAccess;
     @Configuration static class Fixture {
-        @Bean AiAccessTokenValidator validator() {return java.util.Objects.requireNonNull(suppliedValidator);}
+        @Bean McpTransportConfiguration.DeadlineAccess validator() {return java.util.Objects.requireNonNull(suppliedAccess);}
     }
-    public static void verifyClients(AiAccessTokenValidator validator,String TOKEN,Path temp)throws Exception {
-        suppliedValidator=validator;
+    public static void verifyClients(javax.sql.DataSource bootstrap,javax.sql.DataSource runtime,String issuer,String resource,String TOKEN,Path temp)throws Exception {
+        suppliedAccess=(token,deadline)-> {
+            var bootstrapLease=new McpJdbcDeadline(bootstrap,deadline);
+            return new AiAccessTokenValidator(()-> {try{return bootstrapLease.getConnection();}catch(java.sql.SQLException failure){throw new SecurityException();}},
+                    new McpJdbcDeadline(runtime,deadline),true,issuer,resource).validate(token);
+        };
         var tomcat=new org.apache.catalina.startup.Tomcat();tomcat.setBaseDir(temp.toString());tomcat.setPort(0);
         tomcat.getConnector().setProperty("address","127.0.0.1");var tc=tomcat.addContext("",temp.toString());
         try(var context=new AnnotationConfigWebApplicationContext()) {
@@ -77,6 +81,6 @@ public final class McpClientInteropFixture {
                     }
                 }
             }
-        } finally {tomcat.stop();tomcat.destroy();suppliedValidator=null;}
+        } finally {tomcat.stop();tomcat.destroy();suppliedAccess=null;}
     }
 }

@@ -9,7 +9,7 @@ permissions:
   contents: read
 concurrency:
   group: mcp-sdk-compatibility-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   compatibility:
     if: github.ref == 'refs/heads/codex/phase-3b4-transport'
@@ -120,7 +120,17 @@ jobs:
           timeout 900 xvfb-run -a mvn -B -ntp test 2>&1 | tee work/mcp-evidence/critical.log
       - name: Documentation and whitespace
         run: |
-          test -f docs/architecture/ai-integration-and-mcp.md
+          python3 - <<'PY'
+          import pathlib,re,urllib.parse
+          for name in ['docs/architecture/ai-integration-and-mcp.md','docs/azure-app-service-deployment.md']:
+              path=pathlib.Path(name);text=path.read_text()
+              assert sum(line.startswith('```') for line in text.splitlines())%2==0,name
+              for target in re.findall(r'\]\(([^)\s]+)\)',text):
+                  if ':' in target or target.startswith('#'):continue
+                  relative=urllib.parse.unquote(target.split('#',1)[0])
+                  assert (path.parent/relative).exists(),(name,target)
+          print('Documentation fences and relative paths PASS')
+          PY
           git diff --check daec1cc3e1461373029390a697d624cbf7464aca HEAD
       - name: Summarize independent client and conformance evidence
         if: always()
