@@ -1,0 +1,37 @@
+{
+  "version": "1.0.138",
+  "title": "What's New in Shale 1.0.138",
+  "releaseDate": "2026-10-23",
+  "summary": "Draft generated from commit messages since Shale 1.0.137. Review and edit before publishing.",
+  "groups": {
+    "New": [
+      "Add targeted Phase 1R read RLS candidate and isolated synthetic acceptance",
+      "Implement default-off integration persistence and security foundation",
+      "Add isolated default-off OAuth authorization server foundation",
+      "Implement durable self-consent and PKCE authorization code transactions",
+      "Implement opaque OAuth credential issuance and rotating refresh candidate",
+      "Implement Phase 3B.3 audited Case disclosure seam"
+    ],
+    "Improvements": [
+      "docs: reconcile auth retirement and shared API/MCP roadmap",
+      "Replace elevated installer scripts with native per-user registration",
+      "Document legacy migration and verify standard-user installer contracts",
+      "Preserve native build JDK resolution and scheduler safeguards",
+      "test(cases): prove shared secured minimized read operations",
+      "Formalize stable v2 Case REST and OpenAPI contract",
+      "docs: define Phase 3A MCP security and delegation contract",
+      "docs(ai): record Phase 3B.2A OAuth compatibility blocker",
+      "build(server): migrate to supported Spring Boot 4.1.1 baseline",
+      "Validate authorization-code exchange with pinned client proof and durable replay",
+      "Record Phase 3B.2C.1 verification and bounded credential roadmap",
+      "Harden explicit issuance transaction and record verification blockers",
+      "Verify durable OAuth lifecycle and prevent disabled-family resurrection",
+      "Complete authenticated RFC 7009 credential revocation closeout",
+      "feat(ai): validate opaque ACCESS authority through confined live SQL gates",
+      "test(ai): record bounded ACCESS verification and unresolved expiry race",
+      "docs: close Phase 3B.2D expiry-race verification gap",
+      "docs: record blocked Phase 3B.4 MCP compatibility gate"
+    ],
+    "Fixes": []
+  }
+}
