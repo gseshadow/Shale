@@ -1,8 +1,8 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); MCP inactive.
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 BLOCKED (compatibility verification); MCP inactive.
 
-**Last reviewed:** 2026-10-23 (Phase 3B.3 internal audit/disclosure; historical acceptance scopes retained)
+**Last reviewed:** 2026-10-23 (Phase 3B.4 SDK compatibility gate BLOCKED; historical acceptance scopes retained)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of
@@ -697,7 +697,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | OAuth revocation closeout | COMPLETE (source/local synthetic verification) | §10.20; authenticated RFC 7009, atomic family audit, races/replay/restart and full required local verification. |
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | COMPLETE (source/local synthetic verification) | §10.21 expiry closeout; observed SQL lock wait, post-release database UTC rejection, complete affected suite and critical reactor pass. |
 | Phase 3B.3 AI audit/shared disclosure seam | COMPLETE (source/local synthetic verification) | §10.22; mandatory audit/PHI atomicity, bounded buffer and live final handoff; no transport. |
-| Phase 3B.4 MCP transport/discovery | NOT STARTED | No route, dependency or discovery through 3B.3. |
+| Phase 3B.4 MCP transport/discovery | BLOCKED (compatibility verification) | §10.23; stable SDK lacks the pinned revision; modern prerelease candidate requires dependency/build/client verification unavailable in this environment. No transport implementation or dependency adopted. |
 | Phase 3B.5 search_cases | NOT STARTED | No MCP Case tool handler. |
 | Phase 3B.6 get_case_overview | NOT STARTED | No MCP Case tool handler. |
 | Phase 3B.7 adversarial/local acceptance | NOT STARTED | Authoritative Case artifact and remaining operational/security/client acceptance required. |
@@ -726,7 +726,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4+ remain NOT STARTED.
+durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is BLOCKED at compatibility verification (§10.23); 3B.5–3B.7 remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -3351,3 +3351,168 @@ requires authoritative Case SQL, deployed permissions/RLS and explicit later ope
 Explicitly: no `/mcp`, JSON-RPC/MCP transport, public AI data endpoint or public resource accepting AI
 bearers; no real tenant/integration enabled; WEB/DESKTOP remains authoritative; AI defaults OFF; no
 production/Azure SQL, deployment, installer/version publication or production acceptance.
+
+### 10.23 Phase 3B.4 MCP SDK compatibility assessment — 2026-10-23
+
+**Status: BLOCKED at dependency/runtime compatibility verification; transport implementation NOT STARTED.**
+This is a documentation-only blocker record, not completion of 3B.4 and not a finding that the modern
+SDK is necessarily incompatible. No SDK is adopted. The required first gate cannot be demonstrated
+with this environment's unavailable Maven and unreachable shell-network proxy. Do not write a custom
+MCP parser/transport or downgrade the pinned protocol to work around that gate.
+
+The live GitHub branch API identifies `origin/codex/latest` as
+`47aa5ada36d37ddbd43a103433eeb661c797d37d` (merged #1912 / 3B.3).
+Command-line `git fetch origin codex/latest` failed once because the configured proxy's port 8080
+was unreachable. A bounded curl diagnosis failed at the same proxy, before TLS or GitHub authentication;
+no repeated fetch/download attempts followed. The working GitHub connector retrieved the exact commit,
+recursive tree and selected source blobs. Their Git SHA-1 object identities were verified before creating
+the separate sparse task worktree/branch `codex/phase-3b4-mcp-compatibility`.
+The stale original checkout was not modified. This connector reconstruction is not a successful CLI fetch.
+
+#### Live maintained SDK evidence and selection decision
+
+On this review date the official
+[latest stable release](https://api.github.com/repos/modelcontextprotocol/java-sdk/releases/latest)
+is **2.1.0**, and the newer
+[2.2.0-M1 release](https://github.com/modelcontextprotocol/java-sdk/releases/tag/v2.2.0-M1)
+is explicitly **prerelease**. Both were checked live through the official GitHub repository, rather than
+inferred from the task's prepared version information.
+
+| Evaluated SDK | Actual protocol evidence | Decision |
+| --- | --- | --- |
+| **2.1.0 — stable** | Tagged `ProtocolVersions` defines 2024-11-05, 2025-03-26, 2025-06-18 and 2025-11-25. Its servlet Streamable HTTP provider advertises only 2025-03-26, 2025-06-18 and 2025-11-25. It has no modern 2026-07-28 contract. | Reject for this pinned increment; a stable release cannot justify silent protocol downgrade. |
+| **2.2.0-M1 — prerelease** | Tagged `io.modelcontextprotocol.modern.McpSchema.LATEST_PROTOCOL_VERSION` is exactly `2026-07-28`. The release introduces the independent modern server and reports 37/37 required conformance scenarios. It explicitly does not yet supply a modern client. | Candidate for a resumed compatibility probe only. Not adopted without the actual Shale dependency/build/transport evidence below. |
+
+Source references:
+[stable version constants](https://github.com/modelcontextprotocol/java-sdk/blob/v2.1.0/mcp-core/src/main/java/io/modelcontextprotocol/spec/ProtocolVersions.java),
+[stable HTTP versions](https://github.com/modelcontextprotocol/java-sdk/blob/v2.1.0/mcp-core/src/main/java/io/modelcontextprotocol/server/transport/HttpServletStreamableServerTransportProvider.java),
+[modern schema](https://github.com/modelcontextprotocol/java-sdk/blob/v2.2.0-M1/mcp-core/src/main/java/io/modelcontextprotocol/modern/McpSchema.java),
+[modern servlet](https://github.com/modelcontextprotocol/java-sdk/blob/v2.2.0-M1/mcp-core/src/main/java/io/modelcontextprotocol/modern/server/transport/HttpServletMcpTransport.java).
+The milestone's modern servlet is stateless, handles each POST independently, and returns 405 for GET/DELETE;
+it does not mint protocol session IDs. It can return plain JSON or request-scoped SSE. Its optional
+subscription path is not approved for Shale. These are upstream source findings, not Shale runtime results.
+
+#### Dependency comparison and unresolved gate
+
+Shale's inspected parent imports Boot **4.1.1**, retains Java **21**, and the merged baseline records
+Framework **7.0.9**, Security **7.1.1**, Servlet **6.1**, application Jackson **3.1.5** (§10.15–10.16).
+Those effective versions are inherited recorded evidence; no dependency tree was resolved afresh here.
+
+| Dependency area | Tagged SDK declarations | Compatibility finding / outstanding proof |
+| --- | --- | --- |
+| Java | Both evaluated SDK parent POMs target Java 17. | Java 21 meets the declared bytecode baseline; runtime compilation not executed here. |
+| Spring / Security | The modern servlet/core path has no Spring Boot/Security adapter dependency. The parent contains `springframework.version=6.2.1`; that property is not itself a runtime dependency in the inspected core/Jackson modules. | Do not infer a Framework 6 downgrade from an unused property, or compatibility with Framework 7 from servlet source alone. Resolve the actual server graph and start the composed application. |
+| Servlet | Core declares `jakarta.servlet-api:6.1.0`, provided scope. | Matches Shale's declared Servlet generation. Verify embedded Tomcat and servlet registration/async/filter behavior in Shale. |
+| Jackson | `mcp` selects `mcp-json-jackson3`; the milestone pins databind **3.1.4**, annotations **2.21**, and NetworkNT validator **3.0.6**. Jackson 2 is a separate optional module. | Shale manages Jackson 3.1.5. Inspect effective mediation and validate the SDK mapper/validator with that version; do not swap the application mapper or silently add a second Jackson baseline. |
+| Reactor | Stable SDK imports **2024.0.0**; milestone imports **2026.0.0-M2**, with core depending on `reactor-core`. | Milestone Reactor is an additional prerelease dependency concern. Boot's actual mediated Reactor version and binary compatibility remain unverified. Neither force the milestone BOM nor assume Boot's managed version works without evidence. |
+
+Tagged [SDK parent POM](https://github.com/modelcontextprotocol/java-sdk/blob/v2.2.0-M1/pom.xml),
+[core POM](https://github.com/modelcontextprotocol/java-sdk/blob/v2.2.0-M1/mcp-core/pom.xml),
+[Jackson 3 POM](https://github.com/modelcontextprotocol/java-sdk/blob/v2.2.0-M1/mcp-json-jackson3/pom.xml)
+and [aggregate POM](https://github.com/modelcontextprotocol/java-sdk/blob/v2.2.0-M1/mcp/pom.xml)
+were inspected. No demonstrated Shale dependency conflict is claimed; resolution/build/startup are
+**unexecuted**, so a safe compatible combination is not yet proven. A separate live Boot tagged-source
+lookup returned 404; it supplies no fresh BOM evidence and does not override Shale's recorded baseline.
+`mvn -version` returned command not found; no Maven wrapper exists in the inspected repository tree.
+No dependency download or full reactor was repeatedly retried.
+
+#### Preserved transport, authority and catalog boundary
+
+No `/mcp` servlet/filter/controller, SDK dependency, JSON-RPC parser, GET/SSE endpoint, protocol session,
+or transport configuration is added. OAuth composition remains independently default OFF. The existing
+opaque ACCESS validator is internal: `AiAccessTokenValidator.validate` uses confined digest resolution
+and fresh tenant/user runtime validation to create immutable `VerifiedIntegrationContext`. Its bearer
+parser rejects duplicate/malformed credentials. No REST bearer resolver is replaced or expanded.
+
+The existing `IntegrationInvocation`, `IntegrationCaseReadService` and `DisclosureBuffer` remain internal
+3B.3 seams. This assessment installs no consumer of them. MCP cannot invoke `CaseServicePort`, read Case
+SQL, or create `IntegrationAccessAudit.ALLOWED_READ`. No new sensitive read or administrative/domain
+mutation exists, so no PHI/integration/entity-action audit event or SQL migration is appropriate.
+Pure future discovery/catalog calls remain operational security telemetry only (§10.5); this exception
+must never cover a protected read.
+
+The existing namespace-only OAuth security chain, no Basic/form/session fallback, WEB/DESKTOP authority,
+canonical configured `publicOrigin`, production HTTPS rules and hostile-forwarded-header tests remain
+untouched. This is static preservation, not newly executed regression evidence. RFC 9728 metadata remains
+prepared but **unmounted**: there is no actual MCP resource to advertise. When transport is implemented,
+publish only `resource=${publicOrigin}/mcp` and
+`authorization_servers=[${publicOrigin}/oauth/mcp]`, conditionally and truthfully, reusing the existing
+metadata contract.
+
+For resumed 3B.4, retain the exact 2026-07-28 `server/discover` contract, not legacy `initialize`.
+Use fixed reviewed server identity, only implemented capabilities, and an **empty callable tools catalog**
+while both data handlers are disabled. Keep the two eventual names/scopes in a closed server registry:
+`cases.search -> search_cases` and `cases.overview.read -> get_case_overview`; visibility requires both
+handler activation and the verified live scope. A scope alone must not advertise a disabled handler.
+Unknown/disabled tools must fail with a bounded protocol error and no shared Case call. This is the
+implementation decision for the next attempt, not a catalog implemented by this change.
+
+The remaining mandatory work includes exact configured Origin matching (403 for invalid supplied Origin;
+missing Origin is normal for nonbrowser callers, never identity), production HTTPS and canonical identity
+independent of Host/Forwarded, one POST endpoint with every POST authenticated, strict bounded protocol/
+metadata/content-type/Accept checks, closed safe errors, cancellation and immediate admission limits.
+Retain §10.7's **8 KiB** uncompressed request maximum, depth **8**, string IDs at most **64 ASCII** chars,
+errors at most **4 KiB**, and **10 seconds** across authentication through serialization/handoff.
+The SDK's default 16 MiB body limit and blocking calls are not Shale acceptance. Prove an entry-established
+deadline is never restarted at the later invocation seam. No data queue, session cache or protected stream.
+
+#### Conformance, clients, test impact and evidence classification
+
+The upstream [modern conformance instructions](https://github.com/modelcontextprotocol/java-sdk/blob/v2.2.0-M1/conformance-tests/server-servlet-modern/README.md)
+use **@modelcontextprotocol/conformance 0.2.0-alpha.12** with `--requirements 2026-07-28`.
+Its [validation record](https://github.com/modelcontextprotocol/java-sdk/blob/v2.2.0-M1/conformance-tests/VALIDATION_RESULTS.md)
+reports 37/37 required modern scenarios, but also identifies unscored failing SEP-2243 custom-header
+validation and unsupported tasks. Pending/unscored does not waive a specification MUST. Shale prohibits
+`x-mcp-header` annotations on Case arguments and advertises no tasks; the resumed gate must assess the
+applicability of each limitation and run the relevant maintained scenarios. Upstream scores do not prove
+Shale conformance or supply either independent client result.
+
+| Verification item | Result / evidence class for this assessment |
+| --- | --- |
+| Live Shale base, official releases and tagged declarations | Executed remote source/metadata inspection; local Git object hash verification. |
+| SDK dependency graph/build and composed startup | BLOCKED: Maven unavailable; configured shell proxy unreachable. No compatible SDK selected. |
+| SDK transport conformance, default-OFF combinations, headers/body/Origin/proxy/auth/discovery/no-handler tests | NOT RUN: transport not implemented after the first gate. |
+| Independent client #1 / exact version / results | NOT SELECTED / NOT RUN. No interoperability claim. |
+| Independent client #2 / exact version / results | NOT SELECTED / NOT RUN. At least one must use a different implementation from the server; this remains a completion gate. |
+| OAuth/code/refresh/revocation/ACCESS and 3B.3 regressions | NOT RUN here; prior §10.16–10.22 receipts retain their exact recorded scopes. |
+| WEB/DESKTOP and REST/OpenAPI regressions; affected/critical Maven suites | NOT RUN here; no runtime source changed, Maven unavailable. No inherited pass is counted as a new run. |
+| Selector affected plan | Executed: documentation-only, no selected modules/tests, no full-suite escalation. Its generic critical suggestion is unexecuted; no runtime acceptance implied. |
+| Selector Python | Executed once: 27 tests, 24 PASS / 3 FAIL. Sparse checkout omits SettingsFxmlLoadTest, SemanticControlCssContractTest and the full critical-test catalog, so catalog/inventory assertions fail. This is not a full selector pass or a demonstrated production regression. No selector/test source was changed to conceal it. |
+| Documentation / whitespace | Local fence/link-existence/runbook consistency checks and final git diff checks recorded with the PR; initial extra deployment-file EOF blank line corrected. |
+
+Pre-edit test-impact inventory reviewed `AiAccessContractTest`, `IntegrationAccessContractTest`,
+`IntegrationCaseReadTest`, `OAuthFilterIsolationTest`, `OAuthMetadataTest`, their production authority/
+configuration/seam classes, parent/server POMs and default application properties. No production symbol,
+constructor, SQL statement, DTO, selector contract or existing test expectation changes. No new runtime
+test is added merely to test prose. Runtime verification sequence stops at the blocked first gate;
+unexecuted client/conformance/regression checks are not passing evidence.
+
+```text
+3B.1                 COMPLETE (recorded source/local synthetic scope)
+3B.2                 COMPLETE (recorded source/local synthetic scope)
+3B.3                 COMPLETE (source/local synthetic verification)
+3B.4                 BLOCKED (dependency/runtime compatibility verification)
+3B.5                 NOT STARTED
+3B.6                 NOT STARTED
+3B.7                 NOT STARTED
+Aggregate Phase 3B   IN PROGRESS
+MCP transport        NOT IMPLEMENTED; inactive
+```
+
+**Exact next recommendation:** restore a working managed shell proxy and Maven 3.9.x/JDK21, then resume
+**3B.4's compatibility gate first**, reevaluating current official releases. If no stable release meets
+2026-07-28, document and prove the modern prerelease dependency combination on the unchanged Boot
+baseline before adopting it in shale-server only. Complete transport, two independent client and focused/
+affected/critical verification before marking 3B.4 complete. **Do not start 3B.5** while this gate remains
+blocked. After 3B.4 passes, 3B.5 may implement only the isolated synthetic `search_cases` handler through
+the existing audited buffer seam; Overview remains for 3B.6 and real enablement for later acceptance.
+
+The [cumulative deployment sequence](../azure-app-service-deployment.md#future-ai-oauth-deployment-sequence--through-phase-3b2d)
+is preserved: build/upload server JAR; execute every unapplied accumulated AI migration in order; run
+cumulative verifier/permission checks; perform live OAuth acceptance; only then MCP transport acceptance.
+Keep Case handlers and real tenants disabled until the later 3B.5–3B.7 gates are explicitly complete.
+
+Explicitly: `search_cases` is not implemented as an MCP handler; `get_case_overview` is not implemented
+as an MCP handler; MCP cannot disclose Case data; no public REST endpoint accepts AI bearer tokens;
+no real tenant/integration is enabled; WEB/DESKTOP remains authoritative; AI defaults remain OFF.
+No production/Azure SQL, deployment, installer/version publication or full MCP conformance is claimed.

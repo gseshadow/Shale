@@ -587,7 +587,8 @@ revocation; only explicit Logout revokes the durable session. Logged-out automat
 
 ## Future AI OAuth deployment sequence — through Phase 3B.2D
 
-This stable linked sequence now also includes the Phase 3B.3 internal audit/disclosure candidate.
+This stable linked sequence includes the Phase 3B.3 internal audit/disclosure candidate.
+Phase 3B.4 is blocked at SDK compatibility verification; it adds no transport, dependency or SQL migration.
 
 This is a cumulative future operator sequence, **not authorization to deploy, run production/Azure SQL,
 enable a tenant, publish an installer/version or perform live acceptance in this task**. Keep every AI
@@ -617,7 +618,12 @@ session authority and previously completed deployment/security records above rem
    No public protected resource accepts these access tokens. 3B.2D is internal ACCESS validation;
    3B.3 adds only the internal audited buffered seam. MCP transport/discovery and public data handling remain later.
    Live OAuth acceptance starts only after SQL migrations, the cumulative verifier and server deployment all succeed.
-5. Do not enable MCP or any real tenant/integration until the later acceptance gates are explicitly satisfied.
+5. Only after server deployment, all accumulated SQL migrations/verifier/permission checks and live OAuth
+   acceptance succeed, perform separately authorized MCP transport acceptance with synthetic identities.
+   First complete the source/local 3B.4 SDK, protocol and two-independent-client gates; no transport is
+   implemented by the blocked compatibility assessment. Keep Case data handlers disabled.
+6. Do not enable Case MCP handlers or a real tenant/integration until the later 3B.5–3B.7 gates are
+   explicitly complete and operational enablement is separately authorized.
 
 Rollback disables OAuth/AI and revokes credential families while retaining all additive storage, receipts,
 consumption/replay/audit/revocation history and the configured token namespace. Re-enable cannot restore
