@@ -7,7 +7,7 @@ def graph(name):
     text = (ROOT / name).read_text()
     selected = {}
     for line in text.splitlines():
-        if "(omitted for" in line:
+        if "omitted for" in line:
             continue
         match = re.search(r"([\w.-]+):([\w.-]+):jar:([^\s]+):(compile|runtime|test|provided)", line)
         if match:
