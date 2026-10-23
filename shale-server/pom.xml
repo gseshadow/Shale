@@ -21,12 +21,11 @@
     </properties>
 
     <dependencies>
-        <!-- Prerelease compatibility experiment only; no production SDK adoption. -->
+        <!-- Phase 3B.4 implementation candidate; prerelease, NOT production acceptance. -->
         <dependency>
             <groupId>io.modelcontextprotocol.sdk</groupId>
             <artifactId>mcp-json-jackson3</artifactId>
             <version>2.2.0-M1</version>
-            <scope>test</scope>
         </dependency>
         <!-- Authorization Server is maintained within Security 7; version follows the Boot BOM.
              Use the library, not the starter's operational endpoint auto-configuration. -->
@@ -91,6 +90,10 @@
                 </configuration>
                 <executions>
                     <execution>
+                        <id>mcp-trusted-build-info</id>
+                        <goals><goal>build-info</goal></goals>
+                    </execution>
+                    <execution>
                         <goals>
                             <goal>repackage</goal>
                         </goals>
@@ -100,3 +103,4 @@
         </plugins>
     </build>
 </project>
+
