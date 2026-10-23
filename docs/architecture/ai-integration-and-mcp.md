@@ -1,8 +1,8 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 BLOCKED (compatibility verification); MCP inactive.
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 IN PROGRESS (SDK compatibility gate PASSED; transport implementation NOT STARTED); MCP inactive.
 
-**Last reviewed:** 2026-10-23 (Phase 3B.4 SDK compatibility gate BLOCKED; historical acceptance scopes retained)
+**Last reviewed:** 2026-10-23 (Phase 3B.4 SDK compatibility gate PASSED; transport NOT STARTED; historical acceptance scopes retained)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of
@@ -697,7 +697,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | OAuth revocation closeout | COMPLETE (source/local synthetic verification) | §10.20; authenticated RFC 7009, atomic family audit, races/replay/restart and full required local verification. |
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | COMPLETE (source/local synthetic verification) | §10.21 expiry closeout; observed SQL lock wait, post-release database UTC rejection, complete affected suite and critical reactor pass. |
 | Phase 3B.3 AI audit/shared disclosure seam | COMPLETE (source/local synthetic verification) | §10.22; mandatory audit/PHI atomicity, bounded buffer and live final handoff; no transport. |
-| Phase 3B.4 MCP transport/discovery | BLOCKED (compatibility verification) | §10.23; stable SDK lacks the pinned revision; modern prerelease candidate requires dependency/build/client verification unavailable in this environment. No transport implementation or dependency adopted. |
+| Phase 3B.4 MCP transport/discovery | IN PROGRESS | §10.24: SDK compatibility gate PASSED for 2.2.0-M1, a prerelease COMPATIBLE CANDIDATE only; transport implementation NOT STARTED. Test-scoped dependency only; no production adoption or client/conformance acceptance. |
 | Phase 3B.5 search_cases | NOT STARTED | No MCP Case tool handler. |
 | Phase 3B.6 get_case_overview | NOT STARTED | No MCP Case tool handler. |
 | Phase 3B.7 adversarial/local acceptance | NOT STARTED | Authoritative Case artifact and remaining operational/security/client acceptance required. |
@@ -726,7 +726,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is BLOCKED at compatibility verification (§10.23); 3B.5–3B.7 remain NOT STARTED.
+durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is IN PROGRESS: SDK compatibility gate PASSED (§10.24), transport implementation NOT STARTED; 3B.5–3B.7 remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -3354,6 +3354,9 @@ production/Azure SQL, deployment, installer/version publication or production ac
 
 ### 10.23 Phase 3B.4 MCP SDK compatibility assessment — 2026-10-23
 
+Historical blocker receipt from merged PR #1913. The hosted compatibility evidence in §10.24 supersedes
+this environment blocker; the original unexecuted checks below remain historical, not current failures.
+
 **Status: BLOCKED at dependency/runtime compatibility verification; transport implementation NOT STARTED.**
 This is a documentation-only blocker record, not completion of 3B.4 and not a finding that the modern
 SDK is necessarily incompatible. No SDK is adopted. The required first gate cannot be demonstrated
@@ -3516,3 +3519,151 @@ Explicitly: `search_cases` is not implemented as an MCP handler; `get_case_overv
 as an MCP handler; MCP cannot disclose Case data; no public REST endpoint accepts AI bearer tokens;
 no real tenant/integration is enabled; WEB/DESKTOP remains authoritative; AI defaults remain OFF.
 No production/Azure SQL, deployment, installer/version publication or full MCP conformance is claimed.
+
+### 10.24 Phase 3B.4 hosted SDK compatibility gate — 2026-10-23
+
+**Classification: COMPATIBLE CANDIDATE — prerelease compatibility only, not production approval.**
+
+```text
+3B.4                       IN PROGRESS
+SDK compatibility gate     PASSED
+transport implementation   NOT STARTED
+3B.5–3B.7                  NOT STARTED
+MCP transport              NOT IMPLEMENTED; inactive
+```
+
+#### Execution and provenance
+
+The live base was `71e39b863f5929022dba5b6dae9642be88dbb28a`, merged PR #1913.
+Repository access, branch creation and publication used the GitHub connector; unrelated local work was
+preserved. The owner explicitly authorized this one-off GitHub Actions execution despite the standing
+no-Actions-testing policy. That policy is unchanged.
+
+[Successful hosted run 40003308175](https://github.com/gseshadow/Shale/actions/runs/40003308175)
+tested commit `e2996902fac2f072185276b1f71f1fa50e05196e` on branch
+`codex/phase-3b4-sdk-actions-probe`. Job `120584742200` used GitHub-hosted Ubuntu 24.04,
+Temurin Java **21.0.12.1** and Maven **3.10.0**. Maven Central dependency access, compilation and
+actual runtime tests succeeded. No dependency cache was restored.
+
+[Evidence artifact 12522769245](https://github.com/gseshadow/Shale/actions/runs/40003308175/artifacts/12522769245)
+retains the environment versions, official release metadata, full verbose baseline/candidate dependency
+trees, effective POM, resolved-version summary, compile/smoke/focused/affected/critical logs, selector
+plan and Python output, and Surefire XML. Its ZIP SHA-256 is
+`527d004077c2a940a88c8154721f9148049e38bc39c405d00da7f02236b3c3d2`;
+the configured artifact retention expires November 6, 2026. The immutable run logs also show the
+selected graph, protocol smoke result and focused/critical receipts.
+
+The first hosted attempt stopped on an evidence-parser bug: omitted duplicate nodes were counted as
+selected. The next stopped on an unattached Tomcat test context. Both probe defects were corrected;
+neither is evidence of SDK incompatibility. The successful run compiled and exercised the corrected
+test, and ran the critical reactor exactly once. No full reactor was used to debug either probe defect.
+
+#### Candidate and actual selected dependencies
+
+Official [2.2.0-M1 release metadata](https://api.github.com/repos/modelcontextprotocol/java-sdk/releases/tags/v2.2.0-M1)
+was checked again through the connector and by the hosted runner: `prerelease=true`, modern stateless
+2026-07-28 server, 37 required upstream conformance scenarios, no modern client, and declared Reactor
+BOM 2026.0.0-M2. Those upstream statements are not Shale conformance or production approval.
+
+The only direct SDK dependency is `io.modelcontextprotocol.sdk:mcp-json-jackson3:2.2.0-M1`,
+**test scope in shale-server**. It brings `io.modelcontextprotocol.sdk:mcp-core:2.2.0-M1` in test
+scope. No aggregate/client/Spring adapter or Jackson 2 MCP module is added. No SDK types cross
+shale-core, service ports, DAOs or Case contracts; no production dependency is adopted.
+
+| Area | Actual selected result | Evidence / mediation |
+| --- | --- | --- |
+| Java / Boot | Java 21; Boot 4.1.1 | Runner version output, effective POM and runtime assertions. |
+| Spring Framework | 7.0.9 | Core/beans/context/AOP/expression/web/webmvc/test; unchanged from baseline. |
+| Spring Security | 7.1.1 | Core/config/crypto/web/OAuth2 modules; unchanged from baseline. |
+| Tomcat / Servlet | Embedded core/EL/websocket 11.0.24; bundled Servlet 6.1 | Actual started Tomcat context reports major 6/minor 1. Core SDK's provided servlet dependency does not add a second API JAR. No javax.servlet or Servlet downgrade. |
+| Application Jackson 3 | Core/databind 3.1.5; SDK YAML 3.1.5 in test scope | Boot mediates SDK databind/YAML declarations from 3.1.4. Actual mapper version is 3.1.5. |
+| Shared Jackson annotations | 2.21 | Shared annotation package used by Jackson 3; not Jackson 2 databind takeover. |
+| Existing Jackson 2 | Core/databind/YAML/JSR310 2.21.5 | Unchanged baseline Springdoc/Swagger internal graph; Boot mediates Swagger's 2.22.1 declarations. SDK mapper/provider uses Jackson 3; no Jackson 2 MCP provider. |
+| Reactor / reactive streams | reactor-core 3.8.7; reactive-streams 1.0.4 | Boot-managed selection; no Reactor BOM import, version override or milestone Reactor artifact. Actual modern dispatch and servlet POST path pass. |
+| NetworkNT | json-schema-validator 3.0.6 | Test scope; provider initialization, valid/invalid schema-content checks pass with managed Jackson. |
+| Logging | SLF4J API/JUL bridge 2.0.18; Logback core/classic 1.5.38; Log4j API/SLF4J bridge 2.25.5 | Existing Boot-managed logging graph retained; SDK SLF4J 2.0.16 and validator 2.0.17 declarations mediated. |
+| Netty / other HTTP server | No Netty introduced; existing embedded Tomcat retained | Full candidate tree retained in the artifact; no new HTTP server/transport framework. |
+
+Verbose trees retain duplicate/conflicting edges and managed-from versions. The checker compared the
+selected baseline framework and Jackson 2 graph with the candidate rather than asserting compatibility
+from a POM alone. No global framework or Reactor override was used.
+
+#### Runtime proof and regression receipts
+
+`McpSdkCompatibilityTest` constructs actual modern `McpServer` and
+`HttpServletMcpTransport` objects in test-only code. Its Spring context starts; a separate loopback
+Tomcat 11 container starts with Servlet 6.1, and the SDK servlet initializes against that context
+**without being registered at any route**. Independent direct POST calls return JSON without an HTTP
+session, protocol session header or prior initialize/GET exchange. A stray synthetic session header
+does not become required authority; no session header is minted. GET/DELETE return 405 and the JSON
+path starts no async/SSE stream. No subscription feature or Case feature is configured.
+
+The compiled API constant `io.modelcontextprotocol.modern.McpSchema.LATEST_PROTOCOL_VERSION`
+is asserted equal to **2026-07-28**. The actual default server accepts that revision and advertises only
+that supported version; it rejects 2025-11-25 with the SDK's unsupported-protocol error and the exact
+supported-version list. This is executed implementation proof, not release-note inference.
+
+The SDK service loader selects `JacksonMcpJsonMapper`, whose mapper reports **3.1.5**. Modern JSON-RPC
+requests and `McpSchema.DiscoverResult` serialize/deserialize successfully; malformed JSON is rejected,
+invalid JSON-RPC arrays are rejected, and the servlet emits the expected parse-error response.
+NetworkNT's selected provider initializes and distinguishes valid/invalid structured content. Existing
+REST/OpenAPI and context tests independently retain ordinary application mapper behavior.
+
+| Verification | Result |
+| --- | --- |
+| Dependency resolution, effective POM and verbose baseline/candidate trees | PASS; no unresolved compatibility conflict. |
+| Compile | PASS; parent/core/data/server compile with release 21. |
+| Modern SDK/Jackson/Servlet smoke | **3 PASS**, no failures/errors/skips. |
+| Focused regressions | **228 PASS**: 101 data and 127 server checks, no failures/errors/skips. |
+| Included live synthetic ACCESS/disclosure SQL | **58 PASS**, selected `AiSecurityLocalSqlServerTest#access*+disclosure*`; skip explicitly rejected as evidence. |
+| Maintained OAuth authorization/issuance/refresh/revocation filters | **12 PASS** in `OAuthAuthorizationFlowTest`, backed by the disposable SQL fixture. |
+| WEB / remembered DESKTOP / REST / context | Focused AuthController, durable/remembered sessions, logout/session controllers, ApiReadController, OpenApiDocumentation and service/context tests PASS. |
+| Selector Python | **27 PASS**. |
+| Affected selector suite | PASS; selector selected the directly added SDK compatibility class in shale-server with upstream modules. |
+| Critical reactor | **188 PASS**, all seven modules BUILD SUCCESS, no failures/errors/skips; executed once after viability/focused checks. |
+| Historical all-tests profile | Informational escalation for the POM/scaffolding; not run and not needed to replace the focused receipts. |
+| Documentation / whitespace | Hosted checks PASS; final documentation and final diff checked separately after scaffolding removal. |
+
+The focused inventory also covers OAuth configuration/client mapping/PKCE/revocation/assertion/metadata
+and namespace isolation, AiAccessContract, IntegrationAccessContract and IntegrationCaseRead.
+Existing assertions/production contracts were not changed to obtain passes. SQL uses a task-owned
+2022 Developer container published only on loopback, disposable synthetic databases/restricted identities
+and an ephemeral masked password. It was removed at job end. No production or Azure SQL access occurred.
+
+Representative exact commands (the historical workflow records all flags and bounded timeouts):
+
+```bash
+mvn -B -ntp -U -pl shale-server -am -Dmaven.test.skip=true install
+mvn -B -ntp -pl shale-server dependency:tree -Dverbose -DoutputFile=target/mcp-dependency-tree.txt
+mvn -B -ntp -pl shale-server help:effective-pom -Doutput=target/mcp-effective-pom.xml
+mvn -B -ntp -pl shale-server -am -Dtest=McpSdkCompatibilityTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -ntp -pl shale-server -am '-Dtest=OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,Ai*ContractTest,AiSecurityLocalSqlServerTest#access*+disclosure*,IntegrationAccessContractTest,IntegrationCaseReadTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest' -Dsurefire.failIfNoSpecifiedTests=false test
+python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+python3 build/test-selection/select_tests.py --base 71e39b863f5929022dba5b6dae9642be88dbb28a --head HEAD --format markdown --plan-output work/mcp-evidence/selection.json
+xvfb-run -a mvn -B -ntp -pl shale-server -am -Dtest=com.shale.server.mcp.McpSdkCompatibilityTest -Dsurefire.failIfNoSpecifiedTests=false test
+xvfb-run -a mvn -B -ntp test
+git diff --check 71e39b863f5929022dba5b6dae9642be88dbb28a HEAD
+```
+
+#### Cleanup, audit boundary and next increment
+
+**Temporary workflow decision: REMOVED**, together with the three workflow-only evidence helpers.
+The [tested workflow source](https://github.com/gseshadow/Shale/blob/e2996902fac2f072185276b1f71f1fa50e05196e/.github/workflows/mcp-sdk-compatibility-probe.yml)
+and run/artifact remain reviewable. The final change retains only the test-scoped dependency, the
+compatibility test and this roadmap receipt. The tested POM and Java test are unchanged by cleanup;
+no additional reactor run is claimed or needed for the subsequent documentation/scaffolding deletion.
+
+This increment introduces no sensitive read, administrative/domain mutation, SQL migration or
+production audit event. The existing audit schema/seams remain unchanged; their synthetic regression
+tests are evidence of preservation, not a new MCP audit consumer.
+
+**Next:** a separate Phase 3B.4 default-off transport/discovery increment may proceed using this
+prerelease as the proven compatibility candidate. It still requires the complete pinned security/
+protocol/body/Origin/deadline/no-handler contracts, two independent clients and relevant conformance/
+regression evidence before 3B.4 can be COMPLETE. The upstream modern-client/custom-header/tasks
+limitations remain subject to that increment's applicability review. Do not begin 3B.5 handlers here.
+
+Explicitly: no `/mcp`, MCP security filter chain, discovery/tool endpoint, MCP Case handler,
+`search_cases` or `get_case_overview` implementation; no Case disclosure or IntegrationAccessAudit
+from MCP; no real tenant/integration enablement; AI defaults OFF; no production/Azure SQL;
+no deployment or installer/version publication.
