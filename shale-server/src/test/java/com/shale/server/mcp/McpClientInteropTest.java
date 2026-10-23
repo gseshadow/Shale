@@ -43,13 +43,21 @@ class McpClientInteropTest {
             assertTrue(context.getBeansOfType(com.shale.core.service.CaseServicePort.class).isEmpty());
             var registration=context.getBean("mcpServlet",org.springframework.boot.web.servlet.ServletRegistrationBean.class);
             var servlet=(HttpServletMcpTransport)registration.getServlet();
-            org.apache.catalina.startup.Tomcat.addServlet(tc,"mcp",servlet);tc.addServletMappingDecoded("/mcp","mcp");
-            var definition=new FilterDef();definition.setFilterName("springMcp");definition.setFilter(context.getBean(FilterChainProxy.class));tc.addFilterDef(definition);
-            var mapping=new FilterMap();mapping.setFilterName("springMcp");mapping.addURLPattern("/mcp");tc.addFilterMap(mapping);
+            org.apache.catalina.startup.Tomcat.addServlet(tc,"mcp",servlet).setAsyncSupported(true);tc.addServletMappingDecoded("/mcp","mcp");
+            var definition=new FilterDef();definition.setAsyncSupported("true");definition.setFilterName("springMcp");definition.setFilter(context.getBean(FilterChainProxy.class));tc.addFilterDef(definition);
+            var mapping=new FilterMap();mapping.setFilterName("springMcp");mapping.addURLPattern("/mcp");mapping.setDispatcher("REQUEST");mapping.setDispatcher("ASYNC");tc.addFilterMap(mapping);
+            var body=new FilterDef();body.setFilterName("body");body.setAsyncSupported("true");body.setFilter(new McpBodyFilter());tc.addFilterDef(body);
+            var bodyMapping=new FilterMap();bodyMapping.setFilterName("body");bodyMapping.addURLPattern("/mcp");bodyMapping.setDispatcher("REQUEST");bodyMapping.setDispatcher("ASYNC");tc.addFilterMapBefore(bodyMapping);
             var off=new FilterDef();off.setFilterName("off");off.setFilter(new McpGate(new McpTransportProperties(false,Set.of()),
                     new com.shale.server.oauth.McpOAuthProperties(null,null,false),false,t->{throw new AssertionError();}));tc.addFilterDef(off);
             var offMapping=new FilterMap();offMapping.setFilterName("off");offMapping.addURLPattern("/off");tc.addFilterMap(offMapping);
             tomcat.start();String base="http://127.0.0.1:"+tomcat.getConnector().getLocalPort();
+            try(var socket=new java.net.Socket("127.0.0.1",tomcat.getConnector().getLocalPort())) {
+                socket.setSoTimeout(13000);
+                socket.getOutputStream().write(("POST /mcp HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 64\r\n\r\n{").getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                var reader=new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()));
+                assertTrue(reader.readLine().contains("504"),"Slow body must time out before authentication, with no detached work");
+            }
             Path evidence=Path.of("../work/mcp-evidence");Files.createDirectories(evidence);
             for(var command:List.of(List.of("node","../build/mcp-transport/client-ts.mjs"),
                     List.of("../work/mcp-clients/bin/python","../build/mcp-transport/client-python.py"))) {

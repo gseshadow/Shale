@@ -25,7 +25,7 @@ final class McpGate extends OncePerRequestFilter {
     private final McpTransportProperties properties;
     private final McpOAuthProperties identity;
     private final boolean global;
-    private final Function<String,VerifiedIntegrationContext> authenticate;
+    private final java.util.function.BiFunction<String,Long,VerifiedIntegrationContext> authenticate;
     private final Semaphore active=new Semaphore(5);
     private final java.util.function.LongSupplier nanoTime;
     private final io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper mapper=McpTransportConfiguration.mapper();
@@ -35,11 +35,16 @@ final class McpGate extends OncePerRequestFilter {
     }
     McpGate(McpTransportProperties properties,McpOAuthProperties identity,boolean global,
             Function<String,VerifiedIntegrationContext> authenticate,java.util.function.LongSupplier nanoTime) {
+        this(properties,identity,global,(token,deadline)->authenticate.apply(token),nanoTime);
+    }
+    McpGate(McpTransportProperties properties,McpOAuthProperties identity,boolean global,
+            java.util.function.BiFunction<String,Long,VerifiedIntegrationContext> authenticate,java.util.function.LongSupplier nanoTime) {
         this.properties=properties;this.identity=identity;this.global=global;this.authenticate=authenticate;this.nanoTime=nanoTime;
     }
+    @Override protected boolean shouldNotFilterAsyncDispatch() { return false; }
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)
             throws ServletException,IOException {
-        long deadline=nanoTime.getAsLong()+MAX_NANOS;
+        long deadline=request.getAttribute(McpBodyFilter.ADMISSION) instanceof McpBodyFilter.Admission admission ? admission.deadline : nanoTime.getAsLong()+MAX_NANOS;
         response.setHeader("Cache-Control","no-store");
         if (!properties.enabled()) { fail(response,404,"disabled"); return; }
         String path=request.getRequestURI().substring(request.getContextPath().length());
@@ -56,12 +61,14 @@ final class McpGate extends OncePerRequestFilter {
         catch (Rejected rejected) { fail(response,rejected.status,rejected.code);return; }
         if (!active.tryAcquire()) { response.setHeader("Retry-After","1");fail(response,429,"throttled");return; }
         try {
+            check(deadline);
             VerifiedIntegrationContext authority;
             try {
                 if (!global || request.getQueryString()!=null || request.getCookies()!=null && request.getCookies().length>0) throw new SecurityException();
-                authority=authenticate.apply(AiBearerParser.extract(Collections.list(request.getHeaders("Authorization"))));
+                authority=authenticate.apply(AiBearerParser.extract(Collections.list(request.getHeaders("Authorization"))),deadline);
                 if (authority==null || authority.credentialId()==null) throw new SecurityException();
             } catch (RuntimeException denied) {
+                check(deadline);
                 response.setHeader("WWW-Authenticate","Bearer resource_metadata=\""+identity.publicOrigin()+OAuthMetadataContract.PROTECTED_RESOURCE_PATH+"\"");
                 fail(response,401,"unauthorized");return;
             }
@@ -169,7 +176,7 @@ final class McpGate extends OncePerRequestFilter {
         final int status;final String code;
         Rejected(int status,String code) { super(null,null,false,false);this.status=status;this.code=code; }
     }
-    private static final class BodyRequest extends HttpServletRequestWrapper {
+    static final class BodyRequest extends HttpServletRequestWrapper {
         private final byte[] body;
         BodyRequest(HttpServletRequest request,byte[] body) { super(request);this.body=body; }
         @Override public int getContentLength() { return body.length; }

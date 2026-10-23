@@ -44,7 +44,7 @@ public class McpTransportConfiguration {
     }
     @Bean @Order(0)
     SecurityFilterChain mcpTransportChain(HttpSecurity http, McpTransportProperties transport, McpOAuthProperties identity,
-            Environment env, ObjectProvider<AiAccessTokenValidator> validators) throws Exception {
+            Environment env, ObjectProvider<AiAccessTokenValidator> validators, ObjectProvider<DeadlineAccess> bounded) throws Exception {
         transport.validate(identity);
         http.securityMatcher(request -> {
             String path=request.getRequestURI().substring(request.getContextPath().length());
@@ -57,22 +57,35 @@ public class McpTransportConfiguration {
                 .sessionManagement(c->c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(c->c.anyRequest().permitAll());
         http.addFilterBefore(new McpGate(transport,identity,env.getProperty("shale.ai.enabled",Boolean.class,false),
-                token->validators.getObject().validate(token)),SecurityContextHolderFilter.class);
+                (token,deadline)->{var fixture=validators.getIfAvailable();return fixture!=null?fixture.validate(token):bounded.getObject().validate(token,deadline);},System::nanoTime),SecurityContextHolderFilter.class);
         return http.build();
     }
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(AiAccessTokenValidator.class)
     @ConditionalOnProperty(name="shale.ai.mcp.enabled",havingValue="true")
-    AiAccessTokenValidator mcpAccessValidator(McpOAuthProperties identity, Environment env, ObjectProvider<DataSources> sources) {
+    DeadlineAccess mcpAccessAuthenticator(McpOAuthProperties identity, Environment env, ObjectProvider<DataSources> sources) {
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();
         source.setURL(env.getRequiredProperty("shale.ai.oauth.bootstrap.jdbc-url"));
         source.setUser(env.getRequiredProperty("shale.ai.oauth.bootstrap.username"));
         source.setPassword(env.getRequiredProperty("shale.ai.oauth.bootstrap.password"));
         source.setLoginTimeout(2); source.setSocketTimeout(5000);
-        return new AiAccessTokenValidator(()-> {
-            try { return source.getConnection(); }
-            catch(java.sql.SQLException unavailable) { throw new SecurityException("Integration authentication failed."); }
-        },sources.getObject().runtime(),env.getProperty("shale.ai.enabled",Boolean.class,false),identity.issuer(),identity.resource());
+        return (token,deadline)-> {
+            var bootstrap=new McpJdbcDeadline(source,deadline);
+            var runtime=new McpJdbcDeadline(sources.getObject().runtime(),deadline);
+            return new AiAccessTokenValidator(()-> {
+                try { return bootstrap.getConnection(); }
+                catch(java.sql.SQLException unavailable) { throw new SecurityException("Integration authentication failed."); }
+            },runtime,env.getProperty("shale.ai.enabled",Boolean.class,false),identity.issuer(),identity.resource()).validate(token);
+        };
+    }
+    @FunctionalInterface interface DeadlineAccess { com.shale.data.security.ai.VerifiedIntegrationContext validate(String token,long deadline); }
+    @Bean
+    @ConditionalOnProperty(name="shale.ai.mcp.enabled",havingValue="true")
+    org.springframework.boot.web.servlet.FilterRegistrationBean<McpBodyFilter> mcpBodyAdmission() {
+        var registration=new org.springframework.boot.web.servlet.FilterRegistrationBean<>(new McpBodyFilter());
+        registration.addUrlPatterns("/mcp");registration.setDispatcherTypes(jakarta.servlet.DispatcherType.REQUEST,jakarta.servlet.DispatcherType.ASYNC);
+        registration.setAsyncSupported(true);registration.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE+10);
+        return registration;
     }
     @Bean
     @ConditionalOnProperty(name="shale.ai.mcp.enabled",havingValue="true")
@@ -87,7 +100,7 @@ public class McpTransportConfiguration {
                 .contextExtractor(request->McpTransportContext.create(Map.of(McpGate.AUTHORITY,request.getAttribute(McpGate.AUTHORITY))))
                 .build();
         var registration=new ServletRegistrationBean<>(servlet,"/mcp");
-        registration.setName("shaleMcp");registration.setAsyncSupported(false);registration.setLoadOnStartup(1);
+        registration.setName("shaleMcp");registration.setAsyncSupported(true);registration.setLoadOnStartup(1);
         return registration;
     }
 }
