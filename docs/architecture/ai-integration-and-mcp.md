@@ -1,8 +1,8 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 IN PROGRESS (SDK compatibility gate PASSED; transport implementation NOT STARTED); MCP inactive.
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); MCP transport defaults OFF.
 
-**Last reviewed:** 2026-10-23 (Phase 3B.4 SDK compatibility gate PASSED; transport NOT STARTED; historical acceptance scopes retained)
+**Last reviewed:** 2026-10-23 (Phase 3B.4 source/local protocol/client verification COMPLETE; MCP default OFF; historical scopes retained)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of
@@ -697,7 +697,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | OAuth revocation closeout | COMPLETE (source/local synthetic verification) | §10.20; authenticated RFC 7009, atomic family audit, races/replay/restart and full required local verification. |
 | Phase 3B.2D live credential validation + VerifiedIntegrationContext | COMPLETE (source/local synthetic verification) | §10.21 expiry closeout; observed SQL lock wait, post-release database UTC rejection, complete affected suite and critical reactor pass. |
 | Phase 3B.3 AI audit/shared disclosure seam | COMPLETE (source/local synthetic verification) | §10.22; mandatory audit/PHI atomicity, bounded buffer and live final handoff; no transport. |
-| Phase 3B.4 MCP transport/discovery | IN PROGRESS | §10.24: SDK compatibility gate PASSED for 2.2.0-M1, a prerelease COMPATIBLE CANDIDATE only; transport implementation NOT STARTED. Test-scoped dependency only; no production adoption or client/conformance acceptance. |
+| Phase 3B.4 MCP transport/discovery | COMPLETE (source/local protocol/client verification) | §10.25: default-OFF modern transport, empty catalog, real synthetic ACCESS/two-client proof and applicable conformance/regressions. Prerelease SDK remains a production-acceptance item; no Case handler. |
 | Phase 3B.5 search_cases | NOT STARTED | No MCP Case tool handler. |
 | Phase 3B.6 get_case_overview | NOT STARTED | No MCP Case tool handler. |
 | Phase 3B.7 adversarial/local acceptance | NOT STARTED | Authoritative Case artifact and remaining operational/security/client acceptance required. |
@@ -726,7 +726,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is IN PROGRESS: SDK compatibility gate PASSED (§10.24), transport implementation NOT STARTED; 3B.5–3B.7 remain NOT STARTED.
+durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is COMPLETE at source/local protocol/client scope (§10.25), with transport default OFF and prerelease production acceptance still open; 3B.5–3B.7 remain NOT STARTED.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -3667,3 +3667,249 @@ Explicitly: no `/mcp`, MCP security filter chain, discovery/tool endpoint, MCP C
 `search_cases` or `get_case_overview` implementation; no Case disclosure or IntegrationAccessAudit
 from MCP; no real tenant/integration enablement; AI defaults OFF; no production/Azure SQL;
 no deployment or installer/version publication.
+
+### 10.25 Phase 3B.4 default-OFF transport and discovery — 2026-10-23
+
+**Status: COMPLETE (source/local protocol/client verification through hosted loopback fixtures).** Source is on
+[`codex/phase-3b4-transport`](https://github.com/gseshadow/Shale/pull/1915), based on
+`daec1cc3e1461373029390a697d624cbf7464aca` (merged #1914).
+The original checkout is preserved. The managed environment has no Maven and its configured proxy refused
+the first Git fetch; work uses the GitHub connector and the user's explicitly authorized temporary hosted
+workflow. The standing no-Actions-testing policy is unchanged.
+
+#### Production boundary and mounted behavior
+
+Only shale-server adopts `io.modelcontextprotocol.sdk:mcp-json-jackson3:2.2.0-M1` in compile scope;
+its minimum transitive SDK module is `mcp-core:2.2.0-M1`. This is a **prerelease implementation
+candidate, not production approval**. No aggregate/client/Spring adapter/Jackson 2 MCP provider or Reactor
+milestone BOM is imported. No SDK type crosses shale-core, service ports, DAOs or shared Case contracts.
+
+`shale.ai.mcp.enabled=false` is an independent explicit transport switch. `shale.ai.enabled=false`
+is a further startup denial, separate from OAuth composition/authorization/exchange. Every live ACCESS
+validation independently enforces the existing SQL global capability, tenant policy, registration,
+grant/session/user/credential state and intersected scopes. No positive authorization cache is introduced.
+
+When transport is OFF, its SDK servlet and body-admission filter are absent; the narrow security gate
+returns bounded 404 for `/mcp` and the exact protected-resource metadata path. OAuth can operate
+independently. When ON, only POST is MCP transport; GET/PUT/PATCH/DELETE/OPTIONS/HEAD receive 405 and
+`Allow: POST`. There is no GET SSE stream, session identifier, cookie authority, prior handshake,
+subscription, replay, automatic retry or sticky-session requirement.
+
+Modern 2026-07-28 uses **`server/discover`, not legacy `initialize`**. Every POST, including catalog
+and discovery, authenticates using `AiBearerParser` and `AiAccessTokenValidator`. Duplicate Authorization,
+query/cookie credentials, ordinary WEB JWTs, remembered DESKTOP credentials, refresh/code/assertion-shaped
+credentials and malformed JWTs never become integration authority. Failure is terminal. Verified authority
+is an immutable request attribute copied into that request's SDK transport context and removed in finally;
+it is never installed into Spring's ordinary principal, a session, static map or ThreadLocal.
+
+Spring Security has exactly two disjoint namespace chains: the existing OAuth chain and the new exact
+`/mcp` / protected-resource metadata chain. There is no catch-all resource-server chain, Basic/form login,
+generated user, WEB or DESKTOP fallback. Ordinary controllers/session resolvers and OpenAPI keep their
+existing authority. The new body filter is registered only for `/mcp`.
+
+#### Canonical identity, Origin and metadata
+
+Reuse `McpOAuthProperties` as the single canonical issuer/resource authority. Production identity requires
+HTTPS and the existing explicit nonproduction profile rules remain. Host, Forwarded and X-Forwarded headers
+never supply issuer, resource, tenant identity or an allowed Origin.
+
+`shale.ai.mcp.allowed-origins` contains at most eight canonical serialized exact origins. Production
+origins require HTTPS; wildcards, null, noncanonical case, trailing slashes and explicit default-port aliases
+are rejected at configuration. A supplied Origin must match byte for byte, with no normalization at request
+time; invalid Origin is 403. Missing Origin is normal for nonbrowser callers and supplies no authority.
+No permissive CORS/preflight surface is added.
+
+With both transport and startup capability ON, GET
+`/.well-known/oauth-protected-resource/mcp` publishes only the existing
+`OAuthMetadataContract.protectedResource` map:
+`resource=${publicOrigin}/mcp`, `authorization_servers=[${publicOrigin}/oauth/mcp]`.
+It contains no tenant/client/grant/scope inventory. AS metadata logic is not duplicated. Authentication
+failure uses the canonical RFC 9728 resource_metadata challenge; token state remains non-oracular.
+
+#### Closed catalog, identity and limits
+
+Fixed server name: `shale-mcp`; version comes from trusted Boot build-info (`development` for an
+unpackaged fixture). Supported versions contain only `2026-07-28`. The SDK owns JSON-RPC parsing,
+metadata/header agreement, modern dispatch and response schemas. Unsupported older/future versions never
+downgrade. Discovery advertises only the implemented tools catalog. No resources, prompts, sampling,
+elicitation, tasks, roots, subscriptions or logging extension is advertised.
+
+The closed registry internally names `cases.search -> search_cases` and
+`cases.overview.read -> get_case_overview`. Visibility requires **scope present AND handler activated**.
+Both activation values are fixed false; `tools/list` returns an empty callable catalog even with both
+scopes. `tools/call` returns a fixed invalid-parameters error for every name; neither Case name is a
+handler. There is no dynamic registry, client schema registration, reflection tool dispatch, arbitrary SQL
+or generic application gateway. JDBC lease decoration uses only fixed JDBC interfaces, never client input
+or handler/class discovery.
+
+| Boundary | Implemented ceiling |
+| --- | --- |
+| Body | 8192 decoded bytes; no compression/upload/document/PDF channel; early declared-length rejection and bounded chunked reads. |
+| Parser | Depth 8; strict duplicate keys/trailing-token rejection; numeric token length 20; JSON-RPC string IDs at most 64 printable ASCII characters; method length 128. |
+| Headers | One value each: Authorization 50, Origin 240, protocol version 32, Accept 256, Content-Type 128, Mcp-Method 128, Mcp-Name 256 ASCII characters; controls/duplicates rejected. Mcp-Param-* and session headers rejected. |
+| Media | application/json, optionally UTF-8; Accept must permit finite application/json, respecting specific q=0 exclusions. No arbitrary content fallback or SSE-only catalog. |
+| Time | One admission deadline, 10 seconds, carried through nonblocking body read, authentication, SDK parsing/dispatch and final serialized handoff; never restarted after body arrival. |
+| Process admission | Five active requests, including slow bodies; immediate 429 with Retry-After: 1, no MCP work queue. Existing durable data quotas remain the later read authority. |
+| Serialization/errors | Finite buffered JSON, at most 4096 bytes in this no-handler phase; no partial handoff. Fixed HTTP/JSON-RPC errors preserve codes and safe unsupported-version data, never exception/client method text. |
+
+The upload filter uses servlet nonblocking reads and a request-owned async timeout solely to bound that
+single POST's body. It dispatches once into the normal namespace chain; there is no SSE stream or detached
+handler. Disconnect/error/completion releases admission state. ACCESS JDBC leases carry the same remaining
+monotonic budget: the existing Hikari 5.1 runtime pool is borrowed through its bounded-borrow API without
+changing ordinary pool settings, and network/statement timeouts are clipped before downstream operations.
+Leases restore network settings and close synchronously. No application work is retried or replayed.
+The pilot's data-read durable quota/audit/final-disclosure seam is neither replaced nor invoked here.
+
+SDK modern parser DEBUG logging contains raw JSON upstream. A closed Logback filter suppresses modern SDK
+payload/exception loggers even under root DEBUG; application JSON/logging configuration elsewhere is
+unchanged. MCP query request-line DEBUG/TRACE messages are suppressed before rejected query credentials can be logged.
+Transport errors contain only closed codes. No Authorization, token, raw arguments, prompt,
+Case DTO/PHI or future query string is logged.
+
+#### Audit compatibility, persistence and verification
+
+Protocol calls are pure metadata: initialize rejection, discovery, catalog, invalid method and resource
+metadata create no PHI or IntegrationAccessAudit ALLOWED_READ. There is no Case read/application injection.
+Production MCP sources have no dependency on CaseServicePort, CaseServiceAdapter, IntegrationCaseReadService
+or CaseSummaryDao. **No migration**: reuse existing registration/credentials/grants/sessions/quota/audit
+state; no transport/session persistence is added.
+
+Tests cover default OFF and independent OAuth enablement; global startup/tenant live denial; strict
+bearer/header/media/Origin/proxy/version/parser/error behavior; process shedding and cleanup; original
+admission deadline and bounded JDBC borrow; actual slow partial-body timeout; fixed identity/empty catalog;
+ordinary startup/security/OpenAPI preservation. The SQL fixture installs only existing candidate migrations
+into task-owned loopback disposable SQL databases, issues ACCESS through the maintained OAuth code/PKCE
+flow, runs real validation through the mounted transport and asserts zero protected read audit/PHI rows.
+The MCP database deliberately has no Cases table or Case permissions; no Case data is seeded in this fixture.
+
+Pinned independent clients:
+- TypeScript `@modelcontextprotocol/client 2.4.0`: `node build/mcp-transport/client-ts.mjs`, modern pin
+  `versionNegotiation.mode={pin:"2026-07-28"}`, Streamable HTTP finite JSON.
+- Python `mcp 2.3.0`: `work/mcp-clients/bin/python build/mcp-transport/client-python.py`,
+  `Client(streamable_http_client(...), mode="auto")`, asserted negotiated 2026-07-28.
+Both use a freshly issued synthetic ACCESS bearer via MCP_URL/MCP_TOKEN/MCP_OFF_URL environment variables;
+the credential is never printed. They verify discovery/server identity/empty catalog, valid/bad bearer,
+invalid Origin, unsupported version, unknown method and transport OFF. Python negative protocol probes
+use its underlying httpx2 client; its positive discovery/catalog use the independent MCP implementation.
+No Case handler is called.
+
+Selected upstream `@modelcontextprotocol/conformance 0.2.0-alpha.12` scenarios run with
+`--spec-version 2026-07-28`: server-stateless and tools-list. Upstream dns-rebinding-protection explicitly
+targets unauthenticated localhost servers and is not applicable to this ACCESS-protected profile; the
+authenticated exact-Origin/proxy matrix is tested independently. The upstream CLI
+has no bearer option; a test-only fetch preload injects the fresh synthetic ACCESS token only for the exact
+task-owned loopback endpoint. The Spring/auth/Origin/body/header/SDK layers remain mounted. This is not
+an unauthenticated adapter or a production bypass. Per-check results and unsupported fixture/capability
+skips must be recorded before completion; the other resource/prompt/Case/tool/MRTR/task fixture scenarios
+are not implemented or advertised. Neither upstream's 37/37 SDK receipt nor a selected run is a claim
+of full Shale conformance.
+
+#### Executed hosted receipts and evidence classification
+
+[Successful run 40023220028](https://github.com/gseshadow/Shale/actions/runs/40023220028), job
+`120652906640`, tested commit `8de6a6910afc4411776a1f794904f7aa3db22922` on GitHub-hosted Ubuntu 24.04,
+Temurin Java 21.0.12.1 / Maven 3.10.0. This is **executed source/hosted synthetic loopback protocol/client
+verification**, not local-shell Maven, deployed TLS/proxy, authoritative Case SQL or production acceptance.
+The runtime graph retains Boot 4.1.1, Framework 7.0.9, Security 7.1.1, Tomcat 11.0.24 / Servlet 6.1,
+Jackson 3.1.5 and Boot-managed Reactor 3.8.7. Effective POM and verbose baseline/candidate trees are retained.
+
+[Evidence artifact 12531154131](https://github.com/gseshadow/Shale/actions/runs/40023220028/artifacts/12531154131)
+retains the dependency graphs/effective POM, compile/smoke/focused/affected/critical logs, selector plan,
+Python output, exact npm lockfile, client records, raw conformance checks/applicability report and Surefire
+XML. GitHub reports ZIP SHA-256
+`674d3a34f27d2303f5e3455634274be44fcd761ec42c763195793a32b37a38d8`, retained through November 6, 2026.
+The immutable hosted run logs also print the client/conformance records and regression summaries.
+
+| Verification | Actual result |
+| --- | --- |
+| Dependency resolution, compile, effective POM and verbose trees | PASS; minimum two SDK modules in shale-server compile graph; no global Reactor/framework override. |
+| SDK/transport/parser/Origin/header/media/deadline/load/logging + startup/OpenAPI smoke | **38 PASS**, no failures/errors/skips: 25 MCP/SDK and 13 existing startup/OpenAPI checks. |
+| Focused OAuth/ACCESS/disclosure/WEB/DESKTOP/REST/context | **229 PASS**, no failures/errors/skips: 101 data + 128 server; includes **58 actual synthetic ACCESS/disclosure SQL** and **13 maintained OAuth/MCP flow** checks. |
+| Independent TypeScript client 2.4.0 | PASS; modern discovery/identity/empty catalog and all five rejection/OFF scenarios. Real freshly issued ACCESS, production ACCESS factory, actual SQL and Hikari. |
+| Independent Python client 2.3.0 | PASS; same six scenario records, modern 2026-07-28 asserted; no Case call. |
+| Applicable upstream conformance | **23 SUCCESS per pass**: 21 server-stateless + 2 tools-list/wire-schema checks; executed in focused and affected runs. Details below. |
+| Affected selector batch | PASS; exact generated shale-server/upstream Maven batch is retained in selection.json and affected.log. |
+| Critical reactor | **188 PASS**, all seven modules BUILD SUCCESS, no failures/errors/skips; executed once after focused and affected viability. |
+| Selector Python | **27 PASS**. |
+| Documentation / whitespace | Hosted fences/relative paths and base-to-head diff check PASS; final documentation/scaffolding cleanup checked separately. |
+| Historical all-tests profile | Informational selector escalation for dependency/build files; not run, not substituted for focused/affected/critical receipts. |
+
+Conformance is **not full Shale conformance**. The unmodified `server-stateless` scenario exits **1**:
+it records four raw **FAILURE / Not testable** checks because the deliberately empty catalog does not
+provide `test_missing_capability` (two checks), `test_streaming_elicitation` or `test_logging_tool`.
+These diagnostics would require enabling extra tools/client callbacks/streaming that this increment does
+not implement or advertise. Their four exact IDs are preserved in raw checks and explicitly classified
+as unavailable diagnostic fixtures; no raw outcome is rewritten to PASS. Five subscription checks are
+upstream SKIPPED because subscriptions/list-change streams are absent. `tools-list` exits **0**, with two
+SUCCESS and two INFO observations about the empty list. Any other conformance FAILURE fails the fixture.
+Across focused plus affected execution the raw artifacts contain 46 SUCCESS, 8 unavailable diagnostic
+fixture failures and 10 upstream skips; per-pass counts above avoid presenting repeats as extra coverage.
+
+The other 35 required scenario fixtures were not executed against this no-handler increment. They cover
+resource/prompt/tool execution, streaming/MRTR/completion and the unauthenticated-localhost DNS profile;
+none is advertised here. In particular the upstream DNS scenario explicitly targets servers **without
+authentication**, uses undici independently of the bearer preload, and is not an acceptance test for
+Shale's configured ACCESS/HTTPS profile. Own authenticated Origin/Host/forwarded-header and no-stream
+checks execute against Shale. No upstream 37/37 claim is inherited or asserted.
+
+The MCP SQL fixture has **no Cases table or Case permissions**. It creates only the pre-existing audit
+shape needed to install the existing 3B.3 candidate; no Case data is seeded or read. Requests run through
+the actual composed security/SDK transport and production bounded ACCESS factory, backed by the maintained
+OAuth code/PKCE issuer, restricted bootstrap identity, live SQL validation and real Hikari pool. Fresh
+live ACCESS is rejected by the ordinary REST resolver. Live tenant/global disable denies MCP; startup
+global-OFF starts without SQL credentials. Every protocol/client/conformance run leaves PHI and
+IntegrationAccessAudit ALLOWED_READ counts at **zero**. Existing 3B.3 read regressions use their separate
+explicitly synthetic data-worker fixtures and do not expose a Case tool through MCP.
+
+Earlier attempts exposed import/whitespace/runner-command and test-fixture defects, including a
+component-scanned helper configuration and a duplicate-header mutation in the external test. Those were
+corrected before the successful run. No framework rollback, assertion weakening or Case handler was used
+to obtain a pass. Obsolete startup expectations were updated to two isolated chains and explicit MCP-OFF
+404 while preserving every ordinary route/wire/schema/WEB/DESKTOP assertion.
+
+**Temporary workflow: REMOVED from final diff.** The exact task-authorized workflow remains inspectable at
+[the tested commit](https://github.com/gseshadow/Shale/blob/8de6a6910afc4411776a1f794904f7aa3db22922/.github/workflows/mcp-transport-acceptance.yml).
+The optional independent-client fixtures remain for reproducibility; they install no standing CI/test gate.
+Final cleanup changes only documentation and removes that workflow; retained production/test/client Git
+blobs are identical to the tested commit. No additional reactor run is claimed for cleanup.
+
+Representative commands (full flags and generated selector batch are in the retained workflow/artifact):
+
+```bash
+mvn -B -ntp -U -pl shale-server -am -Dmaven.test.skip=true install
+mvn -B -ntp -pl shale-server -am -Dtest=McpSdkCompatibilityTest,McpTransportTest,McpFilterIsolationTest,McpJdbcDeadlineTest,OpenApiDocumentationTest,ShaleServerServiceConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+python3 build/test-selection/select_tests.py --base daec1cc3e1461373029390a697d624cbf7464aca --head HEAD --format markdown --plan-output work/mcp-evidence/selection.json
+xvfb-run -a mvn -B -ntp test
+git diff --check daec1cc3e1461373029390a697d624cbf7464aca HEAD
+```
+
+```text
+3B.1                 COMPLETE
+3B.2                 COMPLETE
+3B.3                 COMPLETE
+3B.4                 COMPLETE (source/local protocol/client verification)
+3B.5                 NOT STARTED
+3B.6                 NOT STARTED
+3B.7                 NOT STARTED
+Aggregate Phase 3B   IN PROGRESS
+MCP transport        EXISTS IN SOURCE; default OFF
+```
+
+**Recommendation:** proceed to a separate 3B.5 synthetic-only bounded `search_cases` implementation
+through the existing audited/quota/final-buffer seam, preserving the original transport deadline.
+Do not implement Overview until 3B.6, enable a real tenant/integration, or treat this prerelease candidate
+as production approved. Remaining production/authoritative/live acceptance gates below are unchanged.
+
+3B.1/3B.2/3B.3 retain their recorded COMPLETE scopes; aggregate 3B remains IN PROGRESS; 3B.5/3B.6/3B.7
+remain NOT STARTED. Prerelease SDK production acceptance, authoritative Case SQL, live deployment/TLS/proxy,
+tenant/legal and real-data acceptance remain independent later gates.
+
+The cumulative deployment order is preserved: (1) build/upload the new shale-server JAR, with AI/MCP OFF;
+(2) apply every accumulated unapplied AI migration in documented order; (3) cumulative verifier and
+non-bypass permission checks; (4) live OAuth acceptance; (5) MCP transport acceptance; (6) only later
+Case handler/tenant enablement after 3B.5–3B.7 acceptance. No deployment occurs in this phase.
+
+Explicitly: **search_cases is not an MCP handler; get_case_overview is not an MCP handler; MCP cannot
+disclose Case data.** No real tenant/integration is enabled; no production/Azure SQL, deployment,
+installer/version publication or production approval is performed.

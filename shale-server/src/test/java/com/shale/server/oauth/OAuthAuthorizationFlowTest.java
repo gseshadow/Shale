@@ -47,6 +47,11 @@ class OAuthAuthorizationFlowTest {
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c1.sql")));
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2c2.sql")));
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/revocation.sql")));
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b2d.sql")));
+            // Existing audit shape only: deliberately no Cases table, Case rows or Case permissions.
+            sql(c,"CREATE TABLE dbo.AuditLog(Id bigint IDENTITY PRIMARY KEY,ShaleClientId int NOT NULL,UserId int,ObjectTypeId int,ObjectId bigint,FieldName varchar(64),FieldCode int,StringValue nvarchar(500),DateValue date,BooleanValue bit,IntValue int,EntryDate datetime2)");
+            sql(c,"ALTER SECURITY POLICY sec.TenantFilter ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.AuditLog");
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b3.sql")));
             sql(c,"CREATE USER ["+bootstrapLogin+"] FOR LOGIN ["+bootstrapLogin+"]; ALTER ROLE AiIntegrationBootstrap ADD MEMBER ["+bootstrapLogin+"]");
             sql(c,"CREATE USER ["+login+"] FOR LOGIN ["+login+"]; ALTER ROLE AiIntegrationRuntime ADD MEMBER ["+login+"]; ALTER ROLE AiCapabilityOperator ADD MEMBER ["+login+"]");
         }
@@ -63,7 +68,7 @@ class OAuthAuthorizationFlowTest {
         try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,72,'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
         context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
         context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url",url(db),"shale.ai.oauth.bootstrap.username",bootstrapLogin,"shale.ai.oauth.bootstrap.password",bootstrapSecret)));
-        context.register(McpOAuthSecurityConfiguration.class,Fixtures.class);context.refresh();
+        context.register(McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class,Fixtures.class);context.refresh();
     }
     @Configuration static class Fixtures {
         @Bean ShaleAuthTokenService tokens(){return tokens;}
@@ -232,7 +237,8 @@ class OAuthAuthorizationFlowTest {
             var request=new MockHttpServletRequest("GET","/mcp");request.addHeader("Authorization","Bearer "+token);
             var response=new MockHttpServletResponse();var escaped=new java.util.concurrent.atomic.AtomicBoolean();
             context.getBean(FilterChainProxy.class).doFilter(request,response,(q,res)->escaped.set(true));
-            assertTrue(escaped.get(),"No bearer/MCP security surface may accept these credentials");
+            assertFalse(escaped.get(),"Default-OFF MCP must terminate without ordinary authentication fallback");
+            assertEquals(404,response.getStatus());
         }
     }
 
@@ -305,4 +311,56 @@ class OAuthAuthorizationFlowTest {
         assertEquals(200,send(refreshRequest(body.path("refresh_token").asText())).getStatus(),"Audit failure must roll back family revocation");
     }
 
+
+    @Test void mountedMcpUsesRealAccessGateRejectsOtherKindsAndCreatesNoCaseAudit(@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
+        var issued=new tools.jackson.databind.ObjectMapper().readTree(send(exchangeRequest(freshCode())).getContentAsString());
+        String access=issued.path("access_token").asText(),refresh=issued.path("refresh_token").asText();
+        assertEquals(43,access.length());
+        var rest=new MockHttpServletRequest("GET","/api/cases/search");rest.addHeader("Authorization","Bearer "+access);
+        var rejection=assertThrows(org.springframework.web.server.ResponseStatusException.class,()->new BearerTokenServerSessionResolver(tokens,new InMemoryTokenRevocationStore()).resolve(rest));
+        assertEquals(401,rejection.getStatusCode().value(),"A live ACCESS credential must fail ordinary REST authority");
+        var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();source.setURL(url(db));source.setUser(login);source.setPassword(secret);
+        var mcpValidator=new AiAccessTokenValidator(()->{try{return DriverManager.getConnection(url(db),bootstrapLogin,bootstrapSecret);}catch(SQLException e){throw new IllegalStateException(e);}},source,true,ISSUER,RESOURCE);
+        try(var mcp=new org.springframework.web.context.support.GenericWebApplicationContext()) {
+            mcp.setServletContext(new MockServletContext());mcp.getEnvironment().setActiveProfiles("test");
+            mcp.getEnvironment().getPropertySources().addFirst(new MapPropertySource("mcp",Map.of(
+                    "shale.ai.mcp.enabled",true,"shale.ai.enabled",true,"shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST")));
+            mcp.registerBean(AiAccessTokenValidator.class,()->mcpValidator);
+            new org.springframework.context.annotation.AnnotatedBeanDefinitionReader(mcp).register(McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class);
+            mcp.refresh();
+            var sdk=(jakarta.servlet.Servlet)mcp.getBean("mcpServlet",org.springframework.boot.web.servlet.ServletRegistrationBean.class).getServlet();
+            for(String method:List.of("server/discover","tools/list","unknown/method")) {
+                var response=mcpSend(mcp,sdk,access,method);assertEquals(method.equals("unknown/method")?404:200,response.getStatus(),response.getContentAsString());
+                assertFalse(response.getContentAsString().contains("Synthetic"));
+            }
+            for(String token:List.of(refresh,freshCode(),webToken,"a".repeat(43),"malformed.jwt.like"))
+                assertTrue(mcpSend(mcp,sdk,token,"server/discover").getStatus()>=400,"Only ACCESS credentials may authenticate MCP");
+            if("true".equals(System.getenv("SHALE_MCP_EXTERNAL_CLIENTS"))) {
+                com.shale.server.mcp.McpClientInteropFixture.verifyClients(url(db),bootstrapLogin,bootstrapSecret,source,access,temp);
+            }
+            var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
+            var policy=controls.inspectTenantPolicy();controls.setTenantEnabled(false,policy.rowVersion());
+            try {assertEquals(401,mcpSend(mcp,sdk,access,"server/discover").getStatus());}
+            finally {controls.setTenantEnabled(true,controls.inspectTenantPolicy().rowVersion());}
+            var fresh=send(exchangeRequest(freshCode()));assertEquals(200,fresh.getStatus());
+            String freshAccess=new tools.jackson.databind.ObjectMapper().readTree(fresh.getContentAsString()).path("access_token").asText();
+            assertEquals(200,mcpSend(mcp,sdk,freshAccess,"server/discover").getStatus());
+            var capability=new AiProductCapabilityService(()->{try{return DriverManager.getConnection(url(db),login,secret);}catch(SQLException e){throw new IllegalStateException(e);}});
+            capability.setEnabled(false,capability.inspect().rowVersion());
+            try {assertEquals(401,mcpSend(mcp,sdk,freshAccess,"server/discover").getStatus());}
+            finally {capability.setEnabled(true,capability.inspect().rowVersion());}
+            try(var c=owner(db);var q=c.createStatement();var rows=q.executeQuery("SELECT (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'),(SELECT COUNT(*) FROM dbo.AuditLog),CASE WHEN OBJECT_ID(N'dbo.Cases') IS NULL THEN 1 ELSE 0 END")) {
+                assertTrue(rows.next());assertEquals(0,rows.getInt(1));assertEquals(0,rows.getInt(2));assertEquals(1,rows.getInt(3),"MCP fixture must contain no Cases table");
+            }
+        }
+    }
+    MockHttpServletResponse mcpSend(org.springframework.web.context.WebApplicationContext context,jakarta.servlet.Servlet sdk,String token,String method)throws Exception {
+        var request=new MockHttpServletRequest("POST","/mcp");request.setServletPath("/mcp");request.setContentType("application/json");
+        request.addHeader("Accept","application/json");request.addHeader("Authorization","Bearer "+token);
+        request.addHeader("MCP-Protocol-Version","2026-07-28");request.addHeader("Mcp-Method",method);
+        request.setContent(io.modelcontextprotocol.json.McpJsonDefaults.getMapper().writeValueAsBytes(new io.modelcontextprotocol.modern.JsonRpc.JSONRPCRequest(method,"sql",Map.of("_meta",Map.of(
+                io.modelcontextprotocol.modern.McpSchema.MetaKeys.PROTOCOL_VERSION,"2026-07-28",io.modelcontextprotocol.modern.McpSchema.MetaKeys.CLIENT_CAPABILITIES,Map.of())))));
+        var response=new MockHttpServletResponse();context.getBean(FilterChainProxy.class).doFilter(request,response,sdk::service);
+        assertNull(request.getSession(false));assertNull(response.getHeader("Mcp-Session-Id"));return response;
+    }
 }
