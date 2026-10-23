@@ -19,6 +19,7 @@ public final class IntegrationCaseReadService {
     private static final org.slf4j.Logger LOG=org.slf4j.LoggerFactory.getLogger(IntegrationCaseReadService.class);
     private static final java.util.concurrent.Semaphore PROCESS_READS=new java.util.concurrent.Semaphore(5);
     private final DataSource runtime;
+    private final DataSource auditRuntime;
     private final CaseServicePort cases;
     private final Encoder encoder;
     private final boolean enabled;
@@ -30,20 +31,40 @@ public final class IntegrationCaseReadService {
     public IntegrationCaseReadService(DataSource runtime, CaseServicePort cases, boolean enabled) {
         this(runtime,cases,new MinimizedCaseEncoder(),enabled);
     }
+    /** Failure accounting has its existing independent short budget after request expiry/cancellation. */
+    public IntegrationCaseReadService(DataSource runtime,DataSource auditRuntime,CaseServicePort cases,boolean enabled) {
+        this(runtime,auditRuntime,cases,new MinimizedCaseEncoder(),enabled);
+    }
     IntegrationCaseReadService(DataSource runtime, CaseServicePort cases, Encoder encoder) {
         this(runtime,cases,encoder,false);
     }
     IntegrationCaseReadService(DataSource runtime, CaseServicePort cases, Encoder encoder, boolean enabled) {
+        this(runtime,runtime,cases,encoder,enabled);
+    }
+    private IntegrationCaseReadService(DataSource runtime,DataSource auditRuntime,CaseServicePort cases,Encoder encoder,boolean enabled) {
         this.runtime=Objects.requireNonNull(runtime); this.cases=Objects.requireNonNull(cases);
+        this.auditRuntime=Objects.requireNonNull(auditRuntime);
         this.encoder=Objects.requireNonNull(encoder); this.enabled=enabled;
     }
     public DisclosureBuffer search(VerifiedIntegrationContext verified, String query, int page) {
         return execute(IntegrationInvocation.create(verified,IntegrationInvocation.Operation.SEARCH),query,page,null);
     }
+    /** Wire validation failures pass null query/page through the same verified failure-audit path.
+     * Envelope measurement runs on the completed private buffer before final authorization.
+     * The callback must only measure serialization, never disclose or perform another read. */
+    public DisclosureBuffer search(IntegrationInvocation invocation,String query,Integer page,
+            java.util.function.ToIntFunction<DisclosureBuffer> envelopeBytes) {
+        if(invocation.operation()!=IntegrationInvocation.Operation.SEARCH)throw new SecurityException("Search invocation required.");
+        return execute(invocation,query,page,null,Objects.requireNonNull(envelopeBytes));
+    }
     public DisclosureBuffer overview(VerifiedIntegrationContext verified, long caseId) {
         return execute(IntegrationInvocation.create(verified,IntegrationInvocation.Operation.OVERVIEW),null,null,caseId);
     }
     private DisclosureBuffer execute(IntegrationInvocation i, String query, Integer page, Long id) {
+        return execute(i,query,page,id,buffer->0);
+    }
+    private DisclosureBuffer execute(IntegrationInvocation i,String query,Integer page,Long id,
+            java.util.function.ToIntFunction<DisclosureBuffer> envelopeBytes) {
         Integer safePage=page!=null && page>=0 && page<=9 ? page : null;
         Integer requested=id!=null && id>0 && id<=Integer.MAX_VALUE ? id.intValue() : null;
         boolean reserved=false, process=false, committed=false, commitAttempted=false;
@@ -52,7 +73,9 @@ public final class IntegrationCaseReadService {
             i.check();
             if (!enabled || !i.authority().effectiveScopes().contains(i.operation().scope())) throw failure(Outcome.DENIED,Reason.AUTHORITY);
             if(i.operation()==IntegrationInvocation.Operation.SEARCH) {
-                if(query==null || query.length()>100 || query.strip().length()<3 || query.strip().codePoints().filter(Character::isLetterOrDigit).count()<3 || safePage==null)
+                if(query==null || query.length()>100 || query.strip().length()<3
+                        || query.codePoints().anyMatch(cp->cp>=0xd800 && cp<=0xdfff)
+                        || query.strip().codePoints().filter(Character::isLetterOrDigit).count()<3 || safePage==null)
                     throw failure(Outcome.INVALID_INPUT,Reason.INPUT);
                 query=query.strip();
             } else if(requested==null) throw failure(Outcome.INVALID_INPUT,Reason.INPUT);
@@ -104,6 +127,9 @@ public final class IntegrationCaseReadService {
             i.check();
             var buffer=new DisclosureBuffer(out.toByteArray(),i);
             if(buffer.size()==0) throw failure(Outcome.UNAVAILABLE,Reason.SERIALIZATION);
+            int fullBytes=envelopeBytes.applyAsInt(buffer);
+            if(fullBytes<0 || fullBytes>65536)throw failure(Outcome.UNAVAILABLE,Reason.OVERSIZED);
+            i.check();
             phase=Reason.AUTHORITY;
             // Short final gate: DB UTC after all lock waits. Commit/close before any internal handoff.
             GatePermit permit;
@@ -174,7 +200,7 @@ public final class IntegrationCaseReadService {
         finally { if(interrupted)Thread.currentThread().interrupt(); }
     }
     private Connection auditLease(IntegrationInvocation i)throws SQLException {
-        return IntegrationRuntimeLease.open(runtime,i.authority().shaleClientId(),i.authority().actingUserId(),3);
+        return IntegrationRuntimeLease.open(auditRuntime,i.authority().shaleClientId(),i.authority().actingUserId(),3);
     }
     private void release(IntegrationInvocation i) {
         boolean interrupted=Thread.interrupted();
@@ -193,7 +219,10 @@ public final class IntegrationCaseReadService {
         if(fault instanceof CaseReadException read) {
             if(read.kind()==CaseReadException.Kind.DENIED) return failure(Outcome.DENIED,Reason.AUTHORITY);
             if(read.kind()==CaseReadException.Kind.AUDIT_UNAVAILABLE) return failure(Outcome.UNAVAILABLE,Reason.AUDIT);
+            if(read.kind()==CaseReadException.Kind.OVERSIZED) return failure(Outcome.UNAVAILABLE,Reason.OVERSIZED);
+            if(read.kind()==CaseReadException.Kind.TIMEOUT) return failure(Outcome.UNAVAILABLE,Reason.DEADLINE);
         }
+        if(fault instanceof SQLTimeoutException) return failure(Outcome.UNAVAILABLE,Reason.DEADLINE);
         if(fault instanceof SQLException sql && Set.of(58901,58403,58404,58408).contains(sql.getErrorCode())) return failure(Outcome.DENIED,Reason.AUTHORITY);
         return failure(Outcome.UNAVAILABLE,phase);
     }
