@@ -62,12 +62,6 @@ jobs:
           python3 -m venv work/mcp-clients
           work/mcp-clients/bin/pip install 'mcp==2.3.0'
           echo 'SHALE_MCP_EXTERNAL_CLIENTS=true' >> "$GITHUB_ENV"
-      - name: Two independent clients against mounted loopback transport
-        env:
-          SHALE_MCP_EXTERNAL_CLIENTS: 'true'
-        run: |
-          set -o pipefail
-          timeout 300 mvn -B -ntp -pl shale-server -am -Dtest=McpClientInteropTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/clients.log
       - name: Disposable loopback SQL for existing OAuth authorization through revocation tests
         run: |
           probe_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(30)+"aB9!")')"
@@ -128,6 +122,19 @@ jobs:
         run: |
           test -f docs/architecture/ai-integration-and-mcp.md
           git diff --check daec1cc3e1461373029390a697d624cbf7464aca HEAD
+      - name: Summarize independent client and conformance evidence
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob,json,pathlib
+          for path in glob.glob('work/mcp-evidence/client*.json'):
+              print(path, pathlib.Path(path).read_text())
+          for path in glob.glob('work/mcp-evidence/conformance-*.exit'):
+              print(path, pathlib.Path(path).read_text())
+          for path in glob.glob('work/mcp-evidence/conformance/**/checks.json',recursive=True):
+              data=json.load(open(path)); checks=data if isinstance(data,list) else data.get('checks',[])
+              print(path, json.dumps([{'id':c.get('id'),'status':c.get('status'),'error':c.get('errorMessage')} for c in checks]))
+          PY
       - name: Retain evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -139,6 +146,7 @@ jobs:
             **/target/surefire-reports/
             shale-server/target/mcp-dependency-tree.txt
             shale-server/target/mcp-effective-pom.xml
+            build/mcp-transport/package-lock.json
       - name: Remove disposable SQL
         if: always()
         run: docker rm -f shale-mcp-probe-sql >/dev/null 2>&1 || true

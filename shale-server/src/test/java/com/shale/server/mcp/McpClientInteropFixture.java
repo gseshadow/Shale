@@ -15,23 +15,14 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-/** Real loopback Tomcat + composed Spring security + SDK transport; authority is explicitly synthetic. */
-class McpClientInteropTest {
-    static final String TOKEN="a".repeat(43);
+/** Real loopback Tomcat + Spring security + SDK transport, using the supplied real SQL ACCESS validator. */
+public final class McpClientInteropFixture {
+    static AiAccessTokenValidator suppliedValidator;
     @Configuration static class Fixture {
-        @Bean AiAccessTokenValidator validator() {
-            var validator=mock(AiAccessTokenValidator.class);
-            var context=mock(VerifiedIntegrationContext.class);
-            when(context.credentialId()).thenReturn(1L);
-            when(context.effectiveScopes()).thenReturn(com.shale.core.security.ai.AiScope.fromMask(3));
-            when(validator.validate(anyString())).thenAnswer(call->{
-                if(!TOKEN.equals(call.getArgument(0)))throw new SecurityException();return context;
-            });
-            return validator;
-        }
+        @Bean AiAccessTokenValidator validator() {return java.util.Objects.requireNonNull(suppliedValidator);}
     }
-    @Test void independentModernClientsUseMountedTransportWithoutAnyCaseService(@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
-        Assumptions.assumeTrue("true".equals(System.getenv("SHALE_MCP_EXTERNAL_CLIENTS")),"External client packages required; skip is not acceptance evidence");
+    public static void verifyClients(AiAccessTokenValidator validator,String TOKEN,Path temp)throws Exception {
+        suppliedValidator=validator;
         var tomcat=new org.apache.catalina.startup.Tomcat();tomcat.setBaseDir(temp.toString());tomcat.setPort(0);
         tomcat.getConnector().setProperty("address","127.0.0.1");var tc=tomcat.addContext("",temp.toString());
         try(var context=new AnnotationConfigWebApplicationContext()) {
@@ -79,12 +70,13 @@ class McpClientInteropTest {
                 if(!running.waitFor(60,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();}
                 // Record individual outcomes, including unsupported fixture requirements; no full-conformance claim.
                 Files.writeString(evidence.resolve("conformance-"+scenario+".exit"),Integer.toString(running.exitValue()));
+                System.out.println("MCP conformance "+scenario+" exit="+running.exitValue());
                 try(var files=Files.walk(evidence)) {
                     for(Path file:files.filter(Files::isRegularFile).toList()) {
                         String value=Files.readString(file);if(value.contains(TOKEN))Files.writeString(file,value.replace(TOKEN,"[REDACTED]"));
                     }
                 }
             }
-        } finally {tomcat.stop();tomcat.destroy();}
+        } finally {tomcat.stop();tomcat.destroy();suppliedValidator=null;}
     }
 }

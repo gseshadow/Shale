@@ -36,7 +36,7 @@ public class McpTransportConfiguration {
         McpPayloadLogFilter.install();
         var factory=JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                 .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(8).maxStringLength(8192).maxNumberLength(20).build()).build();
-        return new JacksonMcpJsonMapper(JsonMapper.builder(factory).build());
+        return new JacksonMcpJsonMapper(JsonMapper.builder(factory).enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build());
     }
     static McpServer server(String version, JacksonMcpJsonMapper mapper) {
         return McpServer.builder().serverInfo(McpSchema.Implementation.builder("shale-mcp",version).build())

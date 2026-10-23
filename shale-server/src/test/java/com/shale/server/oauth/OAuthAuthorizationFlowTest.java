@@ -314,7 +314,7 @@ class OAuthAuthorizationFlowTest {
     @Configuration static class McpFixtures {
         @Bean AiAccessTokenValidator mcpValidator() { return mcpValidator; }
     }
-    @Test void mountedMcpUsesRealAccessGateRejectsOtherKindsAndCreatesNoCaseAudit()throws Exception {
+    @Test void mountedMcpUsesRealAccessGateRejectsOtherKindsAndCreatesNoCaseAudit(@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
         var issued=new tools.jackson.databind.ObjectMapper().readTree(send(exchangeRequest(freshCode())).getContentAsString());
         String access=issued.path("access_token").asText(),refresh=issued.path("refresh_token").asText();
         assertEquals(43,access.length());
@@ -332,6 +332,8 @@ class OAuthAuthorizationFlowTest {
             }
             for(String token:List.of(refresh,freshCode(),webToken,"a".repeat(43),"malformed.jwt.like"))
                 assertTrue(mcpSend(mcp,sdk,token,"server/discover").getStatus()>=400,"Only ACCESS credentials may authenticate MCP");
+            if("true".equals(System.getenv("SHALE_MCP_EXTERNAL_CLIENTS")))
+                com.shale.server.mcp.McpClientInteropFixture.verifyClients(mcpValidator,access,temp);
             var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
             var policy=controls.inspectTenantPolicy();controls.setTenantEnabled(false,policy.rowVersion());
             try {assertEquals(401,mcpSend(mcp,sdk,access,"server/discover").getStatus());}

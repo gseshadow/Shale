@@ -123,7 +123,7 @@ class McpTransportTest {
     }
     @Test void bodyAndParserAdversarialBoundariesFailDeterministically()throws Exception {
         var valid=body("server/discover",McpGate.PROTOCOL);
-        for(String body:List.of("","{","[]","null","{}",valid.replace("2.0","1.0"),valid.replace("\"id\":\"one\"","\"id\":null"),
+        for(String body:List.of("","{","[]","null","{}",valid+"{}",valid.replace("2.0","1.0"),valid.replace("\"id\":\"one\"","\"id\":null"),
                 valid.replace("\"id\":\"one\"","\"id\":1.25"),valid.replace("\"id\":\"one\"","\"id\":\""+"a".repeat(65)+"\""),
                 valid.replace("\"method\":\"server/discover\"","\"method\":null"),valid.replace("\"id\":\"one\"","\"id\":\"one\",\"id\":\"two\""),
                 valid.replace("\"_meta\":{","\"_meta\":{\"deep\":"+"[".repeat(10)+"0"+"]".repeat(10)+","))) {
@@ -173,6 +173,17 @@ class McpTransportTest {
             var text=java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/server/mcp/"+source+".java"));
             for(String forbidden:List.of("CaseServicePort","CaseServiceAdapter","IntegrationCaseReadService","CaseSummaryDao","IntegrationAccessAudit","ThreadLocal","getSession("))
                 assertFalse(text.contains(forbidden),source+" must not reach "+forbidden);
+        }
+    }
+    @Test void disabledCaseNamesCannotBecomeCallableEvenWithBothScopes()throws Exception {
+        for(String name:List.of("search_cases","get_case_overview","arbitrary")) {
+            var request=request("tools/call");request.addHeader("Mcp-Name",name);
+            var mapper=McpTransportConfiguration.mapper();
+            var body=mapper.getJsonMapper().readTree(body("tools/call",McpGate.PROTOCOL));
+            ((tools.jackson.databind.node.ObjectNode)body.path("params")).put("name",name);
+            request.setContent(mapper.getJsonMapper().writeValueAsBytes(body));
+            var response=send(request);assertEquals(400,response.getStatus());
+            assertTrue(response.getContentAsString().contains("-32602"));assertFalse(response.getContentAsString().contains(name));
         }
     }
 }

@@ -81,7 +81,7 @@ final class McpGate extends OncePerRequestFilter {
             // SDK owns JSON-RPC parsing; this preliminary SDK parse adds only Shale envelope ceilings.
             // The mounted SDK servlet independently validates metadata/header equality and dispatches.
             JsonRpc.JSONRPCMessage message;
-            try { message=JsonRpc.deserializeMessage(mapper,new String(body,StandardCharsets.UTF_8)); }
+            try { message=JsonRpc.deserializeMessage(mapper,StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(body)).toString()); }
             catch (IOException malformed) { rpc(response,400,null,-32700,"Parse error");return; }
             catch (IllegalArgumentException invalid) { rpc(response,400,null,-32600,"Invalid request");return; }
             if (message instanceof JsonRpc.JSONRPCRequest rpc) {
@@ -90,7 +90,12 @@ final class McpGate extends OncePerRequestFilter {
                     rpc(response,400,null,-32600,"Invalid request");return;
                 }
             } else if (!(message instanceof JsonRpc.JSONRPCNotification notification) ||
-                    !notification.method().equals("notifications/cancelled")) {
+                    !notification.method().equals("notifications/cancelled") ||
+                    !notification.method().equals(request.getHeader("Mcp-Method")) ||
+                    !PROTOCOL.equals(request.getHeader("MCP-Protocol-Version")) ||
+                    !(notification.params() instanceof Map<?,?> params) || !(params.get("_meta") instanceof Map<?,?> meta) ||
+                    !PROTOCOL.equals(meta.get(io.modelcontextprotocol.modern.McpSchema.MetaKeys.PROTOCOL_VERSION)) ||
+                    !(meta.get(io.modelcontextprotocol.modern.McpSchema.MetaKeys.CLIENT_CAPABILITIES) instanceof Map<?,?>)) {
                 rpc(response,400,null,-32600,"Invalid request");return;
             }
             request.setAttribute(AUTHORITY,authority);
