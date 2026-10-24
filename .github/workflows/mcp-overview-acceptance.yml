@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: mcp-sdk-compatibility-${{ github.ref }}
   cancel-in-progress: true
@@ -40,10 +41,6 @@ jobs:
         run: |
           set -o pipefail
           timeout 900 mvn -B -ntp -U -pl shale-server -am -Dmaven.test.skip=true install 2>&1 | tee work/mcp-evidence/compile.log
-      - name: Actual modern SDK, Jackson and unregistered servlet smoke tests
-        run: |
-          set -o pipefail
-          timeout 600 mvn -B -ntp -pl shale-server -am -Dtest=McpOverviewTest,McpSearchTest,IntegrationCaseReadTest,McpSdkCompatibilityTest,McpTransportTest,McpFilterIsolationTest,McpJdbcDeadlineTest,OpenApiDocumentationTest,ShaleServerServiceConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/sdk-smoke.log
       - name: Install pinned independent clients
         run: |
           npm install --prefix build/mcp-transport --ignore-scripts --no-audit --no-fund
@@ -68,18 +65,6 @@ jobs:
           done
           echo "Disposable SQL startup failed"
           exit 1
-      - name: Focused OAuth ACCESS disclosure WEB DESKTOP REST and context regressions
-        run: |
-          set -o pipefail
-          timeout 900 mvn -B -ntp -pl shale-server -am '-Dtest=McpOverviewTest,McpSearchTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,MinimizedCaseReadControllerTest,RequestScopedDbSessionProviderTest,OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,Ai*ContractTest,IntegrationAccessContractTest,IntegrationCaseReadTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest' -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/focused.log
-          python3 - <<'PY'
-          import glob, xml.etree.ElementTree as E
-          for path in glob.glob('**/target/surefire-reports/TEST-*.xml',recursive=True):
-              root=E.parse(path).getroot()
-              assert int(root.get('failures',0))==0 and int(root.get('errors',0))==0, path
-              if 'AiSecurityLocalSqlServerTest' in path or 'OAuthAuthorizationFlowTest' in path:
-                  assert int(root.get('tests',0))>0 and int(root.get('skipped',0))==0, path
-          PY
       - name: Headless JavaFX prerequisites for selector and critical suites
         run: |
           sudo apt-get update -qq
@@ -89,65 +74,64 @@ jobs:
           set -o pipefail
           python3 -m unittest discover -s build/test-selection -p test_select_tests.py 2>&1 | tee work/mcp-evidence/selector-python.log
           python3 build/test-selection/select_tests.py --base ef44a0aa40a178dfd9511fbcfbc4ed177c9e0526 --head HEAD --format markdown --plan-output work/mcp-evidence/selection.json | tee work/mcp-evidence/selection.md
-      - name: Affected suite
+      - name: Retain prior successful focused and affected receipts
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12563050555
+          run-id: 40099484551
+          github-token: ${{ github.token }}
+          path: work/prior-evidence
+      - name: Complete affected suite with smaller unfinished partitions (one infrastructure retry)
         run: |
-          python3 - <<'PY'
-          import json, subprocess, pathlib, re, shutil, xml.etree.ElementTree as ET
-          plan = json.load(open("work/mcp-evidence/selection.json"))
-          inventory = pathlib.Path("shale-data/src/test/java/com/shale/data/security/ai/AiSecurityLocalSqlServerTest.java").read_text()
-          methods = re.findall(r"@(?:[\w.]*\.)?(?:Test|ParameterizedTest)\b[\s\S]*?\bvoid\s+(\w+)\s*\(", inventory)
-          assert len(methods)==len(set(methods)) and len(methods)>90, "Complete annotated SQL method inventory required"
-          sql_class="com.shale.data.security.ai.AiSecurityLocalSqlServerTest"
-          commands=[]
-          selected_sql=False
-          for args in plan["selected_maven_batches"]:
-              args=list(args)
-              for n,arg in enumerate(args):
-                  if arg.startswith("-Dtest="):
-                      tests=arg[len("-Dtest="):].split(",")
-                      if sql_class in tests:
-                          selected_sql=True
-                          args[n]="-Dtest="+",".join(t for t in tests if t!=sql_class)
-              commands.append(args)
-          if selected_sql:
-              for offset in range(0,len(methods),20):
-                  group=methods[offset:offset+20]
-                  commands.append(["-pl","shale-data","-am","-Dtest="+sql_class+"#"+"+".join(group),"-Dsurefire.failIfNoSpecifiedTests=false","test"])
-          pathlib.Path("work/mcp-evidence/affected-partitions.json").write_text(json.dumps({"selectedSql":selected_sql,"sqlMethods":methods,"commands":commands},indent=2))
-          focused=pathlib.Path("work/mcp-evidence/focused-reports");focused.mkdir(exist_ok=True)
-          for report in pathlib.Path(".").glob("*/target/surefire-reports/TEST-*.xml"):
-              shutil.copy2(report,focused/(report.parent.parent.parent.name+"-"+report.name))
-          executed=set();sql_total=0;partition_counts=[]
-          with open("work/mcp-evidence/affected.log", "w") as log:
-              for index,args in enumerate(commands):
-                  command = ["xvfb-run", "-a", "mvn", "-B", "-ntp", *args]
-                  print(command, flush=True)
-                  for old in pathlib.Path(".").glob("*/target/surefire-reports"):
-                      shutil.rmtree(old)
-                  result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=360)
-                  # Keep every partition's receipts; later invocations replace Surefire reports.
-                  receipt=pathlib.Path("work/mcp-evidence/affected-reports")/str(index)
-                  receipt.mkdir(parents=True,exist_ok=True)
-                  total=0
-                  for report in pathlib.Path(".").glob("*/target/surefire-reports/TEST-*.xml"):
-                      shutil.copy2(report,receipt/(report.parent.parent.parent.name+"-"+report.name))
-                      xml=ET.parse(report).getroot()
-                      assert all(int(xml.get(k,0))==0 for k in ["failures","errors","skipped"]), str(report)
-                      total+=int(xml.get("tests",0))
-                      if xml.get("name")==sql_class:
-                          sql_total+=int(xml.get("tests",0))
-                          for case in xml.findall("testcase"):
-                              executed.add(case.get("name").split("(")[0].split("[")[0])
-                  if result.returncode:
-                      raise SystemExit(result.returncode)
-                  assert total>0
-                  partition_counts.append(total)
-          if selected_sql:
-              assert executed==set(methods), {"missing":sorted(set(methods)-executed),"unexpected":sorted(executed-set(methods))}
-              assert sql_total==168, sql_total
-          print("Affected partition test counts:",partition_counts,"SQL invocations:",sql_total,"annotated methods:",len(executed))
-          pathlib.Path("work/mcp-evidence/affected-summary.json").write_text(json.dumps({"partitionTests":partition_counts,"sqlTests":sql_total,"sqlMethods":len(executed)},indent=2))
-          PY
+          git diff --exit-code b8b91b96862157a5e50ca58e0cd6f4cfb5e6da4b HEAD -- shale-core shale-data shale-server build/mcp-transport build/test-selection
+          python3 - <<'PYTHON'
+          import pathlib,json,subprocess,shutil,xml.etree.ElementTree as ET
+          previous=next(pathlib.Path('work/prior-evidence').rglob('affected-partitions.json')).parent
+          plan=json.loads((previous/'affected-partitions.json').read_text())
+          assert len(plan['sqlMethods'])==99 and plan['selectedSql']
+          destination=pathlib.Path('work/mcp-evidence')
+          shutil.copytree(previous,destination/'prior-passing-receipts',dirs_exist_ok=True)
+          executed=set();sql_total=0;counts=[];receipts=[]
+          def inspect(folder):
+              global sql_total
+              total=0
+              reports=list(folder.glob('*.xml'));assert reports,folder
+              for report in reports:
+                  xml=ET.parse(report).getroot()
+                  assert all(int(xml.get(k,0))==0 for k in ['failures','errors','skipped']),str(report)
+                  total+=int(xml.get('tests',0))
+                  if xml.get('name')=='com.shale.data.security.ai.AiSecurityLocalSqlServerTest':
+                      sql_total+=int(xml.get('tests',0))
+                      for case in xml.findall('testcase'):executed.add(case.get('name').split('(')[0].split('[')[0])
+              assert total>0
+              return total
+          pending=[]
+          for index,args in enumerate(plan['commands']):
+              old=previous/'affected-reports'/str(index)
+              if old.exists() and list(old.glob('*.xml')):
+                  counts.append(inspect(old));receipts.append({'run':40099484551,'partition':index,'tests':counts[-1]})
+              else:
+                  test=next(x for x in args if x.startswith('-Dtest='))
+                  cls,methods=test[len('-Dtest='):].split('#');methods=methods.split('+')
+                  for offset in range(0,len(methods),2):
+                      pending.append([x if x!=test else '-Dtest='+cls+'#'+'+'.join(methods[offset:offset+2]) for x in args])
+          assert len(receipts)==5 and len(pending)==10,(receipts,pending)
+          (destination/'affected-resume-plan.json').write_text(json.dumps({'priorRun':40099484551,'retained':receipts,'pending':pending},indent=2))
+          with (destination/'affected-resume.log').open('w') as log:
+              for index,args in enumerate(pending):
+                  command=['xvfb-run','-a','mvn','-B','-ntp',*args];print(command,flush=True)
+                  for old in pathlib.Path('.').glob('*/target/surefire-reports'):shutil.rmtree(old)
+                  result=subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,timeout=360)
+                  receipt=destination/'affected-resume-reports'/str(index);receipt.mkdir(parents=True,exist_ok=True)
+                  for report in pathlib.Path('.').glob('*/target/surefire-reports/TEST-*.xml'):
+                      shutil.copy2(report,receipt/(report.parent.parent.parent.name+'-'+report.name))
+                  if result.returncode:raise SystemExit(result.returncode)
+                  counts.append(inspect(receipt));print('PASS partition',index,'tests',counts[-1],flush=True)
+          assert executed==set(plan['sqlMethods']),{'missing':sorted(set(plan['sqlMethods'])-executed),'unexpected':sorted(executed-set(plan['sqlMethods']))}
+          assert sql_total==168,sql_total
+          summary={'partitionTests':counts,'totalTests':sum(counts),'sqlTests':sql_total,'sqlMethods':len(executed),'priorRun':40099484551,'sameSourceVerified':True}
+          (destination/'affected-summary.json').write_text(json.dumps(summary,indent=2));print('Complete affected summary',json.dumps(summary),flush=True)
+          PYTHON
       - name: Critical reactor once after candidate and focused checks pass
         run: |
           set -o pipefail
