@@ -1,8 +1,8 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); transport and both handlers default OFF.
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL BLOCKED; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); 3B.7 BLOCKED — authoritative Case artifact unavailable (§10.28); transport and both handlers default OFF.
 
-**Last reviewed:** 2026-10-24 (Phase 3B.6 synthetic Overview protocol/client verification COMPLETE; defaults OFF; historical scopes retained)
+**Last reviewed:** 2026-10-24 (Phase 3B.7 adversarial/local acceptance BLOCKED — authoritative Case artifact unavailable; defaults OFF; historical scopes retained)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of
@@ -700,7 +700,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B.4 MCP transport/discovery | COMPLETE (source/local protocol/client verification) | §10.25: default-OFF modern transport, empty catalog, real synthetic ACCESS/two-client proof and applicable conformance/regressions. Prerelease SDK remains a production-acceptance item; 3B.4 itself adds no Case handler. |
 | Phase 3B.5 search_cases | COMPLETE (source/local synthetic protocol/client verification) | §10.26; sole scope-filtered synthetic/test search handler, quota/audit/final gate, two independent clients and affected/critical checks; defaults OFF. |
 | Phase 3B.6 get_case_overview | COMPLETE (source/local synthetic protocol/client verification) | §10.27; independent scope, exact minimized Overview/PHI/integration atomicity, byte limits, fault/race and two-client proof; defaults OFF. |
-| Phase 3B.7 adversarial/local acceptance | NOT STARTED | Authoritative Case artifact and remaining operational/security/client acceptance required. |
+| Phase 3B.7 adversarial/local acceptance | BLOCKED — authoritative Case artifact unavailable | Independent checks and precise remaining full-stack acceptance gaps: [§10.28](#1028-phase-3b7-adversariallocal-acceptance--2026-10-24). Phase 3B remains IN PROGRESS; no real enablement. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
 | Phase 5 administration experience | NOT STARTED | Minimum controls first, then pilot feedback. |
 | Phase 6 optional controlled writes | NOT STARTED | Read-only maturity and per-command approval. |
@@ -726,7 +726,7 @@ Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RL
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is COMPLETE at source/local protocol/client scope (§10.25), with transport default OFF and prerelease production acceptance still open; 3B.5 is COMPLETE at source/local synthetic protocol/client scope (§10.26); 3B.6 is COMPLETE at source/local synthetic protocol/client scope (§10.27); 3B.7 remains NOT STARTED.
+durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is COMPLETE at source/local protocol/client scope (§10.25), with transport default OFF and prerelease production acceptance still open; 3B.5 is COMPLETE at source/local synthetic protocol/client scope (§10.26); 3B.6 is COMPLETE at source/local synthetic protocol/client scope (§10.27); 3B.7 is BLOCKED — authoritative Case artifact unavailable (§10.28).
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -4199,3 +4199,32 @@ Future deployment order is preserved: (1) build/upload new shale-server JAR with
 accumulated unapplied AI migrations in documented order; (3) cumulative verifier/permission checks;
 (4) live OAuth acceptance; (5) live MCP transport acceptance; (6) only after 3B.7 acceptance consider real
 Case handler/tenant enablement. This task performs none of those deployment steps.
+
+
+### 10.28 Phase 3B.7 adversarial/local acceptance — 2026-10-24
+
+**3B.7 BLOCKED — authoritative Case artifact unavailable. Phase 3B IN PROGRESS.**
+Base: merged #1917, `90580f11dcfd3371cac3b7f4bb9dd4819ec5e181`.
+The [acceptance ledger](../testing/phase3b7-adversarial-acceptance.md) records approved
+source provenance/hash, environment/tooling, independent executed checks, raw diagnostic
+limits, the SDK review, operator configuration and exact remaining acceptance gaps.
+The source artifact remains absent; no authoritative derived/candidate hash or
+Case/RLS/permission acceptance is available. Synthetic schemas are not substitutes.
+
+Only acceptance tests and documentation/evidence change. Additional real synthetic
+SQL tests exercise literal punctuation and instruction-looking Case names through
+the existing search/Overview workers, typed audit privacy and small internal-service
+latency samples. These supplement serving client evidence; they do not replace the
+required complete-stack TLS, two-client, race, authoritative Case or performance proof.
+No material production defect has been established; no feature or dependency change.
+
+Phases 3B.1–3B.6 remain COMPLETE only at their recorded source/local synthetic scopes.
+SDK 2.2.0-M1 remains prerelease, and tenant/legal retention sign-off remains OPEN.
+Recover the governed approved offline artifact and close the ledger's local acceptance
+gaps before deciding technical readiness for a later separately authorized live stage.
+Do not recommend real enablement while blocked. Current handlers reject prod/azure
+activation; deploying a test profile is not an approved activation mechanism.
+
+Exactly search_cases and get_case_overview, unchanged eight-field Case projection,
+all defaults OFF. No real tenant/integration enabled; no production/Azure SQL,
+deployment, installer/version publication or aggregate Phase 3B completion.

@@ -1,0 +1,1362 @@
+{
+  "phase": "3B.7",
+  "classification": "BLOCKED",
+  "reason": "authoritative Case artifact unavailable",
+  "aggregatePhase3B": "IN PROGRESS",
+  "baseCommit": "90580f11dcfd3371cac3b7f4bb9dd4819ec5e181",
+  "baseTree": "856b031cab8c6c0a375b1f96acf089a4dde93d89",
+  "branch": "codex/phase-3b7-adversarial-acceptance",
+  "authoritativeCaseArtifact": {
+    "source": "historically approved user-supplied schema-only SSMS export shale-schema-source.sql; existing Case verification runbook",
+    "path": null,
+    "recordedSourceSha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+    "sourceBytesReadThisExecution": false,
+    "derivedSha256": null,
+    "candidateSha256": null,
+    "equivalentApproved": false,
+    "rlsPermissionAcceptance": "BLOCKED"
+  },
+  "productionChanges": [],
+  "tools": [
+    "search_cases",
+    "get_case_overview"
+  ],
+  "caseFields": [
+    "caseId",
+    "caseNumber",
+    "caseName",
+    "status",
+    "practiceArea",
+    "responsibleAttorney",
+    "primaryLegalAssistant",
+    "updatedAt"
+  ],
+  "local": {
+    "mavenOffline": "BLOCKED: Boot 4.1.1 BOM absent",
+    "mavenOneOnlineRetry": "BLOCKED: Operation not permitted",
+    "selectorPython": {
+      "pass": 27
+    },
+    "caseLauncherPython": {
+      "pass": 4
+    },
+    "phase1rLauncherPython": {
+      "pass": 3
+    },
+    "authLauncherPython": {
+      "pass": 35,
+      "skip": 8
+    },
+    "staticSchema": {
+      "pass": 64,
+      "scope": "JSON Schema only; no runtime inference"
+    }
+  },
+  "hostedMain": {
+    "runId": 40132997548,
+    "commit": "e67a4e867208bfbbe6f6c1bfa8bdf7402cbe781c",
+    "status": "PASS",
+    "productionCompile": "PASS",
+    "smoke": {
+      "pass": 94,
+      "fail": 0,
+      "error": 0,
+      "skip": 0
+    },
+    "focused": {
+      "pass": 257,
+      "data": 91,
+      "server": 166,
+      "fail": 0,
+      "error": 0,
+      "skip": 0
+    },
+    "broadAcceptancePartitions": {
+      "pass": 451,
+      "partitionTests": [
+        283,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        9,
+        2,
+        2,
+        2,
+        2,
+        11,
+        7,
+        2,
+        2,
+        2,
+        9,
+        2,
+        3,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        5,
+        16,
+        2,
+        2,
+        25,
+        2,
+        2,
+        2,
+        2,
+        1
+      ],
+      "sqlMethods": 99,
+      "sqlInvocations": 168,
+      "fail": 0,
+      "error": 0,
+      "skip": 0
+    },
+    "critical": {
+      "pass": 207,
+      "modules": 7,
+      "fail": 0,
+      "error": 0,
+      "skip": 0,
+      "runs": 1
+    },
+    "selectorReconciliation": {
+      "selectedClasses": 22,
+      "missingClasses": [],
+      "coverage": "main focused/partition/critical reports plus 9-test closeout; new fixture methods in supplement"
+    },
+    "clientRecords": [
+      {
+        "client": "@modelcontextprotocol/client",
+        "version": "2.4.0",
+        "protocol": "2026-07-28",
+        "records": [
+          "scope-filtered-overview-and-search-absent",
+          "revoked-access",
+          "exact-wire-schema",
+          "page-zero",
+          "page-one",
+          "zero",
+          "window",
+          "short",
+          "wildcard",
+          "page-invalid",
+          "additional-property",
+          "bound",
+          "quota-exhausted",
+          "overview-uninvokable"
+        ]
+      },
+      {
+        "client": "@modelcontextprotocol/client",
+        "version": "2.4.0",
+        "transport": "Streamable HTTP",
+        "protocol": "2026-07-28",
+        "records": [
+          {
+            "scenario": "discovery-identity-empty-catalog-valid-access",
+            "status": 200
+          },
+          {
+            "scenario": "bad-access",
+            "status": 401
+          },
+          {
+            "scenario": "invalid-origin",
+            "status": 403
+          },
+          {
+            "scenario": "unsupported-version",
+            "status": 400
+          },
+          {
+            "scenario": "unknown-method",
+            "status": 404
+          },
+          {
+            "scenario": "default-off",
+            "status": 404
+          }
+        ]
+      },
+      {
+        "client": "mcp",
+        "version": "2.3.0",
+        "transport": "Streamable HTTP",
+        "protocol": "2026-07-28",
+        "records": [
+          {
+            "scenario": "discovery-identity-empty-catalog-valid-access",
+            "status": 200
+          },
+          {
+            "scenario": "bad-access",
+            "status": 401
+          },
+          {
+            "scenario": "invalid-origin",
+            "status": 403
+          },
+          {
+            "scenario": "unsupported-version",
+            "status": 400
+          },
+          {
+            "scenario": "unknown-method",
+            "status": 404
+          },
+          {
+            "scenario": "default-off",
+            "status": 404
+          }
+        ]
+      },
+      {
+        "client": "mcp",
+        "version": "2.3.0",
+        "protocol": "2026-07-28",
+        "records": [
+          "SEARCH_TOKEN-exact-schema",
+          "BOTH_TOKEN-exact-schema",
+          "revoked-authority",
+          "overview-only-exact-schema",
+          "search-absent",
+          "direct-overview-no-search",
+          "same-tenant-unassigned",
+          "missing",
+          "foreign",
+          "deleted",
+          "source-bound",
+          "phi-append-rollback",
+          "quota-exhausted-no-refund",
+          "strict-invalid-13",
+          "strict-invalid-14",
+          "strict-invalid-15",
+          "strict-invalid-16",
+          "strict-invalid-17",
+          "strict-invalid-18",
+          "strict-invalid-19",
+          "strict-invalid-20",
+          "strict-invalid-21"
+        ]
+      },
+      {
+        "client": "mcp",
+        "version": "2.3.0",
+        "protocol": "2026-07-28",
+        "records": [
+          "scope-filtered-overview-and-search-absent",
+          "revoked-access",
+          "exact-wire-schema",
+          "page-zero",
+          "page-one",
+          "zero",
+          "window",
+          "short",
+          "wildcard",
+          "page-invalid",
+          "additional-property",
+          "bound",
+          "quota-exhausted",
+          "overview-uninvokable"
+        ]
+      },
+      {
+        "client": "@modelcontextprotocol/client",
+        "version": "2.4.0",
+        "protocol": "2026-07-28",
+        "records": [
+          "SEARCH_TOKEN-exact-schema",
+          "BOTH_TOKEN-exact-schema",
+          "revoked-authority",
+          "overview-only-exact-schema",
+          "search-absent",
+          "direct-overview-no-search",
+          "same-tenant-unassigned",
+          "missing",
+          "foreign",
+          "deleted",
+          "source-bound",
+          "phi-append-rollback",
+          "quota-exhausted-no-refund",
+          "strict-invalid-13",
+          "strict-invalid-14",
+          "strict-invalid-15",
+          "strict-invalid-16",
+          "strict-invalid-17",
+          "strict-invalid-18",
+          "strict-invalid-19",
+          "strict-invalid-20",
+          "strict-invalid-21"
+        ]
+      }
+    ],
+    "conformance": {
+      "suite": "0.2.0-alpha.12",
+      "protocol": "2026-07-28",
+      "fixture": "no-handler",
+      "perPass": {
+        "success": 23,
+        "failureNotTestable": 4,
+        "skipped": 5,
+        "info": 2
+      },
+      "passes": 2,
+      "serverStatelessExit": 1,
+      "toolsListExit": 0,
+      "fullTwoToolConformance": "NOT TESTABLE with current fixture; OPEN",
+      "rawChecks": [
+        {
+          "file": "work/mcp-evidence/conformance/server-tools-list-2026-10-24T21-12-30-003Z/checks.json",
+          "checks": [
+            {
+              "id": "tools-list",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "tools-name-format",
+              "status": "INFO",
+              "error": "No tools advertised; nothing to validate"
+            },
+            {
+              "id": "tools-list-deterministic-order",
+              "status": "INFO",
+              "error": "0 tool(s) advertised; nothing to compare"
+            },
+            {
+              "id": "wire-schema-valid",
+              "status": "SUCCESS",
+              "error": null
+            }
+          ]
+        },
+        {
+          "file": "work/mcp-evidence/conformance/server-tools-list-2026-10-24T21-13-51-698Z/checks.json",
+          "checks": [
+            {
+              "id": "tools-list",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "tools-name-format",
+              "status": "INFO",
+              "error": "No tools advertised; nothing to validate"
+            },
+            {
+              "id": "tools-list-deterministic-order",
+              "status": "INFO",
+              "error": "0 tool(s) advertised; nothing to compare"
+            },
+            {
+              "id": "wire-schema-valid",
+              "status": "SUCCESS",
+              "error": null
+            }
+          ]
+        },
+        {
+          "file": "work/mcp-evidence/conformance/server-server-stateless-2026-10-24T21-12-29-020Z/checks.json",
+          "checks": [
+            {
+              "id": "sep-2575-request-meta-invalid-missing-meta",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-meta-invalid-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-request-meta-invalid-missing-protocol-version",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-meta-invalid-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-request-meta-invalid-missing-client-capabilities",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-meta-invalid-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-request-meta-client-info-optional",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-implements-discover",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-identifies-in-result-meta",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-declares-prompts-in-discover",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-discover-capabilities-match-handlers",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-unsupported-version-error",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-unsupported-version-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-header-mismatch-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-rejects-undeclared-capability",
+              "status": "FAILURE",
+              "error": "Not testable: server does not list the diagnostic tool 'test_missing_capability' in tools/list and the probe call did not exercise it (required for the undeclared-capability rejection)"
+            },
+            {
+              "id": "sep-2575-missing-capability-http-400",
+              "status": "FAILURE",
+              "error": "Not testable: server does not list the diagnostic tool 'test_missing_capability' in tools/list, so the -32021 HTTP status could not be validated"
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-initialize",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-ping",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-logging-setlevel",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-resources-subscribe",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-resources-unsubscribe",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-no-independent-requests-on-stream",
+              "status": "FAILURE",
+              "error": "Not testable: server does not list the diagnostic tool 'test_streaming_elicitation' in tools/list, so the response stream could not be exercised"
+            },
+            {
+              "id": "sep-2575-server-no-log-without-loglevel",
+              "status": "FAILURE",
+              "error": "Not testable: server does not list the diagnostic tool 'test_logging_tool' in tools/list, so the no-log-without-logLevel requirement could not be exercised"
+            },
+            {
+              "id": "sep-2575-server-sends-subscription-ack",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-tags-subscription-id",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-honors-notification-filter",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-sends-prompts-list-changed-on-subscription",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-sends-tools-list-changed-on-subscription",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-error-jsonrpc-id",
+              "status": "SUCCESS",
+              "error": null
+            }
+          ]
+        },
+        {
+          "file": "work/mcp-evidence/conformance/server-server-stateless-2026-10-24T21-13-50-782Z/checks.json",
+          "checks": [
+            {
+              "id": "sep-2575-request-meta-invalid-missing-meta",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-meta-invalid-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-request-meta-invalid-missing-protocol-version",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-meta-invalid-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-request-meta-invalid-missing-client-capabilities",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-meta-invalid-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-request-meta-client-info-optional",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-implements-discover",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-identifies-in-result-meta",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-declares-prompts-in-discover",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-discover-capabilities-match-handlers",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-unsupported-version-error",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-unsupported-version-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-header-mismatch-400",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-rejects-undeclared-capability",
+              "status": "FAILURE",
+              "error": "Not testable: server does not list the diagnostic tool 'test_missing_capability' in tools/list and the probe call did not exercise it (required for the undeclared-capability rejection)"
+            },
+            {
+              "id": "sep-2575-missing-capability-http-400",
+              "status": "FAILURE",
+              "error": "Not testable: server does not list the diagnostic tool 'test_missing_capability' in tools/list, so the -32021 HTTP status could not be validated"
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-initialize",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-ping",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-logging-setlevel",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-resources-subscribe",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404-resources-unsubscribe",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-method-not-found-404",
+              "status": "SUCCESS",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-no-independent-requests-on-stream",
+              "status": "FAILURE",
+              "error": "Not testable: server does not list the diagnostic tool 'test_streaming_elicitation' in tools/list, so the response stream could not be exercised"
+            },
+            {
+              "id": "sep-2575-server-no-log-without-loglevel",
+              "status": "FAILURE",
+              "error": "Not testable: server does not list the diagnostic tool 'test_logging_tool' in tools/list, so the no-log-without-logLevel requirement could not be exercised"
+            },
+            {
+              "id": "sep-2575-server-sends-subscription-ack",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-tags-subscription-id",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-honors-notification-filter",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-sends-prompts-list-changed-on-subscription",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-server-sends-tools-list-changed-on-subscription",
+              "status": "SKIPPED",
+              "error": null
+            },
+            {
+              "id": "sep-2575-http-server-error-jsonrpc-id",
+              "status": "SUCCESS",
+              "error": null
+            }
+          ]
+        }
+      ]
+    },
+    "artifact": {
+      "id": 12576053523,
+      "name": "mcp-phase3b7-adversarial-evidence",
+      "size_in_bytes": 649141,
+      "url": "https://api.github.com/repos/gseshadow/Shale/actions/artifacts/12576053523",
+      "archive_download_url": "https://api.github.com/repos/gseshadow/Shale/actions/artifacts/12576053523/zip",
+      "expired": false,
+      "created_at": "2026-10-24T21:39:35Z",
+      "expires_at": "2026-11-07T21:39:33Z",
+      "updated_at": "2026-10-24T21:39:35Z",
+      "digest": "sha256:b6335c9e70613c4ed6f7408fe19fb2c82154a2f938ca2c373005ee519cb8788d",
+      "workflow_run": {
+        "id": 40132997548,
+        "repository_id": 976708406,
+        "head_repository_id": 976708406,
+        "head_branch": "codex/phase-3b7-adversarial-acceptance",
+        "head_sha": "e67a4e867208bfbbe6f6c1bfa8bdf7402cbe781c"
+      }
+    }
+  },
+  "hostedSupplement": {
+    "runId": 40133653040,
+    "commit": "1b79bd92271525d98e834935108f90a8a21b5b06",
+    "status": "PASS",
+    "addedTests": {
+      "pass": 14,
+      "fail": 0,
+      "error": 0,
+      "skip": 0,
+      "parameterizedDataVectors": 13
+    },
+    "desktop": {
+      "pass": 21,
+      "fail": 0,
+      "error": 0,
+      "skip": 0
+    },
+    "retainedFixtureBlob": "666f9aca92d0373b912d05c2a2427287f8e23f3d"
+  },
+  "hostedSelectorCloseout": {
+    "runId": 40133772348,
+    "commit": "0cd5b858aaba0ad50ed6763fdf258674ac45ac0a",
+    "status": "PASS",
+    "pass": 9,
+    "fail": 0,
+    "error": 0,
+    "skip": 0
+  },
+  "artifacts": [
+    {
+      "runId": 40133653040,
+      "id": 12576730147,
+      "name": "mcp-phase3b7-supplement-evidence",
+      "size_in_bytes": 32079,
+      "url": "https://api.github.com/repos/gseshadow/Shale/actions/artifacts/12576730147",
+      "archive_download_url": "https://api.github.com/repos/gseshadow/Shale/actions/artifacts/12576730147/zip",
+      "expired": false,
+      "created_at": "2026-10-24T21:21:24Z",
+      "expires_at": "2026-11-07T21:21:24Z",
+      "updated_at": "2026-10-24T21:21:24Z",
+      "digest": "sha256:a81deb0e108001c2d1ece1d2bb7584fe88a2e13a2d01662a2a6fb9eb43e521d9",
+      "workflow_run": {
+        "id": 40133653040,
+        "repository_id": 976708406,
+        "head_repository_id": 976708406,
+        "head_branch": "codex/phase-3b7-supplement",
+        "head_sha": "1b79bd92271525d98e834935108f90a8a21b5b06"
+      }
+    },
+    {
+      "runId": 40133772348,
+      "id": 12575709800,
+      "name": "mcp-phase3b7-selector-closeout",
+      "size_in_bytes": 8926,
+      "url": "https://api.github.com/repos/gseshadow/Shale/actions/artifacts/12575709800",
+      "archive_download_url": "https://api.github.com/repos/gseshadow/Shale/actions/artifacts/12575709800/zip",
+      "expired": false,
+      "created_at": "2026-10-24T21:20:58Z",
+      "expires_at": "2026-11-07T21:20:57Z",
+      "updated_at": "2026-10-24T21:20:58Z",
+      "digest": "sha256:a26a84a86c36cecc6574e56af7a798336f750226974facbd2efc77af0df10e59",
+      "workflow_run": {
+        "id": 40133772348,
+        "repository_id": 976708406,
+        "head_repository_id": 976708406,
+        "head_branch": "codex/phase-3b7-affected-closeout",
+        "head_sha": "0cd5b858aaba0ad50ed6763fdf258674ac45ac0a"
+      }
+    }
+  ],
+  "performance": {
+    "unit": "nanoseconds",
+    "samplesPerOperation": 5,
+    "scope": "synthetic internal shared service; not transport or SLA",
+    "samples": {
+      "accessValidation": [
+        19365306,
+        14079845,
+        15683318,
+        15750502,
+        13224471
+      ],
+      "searchIncludingQuotaAuditAndHandoff": [
+        143087734,
+        30642435,
+        26480092,
+        27454925,
+        34895522
+      ],
+      "overviewIncludingQuotaAuditAndHandoff": [
+        136488377,
+        39049144,
+        37937572,
+        39264267,
+        38150485
+      ]
+    }
+  },
+  "remainingGaps": [
+    "approved authoritative artifact and actual Case/read-dependency RLS/permissions",
+    "complete serving OAuth/two-tool/two-client main adversarial matrix",
+    "full-stack lock-wait expiry and every live-gate race",
+    "true serving TLS/trusted proxy execution",
+    "finished two-tool conformance applicability and required-scenario execution",
+    "exact source-data response byte boundaries and authoritative invalid-source compatibility",
+    "tools/list endpoint and separately isolated audit/quota transaction performance"
+  ],
+  "retention": {
+    "proposedYears": 7,
+    "tenantLegalSignOff": "OPEN",
+    "purgeImplemented": false
+  },
+  "sdk": {
+    "version": "2.2.0-M1",
+    "prerelease": true,
+    "latestStableObserved": "2.1.0",
+    "modernInStableTree": false,
+    "productionApproval": "OPEN",
+    "relevantUpstreamIssues": [
+      1269,
+      1198
+    ],
+    "dependencyChange": false
+  },
+  "defaults": {
+    "globalAi": false,
+    "mcp": false,
+    "search": false,
+    "overview": false,
+    "tenantAi": false
+  },
+  "productionAzureSql": false,
+  "deployed": false,
+  "realTenantIntegrationEnabled": false,
+  "installerVersionPublished": false,
+  "sourceManifest": [
+    {
+      "path": "build/mcp-transport/client-python.py",
+      "gitBlob": "fd27f8668e4ec063d10abd5f9237c439895edf57",
+      "sha256": "357304eef3d24c9997960daa706206315cdd97386fe040678ea7d78b2e73916b"
+    },
+    {
+      "path": "build/mcp-transport/client-ts.mjs",
+      "gitBlob": "36d2364f3b3c986b6c9e4cf07d452aa48af8d9b8",
+      "sha256": "7587f2765b78694c04a675ea75086d431b027431062c853033622a7c57ea8b65"
+    },
+    {
+      "path": "build/mcp-transport/conformance-auth.mjs",
+      "gitBlob": "973a1703465694f4ad57eb99bcfcdf14e7ddf2f2",
+      "sha256": "8a76b49217b76fe1e4ab29680bfa9139011bb7eb0a1b353d39e6aecb59874621"
+    },
+    {
+      "path": "build/mcp-transport/overview-python.py",
+      "gitBlob": "523eb71a0bcfbf2881c2999584b5c30c2425a033",
+      "sha256": "c9e4aaf56fab9544103d057f57d4a2f9a18941a5a4dc0c7d87c8d370b2141e03"
+    },
+    {
+      "path": "build/mcp-transport/overview-ts.mjs",
+      "gitBlob": "773a7b53dab8ea1725017c239ecdc6abffdbd7e5",
+      "sha256": "53fc64341353f6400cae263ed1c8f7d35e0bc7da861cce66df2e12305c4d0eff"
+    },
+    {
+      "path": "build/mcp-transport/package.json",
+      "gitBlob": "1ab0dbe16fd69f9151fdd03dd5ca1b7e781bddef",
+      "sha256": "c489926359e04ab373b00b7bfaf112c54068415e299aac85da55f893fe551142"
+    },
+    {
+      "path": "build/mcp-transport/search-python.py",
+      "gitBlob": "c0bf010f652b3e3f7ad70b29e83d73dcd95d1715",
+      "sha256": "97040aa0032153d1cfefbc1cfa37fe0ca36999024549faade8b00a7cd6429440"
+    },
+    {
+      "path": "build/mcp-transport/search-ts.mjs",
+      "gitBlob": "1366816cf31ac87dc533aa02a551ac800fe356da",
+      "sha256": "81db6ff3ef24796ae4da1ce95e7326ebe54654cf763696499985db9dd8fd6443"
+    },
+    {
+      "path": "docs/sql/ai-integration/README.md",
+      "gitBlob": "9a6ec78bb84d4e81f3a21f5f1d5bcf2b9e08fe81",
+      "sha256": "97a34d816131f0077159b51e209007a0ae24bcfe97533f464d894c0410d6a38b"
+    },
+    {
+      "path": "docs/sql/ai-integration/phase3b1.sql",
+      "gitBlob": "b055cd7101a070c2001a3c271d82cd3f0ce387b7",
+      "sha256": "a25cf6feab9c399be743827a783b2b75c6efb1c26bac917d787dc936650f84ef"
+    },
+    {
+      "path": "docs/sql/ai-integration/phase3b2b.sql",
+      "gitBlob": "9552eec71cb163789236767aae60e7781616398d",
+      "sha256": "47adadb3ead42ee9ed693aea438ecb906aab0981b05cf592c6d9ea970179692f"
+    },
+    {
+      "path": "docs/sql/ai-integration/phase3b2c1.sql",
+      "gitBlob": "431e77ae2905edae9bacfe42ba58086c9396dd6e",
+      "sha256": "3768750d096b5b7b320e47ed197d121d98250bb42145cd7b5bcbb6a4f4124e2c"
+    },
+    {
+      "path": "docs/sql/ai-integration/phase3b2c2.sql",
+      "gitBlob": "f439621574a5d893803177b9b708adfb4c7b9672",
+      "sha256": "60546c5bd11b91a02c0061fbf0a685eaebbe491ed12b9711cef4c7f251be0668"
+    },
+    {
+      "path": "docs/sql/ai-integration/phase3b2d.sql",
+      "gitBlob": "3c859646906a369925c56484e16fe96664199268",
+      "sha256": "9eb9c2a16688a3c5627960b58f226c387cfa97137776082be874ae3468f81a07"
+    },
+    {
+      "path": "docs/sql/ai-integration/phase3b3.sql",
+      "gitBlob": "a4c21fa2d9b3d5b1b6fc2c8affb92c31a1db29e1",
+      "sha256": "77aa82d6bb2944a8125e4e92ee55cc17fd6e010f7139915405b63e791e9a5021"
+    },
+    {
+      "path": "docs/sql/ai-integration/revocation.sql",
+      "gitBlob": "115a539fe18ecabe5b0cf08eb45bc36c89cb4733",
+      "sha256": "4c3a0e3987e4e19a65d0a70511a901dbbfb532459b2d817c907d5a14d9c8e08d"
+    },
+    {
+      "path": "docs/sql/ai-integration/verify.sql",
+      "gitBlob": "e0c4f679310847f1be2bd604f6509154e0f91428",
+      "sha256": "5fabf167424a25003e6e48250810026923559bf3d500d8cbef75e69197471d79"
+    },
+    {
+      "path": "pom.xml",
+      "gitBlob": "67f895fa68a3bbaa4d5137c15394b8ca6bc2b3c9",
+      "sha256": "8ec17f729bb9c3cef6e7628caa58b034e2fcaf6610abf0ab4cef83b7c5c89217"
+    },
+    {
+      "path": "shale-core/src/main/java/com/shale/core/security/ai/AiScope.java",
+      "gitBlob": "c51f4aa3b501a72bda1e5d362c5654177fcf2f13",
+      "sha256": "466db674597cabde305e5b3d39bef92ac3298c8c21dbdf9b6294f789995678f7"
+    },
+    {
+      "path": "shale-core/src/test/java/com/shale/core/security/ai/AiScopeTest.java",
+      "gitBlob": "f55a3809028ba76fdaa9699d7bb1f46bd64219a4",
+      "sha256": "a5ca60ef83fa5551606f0640a778a260061cfc72c84422afc303a3de0a742717"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiAccessTokenValidator.java",
+      "gitBlob": "ccb32e40a05a90c1a6cd9e6f224632de018e1811",
+      "sha256": "55a854f9ee996092a28179f62d119bec0d87e69c58e05d150ac751828d67d039"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiBearerParser.java",
+      "gitBlob": "3961ace63628e5b9941a0d6a43d1ab6e4ffe755a",
+      "sha256": "507b766bb9635535115e2bdbcf1301b222c4634150b90d2ef78755d300e06fec"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiBootstrapResolver.java",
+      "gitBlob": "0908a3ae0d6737f3756eec2be6054e0014679c15",
+      "sha256": "6e01c80cc8cf0466970afa06a27a208ea978c98b1493528538c9350ed411fba5"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiIntegrationSecurityService.java",
+      "gitBlob": "241d5a536b7afcf330b122620f1f944683ee7422",
+      "sha256": "149669115a82bfd28a303a01a0a6faa490646d58df15dbbc21a6d70520110c51"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiOAuthCredentialStore.java",
+      "gitBlob": "a5ef81ba4b5a5acc7915ae32bc85f9c2bd45cac7",
+      "sha256": "1f234331e3598ef04105bf34d792def160934cb47840a96b25f40609fe5c0caa"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiOAuthExchangeStore.java",
+      "gitBlob": "f98ef9cb5a09934c8c832590c3e2a3330240567f",
+      "sha256": "793d5a9e2ab4a55af3c6985e8feb85ac6b6544ab00b7f362d097e5d1a92a5ff4"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiOAuthTransactionStore.java",
+      "gitBlob": "6bb753ae27383ab2bb545ff597774edd8f9535da",
+      "sha256": "e8a9c49b17b2e60bbcb4d79b15a90a9e63043ddcc0f8d2bd7f82c699c2d38e52"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiProductCapabilityService.java",
+      "gitBlob": "47f7a949fd2eae28f1a31210bf864b75089e0592",
+      "sha256": "3ba2ff989106d87ebbfd7681b8ffb3ec26ae642168155248c5b3dea7e73d73e5"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiSql.java",
+      "gitBlob": "fa6c35cb6297f1e74a040f996bcebbd59bc2ac69",
+      "sha256": "907306959320763264f8cde1607a27c8252692e04e49355c01f5e7eaf665f5ab"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/DisclosureBuffer.java",
+      "gitBlob": "d95d728b4ac2b473bafbd512d48292cc422b0e97",
+      "sha256": "ddb76a0fdace44d151cd74509f124261c2f2f9cf71462cd67141c17164aadf24"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/IntegrationAccessAudit.java",
+      "gitBlob": "bcdefa2acf6792680fdcee184c6eb3b076af985d",
+      "sha256": "0108f3369bea2ff9e74f1c1c0b15bdf5c676f3b0b4068316773fd171bbb883c6"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/IntegrationAccessReview.java",
+      "gitBlob": "786a0519041c5bde5650b28d0ba35b8149e3e2e2",
+      "sha256": "244fc45d45c97c5e93679d685bd01cd487360a2bbe7955d2c40bff35545e9d90"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/IntegrationCaseReadService.java",
+      "gitBlob": "6eea292f2d71d8c52361c9bea29f6f2250176eca",
+      "sha256": "3462d33bd88683f1cd4b07b43bb28fd9ed8de3e5f2a68b33febcc3f824fc5ab0"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/IntegrationInvocation.java",
+      "gitBlob": "e965b983a6bc9a3ea0117618fd84f51860b6ebb2",
+      "sha256": "cdadee6c71a8ce04ebdee8310fceae05bab42dda40b699caff959efedd1fa0f2"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/IntegrationReadException.java",
+      "gitBlob": "23b1b98f39057036eade792bc0785ccd32c91244",
+      "sha256": "ec704435f8a66c543435c05692d18f8546a218a3bf30101b0cc67ecdf68ec474"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/IntegrationRuntimeLease.java",
+      "gitBlob": "e445b9474417942418ee2a79daac9d9e58520914",
+      "sha256": "df2630a069545719167143c9ddf3b243a7ad4d03235eeabe4bc1772c92400bca"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/MinimizedCaseEncoder.java",
+      "gitBlob": "17a020446dd2e04cfc93ad0bbec0b394e7263047",
+      "sha256": "752242539448116497f5821bf6039e0b1801adf804e5546e156a9b67f8f19f55"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/VerifiedIntegrationContext.java",
+      "gitBlob": "a3107de201230e3be8c2ab32d15d70f9cabe87ec",
+      "sha256": "d4d481781b3e77f36e1b5e7f3f8be754b694e34d47881532e71f7ae23740ecf9"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/AiAccessContractTest.java",
+      "gitBlob": "c205f7487912a2f8ed026191b3774db25b8b90b4",
+      "sha256": "fa97b55d6d4379e3d30fbaf5e80e452b97ee2592a31adb086021684eb537991b"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/AiOAuthCredentialContractTest.java",
+      "gitBlob": "784096b461291f84e307e7dca1c5d808c0349ebc",
+      "sha256": "846cfb704e74208fa304016a33ef5cc3cf7656b26d5bfafd34ffcc2ec174a28a"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/AiOAuthExchangeContractTest.java",
+      "gitBlob": "ee081562077f6fdf41ed68c32061db45c579c905",
+      "sha256": "96a689ba8ce1d1182d1c0117d5e77bf8ae14e7edb980eff26aff5f4cae786859"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/AiOAuthRevocationContractTest.java",
+      "gitBlob": "3717db1a1ba7e80b6afab00f7c84acfb0d171415",
+      "sha256": "f276a86f0f199e60d8c87f03ee29a07f4aaee777e7066c6ca3bc0c64ae7c8dbd"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/AiSecurityContractTest.java",
+      "gitBlob": "5d9b69e1752f4ab79393a02f1194900e74ca57d0",
+      "sha256": "d500228e4d4c7f920b474cecae02b5c16bc560e8eff41b6425f1681b7bb380a5"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/AiSecurityLocalSqlServerTest.java",
+      "gitBlob": "666f9aca92d0373b912d05c2a2427287f8e23f3d",
+      "sha256": "b64d78066fdc8b36d36185f1b5e024683f35ccf343a3e627f991ff5514198b6a"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/IntegrationAccessContractTest.java",
+      "gitBlob": "9727f0d90238bae98187458865ad78b2c404bd6e",
+      "sha256": "ab1556253340a8618b0b8ce8568c0339d6b407f512ba4a5ebdb98628d1971fff"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/IntegrationCaseReadTest.java",
+      "gitBlob": "be55f198cef24740e3db991652e789081f5dda45",
+      "sha256": "5dc9927795208af314ecc5a1d3c2ce433a894fbce3467846048e510a34999614"
+    },
+    {
+      "path": "shale-server/pom.xml",
+      "gitBlob": "a9b399c5dbb767369748d0a6b0f29c9d8a73198b",
+      "sha256": "09b5f6487182b3ea48d9882fcdf86c4c7542c86408b5bc9363e0afdac43984b9"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpBodyFilter.java",
+      "gitBlob": "4b6c8ba15e5e2d869fe371bc6e9b4ebd1fefb9d4",
+      "sha256": "bf5386c6409251f7e83f2f85f3af15c567ea0b3e6ae8b1e89c1cbaf0a6fd8e04"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpCatalog.java",
+      "gitBlob": "c3117f92783b5317153edfa616fd87e8159a6c28",
+      "sha256": "a48133997078fca44d13e7a1644f4b611c8ca1d083c996ef54c1dd915b8b730c"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpGate.java",
+      "gitBlob": "a9ee19e39265ff9a7fb25180312802315c947875",
+      "sha256": "b27cf7d241444ed0abf759963ca3e183614f14ee931205b252fdf1240ce8897b"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpJdbcDeadline.java",
+      "gitBlob": "b260bd3e6b2eef66b433224b00dd52708dfc9dfa",
+      "sha256": "989caf7782cf34e98657e4bef9c2446055ffeaf43fa5e1f869b4dbebb1d53315"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+      "gitBlob": "3a06fdebdc9493536a4a8b26fd4f2288b8b7e80e",
+      "sha256": "75a5f2b89aa18d41fe95b5e5605728689cea8da2b90035143cacd92bcfc28e66"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpOverviewHandler.java",
+      "gitBlob": "3423087aeb13d08b785744de3d6dda7c53708f62",
+      "sha256": "83065e0103e8218970e1806847663c86c76cd09e4fca6e2a65ec7993b6df6b82"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpPayloadLogFilter.java",
+      "gitBlob": "e78b55d9a9f9e5c0888b759df537bcc60c9aa8b8",
+      "sha256": "3a5a0a8e46d0aba53896d2b9af9ee764e883abe3be681f0b0001454f715a85d2"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+      "gitBlob": "9bcf3b3c238cc6b5285f224925d25f79e0f9d45a",
+      "sha256": "5c4f963b27ad715d251c82a8bfcfd69537970002ac7130a24ab5ee3942eca8af"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpSearchHandler.java",
+      "gitBlob": "9cdde62344de67fefb9a525a0a5ede2dc3c0d01d",
+      "sha256": "5dbe65049640aa222b6a018d4e03a230892821d9532c59dd6ee5cbe2e2aab7f8"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+      "gitBlob": "d6b93c588d772fa053b13eb9f2af5e7726dd35a5",
+      "sha256": "9a61622b58ce554e458902f337a8a880d39d21a028d707b0cf3cb13d00e163a6"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpTransportProperties.java",
+      "gitBlob": "50f7eba5fb8780daa936e75d05726df02543d63b",
+      "sha256": "9e1f75fa60d559d2c34cb355bc2e83579e6df75aed29af77e1ff9cb9d8a0200d"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/DurableOAuthAuthorization.java",
+      "gitBlob": "7d9925adf76245dbbf6fe344197a369be5fc157f",
+      "sha256": "d12b2995c15582dd9e9cd31ac0e0256030b104d2edcc8c75bd5b039918d582b8"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/McpOAuthProperties.java",
+      "gitBlob": "bffff26cae546081884ab06eeb33c98cad748fc8",
+      "sha256": "0dde774bcd1a763e91028cdbe3a232744a0e7f3b64d0144209b1b83ffb8145b7"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/McpOAuthSecurityConfiguration.java",
+      "gitBlob": "9d6e9d260188699ad9a3b93a827b140345dd3512",
+      "sha256": "ae79dad6a36fa0b42ea4cd7f2769f8a30136bb897875f02dd393ca22ae7cc5fc"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/OAuthAuthorizationRequestPolicy.java",
+      "gitBlob": "63b53491577125cd73a0c46c586e5bb68c402b74",
+      "sha256": "f7b914d0eff450fdd565f82c6b30d4be20f966ebbc10f1addab2e434f806ea5f"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/OAuthCodeBootstrapConfiguration.java",
+      "gitBlob": "97df75920d55e09769558da47d593b9312d9301b",
+      "sha256": "ca69f5c2f2d82a21c5325135b8d7cf38e2477c86545becb14046350fb32808a9"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/OAuthCodeExchange.java",
+      "gitBlob": "3afbfcdb60e79e46b7f260a52210639aeecbb986",
+      "sha256": "85294d9e608270d0acf7eca4164967268140f6696552fd60792e4d415045cbbc"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/OAuthHumanFilter.java",
+      "gitBlob": "5b8bccf35680e4b1da4532c42bcab1f979edc545",
+      "sha256": "9082b19d6ff184fe2d2c5592e7a804fca81bee4340beca45c6003b1500531750"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/OAuthIssuanceDisabled.java",
+      "gitBlob": "0b562b4fd997b3d4af02ac8ce69924adeb959341",
+      "sha256": "432ddbacfadf717d5422f29566e822639a32ff8111494f81a0470a8e5d0def1a"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/OAuthMetadataContract.java",
+      "gitBlob": "2cbacfe4a70837dc892344e36ecb2dac6c3d22d6",
+      "sha256": "eb736cac79390cae8d1e2d6a7ee170eb35eee96297a042487ed322665a3b72b6"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/OAuthRedirectPolicy.java",
+      "gitBlob": "5fe173fc99139043cab554352f9abc6f62eea897",
+      "sha256": "5bc231f677c580648ca24bf2d65ab0ebc3c7794b08f61dbfde02b6508ae2977f"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/OAuthRevocation.java",
+      "gitBlob": "85d1a8f2b1e503f268655e56bc2b818379402524",
+      "sha256": "7b0dcc06c02346dc3e8e57a442cab87d585874af2491d31e8a62ce89c27215d8"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/PinnedClientAssertion.java",
+      "gitBlob": "1d96fe864986d7fa3f84c0c80d7133217a23d678",
+      "sha256": "7e22af6d17e2e5bec1f42a3734f27c786ed7ba0ee91bbb438241b6015441b1cf"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/ShaleOAuthHuman.java",
+      "gitBlob": "bda8dd18e0f22ad4a067a3ed963078619079b98b",
+      "sha256": "ec95f9ea6866a6de54970a223f3d78a8a66690d8dd76c7977679e2e6c1bbba26"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/oauth/TenantBoundOAuthClientRepository.java",
+      "gitBlob": "38fc927a6f1c0ea57d6d6d8adc1206b144e0b965",
+      "sha256": "9549c7044023c608973ea48921cc000e0d9b59da48771d9aeb872f77ba3261c7"
+    },
+    {
+      "path": "shale-server/src/main/resources/application.properties",
+      "gitBlob": "fb7ddc8d8f30513d887d502aebd0a7d822bbbde4",
+      "sha256": "253df5409a8d2888a367853b059c198237381fa29be9c84fdbb638320066f799"
+    },
+    {
+      "path": "shale-server/src/main/resources/mcp/get-case-overview.json",
+      "gitBlob": "9c3e195ccab06f211bac51a49b79b1d34e977200",
+      "sha256": "55db78ef3fd1b0e97e1a2d29b7f6a7cde11d1cd05f80f9033aac566c24e59951"
+    },
+    {
+      "path": "shale-server/src/main/resources/mcp/search-cases.json",
+      "gitBlob": "4581e11d5ec94794bcd92f573f2df99437cdfba6",
+      "sha256": "18eabe6d5e9c26b87083723e52c3e1837e5481145f7e02819191df6ba7edd7f4"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpClientInteropFixture.java",
+      "gitBlob": "ca6dce2cd6af7a4dc7a8a3c732560a0fd12ee4b1",
+      "sha256": "0c552ca0e2b6300e0f5c8fb4faa919d800f6ef8f178ca7490be6a41799feff6c"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpFilterIsolationTest.java",
+      "gitBlob": "dd115da4fab159195084864e2e8e0f6523e3bf4d",
+      "sha256": "21136720b718f80ac28ca95d994d07544ef623de27dd3d6974d53c149b8c810f"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpJdbcDeadlineTest.java",
+      "gitBlob": "ba15d90b3a6a7566558f70b2545983b910a55b79",
+      "sha256": "c973f4b9abb15f603e5a86c45537caa1dbbad7d1af892e768b7aa43f5b993476"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpOverviewClientFixture.java",
+      "gitBlob": "d71886e62cd7612691d7f7a2516316c22315011f",
+      "sha256": "77059b09252d14375a37d0ee9c757b65801d066f0dfc35d4c5dfdecca79d83c0"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpOverviewTest.java",
+      "gitBlob": "d1776dd841da9e1fe855f43c7e62aeeb0665746a",
+      "sha256": "75eae060f78a5a49e44b11a6bb926be51a068e247540dd06d03e1ba576cd040a"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpSdkCompatibilityTest.java",
+      "gitBlob": "5639a5f05050917f856547005d2d0f15bc1ca3af",
+      "sha256": "148c42f17284f3fca6581c78cf9d739966ae81fa46f39c5a58b2b9093cf86bfd"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpSearchClientFixture.java",
+      "gitBlob": "b3825fcf923506bd0a785ad91236916a1df555bf",
+      "sha256": "4961ed5d553fe532fb85ad87351534c0e390a6409b692fe41b5eb7cba5a9d1fd"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpSearchTest.java",
+      "gitBlob": "9819a0395ab3fa0c2994cff95d83350dda9faf9a",
+      "sha256": "1b036e3b52a43b9600c7e0ddc0ad5f7979963dee202f0d24b4186a54ca84b298"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpTransportTest.java",
+      "gitBlob": "744768529a4cf0ad78fd8fb7a72242f4dd2963c1",
+      "sha256": "ffc841988c408704eed7bc4a201c0bd4ee60e8dab70fc4e15510748c5bd88100"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthAuthorizationFlowTest.java",
+      "gitBlob": "a971f64408f9fe0272461b4789d65de95235dfc7",
+      "sha256": "b929ef45141ea462a63092b4950ad4ddf53cbc103f1f69632a3a21490fc91752"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthClientMappingTest.java",
+      "gitBlob": "bc5c2ec57628be06adf82b8bd118429956d16c91",
+      "sha256": "ead379a258fcc745c9cae5fe0cd2144e09d04e37c76a6849cabb5ac85172a163"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthCodeExchangePolicyTest.java",
+      "gitBlob": "3d00557d6e329b1df2e791f6a0d49da8062ff979",
+      "sha256": "b5a4056b7ff6a530d1a1a94fac3d6baa33149331f0ecc35dfd085d34c56568fd"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthConfigurationTest.java",
+      "gitBlob": "c476850dd6032af3bbd7219f24cbbe937f6f454b",
+      "sha256": "499c03666133ba37ad373cf8df6d66a1de7948a32e1588e678f33d366ec4c689"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthFilterIsolationTest.java",
+      "gitBlob": "b4abe2dc5abcfb643b8b951e4f1cc66c12781f2e",
+      "sha256": "9c9a184f1f855f8486013fbd7df64e64595ad5b4722b2e75a4955f8a4eebecf3"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthMetadataTest.java",
+      "gitBlob": "492aebfd23a4b3608693fbfcf36d626d773c30cd",
+      "sha256": "4d8bca543b47b5ccc631304381f80ea27add8fd7f5aac39c1490b2335d5a8d86"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthRevocationPolicyTest.java",
+      "gitBlob": "0e2ec2ca7e5608c330b6e3858231493a23eabf35",
+      "sha256": "1aaa26ad6dcf632e5c081529dca0e34e9f4e5375ad081fb7b9c685a550def829"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthSecurityTestContext.java",
+      "gitBlob": "159e915b08a522747df5124e10cb57c3d0f866e8",
+      "sha256": "e3ec0aaad38db9685078bf77bafb88fe47c4267a73bc2a6f664b5b42a93c2c5b"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/PinnedClientAssertionTest.java",
+      "gitBlob": "44ec4652bdb0eac43e9fd384c18feec98c932b42",
+      "sha256": "c3e61d2ca215584f51014802c818e66076ab13e65c5f0a0201b507daa4acd268"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/ShaleOAuthHumanTest.java",
+      "gitBlob": "611fd604cfd872d9a1b9f2c6c7073515e73586ef",
+      "sha256": "e75f65b2ade28246522454f81ff3672082b24430a51e54b33b20a789eef1ecdd"
+    }
+  ],
+  "requirementCoverage": {
+    "authoritativeArtifact": "BLOCKED",
+    "authoritativeCaseRlsPermissions": "BLOCKED",
+    "nonBypassIdentitySql": "synthetic SQL; full serving identity separation not accepted",
+    "completeServingOAuthMcpCasePath": "partial: maintained OAuth servlet + serving MCP; no TLS",
+    "tools": "exactly search_cases and get_case_overview; synthetic handler execution",
+    "twoClients": "per-tool/no-handler matrices; complete final two-tool matrix OPEN",
+    "authentication": "layered unit/SQL/servlet; exhaustive per-client complete-stack matrix OPEN",
+    "assertions": "pinned RS256 unit, servlet and SQL/replacement replay coverage",
+    "codeRefresh": "synthetic SQL and maintained endpoint lifecycle coverage",
+    "tenantUserScope": "synthetic SQL and separate unit/catalog/client coverage; authoritative/full-client OPEN",
+    "killSwitchesRevocation": "synthetic SQL races and gates; full transport race matrix OPEN",
+    "expiry": "real internal SQL lock wait; full serving stack repetition OPEN",
+    "search": "unit/JDBC/SQL and independent search-client coverage; full final-server corpus OPEN",
+    "overview": "unit/JDBC/SQL and independent Overview-client coverage; authoritative BLOCKED",
+    "outputContract": "64 static schema cases plus runtime regressions; authoritative source compatibility OPEN",
+    "promptInjection": "13-vector synthetic SQL test includes all three exact instruction strings; full wire repetition OPEN",
+    "sqlInjectionWildcards": "13-vector synthetic SQL test covers all requested punctuation classes; full wire/candidate repetition OPEN",
+    "quotaConcurrency": "durable synthetic SQL, real races and replacement JVMs; full serving stress OPEN",
+    "replacementProcess": "actual replacement JVM; no serving replica acceptance",
+    "protocol": "actual SDK servlet + no-handler clients; full final two-tool conformance OPEN",
+    "originProxyTls": "servlet/canonical configuration coverage; true serving TLS/proxy OPEN",
+    "bytes": "deterministic encoder/envelope fault coverage; exhaustive real-data exact boundaries OPEN",
+    "auditAtomicityFailurePrivacyReview": "unit/injected + real synthetic SQL; authoritative permission and full transport faults OPEN",
+    "lostCommitAck": "injected after actual commit; no delivery/replay claim",
+    "poolAsync": "actual synthetic SQL single-SPID + unit async; authoritative/complete serving matrix OPEN",
+    "restWebDesktopOAuth": "server and desktop source regressions; no installed/native acceptance",
+    "sdk": "2.2.0-M1 prerelease; no upgrade or production approval",
+    "conformance": "0.2.0-alpha.12 no-handler fixture only; raw failures/skips retained",
+    "performance": "5 samples each ACCESS/shared search/shared Overview; tools/list and isolated audit/quota OPEN",
+    "retentionLegal": "proposed 7 years; tenant/legal retention sign-off OPEN",
+    "deploymentConfiguration": "cumulative migration order reviewed; deployed receipt/application status UNKNOWN; no execution",
+    "defaults": "all packaged AI/OAuth/MCP/handlers false; SQL global false, missing tenant false",
+    "defects": "no material production defect established; incomplete evidence is not defect absence proof",
+    "completion": "BLOCKED; Phase 3B IN PROGRESS; no real enablement recommendation"
+  },
+  "totalSyntheticSql": {
+    "annotatedMethods": 101,
+    "invocations": 182,
+    "fail": 0,
+    "error": 0,
+    "skip": 0,
+    "classification": "99 unchanged methods/168 invocations in main plus 2 added methods/14 invocations in supplement; no authoritative Case evidence"
+  }
+}

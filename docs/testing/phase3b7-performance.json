@@ -1,0 +1,28 @@
+{
+  "unit": "nanoseconds",
+  "samplesPerOperation": 5,
+  "scope": "synthetic internal shared service; not transport or SLA",
+  "samples": {
+    "accessValidation": [
+      19365306,
+      14079845,
+      15683318,
+      15750502,
+      13224471
+    ],
+    "searchIncludingQuotaAuditAndHandoff": [
+      143087734,
+      30642435,
+      26480092,
+      27454925,
+      34895522
+    ],
+    "overviewIncludingQuotaAuditAndHandoff": [
+      136488377,
+      39049144,
+      37937572,
+      39264267,
+      38150485
+    ]
+  }
+}
