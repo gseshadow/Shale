@@ -1,0 +1,197 @@
+name: Temporary Phase 3B.7 adversarial acceptance
+# Explicit task-authorized exception to the repository's no-Actions-testing policy.
+# Remove before merge: this branch-only workflow is execution scaffolding, not CI policy.
+on:
+  push:
+    branches: [codex/phase-3b7-adversarial-acceptance]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mcp-sdk-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compatibility:
+    if: github.ref == 'refs/heads/codex/phase-3b7-adversarial-acceptance'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Execution environment and fresh repository identity
+        run: |
+          mkdir -p work/mcp-evidence
+          java -version 2>&1 | tee work/mcp-evidence/java.txt
+          mvn -version 2>&1 | tee work/mcp-evidence/maven.txt
+          git rev-parse HEAD | tee work/mcp-evidence/commit.txt
+          git diff --check 90580f11dcfd3371cac3b7f4bb9dd4819ec5e181 HEAD
+          curl --fail --silent --show-error https://api.github.com/repos/modelcontextprotocol/java-sdk/releases/tags/v2.2.0-M1 > work/mcp-evidence/official-release.json
+          python3 -c 'import json; r=json.load(open("work/mcp-evidence/official-release.json")); assert r["tag_name"]=="v2.2.0-M1" and r["prerelease"]'
+      - name: Resolve dependencies and compile production reactor dependencies
+        run: |
+          set -o pipefail
+          timeout 900 mvn -B -ntp -U -pl shale-server -am -Dmaven.test.skip=true install 2>&1 | tee work/mcp-evidence/compile.log
+      - name: Actual modern SDK, Jackson and unregistered servlet smoke tests
+        run: |
+          set -o pipefail
+          timeout 600 mvn -B -ntp -pl shale-server -am -Dtest=McpOverviewTest,McpSearchTest,IntegrationCaseReadTest,McpSdkCompatibilityTest,McpTransportTest,McpFilterIsolationTest,McpJdbcDeadlineTest,OpenApiDocumentationTest,ShaleServerServiceConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/sdk-smoke.log
+      - name: Install pinned independent clients
+        run: |
+          npm install --prefix build/mcp-transport --ignore-scripts --no-audit --no-fund
+          python3 -m venv work/mcp-clients
+          work/mcp-clients/bin/pip install 'mcp==2.3.0'
+          echo 'SHALE_MCP_EXTERNAL_CLIENTS=true' >> "$GITHUB_ENV"
+      - name: Disposable loopback SQL for existing OAuth authorization through revocation tests
+        run: |
+          probe_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(30)+"aB9!")')"
+          echo "::add-mask::$probe_password"
+          echo "SHALE_AI_SQL_PASSWORD=$probe_password" >> "$GITHUB_ENV"
+          echo "SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI" >> "$GITHUB_ENV"
+          echo "SHALE_AI_SQL_PORT=14333" >> "$GITHUB_ENV"
+          export MSSQL_SA_PASSWORD="$probe_password"
+          docker run -d --name shale-mcp-probe-sql -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD -p 127.0.0.1:14333:1433 mcr.microsoft.com/mssql/server:2022-latest > work/mcp-evidence/sql-container-id.txt
+          for attempt in $(seq 1 60); do
+            if docker exec -e MSSQL_SA_PASSWORD shale-mcp-probe-sql bash -c '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -b -Q "SELECT 1"' >/dev/null 2>&1; then
+              docker inspect --format '{{.Image}}' shale-mcp-probe-sql > work/mcp-evidence/sql-image.txt
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Disposable SQL startup failed"
+          exit 1
+      - name: Focused OAuth ACCESS disclosure WEB DESKTOP REST and context regressions
+        run: |
+          set -o pipefail
+          timeout 900 mvn -B -ntp -pl shale-server -am '-Dtest=McpOverviewTest,McpSearchTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,MinimizedCaseReadControllerTest,RequestScopedDbSessionProviderTest,OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,Ai*ContractTest,IntegrationAccessContractTest,IntegrationCaseReadTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest' -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee work/mcp-evidence/focused.log
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as E
+          for path in glob.glob('**/target/surefire-reports/TEST-*.xml',recursive=True):
+              root=E.parse(path).getroot()
+              assert int(root.get('failures',0))==0 and int(root.get('errors',0))==0, path
+              if 'AiSecurityLocalSqlServerTest' in path or 'OAuthAuthorizationFlowTest' in path:
+                  assert int(root.get('tests',0))>0 and int(root.get('skipped',0))==0, path
+          PY
+      - name: Headless JavaFX prerequisites for selector and critical suites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgtk-3-0t64
+      - name: Selector Python and affected plan
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s build/test-selection -p test_select_tests.py 2>&1 | tee work/mcp-evidence/selector-python.log
+          python3 build/test-selection/select_tests.py --base 90580f11dcfd3371cac3b7f4bb9dd4819ec5e181 --head HEAD --format markdown --plan-output work/mcp-evidence/selection.json | tee work/mcp-evidence/selection.md
+      - name: Affected suite
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, pathlib, re, shutil, xml.etree.ElementTree as ET
+          plan = json.load(open("work/mcp-evidence/selection.json"))
+          inventory = pathlib.Path("shale-data/src/test/java/com/shale/data/security/ai/AiSecurityLocalSqlServerTest.java").read_text()
+          methods = re.findall(r"@(?:[\w.]*\.)?(?:Test|ParameterizedTest)\b[\s\S]*?\bvoid\s+(\w+)\s*\(", inventory)
+          assert len(methods)==len(set(methods)) and len(methods)>90, "Complete annotated SQL method inventory required"
+          sql_class="com.shale.data.security.ai.AiSecurityLocalSqlServerTest"
+          commands=[]
+          selected_sql=False
+          plan["selected_maven_batches"]=[["-pl","shale-server","-am","-Dtest=Ai*ContractTest,IntegrationAccessContractTest,IntegrationCaseReadTest,AiSecurityLocalSqlServerTest,Mcp*Test,OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,MinimizedCaseReadControllerTest,RequestScopedDbSessionProviderTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest","-Dsurefire.failIfNoSpecifiedTests=false","test"]]
+          for args in plan["selected_maven_batches"]:
+              args=list(args)
+              for n,arg in enumerate(args):
+                  if arg.startswith("-Dtest="):
+                      tests=arg[len("-Dtest="):].split(",")
+                      if sql_class in tests or "AiSecurityLocalSqlServerTest" in tests:
+                          selected_sql=True
+                          args[n]="-Dtest="+",".join(t for t in tests if t not in [sql_class,"AiSecurityLocalSqlServerTest"])
+              commands.append(args)
+          if selected_sql:
+              for offset in range(0,len(methods),2):
+                  group=methods[offset:offset+2]
+                  commands.append(["-pl","shale-data","-am","-Dtest="+sql_class+"#"+"+".join(group),"-Dsurefire.failIfNoSpecifiedTests=false","test"])
+          pathlib.Path("work/mcp-evidence/affected-partitions.json").write_text(json.dumps({"selectedSql":selected_sql,"sqlMethods":methods,"commands":commands},indent=2))
+          focused=pathlib.Path("work/mcp-evidence/focused-reports");focused.mkdir(exist_ok=True)
+          for report in pathlib.Path(".").glob("*/target/surefire-reports/TEST-*.xml"):
+              shutil.copy2(report,focused/(report.parent.parent.parent.name+"-"+report.name))
+          executed=set();sql_total=0;partition_counts=[]
+          with open("work/mcp-evidence/affected.log", "w") as log:
+              for index,args in enumerate(commands):
+                  command = ["xvfb-run", "-a", "mvn", "-B", "-ntp", *args]
+                  print(command, flush=True)
+                  for old in pathlib.Path(".").glob("*/target/surefire-reports"):
+                      shutil.rmtree(old)
+                  result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=360)
+                  # Keep every partition's receipts; later invocations replace Surefire reports.
+                  receipt=pathlib.Path("work/mcp-evidence/affected-reports")/str(index)
+                  receipt.mkdir(parents=True,exist_ok=True)
+                  total=0
+                  for report in pathlib.Path(".").glob("*/target/surefire-reports/TEST-*.xml"):
+                      shutil.copy2(report,receipt/(report.parent.parent.parent.name+"-"+report.name))
+                      xml=ET.parse(report).getroot()
+                      assert all(int(xml.get(k,0))==0 for k in ["failures","errors","skipped"]), str(report)
+                      total+=int(xml.get("tests",0))
+                      if xml.get("name")==sql_class:
+                          sql_total+=int(xml.get("tests",0))
+                          for case in xml.findall("testcase"):
+                              executed.add(case.get("name").split("(")[0].split("[")[0])
+                  if result.returncode:
+                      raise SystemExit(result.returncode)
+                  assert total>0
+                  partition_counts.append(total)
+          if selected_sql:
+              assert executed==set(methods), {"missing":sorted(set(methods)-executed),"unexpected":sorted(executed-set(methods))}
+              assert sql_total==168, sql_total
+          print("Affected partition test counts:",partition_counts,"SQL invocations:",sql_total,"annotated methods:",len(executed))
+          pathlib.Path("work/mcp-evidence/affected-summary.json").write_text(json.dumps({"partitionTests":partition_counts,"sqlTests":sql_total,"sqlMethods":len(executed)},indent=2))
+          PY
+      - name: Critical reactor once after candidate and focused checks pass
+        run: |
+          set -o pipefail
+          timeout 900 xvfb-run -a mvn -B -ntp test 2>&1 | tee work/mcp-evidence/critical.log
+      - name: Documentation and whitespace
+        run: |
+          python3 - <<'PY'
+          import pathlib,re,urllib.parse
+          for name in ['docs/architecture/ai-integration-and-mcp.md','docs/azure-app-service-deployment.md']:
+              path=pathlib.Path(name);text=path.read_text()
+              assert sum(line.startswith('```') for line in text.splitlines())%2==0,name
+              for target in re.findall(r'\]\(([^)\s]+)\)',text):
+                  if ':' in target or target.startswith('#'):continue
+                  relative=urllib.parse.unquote(target.split('#',1)[0])
+                  assert (path.parent/relative).exists(),(name,target)
+          print('Documentation fences and relative paths PASS')
+          PY
+          git diff --check 90580f11dcfd3371cac3b7f4bb9dd4819ec5e181 HEAD
+      - name: Summarize independent client and conformance evidence
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob,json,pathlib
+          for path in glob.glob('work/mcp-evidence/*client*.json') + glob.glob('work/mcp-evidence/*operations*.json'):
+              print(path, pathlib.Path(path).read_text())
+          for path in glob.glob('work/mcp-evidence/conformance-*.exit'):
+              print(path, pathlib.Path(path).read_text())
+          for path in glob.glob('work/mcp-evidence/conformance/**/checks.json',recursive=True):
+              data=json.load(open(path)); checks=data if isinstance(data,list) else data.get('checks',[])
+              print(path, json.dumps([{'id':c.get('id'),'status':c.get('status'),'error':c.get('errorMessage')} for c in checks]))
+          PY
+      - name: Retain evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-phase3b7-adversarial-evidence
+          retention-days: 14
+          path: |
+            work/mcp-evidence/
+            **/target/surefire-reports/
+            shale-server/target/mcp-dependency-tree.txt
+            shale-server/target/mcp-effective-pom.xml
+            build/mcp-transport/package-lock.json
+      - name: Remove disposable SQL
+        if: always()
+        run: docker rm -f shale-mcp-probe-sql >/dev/null 2>&1 || true
