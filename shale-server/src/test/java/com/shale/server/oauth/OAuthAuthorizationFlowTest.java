@@ -366,7 +366,7 @@ class OAuthAuthorizationFlowTest {
 
     String freshAccess(String scope)throws Exception {
         var start=authorization();start.setParameter("scope",scope);
-        var approval=approve(query(send(start).getRedirectedUrl()).get("state"));approval.setParameter("scope",scope);
+        var approval=approve(query(send(start).getRedirectedUrl()).get("state"));approval.setParameter("scope",scope.split(" "));
         String code=query(send(approval).getRedirectedUrl()).get("code");
         var response=send(exchangeRequest(code));assertEquals(200,response.getStatus());
         return new tools.jackson.databind.ObjectMapper().readTree(response.getContentAsString()).path("access_token").asText();
@@ -421,6 +421,83 @@ class OAuthAuthorizationFlowTest {
         } finally {
             sid=originalSid;webToken=originalWeb;client=originalClient;sessions.current=originalSession;
             try(var c=owner(db)) {
+                for(String table:List.of("Cases","CaseStatuses","CaseUsers"))
+                    sql(c,"IF OBJECT_ID(N'dbo."+table+"') IS NOT NULL ALTER SECURITY POLICY sec.TenantFilter DROP FILTER PREDICATE ON dbo."+table);
+                for(String table:List.of("CaseStatuses","CaseUsers","Cases","Statuses","PracticeAreas"))sql(c,"DROP TABLE IF EXISTS dbo."+table);
+            }
+        }
+    }
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"ts","python"})
+    void syntheticOverviewIndependentClientsUseFreshAccessRealSqlAndOneWorker(String kind,@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
+        Assumptions.assumeTrue("true".equals(System.getenv("SHALE_MCP_EXTERNAL_CLIENTS")),"Independent clients explicitly installed by acceptance runner");
+        var originalSid=sid;String originalWeb=webToken,originalClient=client;var originalSession=sessions.current;
+        int actor=kind.equals("ts")?75:76;
+        int invalidActor=kind.equals("ts")?77:78;
+        try {
+            try(var c=owner(db)) {
+                try(var s=c.createStatement();var rows=s.executeQuery("SELECT CASE WHEN OBJECT_ID(N'dbo.Cases') IS NULL THEN 0 ELSE 1 END")) {
+                    rows.next();if(rows.getInt(1)==0) {
+                        String fixture=Files.readString(Path.of("../shale-data/src/test/resources/ai/synthetic-case-read.sql"))
+                            .replace("ALTER TABLE dbo.Users ADD", "IF COL_LENGTH(N'dbo.Users',N'name_first') IS NULL ALTER TABLE dbo.Users ADD")
+                            .replaceAll("(?m)^CREATE TABLE dbo.AuditLog.*\\R","")
+                            .replace(",\nADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.AuditLog;",";");
+                        for(String batch:fixture.split("(?im)^GO\\s*$"))if(!batch.isBlank())sql(c,batch);
+                        sql(c,"ALTER TABLE dbo.Cases ALTER COLUMN Name nvarchar(max)");
+                        for(int n=0;n<101;n++)sql(c,"INSERT dbo.Cases VALUES("+(1000+n)+",7,N'NUMBER',N'MCP literal "+String.format(java.util.Locale.ROOT,"%03d",n)+"',NULL,0,'2026-10-23T11:22:33.1234567')");
+                        sql(c,"INSERT dbo.Cases VALUES(9000,7,NULL,N'Oversized '+REPLICATE(N'x',256),NULL,0,NULL)");
+                        sql(c,"INSERT dbo.Cases VALUES(9001,8,NULL,N'MCP literal foreign',NULL,0,NULL),(9002,7,NULL,N'MCP literal deleted',NULL,1,NULL)");
+                    }
+                }
+            }
+            var controls=new AiIntegrationSecurityService(()->{try{return runtime.openConnection(new ServerPrincipal(71,7,null));}catch(SQLException e){throw new IllegalStateException(e);}},true,ISSUER,RESOURCE);
+            client=controls.register("Synthetic Overview "+kind,false,Set.of(CASES_SEARCH,CASES_OVERVIEW_READ),1,List.of(URI.create(REDIRECT))).clientId();
+            try(var c=owner(db)) {
+                sql(c,"INSERT dbo.Cases VALUES(9003,7,NULL,N'PHI_FAILURE',NULL,0,NULL)");
+                sql(c,"CREATE TRIGGER dbo.FailMcpPhi ON dbo.AuditLog AFTER INSERT AS IF EXISTS(SELECT 1 FROM inserted WHERE ObjectId=9003) THROW 59010,'Synthetic PHI append failure',1;");
+            }
+            var prepared=tokens.prepare(new ServerPrincipal(actor,7,null));sid=UUID.randomUUID();webToken=tokens.issueBound(prepared,sid);
+            sessions.current=new UserSessionView(actor,sid,ClientType.WEB,null,prepared.tokenId(),Instant.now(),Instant.now().plusSeconds(3600),null,null,null);
+            try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,"+actor+",'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
+            var credentials=new HashMap<String,String>();
+            credentials.put("OVERVIEW_TOKEN",freshAccess("cases.overview.read"));
+            credentials.put("BOTH_TOKEN",freshAccess("cases.search cases.overview.read"));
+            credentials.put("SEARCH_TOKEN",freshAccess("cases.search"));
+            String revoked=freshAccess("cases.overview.read");assertEquals(200,send(revokeRequest(revoked)).getStatus());credentials.put("REVOKED_TOKEN",revoked);
+            var invalidPrepared=tokens.prepare(new ServerPrincipal(invalidActor,7,null));sid=UUID.randomUUID();webToken=tokens.issueBound(invalidPrepared,sid);
+            sessions.current=new UserSessionView(invalidActor,sid,ClientType.WEB,null,invalidPrepared.tokenId(),Instant.now(),Instant.now().plusSeconds(3600),null,null,null);
+            try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,"+invalidActor+",'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
+            credentials.put("INVALID_TOKEN",freshAccess("cases.overview.read"));
+            var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();source.setURL(url(db));source.setUser(login);source.setPassword(secret);
+            com.shale.server.mcp.McpOverviewClientFixture.verify(url(db),bootstrapLogin,bootstrapSecret,source,credentials,kind,temp);
+            try(var c=owner(db);var s=c.createStatement()) {
+                try(var rows=s.executeQuery("SELECT Outcome,COUNT(*) Events FROM dbo.IntegrationAccessAuditLog WHERE UserId="+actor+" GROUP BY Outcome")) {
+                    var counts=new HashMap<String,Integer>();while(rows.next())counts.put(rows.getString(1),rows.getInt(2));
+                    assertEquals(Map.of("ALLOWED_READ",2,"INVALID_INPUT",3,"UNAVAILABLE",5,"THROTTLED",1),counts);
+                }
+                try(var rows=s.executeQuery("SELECT SUM(CONVERT(int,RowCost)),COUNT(*) FROM dbo.AiQuotaReservation WHERE UserId="+actor)) {
+                    rows.next();assertEquals(7,rows.getInt(1),"Seven reserved Overview attempts cost one each, including failed reads and PHI rollback");assertEquals(11,rows.getInt(2));
+                }
+                try(var rows=s.executeQuery("SELECT COUNT(*) FROM dbo.AuditLog WHERE UserId="+actor+" AND FieldName='Case.Overview.Read'")) {rows.next();assertEquals(2,rows.getInt(1));}
+                try(var rows=s.executeQuery("SELECT ReturnedCount,(SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource r WHERE r.EventId=a.Id AND r.Relation='RETURNED') Children FROM dbo.IntegrationAccessAuditLog a WHERE UserId="+actor+" AND Outcome='ALLOWED_READ'")) {
+                    int parents=0;while(rows.next()){parents++;assertEquals(1,rows.getInt(1));assertEquals(1,rows.getInt(2));}assertEquals(2,parents);
+                }
+                try(var rows=s.executeQuery("SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource r JOIN dbo.IntegrationAccessAuditLog a ON a.Id=r.EventId WHERE a.UserId="+actor+" AND Relation='REQUESTED'")) {rows.next();assertEquals(6,rows.getInt(1));}
+                try(var rows=s.executeQuery("SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource r JOIN dbo.IntegrationAccessAuditLog a ON a.Id=r.EventId WHERE a.UserId="+invalidActor)) {rows.next();assertEquals(0,rows.getInt(1));}
+                try(var rows=s.executeQuery("SELECT COUNT(*) FROM dbo.AuditLog WHERE ObjectId=9003")) {rows.next();assertEquals(0,rows.getInt(1));}
+                try(var rows=s.executeQuery("SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource r JOIN dbo.IntegrationAccessAuditLog a ON a.Id=r.EventId WHERE r.CaseId=9003 AND a.Outcome='ALLOWED_READ'")) {rows.next();assertEquals(0,rows.getInt(1));}
+                for(String table:List.of("IntegrationAccessAuditLog","IntegrationAccessAuditResource"))
+                try(var rows=s.executeQuery("SELECT * FROM dbo."+table)) {
+                    while(rows.next())for(int col=1;col<=rows.getMetaData().getColumnCount();col++) {
+                        String value=String.valueOf(rows.getObject(col));
+                        for(String sentinel:List.of("SECRET_CASE","SECRET_NUMBER","MCP literal","PHI_FAILURE","NUMBER","client-metadata-sentinel"))assertFalse(value.contains(sentinel));
+                        for(String token:credentials.values())assertFalse(value.contains(token));
+                    }
+                }
+            }
+        } finally {
+            sid=originalSid;webToken=originalWeb;client=originalClient;sessions.current=originalSession;
+            try(var c=owner(db)) {
+                sql(c,"DROP TRIGGER IF EXISTS dbo.FailMcpPhi");
                 for(String table:List.of("Cases","CaseStatuses","CaseUsers"))
                     sql(c,"IF OBJECT_ID(N'dbo."+table+"') IS NOT NULL ALTER SECURITY POLICY sec.TenantFilter DROP FILTER PREDICATE ON dbo."+table);
                 for(String table:List.of("CaseStatuses","CaseUsers","Cases","Statuses","PracticeAreas"))sql(c,"DROP TABLE IF EXISTS dbo."+table);

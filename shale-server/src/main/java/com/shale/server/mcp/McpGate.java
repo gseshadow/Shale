@@ -106,7 +106,7 @@ final class McpGate extends OncePerRequestFilter {
             catch(IOException internalEncoding) {throw new Rejected(503,"unavailable");}
             check(deadline);
             byte[] result=buffered.getContentAsByteArray();
-            if (result.length>65536 || buffered.getContentType()!=null && !buffered.getContentType().startsWith("application/json"))
+            if (result.length>("get_case_overview".equals(request.getHeader("Mcp-Name"))?32768:65536) || buffered.getContentType()!=null && !buffered.getContentType().startsWith("application/json"))
                 throw new Rejected(503,"unavailable");
             try {
             if (result.length>0) {

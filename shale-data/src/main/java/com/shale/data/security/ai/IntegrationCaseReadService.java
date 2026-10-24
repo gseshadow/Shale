@@ -60,6 +60,12 @@ public final class IntegrationCaseReadService {
     public DisclosureBuffer overview(VerifiedIntegrationContext verified, long caseId) {
         return execute(IntegrationInvocation.create(verified,IntegrationInvocation.Operation.OVERVIEW),null,null,caseId);
     }
+    /** Original transport deadline and exact complete-envelope measurement, before final handoff. */
+    public DisclosureBuffer overview(IntegrationInvocation invocation,Long caseId,
+            java.util.function.ToIntFunction<DisclosureBuffer> envelopeBytes) {
+        if(invocation.operation()!=IntegrationInvocation.Operation.OVERVIEW)throw new SecurityException("Overview invocation required.");
+        return execute(invocation,null,null,caseId,Objects.requireNonNull(envelopeBytes));
+    }
     private DisclosureBuffer execute(IntegrationInvocation i, String query, Integer page, Long id) {
         return execute(i,query,page,id,buffer->0);
     }
@@ -129,7 +135,7 @@ public final class IntegrationCaseReadService {
             var buffer=new DisclosureBuffer(out.toByteArray(),i);
             if(buffer.size()==0) throw failure(Outcome.UNAVAILABLE,Reason.SERIALIZATION);
             int fullBytes=envelopeBytes.applyAsInt(buffer);
-            if(fullBytes<0 || fullBytes>65536)throw failure(Outcome.UNAVAILABLE,Reason.OVERSIZED);
+            if(fullBytes<0 || fullBytes>(i.operation()==IntegrationInvocation.Operation.OVERVIEW?32768:65536))throw failure(Outcome.UNAVAILABLE,Reason.OVERSIZED);
             i.check();
             phase=Reason.AUTHORITY;
             // Short final gate: DB UTC after all lock waits. Commit/close before any internal handoff.

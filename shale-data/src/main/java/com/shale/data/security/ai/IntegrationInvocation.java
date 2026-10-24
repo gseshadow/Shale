@@ -46,6 +46,9 @@ public final class IntegrationInvocation {
     public static IntegrationInvocation search(VerifiedIntegrationContext context,long admissionDeadline) {
         return new IntegrationInvocation(context,Operation.SEARCH,admissionDeadline);
     }
+    public static IntegrationInvocation overview(VerifiedIntegrationContext context,long admissionDeadline) {
+        return new IntegrationInvocation(context,Operation.OVERVIEW,admissionDeadline);
+    }
     public VerifiedIntegrationContext authority() { return authority; }
     public Operation operation() { return operation; }
     public UUID invocationId() { return invocationId; }
