@@ -28,15 +28,23 @@ public final class IntegrationInvocation {
     private final Instant deadline;
     private final long monotonicDeadline;
     private IntegrationInvocation(VerifiedIntegrationContext context, Operation operation) {
+        this(context,operation,System.nanoTime()+10_000_000_000L);
+    }
+    private IntegrationInvocation(VerifiedIntegrationContext context, Operation operation, long admissionDeadline) {
         if (context==null || context.credentialId()==null) throw new SecurityException("Verified ACCESS required.");
         authority=context; this.operation=Objects.requireNonNull(operation);
         invocationId=UUID.randomUUID(); correlationId=UUID.randomUUID();
-        Instant maximum=Instant.now().plusSeconds(10);
+        long remaining=Math.max(0,Math.min(10_000_000_000L,admissionDeadline-System.nanoTime()));
+        Instant maximum=Instant.now().plusNanos(remaining);
         deadline=context.deadline().isBefore(maximum) ? context.deadline() : maximum;
-        monotonicDeadline=System.nanoTime()+10_000_000_000L;
+        monotonicDeadline=admissionDeadline;
     }
     static IntegrationInvocation create(VerifiedIntegrationContext context, Operation operation) {
         return new IntegrationInvocation(context, operation);
+    }
+    /** The transport's original admission deadline, never a new ten-second tool budget. */
+    public static IntegrationInvocation search(VerifiedIntegrationContext context,long admissionDeadline) {
+        return new IntegrationInvocation(context,Operation.SEARCH,admissionDeadline);
     }
     public VerifiedIntegrationContext authority() { return authority; }
     public Operation operation() { return operation; }

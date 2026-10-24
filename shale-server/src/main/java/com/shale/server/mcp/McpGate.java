@@ -21,6 +21,7 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 /** Namespace-only admission. All authority is a request attribute removed in finally; never a session. */
 final class McpGate extends OncePerRequestFilter {
     static final String PROTOCOL="2026-07-28", AUTHORITY=McpGate.class.getName()+".authority";
+    static final String DEADLINE=McpGate.class.getName()+".deadline";
     private static final long MAX_NANOS=10_000_000_000L;
     private final McpTransportProperties properties;
     private final McpOAuthProperties identity;
@@ -99,16 +100,17 @@ final class McpGate extends OncePerRequestFilter {
                 rpc(response,400,null,-32600,"Invalid request");return;
             }
             request.setAttribute(AUTHORITY,authority);
+            request.setAttribute(DEADLINE,deadline);
             var buffered=new ContentCachingResponseWrapper(response);
             try {chain.doFilter(new BodyRequest(request,body),buffered);}
             catch(IOException internalEncoding) {throw new Rejected(503,"unavailable");}
             check(deadline);
             byte[] result=buffered.getContentAsByteArray();
-            if (result.length>4096 || buffered.getContentType()!=null && !buffered.getContentType().startsWith("application/json"))
+            if (result.length>65536 || buffered.getContentType()!=null && !buffered.getContentType().startsWith("application/json"))
                 throw new Rejected(503,"unavailable");
             try {
             if (result.length>0) {
-                var parsed=mapper.readValue(result,JSONRPCResponse.class);
+                var parsed=McpTransportConfiguration.responseMapper().readValue(result,JSONRPCResponse.class);
                 if (parsed.error()!=null) {
                     // SDK error strings can contain client method/parameter names. Preserve only closed codes/data.
                     var error=parsed.error();
@@ -132,7 +134,7 @@ final class McpGate extends OncePerRequestFilter {
         } catch (Rejected rejected) { fail(response,rejected.status,rejected.code); }
         catch (IOException disconnected) { throw disconnected; }
         catch (Exception unavailable) { fail(response,503,"unavailable"); }
-        finally { request.removeAttribute(AUTHORITY);active.release(); }
+        finally { request.removeAttribute(AUTHORITY);request.removeAttribute(DEADLINE);active.release(); }
     }
     private void headers(HttpServletRequest request) {
         for (var header:Map.of("Authorization",50,"Origin",240,"MCP-Protocol-Version",32,"Accept",256,

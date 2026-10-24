@@ -46,6 +46,27 @@ class IntegrationCaseReadTest {
         for(int n=14;n<=23;n++)assertNull(args.get(n));
         assertEquals(1,f.durableAllowed);
     }
+    @Test void semanticUnicodeAndUtf16BoundsCannotBeBypassedByTheAdapter() {
+        for(String invalid:List.of("  ab  ","  %_*  ","a💼💼","\ud800abc","x".repeat(101))) {
+            Fake f=new Fake("");
+            assertThrows(IntegrationReadException.class,()->f.service(new MinimizedCaseEncoder()).search(context(7,72),invalid,0));
+            assertEquals(0,f.reads);assertEquals("INVALID_INPUT",f.auditCalls.getFirst().get(9));
+        }
+        Fake f=new Fake("");assertTrue(f.service(new MinimizedCaseEncoder()).search(context(7,72),"  É漢𐐀  ",1).size()>0);assertEquals(1,f.reads);
+        Fake stripped=new Fake("");assertTrue(stripped.service(new MinimizedCaseEncoder()).search(context(7,72)," "+"x".repeat(97)+"𐐀 ",0).size()>0);
+    }
+    @Test void originalAdmissionDeadlineAndEnvelopeFailureUseExistingFailureAudit() {
+        Fake expired=new Fake("");var invocation=IntegrationInvocation.search(context(7,72),System.nanoTime()-1);
+        var timeout=assertThrows(IntegrationReadException.class,()->expired.service(new MinimizedCaseEncoder()).search(invocation,"literal",0,b->0));
+        assertEquals(IntegrationAccessAudit.Reason.DEADLINE,timeout.reason());assertEquals(0,expired.reads);
+        assertEquals("UNAVAILABLE",expired.auditCalls.getFirst().get(9));
+        Fake large=new Fake("");
+        var failure=assertThrows(IntegrationReadException.class,()->large.service(new MinimizedCaseEncoder()).search(
+                IntegrationInvocation.search(context(7,72),System.nanoTime()+9_000_000_000L),"literal",9,b->65537));
+        assertEquals(IntegrationAccessAudit.Reason.OVERSIZED,failure.reason());assertEquals(1,large.reads);assertEquals(1,large.durableAllowed);
+        assertEquals(2,large.gates,"No final handoff gate for an overlarge envelope");
+        assertTrue(large.auditCalls.stream().anyMatch(a->"TERMINAL".equals(a.get(8))));
+    }
     @ParameterizedTest @ValueSource(strings={"READ","AUDIT_ZERO","PARENT","CHILD","PHI","PRECOMMIT","COMMIT","LOSTACK","CLOSE","SERIALIZE","OVERSIZE","GATE","HANDOFF","CANCEL_READ","CANCEL_ENCODER","QUOTA"})
     void everyPreHandoffFaultWithholdsAllBytesAndNeverReplays(String fault) {
         Fake f=new Fake(fault);

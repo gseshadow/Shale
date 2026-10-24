@@ -10,13 +10,19 @@ import java.util.logging.Logger;
 final class McpJdbcDeadline implements DataSource {
     private final DataSource source;
     private final long deadline;
-    McpJdbcDeadline(DataSource source,long deadline) { this.source=source;this.deadline=deadline; }
+    private final boolean independentAudit;
+    McpJdbcDeadline(DataSource source,long deadline) { this(source,deadline,false); }
+    private McpJdbcDeadline(DataSource source,long deadline,boolean independentAudit) {
+        this.source=source;this.deadline=deadline;this.independentAudit=independentAudit;
+    }
+    static DataSource failureAudit(DataSource source) { return new McpJdbcDeadline(source,0,true); }
     private int remaining() throws SQLException {
         long nanos=deadline-System.nanoTime();
         if(nanos<=0 || Thread.currentThread().isInterrupted())throw new SQLTimeoutException("MCP deadline.");
         return (int)Math.max(1,Math.min(10000,nanos/1_000_000));
     }
     @Override public Connection getConnection()throws SQLException {
+        if(independentAudit)return new McpJdbcDeadline(source,System.nanoTime()+3_000_000_000L).getConnection();
         Connection connection;
         int budget=remaining();
         if(source instanceof com.zaxxer.hikari.HikariDataSource pool) {

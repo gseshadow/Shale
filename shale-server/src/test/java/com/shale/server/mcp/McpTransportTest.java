@@ -64,7 +64,6 @@ class McpTransportTest {
         }
         assertEquals(3,authentications.get(),"Every POST must independently validate ACCESS");
         assertTrue(McpCatalog.visible(authority).isEmpty());
-        for(var tool:McpCatalog.FutureTool.values())assertFalse(tool.activated());
     }
     @Test void defaultOffAndIndependentGlobalOffNeverAuthenticate()throws Exception {
         for(boolean oauth:List.of(false,true)) {
@@ -168,10 +167,10 @@ class McpTransportTest {
         gate=new McpGate(new McpTransportProperties(true,Set.of()),identity,true,t->{time.set(10_000_000_001L);return authority;},time::get);
         assertEquals(504,send(request("server/discover")).getStatus());
     }
-    @Test void productionCompositionHasNoCaseReadDependencyOrAuditConsumer()throws Exception {
-        for(String source:List.of("McpTransportConfiguration","McpGate","McpCatalog")) {
+    @Test void transportAndCatalogCannotBypassTheDisclosureSeam()throws Exception {
+        for(String source:List.of("McpTransportConfiguration","McpGate","McpCatalog","McpSearchHandler","McpSearchConfiguration")) {
             var text=java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/server/mcp/"+source+".java"));
-            for(String forbidden:List.of("CaseServicePort","CaseServiceAdapter","IntegrationCaseReadService","CaseSummaryDao","IntegrationAccessAudit","ThreadLocal","getSession("))
+            for(String forbidden:List.of("CaseServiceAdapter","CaseSummaryDao","ThreadLocal","getSession(","prepareStatement(","createStatement("))
                 assertFalse(text.contains(forbidden),source+" must not reach "+forbidden);
         }
     }

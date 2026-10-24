@@ -1,0 +1,303 @@
+{
+  "phase": "3B.5",
+  "status": "COMPLETE (source/local synthetic protocol/client verification via hosted loopback fixtures)",
+  "baseSha": "e595fb0bec56ec74e3bdd33f341893469f67f00a",
+  "testedSha": "96a3152db80264cc31084a00194c1de9bd34948e",
+  "branch": "codex/phase-3b5-search",
+  "pr": "https://github.com/gseshadow/Shale/pull/1916",
+  "run": {
+    "id": 40041870870,
+    "url": "https://github.com/gseshadow/Shale/actions/runs/40041870870",
+    "jobId": 120714583666,
+    "conclusion": "success"
+  },
+  "artifact": {
+    "id": 12540640827,
+    "url": "https://github.com/gseshadow/Shale/actions/runs/40041870870/artifacts/12540640827",
+    "sha256": "a833f0a9a35f7686a2258263fe64530f07335a67f2138cee62c5340379429a5f",
+    "retentionDays": 14,
+    "expiresAtUtc": "2026-11-07T00:08:08Z"
+  },
+  "environment": {
+    "runner": "GitHub-hosted Ubuntu 24.04",
+    "java": "Temurin 21.0.12.1",
+    "maven": "3.10.0",
+    "sql": "task-owned loopback-only SQL Server 2022 Developer container; synthetic Case shape and separate restricted identities"
+  },
+  "localMaven": {
+    "executedSuccessfully": false,
+    "reason": "Offline Boot 4.1.1 dependency absent; one bounded online attempt failed network access. No local-shell Maven pass claimed."
+  },
+  "groupsOverlap": true,
+  "checks": {
+    "compilation": "PASS",
+    "smoke": {
+      "tests": 72,
+      "data": 27,
+      "server": 45,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "focused": {
+      "tests": 233,
+      "data": 74,
+      "server": 159,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "affected": {
+      "tests": 339,
+      "partitionTests": [
+        179,
+        20,
+        27,
+        41,
+        21,
+        51
+      ],
+      "sqlMethods": 98,
+      "sqlInvocations": 160,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "critical": {
+      "tests": 190,
+      "reactorModules": 7,
+      "executions": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selectorPython": {
+      "tests": 27,
+      "result": "PASS"
+    },
+    "typescript": {
+      "implementation": "@modelcontextprotocol/client",
+      "version": "2.4.0",
+      "protocol": "2026-07-28",
+      "scenarios": 14,
+      "result": "PASS"
+    },
+    "python": {
+      "implementation": "mcp",
+      "version": "2.3.0",
+      "protocol": "2026-07-28",
+      "scenarios": 14,
+      "result": "PASS"
+    },
+    "ordinaryCaseRest": "PASS: minimized search/assigned/Overview, production adapter/JDBC, legacy REST/OpenAPI/context checks",
+    "oauthAccessWebDesktop": "PASS: maintained OAuth/code/refresh/revocation, ACCESS, durable/remembered sessions and ordinary auth/desktop-session adapters",
+    "transport": "PASS: inherited stateless POST, no GET/SSE/session, Origin, version, bearer isolation, body/header/admission/deadline/default-OFF and RFC 9728 matrices",
+    "auditQuotaPrivacy": "PASS: each independent client has 4 ALLOWED_READ parents, 5 INVALID_INPUT, 1 UNAVAILABLE, 1 THROTTLED; 30 returned children; zero-result parent with no children; 50 charged rows across 5 reserved attempts and no refund on oversized failure; persisted privacy sentinels absent",
+    "caseOperationCount": "PASS: exactly 1 authoritative minimized operation on each of 4 successful searches and 1 oversized-source search per client; 0 on protocol/validation/quota rejection; no hydration",
+    "handoff": "PASS: original deadline, 32/64 KiB buffers, escaped duplicate-envelope test, independent failure-audit lease, inherited real synthetic SQL revocation/scope/commit/close/cancellation/fault gates",
+    "docs": "PASS: canonical expanded schema equality, links/anchors, JSON/fences and git diff checks; final cleanup rechecked separately"
+  },
+  "conformance": {
+    "scope": "inherited default-OFF handler transport fixture, not full search-tool conformance",
+    "passes": 2,
+    "successPerPass": 23,
+    "rawMissingDiagnosticFailuresPerPass": 4,
+    "subscriptionSkipsPerPass": 5,
+    "serverStatelessExit": 1,
+    "toolsListExit": 0,
+    "fullConformanceClaimed": false
+  },
+  "affectedCommands": [
+    [
+      "xvfb-run",
+      "-a",
+      "mvn",
+      "-B",
+      "-ntp",
+      "-pl",
+      "shale-core,shale-data,shale-server",
+      "-am",
+      "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.McpJdbcDeadlineTest,com.shale.server.mcp.McpSearchClientFixture,com.shale.server.mcp.McpSearchTest,com.shale.server.mcp.McpTransportTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+      "-Dsurefire.failIfNoSpecifiedTests=false",
+      "test"
+    ],
+    [
+      "xvfb-run",
+      "-a",
+      "mvn",
+      "-B",
+      "-ntp",
+      "-pl",
+      "shale-data",
+      "-am",
+      "-Dtest=com.shale.data.security.ai.AiSecurityLocalSqlServerTest#migrationDefaultsOffRepeatsAndRejectsCatalogDrift+realRuntimeHasNoBypassOrDirectControlTableAuthority+tenantPolicyUsesCurrentAdminContextAndRowVersion+registrationCeilingAndForeignTenantAreEnforced+selfConsentIsOneUseBoundToActorAndCeiling+consentRacingRevokeAndScopeReductionCannotResurrectAuthority+globalTenantIntegrationAndUserRevocationAreLiveAcrossServiceInstances+typedContextRejectsSpoofedTenantUserSessionAndMissingGrant+keyRotationIsBoundedConcurrentAndRevocationInvalidatesSessions+expiredGrantFailsClosedAndDigestResolverRestoresItsCaller+rlsFiltersAndBlocksForeignRowsWithoutPrivilegedRuntime+auditFailureRollsBackMutationAndConsentConsumption+everyNewTenantTableFiltersAndBlocksAnOtherwiseValidForeignInsert+concurrentReservationsHaveOneWinnerAndReleaseNeverRefundsBudget+durableDailyRowAndSlidingMinuteBudgetsSurviveNewServiceInstances+concurrentScopeChangesAndRotationsRejectStaleVersions+dailyBudgetsApplyAcrossUsersIntegrationsAndNewProcesses+distributedConcurrencyCountsAllThreeOwners+slidingMinuteLimitsApplyToIntegrationAndTenant+actualReplacementJvmSeesCommittedAccounting",
+      "-Dsurefire.failIfNoSpecifiedTests=false",
+      "test"
+    ],
+    [
+      "xvfb-run",
+      "-a",
+      "mvn",
+      "-B",
+      "-ntp",
+      "-pl",
+      "shale-data",
+      "-am",
+      "-Dtest=com.shale.data.security.ai.AiSecurityLocalSqlServerTest#sameNonceAndSameInvocationRacesCannotDoubleSpend+bootstrapDefinitionAndCallerRestorationAreExactEvenOnFailure+migrationFailureRollsBackPartialDdlAndAmbiguousAuditAllowlist+expiredKeySessionAndConsentIntentCannotAcquireLiveContext+sessionFamilyRevocationIsSelfBoundPermanentAndAudited+oauthFreshClientLoaderAndSelfConsentBindEveryOwnerAndExactScopes+oauthCodeBindingRejectsChangedClientRedirectIssuerResourceAndVerifier+oauthCodeConsumeRaceHasExactlyOneWinnerAndReplacementJvmRejectsReplay+oauthCommittedRegistrationUserTenantAndGlobalDisablePreventCompletion+oauthGrantRevocationAndApprovalRaceNeverResurrectsRevokedAuthority+oauthScopeWideningDenialAndInjectedExpiryFailClosed+oauthAuditFailureRollsBackCodeGrantAndIntentConsumptionTogether+oauthStorageIsStrictTenantOwnedAndRuntimeCannotReadOrMutateItDirectly+oauthConfidentialPinnedKeyAndGrantRevocationPreventCodeUse+oauthNativeLoopbackPortIsConfinedAndExactIssuedRedirectCannotChange+exchangeMigrationRepeatsRejectsDriftAndRestrictsResolverAndReplayPermissions+exchangeReplayTableUsesActualNonBypassTenantFilterAndInsertBlock+exchangePublicExactBindingsFailureDoesNotConsumeAndRaceHasOneWinner+exchangeAssertionReplayRaceAcrossCodesHasOneWinnerAndFailedPkceDoesNotBurnJti+exchangeCommittedBindingExpiryOrRevocationDenies",
+      "-Dsurefire.failIfNoSpecifiedTests=false",
+      "test"
+    ],
+    [
+      "xvfb-run",
+      "-a",
+      "mvn",
+      "-B",
+      "-ntp",
+      "-pl",
+      "shale-data",
+      "-am",
+      "-Dtest=com.shale.data.security.ai.AiSecurityLocalSqlServerTest#exchangeAuditFailureRollsBackBothReplayAndConsume+exchangeCommittedRevocationAndEveryAuthorityDisableDenyWithoutConsumption+exchangeCommittedKeyRevokePreventsOldKeyAndReplacementKeySubstitution+credentialMigrationRepeatAndCatalogDriftFailClosed+credentialInitialRaceOneFamilyAndHashOnlyFiveMinuteLifetime+credentialRotationResponseLossRetryRevokesAllDescendantsPermanently+credentialConcurrentRefreshHasOneWinnerAndLoserRevokesFamily+credentialReuseRaceWithDescendantActivityLeavesNoActiveCredentials+credentialWrongClientAndAccessTokenCannotRefreshOrResolve+credentialCommittedRevocationDeniesAndReenableCannotRestore+credentialDeadlineClippingAndExpiredAuthorityFailClosed+credentialInitialAndRotationAuditFailureRollBackAllState+credentialRestartObservesAccessRefreshAndConsumedHistory+credentialConfidentialRefreshRequiresSameKeyFreshSharedJtiAndLiveKey+credentialCommittedRevokeBeforeRotationPreventsNewRows+credentialSecurityResetWebRevocationAuditsFamilyAndCannotResurrect+credentialReuseAuditFailureRollsBackRevocationAndRetriesFailClosed+credentialRevokeHoldingAuthorityLockPreventsConcurrentRefreshCommit+credentialEightHourIdleAndConsentAbsoluteMaximumNeverSlide+credentialInitialLiveAuthorityCannotCreateAnyFamily",
+      "-Dsurefire.failIfNoSpecifiedTests=false",
+      "test"
+    ],
+    [
+      "xvfb-run",
+      "-a",
+      "mvn",
+      "-B",
+      "-ntp",
+      "-pl",
+      "shale-data",
+      "-am",
+      "-Dtest=com.shale.data.security.ai.AiSecurityLocalSqlServerTest#credentialSameValidatedTransactionCannotIssueASecondFamily+credentialGlobalDisableCannotRestoreInternalSessionOrQuotaAuthority+revocationMigrationIsRepeatSafeAndDetectsDrift+revocationEitherCredentialRevokesAllDescendantsAndPreservesFirstHistory+revocationUnknownMalformedForeignAndWrongTenantHaveNoStateOrAuditEffects+revocationInactiveSubjectsRemainNonOracleAndPermanent+revocationAuditFailureRollsBackFamilyAndSharedReplayReservation+revocationUnknownConfidentialRequestConsumesSharedJtiAndCannotReplayAcrossRefresh+revocationRaceWithRefreshAndAccessDescendantActivityAlwaysEndsRevoked+revocationCommittedWhileRefreshAwaitsFinalizationPreventsNewCredentials+revocationRepeatedConcurrentRequestsAreIdempotentAndAuditOnce+revocationExpiredAccessAndRefreshHistoryStillRevokeFamily+revocationModulesRetainSeparateRestrictedSqlIdentities+disclosureMigrationRepeatDriftAndActualPermissions+disclosureSharedSearchOverviewAtomicAuditEmptyAndProtectedReview+disclosurePrivacyInspectsEveryPersistedColumnAndRequestedProbeDoesNotResolveCase+disclosureActualIntegrationAndPhiAuditFailuresRollBackAndDoNotRefund+disclosureRevokeBetweenCommitAndHandoffKeepsHistoryAndWithholdsBuffer+disclosureActualRlsBlocksAndAppendOnlyHistory+disclosureFailureForNowDisabledOwnerStillPersistsAndConsumesAttempt",
+      "-Dsurefire.failIfNoSpecifiedTests=false",
+      "test"
+    ],
+    [
+      "xvfb-run",
+      "-a",
+      "mvn",
+      "-B",
+      "-ntp",
+      "-pl",
+      "shale-data",
+      "-am",
+      "-Dtest=com.shale.data.security.ai.AiSecurityLocalSqlServerTest#disclosureFinalHandoffExpiryWhileActuallyBlockedUsesDatabaseUtc+disclosureCommitCloseAndAuthorizedHandoffBoundary+disclosureCommittedAuthorityReductionAfterReadPreventsHandoff+disclosureSuppressedParentCannotReleaseEvenEmptySearchAndNoEmergencySpool+disclosureSingleSpidDistinctOwnersAndFaultCleanupRemainIsolated+accessMigrationRepeatsAndCumulativeVerifierDetectsDrift+accessOnlyFullBoundContextAndSafeFailures+accessOwnerBindingMismatchFailsClosed+accessCommittedAuthorityChangesPreventNewAndRecheckedContexts+accessConfidentialKeyBoundAndRevocationIsLive+accessRecheckNarrowsAndNeverExpandsSnapshotScopes+accessCommittedRevokeBetweenBootstrapAndGatePreventsContext+accessSingleSpidPoolReuseAndConcurrentAsyncCancellation+accessScopeReductionBetweenBootstrapAndGateDeniesAndDoesNotResurrect+accessExpiryWhileWaitingForFinalGateUsesDatabaseUtc+accessSetupMismatchAndStampFailureWithholdContextThenCleanNextBorrow+accessDistinctOwnersInterleaveThroughOnePhysicalSqlConnection+accessReplacementJvmObservesRevocationAndScopeReduction",
+      "-Dsurefire.failIfNoSpecifiedTests=false",
+      "test"
+    ]
+  ],
+  "otherCommands": [
+    "mvn -B -ntp -U -pl shale-server -am -Dmaven.test.skip=true install",
+    "mvn -B -ntp -pl shale-server -am -Dtest=McpSearchTest,IntegrationCaseReadTest,McpSdkCompatibilityTest,McpTransportTest,McpFilterIsolationTest,McpJdbcDeadlineTest,OpenApiDocumentationTest,ShaleServerServiceConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test",
+    "mvn -B -ntp -pl shale-server -am '-Dtest=McpSearchTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,MinimizedCaseReadControllerTest,RequestScopedDbSessionProviderTest,OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,Ai*ContractTest,IntegrationAccessContractTest,IntegrationCaseReadTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest' -Dsurefire.failIfNoSpecifiedTests=false test",
+    "python3 build/test-selection/select_tests.py --base e595fb0bec56ec74e3bdd33f341893469f67f00a --head HEAD --format markdown --plan-output work/mcp-evidence/selection.json",
+    "xvfb-run -a mvn -B -ntp test",
+    "python3 -m unittest discover -s build/test-selection -p test_select_tests.py",
+    "git diff --check e595fb0bec56ec74e3bdd33f341893469f67f00a HEAD"
+  ],
+  "retainedSourceHashes": [
+    {
+      "path": "build/mcp-transport/search-python.py",
+      "gitBlob": "c0bf010f652b3e3f7ad70b29e83d73dcd95d1715",
+      "sha256": "97040aa0032153d1cfefbc1cfa37fe0ca36999024549faade8b00a7cd6429440"
+    },
+    {
+      "path": "build/mcp-transport/search-ts.mjs",
+      "gitBlob": "1366816cf31ac87dc533aa02a551ac800fe356da",
+      "sha256": "81db6ff3ef24796ae4da1ce95e7326ebe54654cf763696499985db9dd8fd6443"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/IntegrationCaseReadService.java",
+      "gitBlob": "deed1f9bce15dea5392ea3132e0b792c41e29e6c",
+      "sha256": "4cb011c26b6ca35503ca72733038b93f1eaa9dbfd20ef2968cb275e8ad0cc4f7"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/IntegrationInvocation.java",
+      "gitBlob": "249146ca488481bc2f6d7343aff3130d94409750",
+      "sha256": "a7dd3167fc0c1629d3fc755c2ee0b767216b4223231d690f54d468e85d9d5d53"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/IntegrationCaseReadTest.java",
+      "gitBlob": "e0cfcba18a96f709d338ae5948fd08db52c219e3",
+      "sha256": "d97a62f22fb34e1b1e80d3f98bb37c941a731d0c8a2976c6b19fb9460ade3d8a"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpCatalog.java",
+      "gitBlob": "f506c0926a0b35fa048d01a9c1c82ac47100c662",
+      "sha256": "47ecacb72fb83930891bb63024550428ed1e92293a0430ad189db0ba2bf79400"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpGate.java",
+      "gitBlob": "3c0f5fa4961a80d8b54aa40be2fb30deff9a13a6",
+      "sha256": "9f8fba12878ff749cc785214bdce94dc3aaecbf2efdd23f384babcf10c66e7bb"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpJdbcDeadline.java",
+      "gitBlob": "b260bd3e6b2eef66b433224b00dd52708dfc9dfa",
+      "sha256": "989caf7782cf34e98657e4bef9c2446055ffeaf43fa5e1f869b4dbebb1d53315"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+      "gitBlob": "9bcf3b3c238cc6b5285f224925d25f79e0f9d45a",
+      "sha256": "5c4f963b27ad715d251c82a8bfcfd69537970002ac7130a24ab5ee3942eca8af"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpSearchHandler.java",
+      "gitBlob": "9cdde62344de67fefb9a525a0a5ede2dc3c0d01d",
+      "sha256": "5dbe65049640aa222b6a018d4e03a230892821d9532c59dd6ee5cbe2e2aab7f8"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+      "gitBlob": "be56c17587ade7b37a98472f4e01081947b53442",
+      "sha256": "d11c115cc02b725e4b626070bd78a1c99fb3fbdfff04d6b5e799d431665102ac"
+    },
+    {
+      "path": "shale-server/src/main/resources/application.properties",
+      "gitBlob": "78e2f04adbcd06cfc03d7f47149b42dc149c96e6",
+      "sha256": "97a64f5bb773895d3c8b932b7af058be7efd4e333ea4ab5e49ccfc53b6ad292f"
+    },
+    {
+      "path": "shale-server/src/main/resources/mcp/search-cases.json",
+      "gitBlob": "4581e11d5ec94794bcd92f573f2df99437cdfba6",
+      "sha256": "18eabe6d5e9c26b87083723e52c3e1837e5481145f7e02819191df6ba7edd7f4"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpJdbcDeadlineTest.java",
+      "gitBlob": "ba15d90b3a6a7566558f70b2545983b910a55b79",
+      "sha256": "c973f4b9abb15f603e5a86c45537caa1dbbad7d1af892e768b7aa43f5b993476"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpSearchClientFixture.java",
+      "gitBlob": "b3825fcf923506bd0a785ad91236916a1df555bf",
+      "sha256": "4961ed5d553fe532fb85ad87351534c0e390a6409b692fe41b5eb7cba5a9d1fd"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpSearchTest.java",
+      "gitBlob": "9819a0395ab3fa0c2994cff95d83350dda9faf9a",
+      "sha256": "1b036e3b52a43b9600c7e0ddc0ad5f7979963dee202f0d24b4186a54ca84b298"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpTransportTest.java",
+      "gitBlob": "744768529a4cf0ad78fd8fb7a72242f4dd2963c1",
+      "sha256": "ffc841988c408704eed7bc4a201c0bd4ee60e8dab70fc4e15510748c5bd88100"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthAuthorizationFlowTest.java",
+      "gitBlob": "00c34315c8dc0f699755c9793dd85935ed88c628",
+      "sha256": "8a5c3d53bfc2b827b941e54d74aae34074701725b75955e51c8d42671ab159a2"
+    }
+  ],
+  "evidenceClassification": [
+    "executed source/hosted synthetic loopback protocol/client verification",
+    "actual SQL with separate restricted identities and the production minimized adapter",
+    "injected driver/encoder/commit/close faults labelled separately by maintained fixtures",
+    "no authoritative Case schema/RLS, deployed TLS/proxy, real-data, live tenant or production approval"
+  ],
+  "unexecuted": [
+    "historical all-tests profile (informational selector escalation only)",
+    "authoritative Case SQL acceptance (approved offline artifact unavailable)",
+    "production/Azure SQL, deployment, real tenant/integration enablement, installer/version publication"
+  ],
+  "temporaryWorkflow": "removed from final diff; frozen at testedSha; only documentation/receipt/workflow cleanup follows the tested runtime/test/client blobs"
+}

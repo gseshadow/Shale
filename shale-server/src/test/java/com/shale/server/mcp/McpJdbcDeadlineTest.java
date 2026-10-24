@@ -7,6 +7,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class McpJdbcDeadlineTest {
+    @Test void failureAccountingRetainsItsIndependentShortLeaseAfterRequestExpiry()throws Exception {
+        var source=mock(DataSource.class);var raw=mock(Connection.class);when(source.getConnection()).thenReturn(raw);
+        when(raw.getNetworkTimeout()).thenReturn(12000);
+        assertThrows(SQLTimeoutException.class,()->new McpJdbcDeadline(source,System.nanoTime()-1).getConnection());
+        try(var audit=McpJdbcDeadline.failureAudit(source).getConnection()) {
+            audit.getAutoCommit();verify(raw,atLeastOnce()).setNetworkTimeout(any(),intThat(t->t>0&&t<=3000));
+        }
+        verify(raw).setNetworkTimeout(any(),eq(12000));verify(raw).close();
+    }
     @Test void expiredAdmissionNeverBorrowsAndActiveLeaseClipsTimeoutsAndRestoresOnClose()throws Exception {
         var source=mock(DataSource.class);
         assertThrows(SQLTimeoutException.class,()->new McpJdbcDeadline(source,System.nanoTime()-1).getConnection());
