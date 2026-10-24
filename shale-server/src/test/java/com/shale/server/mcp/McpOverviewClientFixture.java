@@ -18,6 +18,7 @@ import static org.mockito.Mockito.*;
 public final class McpOverviewClientFixture {
     public static void verify(String jdbcUrl,String bootstrapUser,String bootstrapPassword,javax.sql.DataSource runtime,
             Map<String,String> credentials,String kind,Path temp)throws Exception {
+        boolean authoritative=kind.startsWith("authoritative-");
         var tomcat=new org.apache.catalina.startup.Tomcat();tomcat.setBaseDir(temp.toString());tomcat.setPort(0);
         tomcat.getConnector().setProperty("address","127.0.0.1");var tc=tomcat.addContext("",temp.toString());
         var poolConfig=new com.zaxxer.hikari.HikariConfig();poolConfig.setDataSource(runtime);poolConfig.setMinimumIdle(0);
@@ -27,6 +28,8 @@ public final class McpOverviewClientFixture {
         var reads=new java.util.concurrent.atomic.AtomicInteger();
         doAnswer(call->{reads.incrementAndGet();return real.readMinimizedCaseOverview(call.getArgument(0),call.getArgument(1),call.getArgument(2),call.getArgument(3));})
                 .when(port).readMinimizedCaseOverview(any(java.sql.Connection.class),anyLong(),anyInt(),anyInt());
+        if(authoritative)doAnswer(call->{reads.incrementAndGet();return real.searchMinimizedCases(call.getArgument(0),call.getArgument(1),call.getArgument(2),call.getArgument(3),call.getArgument(4),call.getArgument(5));})
+                .when(port).searchMinimizedCases(any(java.sql.Connection.class),anyString(),anyInt(),anyInt(),anyInt(),eq(10));
         var readFailure=new java.util.concurrent.atomic.AtomicReference<AssertionError>();
         var operationReceipts=Collections.synchronizedList(new ArrayList<Map<String,Object>>());
         try(var pool=new com.zaxxer.hikari.HikariDataSource(poolConfig);var context=new org.springframework.web.context.support.GenericWebApplicationContext()) {
@@ -44,6 +47,7 @@ public final class McpOverviewClientFixture {
             org.apache.catalina.startup.Tomcat.addServlet(tc,"mcp",servlet).setAsyncSupported(true);tc.addServletMappingDecoded("/mcp","mcp");
             var definition=new FilterDef();definition.setAsyncSupported("true");definition.setFilterName("springMcp");
             definition.setFilter((request,response,chain)->{
+                long started=System.nanoTime();
                 int before=reads.get();var buffered=new org.springframework.web.util.ContentCachingResponseWrapper((jakarta.servlet.http.HttpServletResponse)response);
                 context.getBean(FilterChainProxy.class).doFilter(request,buffered,chain);
                 try {
@@ -51,10 +55,12 @@ public final class McpOverviewClientFixture {
                     var result=root.path("result");String outcome="PROTOCOL";int expected=0;
                     if(result.has("isError")) {
                         if(!result.path("isError").asBoolean()){expected=1;outcome="SUCCESS";}
-                        else {outcome=McpTransportConfiguration.mapper().getJsonMapper().readTree(result.path("content").get(0).path("text").asText()).path("code").asText();if(Set.of("CASE_UNAVAILABLE","PAYLOAD_TOO_LARGE","AUDIT_UNAVAILABLE").contains(outcome))expected=1;}
+                        else {outcome=McpTransportConfiguration.mapper().getJsonMapper().readTree(result.path("content").get(0).path("text").asText()).path("code").asText();if(Set.of("CASE_UNAVAILABLE","PAYLOAD_TOO_LARGE","AUDIT_UNAVAILABLE").contains(outcome)||(authoritative&&outcome.equals("FORBIDDEN")))expected=1;}
                     }
                     assertEquals(expected,reads.get()-before,"Exactly one authoritative minimized operation per valid Overview; none for metadata/early rejection");
-                    operationReceipts.add(Map.of("outcome",outcome,"caseOperations",reads.get()-before));
+                    operationReceipts.add(Map.of("outcome",outcome,"caseOperations",reads.get()-before,
+                            "method",String.valueOf(((jakarta.servlet.http.HttpServletRequest)request).getHeader("Mcp-Method")),
+                            "elapsedMillis",(System.nanoTime()-started)/1_000_000.0));
                 } catch(AssertionError failure) {readFailure.compareAndSet(null,failure);}
                 buffered.copyBodyToResponse();
             });tc.addFilterDef(definition);
@@ -62,19 +68,47 @@ public final class McpOverviewClientFixture {
             var body=new FilterDef();body.setFilterName("body");body.setAsyncSupported("true");body.setFilter(new McpBodyFilter());tc.addFilterDef(body);
             var bodyMapping=new FilterMap();bodyMapping.setFilterName("body");bodyMapping.addURLPattern("/mcp");bodyMapping.setDispatcher("REQUEST");bodyMapping.setDispatcher("ASYNC");tc.addFilterMapBefore(bodyMapping);
             tomcat.start();String url="http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/mcp";
-            var command=kind.equals("ts")?List.of("node","../build/mcp-transport/overview-ts.mjs"):
-                    List.of("../work/mcp-clients/bin/python","../build/mcp-transport/overview-python.py");
+            String clientKind=kind.replace("authoritative-", "");
+            String script=authoritative?"authoritative-": "overview-";
+            var command=clientKind.equals("ts")?List.of("node","../build/mcp-transport/"+script+"ts.mjs"):
+                    List.of("../work/mcp-clients/bin/python","../build/mcp-transport/"+script+"python.py");
             var process=new ProcessBuilder(command);process.environment().put("MCP_URL",url);
             credentials.forEach((key,value)->process.environment().put("MCP_"+key,value));
             Path evidence=Path.of("../work/mcp-evidence");Files.createDirectories(evidence);Path log=evidence.resolve("overview-client-"+kind+".json");
             process.redirectErrorStream(true).redirectOutput(log.toFile());var running=process.start();
             if(!running.waitFor(60,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();fail("External search client timed out");}
             String output=Files.readString(log);for(String credential:credentials.values())output=output.replace(credential,"[REDACTED]");Files.writeString(log,output);
-            assertEquals(0,running.exitValue(),"Independent search client failed: "+output);
+            if(!authoritative)assertEquals(0,running.exitValue(),"Independent search client failed: "+output);
             assertNull(readFailure.get(),"Per-request Case operation count: "+readFailure.get());
             Files.writeString(evidence.resolve("overview-operations-"+kind+".json"),McpTransportConfiguration.responseMapper().writeValueAsString(operationReceipts));
-            org.mockito.Mockito.verify(port,times(7)).readMinimizedCaseOverview(any(java.sql.Connection.class),anyLong(),eq(7),anyInt());
+            if(authoritative) {
+                org.mockito.Mockito.verify(port,atLeastOnce()).searchMinimizedCases(any(java.sql.Connection.class),anyString(),anyInt(),anyInt(),anyInt(),eq(10));
+                org.mockito.Mockito.verify(port,atLeastOnce()).readMinimizedCaseOverview(any(java.sql.Connection.class),anyLong(),anyInt(),anyInt());
+            } else org.mockito.Mockito.verify(port,times(7)).readMinimizedCaseOverview(any(java.sql.Connection.class),anyLong(),eq(7),anyInt());
             verifyNoMoreInteractions(port);
+            if(authoritative&&clientKind.equals("ts")) {
+                for(String scenario:List.of("server-stateless","tools-list")) {
+                    var check=new ProcessBuilder("node","--import","../build/mcp-transport/conformance-auth.mjs",
+                            "../build/mcp-transport/node_modules/@modelcontextprotocol/conformance/dist/index.js","server",
+                            "--url",url,"--scenario",scenario,"--spec-version","2026-07-28","--timeout","5000",
+                            "--output-dir","../work/mcp-evidence/authoritative-conformance");
+                    check.environment().put("MCP_URL",url);check.environment().put("MCP_TOKEN",credentials.get("BOTH_TOKEN"));
+                    Path report=evidence.resolve("authoritative-conformance-"+scenario+".log");
+                    var child=check.redirectErrorStream(true).redirectOutput(report.toFile()).start();
+                    boolean finished=child.waitFor(60,TimeUnit.SECONDS);
+                    if(!finished){child.destroyForcibly();child.waitFor();}
+                    // Raw upstream failures/skips are evidence, never a full-conformance pass.
+                    Files.writeString(evidence.resolve("authoritative-conformance-"+scenario+".exit"),finished?Integer.toString(child.exitValue()):"TIMEOUT");
+                    try(var reports=Files.walk(evidence)) {
+                        for(Path file:reports.filter(Files::isRegularFile).toList()) {
+                            String content=Files.readString(file);
+                            for(String credential:credentials.values())content=content.replace(credential,"[REDACTED]");
+                            Files.writeString(file,content);
+                        }
+                    }
+                }
+            }
+            if(authoritative)assertEquals(0,running.exitValue(),"Authoritative independent client failed: "+output);
         } finally {tomcat.stop();tomcat.destroy();}
     }
 }

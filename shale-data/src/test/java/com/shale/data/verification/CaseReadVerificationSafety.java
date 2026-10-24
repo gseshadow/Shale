@@ -64,25 +64,43 @@ final class CaseReadVerificationSafety {
 
     private static void addDdl(String original, String mask, List<String> result) {
         String sql = mask.trim().toUpperCase(java.util.Locale.ROOT);
+        // SSMS may emit multiple spaces after CREATE. Keep the executable definition untouched.
+        sql = sql.replaceFirst("^CREATE\\s+FUNCTION\\s+", "CREATE FUNCTION ");
         if (sql.isEmpty()) return;
         boolean policy = sql.startsWith("CREATE SECURITY POLICY ");
         boolean function = sql.startsWith("CREATE FUNCTION ");
-        require(sql.matches("(?s)(CREATE (SCHEMA|TABLE|FUNCTION|SECURITY POLICY|(?:UNIQUE )?(?:NONCLUSTERED |CLUSTERED )?INDEX) .*|ALTER TABLE .*|SET (ANSI_NULLS|QUOTED_IDENTIFIER) ON\\s*;?)"));
+        boolean reviewedScalar = function && reviewedScalar(original);
+        require(sql.matches("(?s)(CREATE (SCHEMA|TABLE|FUNCTION|SECURITY POLICY|(?:UNIQUE )?(?:NONCLUSTERED |CLUSTERED )?INDEX) .*|ALTER TABLE .*|SET (ANSI_NULLS|QUOTED_IDENTIFIER|ANSI_PADDING|ANSI_WARNINGS|ARITHABORT|CONCAT_NULL_YIELDS_NULL) ON\\s*;?|SET NUMERIC_ROUNDABORT OFF\\s*;?)"));
         String forbidden = "EXEC(?:UTE)?|USE|DROP|MERGE|GRANT|DENY|REVOKE|LOGIN|USER|DATABASE|BACKUP|RESTORE|OPENROWSET|OPENDATASOURCE|OPENQUERY|EXTERNAL|TRIGGER|PROCEDURE|NOCHECK|DISABLE|TRUNCATE";
         require(!Pattern.compile("\\b(?:" + forbidden + ")\\b").matcher(sql).find());
-        if (!policy) require(!Pattern.compile("\\b(?:INSERT|UPDATE|DELETE)\\b").matcher(sql).find());
+        String dataStatementCheck = sql;
+        if (sql.startsWith("ALTER TABLE ") && sql.contains("FOREIGN KEY") && sql.contains("REFERENCES"))
+            dataStatementCheck = sql.replaceAll("\\bON\\s+(?:DELETE|UPDATE)\\s+(?:CASCADE|NO\\s+ACTION|SET\\s+NULL|SET\\s+DEFAULT)\\b", "");
+        if (!policy) require(!Pattern.compile("\\b(?:INSERT|UPDATE|DELETE)\\b").matcher(dataStatementCheck).find());
         if (!function) require(!Pattern.compile("\\bSELECT\\b").matcher(sql).find());
         require(!Pattern.compile("[\\w\\]]\\s*\\.\\s*[\\w\\[\\]]+\\s*\\.").matcher(sql).find());
         require(!Pattern.compile("(?m)^\\s*:").matcher(sql).find()); // no sqlcmd directives
-        require(sql.indexOf(';') < 0 || sql.indexOf(';') == sql.length() - 1);
+        require(reviewedScalar || sql.indexOf(';') < 0 || sql.indexOf(';') == sql.length() - 1);
         var mutations = Pattern.compile("\\b(?:CREATE|ALTER)\\b").matcher(sql);
         int count = 0;
         while (mutations.find()) count++;
         require(count <= 1);
         if (policy) require(Pattern.compile("STATE\\s*=\\s*ON").matcher(sql).find()
                 && !Pattern.compile("\\bOFF\\b").matcher(sql).find());
-        if (function) require(sql.contains("RETURNS TABLE") && sql.contains("SCHEMABINDING"));
+        if (function) require(reviewedScalar || sql.contains("RETURNS TABLE") && sql.contains("SCHEMABINDING"));
         result.add(original);
+    }
+
+    /** Only the reviewed recovered ToBitNV definition, never arbitrary scalar bodies. */
+    private static boolean reviewedScalar(String original) {
+        try {
+            String canonical = original.strip().replace("\r\n", "\n");
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.getBytes(StandardCharsets.UTF_8)))
+                    .equals("4a66a56b195010136d90909b62a241066f3f10a8089798e4ce99b8673732d10b");
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     static String mask(String sql) {

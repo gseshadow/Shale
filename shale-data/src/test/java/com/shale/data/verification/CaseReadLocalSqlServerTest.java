@@ -44,6 +44,7 @@ class CaseReadLocalSqlServerTest {
     private RuntimeSessionService session;
     private CaseServicePort service;
     private String phase = "prerequisites";
+    private String fixtureStep = "not_started";
     private final List<Long> aCases = new ArrayList<>(), bCases = new ArrayList<>();
     private long aDeleted, bDeleted, unassigned, closed;
     private int tenantA, tenantB, actorA, actorA2, actorB, removedA, inactiveA;
@@ -86,7 +87,10 @@ class CaseReadLocalSqlServerTest {
         }
         // No cause/message/DTO/SQL/credential appears in Surefire reports, even for setup errors.
         if (failure != null) throw new AssertionError("Local SQL verification failed in " + phase
-                + "; exceptionClass=" + failure.getClass().getName() + "; inspect runbook prerequisites");
+                + "; exceptionClass=" + failure.getClass().getName()
+                + "; fixtureStep=" + fixtureStep
+                + "; sqlError=" + (failure instanceof SQLException sql ? sql.getErrorCode() : 0)
+                + "; inspect runbook prerequisites");
     }
 
     private static String env(String suffix) { return System.getenv("SHALE_CASE_VERIFY_" + suffix); }
@@ -193,8 +197,8 @@ class CaseReadLocalSqlServerTest {
     private void fixtures() throws Exception {
         try (var con = adminConnection(database)) {
             owned(con);
-            tenantA = (int) insert(con, "ShaleClients", values("DisplayName", "Synthetic A", "City", "Local", "State", "CO", "Postal", "00000", "IsActive", true));
-            tenantB = (int) insert(con, "ShaleClients", values("DisplayName", "Synthetic B", "City", "Local", "State", "CO", "Postal", "00000", "IsActive", true));
+            tenantA = (int) insert(con, "ShaleClients", values("Code", "verify_a", "DisplayName", "Synthetic A", "City", "Local", "StateProvince", "CO", "PostalCode", "00000", "IsActive", true));
+            tenantB = (int) insert(con, "ShaleClients", values("Code", "verify_b", "DisplayName", "Synthetic B", "City", "Local", "StateProvince", "CO", "PostalCode", "00000", "IsActive", true));
             context(con, tenantA, null);
             actorA = user(con, tenantA, "A1"); actorA2 = user(con, tenantA, "A2");
             removedA = user(con, tenantA, "Removed"); inactiveA = user(con, tenantA, "Inactive");
@@ -202,8 +206,8 @@ class CaseReadLocalSqlServerTest {
             update(con, "UPDATE dbo.Users SET is_deleted=1 WHERE id=? AND ShaleClientId=?", inactiveA, tenantA);
             context(con, tenantB, null); actorB = user(con, tenantB, "B1");
             context(con, null, null);
-            explicitInsert(con, "Roles", values("Id", RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY, "Name", "responsible_attorney", "IsActive", true));
-            explicitInsert(con, "Roles", values("Id", RoleSemantics.ROLE_LEGAL_ASSISTANT, "Name", "legal_assistant", "IsActive", true));
+            explicitInsert(con, "Roles", values("Id", RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY, "Name", "responsible_attorney", "IsActive", true, "ShaleClientId", tenantA));
+            explicitInsert(con, "Roles", values("Id", RoleSemantics.ROLE_LEGAL_ASSISTANT, "Name", "legal_assistant", "IsActive", true, "ShaleClientId", tenantA));
             if (scalar(con, "SELECT COUNT_BIG(*) FROM sys.tables WHERE object_id=OBJECT_ID('dbo.ObjectTypes')") == 1)
                 explicitInsert(con, "ObjectTypes", values("Id", 1, "Name", "Case"));
             areaGlobal = area(con, null, "Global"); statusGlobal = status(con, null, "Global", false);
@@ -217,7 +221,7 @@ class CaseReadLocalSqlServerTest {
             // A long unfiltered prefix must not consume the match window.
             for (int i = 0; i < 35; i++) caseRow(con, tenantA, "Alpha nonmatch " + i, false, areaA);
             for (int i = 0; i < 27; i++) {
-                long id = caseRow(con, tenantA, String.format(Locale.ROOT, "Verify matched %02d", i), false, i % 2 == 0 ? areaGlobal : areaA);
+                long id = caseRow(con, tenantA, String.format(Locale.ROOT, "Verify matched %02d", i), false, areaA);
                 aCases.add(id); assignment(con, tenantA, id, actorA, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
                 assignment(con, tenantA, id, actorA2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
                 caseStatus(con, id, i % 2 == 0 ? statusGlobal : statusA);
@@ -246,7 +250,7 @@ class CaseReadLocalSqlServerTest {
 
     private int user(Connection con, int tenant, String name) throws SQLException {
         return (int) insert(con, "Users", values("ShaleClientId", tenant, "name_first", "Synthetic", "name_last", name,
-                "email", name + "@example.invalid", "email_norm", name.toLowerCase(Locale.ROOT) + "@example.invalid",
+                "email", name + "@example.invalid",
                 "password_hash", "unusable-synthetic-hash", "password_alg", "bcrypt", "is_attorney", false,
                 "is_admin", false, "is_deleted", false, "IsRemoved", false, "created_at", Timestamp.valueOf("2026-10-12 12:00:00")));
     }
@@ -265,7 +269,12 @@ class CaseReadLocalSqlServerTest {
     }
     private long caseRow(Connection con, int tenant, String name, boolean deleted, int area) throws SQLException {
         return insert(con, "Cases", values("ShaleClientId", tenant, "Name", name, "CaseNumber", "SYNTHETIC", "PracticeAreaId", area,
-                "IsDeleted", deleted, "CreatedAt", Timestamp.valueOf("2026-10-12 12:00:00"), "UpdatedAt", Timestamp.valueOf("2026-10-12 12:00:00")));
+                "ClientEstate", false, "FollowUpMeetWithClient", false, "FollowUpNurseReview", false,
+                "FollowUpExpertReview", false, "FollowUpCaseTransferred", false, "AcceptedChronology", false,
+                "AcceptedConsultantExpertSearch", false, "AcceptedTestifyingExpertSearch", false,
+                "AcceptedMedicalLiterature", false, "DeniedChronology", false, "FeeAgreementSigned", false,
+                "MedicalRecordsRequested", false, "IsDeleted", deleted,
+                "CreatedAt", Timestamp.valueOf("2026-10-12 12:00:00"), "UpdatedAt", Timestamp.valueOf("2026-10-12 12:00:00")));
     }
     private void assignment(Connection con, int tenant, long id, int actor, int role) throws SQLException {
         insert(con, "CaseUsers", values("ShaleClientId", tenant, "CaseId", id, "UserId", actor, "RoleId", role,
@@ -282,6 +291,12 @@ class CaseReadLocalSqlServerTest {
         return result;
     }
     private long insert(Connection con, String table, LinkedHashMap<String, Object> fields) throws SQLException {
+        fixtureStep = switch (table) {
+            case "ShaleClients", "Users", "Roles", "PracticeAreas", "Statuses", "CaseDateTypes",
+                    "CaseDateSemanticRoles", "CaseDateTypeSemanticRoleMappings", "Cases", "CaseUsers",
+                    "CaseStatuses", "CaseDates", "ObjectTypes" -> table;
+            default -> "other";
+        };
         require(table.matches("[A-Za-z]+") && fields.keySet().stream().allMatch(k -> k.matches("[A-Za-z_]+")));
         for (String field : fields.keySet())
             require(scalar(con, "SELECT COUNT_BIG(*) FROM sys.columns WHERE object_id=OBJECT_ID(?) AND name=?", "dbo." + table, field) == 1);
@@ -295,9 +310,13 @@ class CaseReadLocalSqlServerTest {
     }
     private void explicitInsert(Connection con, String table, LinkedHashMap<String, Object> fields) throws SQLException {
         boolean identity = scalar(con, "SELECT COUNT_BIG(*) FROM sys.identity_columns WHERE object_id=OBJECT_ID(?)", "dbo." + table) > 0;
-        if (identity) execute(con, "SET IDENTITY_INSERT dbo.[" + table + "] ON");
-        try { insert(con, table, fields); }
-        finally { if (identity) execute(con, "SET IDENTITY_INSERT dbo.[" + table + "] OFF"); }
+        // SET inside JDBC's prepared RPC scope is restored when that RPC returns.
+        // Use the top-level session batch for this fixed fixture-only setting.
+        try (var statement = con.createStatement()) {
+            if (identity) statement.execute("SET IDENTITY_INSERT dbo.[" + table + "] ON");
+            try { insert(con, table, fields); }
+            finally { if (identity) statement.execute("SET IDENTITY_INSERT dbo.[" + table + "] OFF"); }
+        }
     }
 
     private void runtimePool() {
@@ -329,6 +348,8 @@ class CaseReadLocalSqlServerTest {
                 require(scalar(con, "SELECT CASE WHEN USER_NAME()=? THEN 1 ELSE 0 END", login) == 1);
                 require(scalar(con, "SELECT HAS_PERMS_BY_NAME('dbo.Cases','OBJECT','UPDATE')") == 0);
                 require(scalar(con, "SELECT HAS_PERMS_BY_NAME('dbo.AuditLog','OBJECT','DELETE')") == 0);
+                require(scalar(con, "SELECT HAS_PERMS_BY_NAME('sec','SCHEMA','CONTROL')") == 0);
+                require(scalar(con, "SELECT HAS_PERMS_BY_NAME('sec.TenantFilter','OBJECT','ALTER')") == 0);
             }
             require(service.searchMinimizedCases("Verify matched", identity[0], identity[1], 0, 25).items().size() == 25);
         }
@@ -336,6 +357,33 @@ class CaseReadLocalSqlServerTest {
         boolean denied = false;
         try { session.getConnection().close(); } catch (IllegalStateException expected) { denied = true; }
         require(denied); session.initialize(tenantA, actorA);
+        var failSecondKey = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var closedFailedLease = new java.util.concurrent.atomic.AtomicInteger();
+        var failing = (javax.sql.DataSource) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{javax.sql.DataSource.class},
+                (proxy, method, args) -> {
+                    try {
+                        Object result = method.invoke(pool, args);
+                        if (!method.getName().equals("getConnection")) return result;
+                        Connection real = (Connection) result;
+                        return Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{Connection.class}, (p, m, a) -> {
+                            if (m.getName().equals("prepareStatement") && a[0].toString().contains("PrincipalUserId")
+                                    && failSecondKey.compareAndSet(true, false)) throw new SQLException("Local second-key setup injection");
+                            if (m.getName().equals("close")) closedFailedLease.incrementAndGet();
+                            try { return m.invoke(real, a); }
+                            catch (InvocationTargetException failure) { throw failure.getCause(); }
+                        });
+                    } catch (InvocationTargetException failure) { throw failure.getCause(); }
+                });
+        var brokenSetup = new RuntimeSessionService(failing); brokenSetup.initialize(tenantB, actorB);
+        try { brokenSetup.getConnection().close(); throw new AssertionError("Second-key setup failure must withhold the lease"); }
+        catch (SQLException expected) { require(closedFailedLease.get() == 1); }
+        session.initialize(tenantA, actorA);
+        try (var con = session.getConnection()) {
+            require(scalar(con, "SELECT @@SPID") == spid);
+            require(scalar(con, "SELECT CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))") == tenantA);
+            require(scalar(con, "SELECT CONVERT(int,SESSION_CONTEXT(N'PrincipalUserId'))") == actorA);
+            require(scalar(con, "SELECT COUNT_BIG(*) FROM dbo.Cases WHERE ShaleClientId<>?", tenantA) == 0);
+        }
     }
 
     private void rlsEnforcement() throws Exception {
@@ -380,7 +428,7 @@ class CaseReadLocalSqlServerTest {
             var overview = service.readMinimizedCaseOverview(expected.getFirst(), tenant, actor).orElseThrow();
             require(overview.responsibleAttorney().userId() == actor);
             require(overview.status().id() == (tenant == tenantA ? statusGlobal : statusB));
-            require(overview.practiceArea().id() == (tenant == tenantA ? areaGlobal : areaB));
+            require(overview.practiceArea().id() == (tenant == tenantA ? areaA : areaB));
             if (tenant == tenantA) require(overview.primaryLegalAssistant().userId() == actorA2);
             else require(overview.primaryLegalAssistant() == null);
         }

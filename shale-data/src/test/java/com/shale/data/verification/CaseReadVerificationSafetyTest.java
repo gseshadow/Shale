@@ -48,6 +48,21 @@ class CaseReadVerificationSafetyTest {
         assertThrows(IllegalStateException.class, () -> CaseReadVerificationSafety.ddl("CREATE TABLE dbo.X(Id int)\n/* harmless */\nDROP DATABASE Shale"));
     }
 
+    @Test void ssmsWhitespaceAndComputedIndexSettingsPreserveDefinitionsWithoutOpeningScalarExecution() {
+        String function = "CREATE   FUNCTION sec.f(@tenant int) RETURNS TABLE WITH SCHEMABINDING AS RETURN (SELECT 1 Visible WHERE @tenant=CONVERT(int,SESSION_CONTEXT(N'ShaleClientId')));";
+        assertEquals(function, CaseReadVerificationSafety.ddl(function).getFirst());
+        for (String setting : new String[]{"ANSI_PADDING", "ANSI_WARNINGS", "ARITHABORT", "CONCAT_NULL_YIELDS_NULL"})
+            assertEquals(1, CaseReadVerificationSafety.ddl("SET " + setting + " ON").size());
+        assertEquals(1, CaseReadVerificationSafety.ddl("SET NUMERIC_ROUNDABORT OFF").size());
+        String foreignKey = "ALTER TABLE dbo.Child WITH CHECK ADD CONSTRAINT FK_Child FOREIGN KEY(ParentId) REFERENCES dbo.Parent(Id) ON DELETE CASCADE ON UPDATE NO ACTION";
+        assertEquals(foreignKey, CaseReadVerificationSafety.ddl(foreignKey).getFirst(), "Authoritative FK actions must be retained");
+        assertThrows(IllegalStateException.class, () -> CaseReadVerificationSafety.ddl(foreignKey + "; DELETE FROM dbo.Parent"));
+        for (String sql : new String[]{"SET ANSI_PADDING OFF", "SET ARITHABORT ON; EXEC('SELECT 1')",
+                "CREATE FUNCTION dbo.ToBitNV(@v nvarchar(255)) RETURNS bit AS BEGIN RETURN 1; END",
+                "CREATE FUNCTION dbo.other() RETURNS bit AS BEGIN RETURN 1; END"})
+            assertThrows(IllegalStateException.class, () -> CaseReadVerificationSafety.ddl(sql), "Unreviewed scalar bodies and extra statements must remain refused");
+    }
+
     @Test void testOnlyLostAcknowledgementDelegatesCommitButPreCommitFaultDoesNot() throws Exception {
         for (var fault : CaseReadLocalSqlServerTest.Fault.values()) {
             int[] actualCommits = {0}, actualRollbacks = {0}, wrapperCommits = {0}, wrapperRollbacks = {0};
