@@ -1,0 +1,42 @@
+{
+  "name": "get_case_overview",
+  "description": "Read one active Case's minimized overview in your authorized Shale tenant by Case ID. Returns name, number, status, practice area, responsible attorney, primary legal assistant and stored local update time only. This is not full Case detail and includes no documents, narratives, chronology or Case Dates. An unavailable Case has no disclosed existence or tenant information.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "caseId"
+    ],
+    "properties": {
+      "caseId": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 2147483647
+      }
+    }
+  },
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "case",
+      "correlationId"
+    ],
+    "properties": {
+      "case": {
+        "$ref": "#/$defs/Case"
+      },
+      "correlationId": {
+        "type": "string",
+        "format": "uuid"
+      }
+    }
+  }
+}

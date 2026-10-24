@@ -1590,6 +1590,41 @@ class AiSecurityLocalSqlServerTest {
         }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"scope","user","global","policy","tenant","grant","session","integration"})
+    void overviewCommittedAuthorityReductionAfterReadPreventsHandoff(String change)throws Exception {
+        var context=disclosureFixture();
+        var read=disclosureService((result,correlation,out)->{
+            try {
+                switch(change) {
+                    case "global" -> {var op=new AiProductCapabilityService(provider("operator",null,null));op.setEnabled(false,op.inspect().rowVersion());}
+                    case "policy" -> {var admin=service(7,71);admin.setTenantEnabled(false,admin.inspectTenantPolicy().rowVersion());}
+                    case "scope","integration" -> {
+                        var admin=service(7,71);var registration=admin.inspectRegistrations().getFirst();
+                        admin.changeIntegration(context.integrationId(),AiScope.fromMask(change.equals("scope")?1:3),change.equals("integration"),registration.rowVersion());
+                    }
+                    default -> {try(var c=owner(db)) {
+                        // Labelled synthetic owner state injection; production mutators retain their own audit rules.
+                        sql(c,switch(change) {
+                            case "user" -> "UPDATE dbo.Users SET IsRemoved=1 WHERE id=72";
+                            case "tenant" -> "UPDATE dbo.ShaleClients SET IsActive=0 WHERE Id=7";
+                            case "grant" -> "UPDATE dbo.AiDelegationGrant SET RevokedAt=SYSUTCDATETIME(),RevokedByUserId=72,RevocationReason='SELF'";
+                            case "session" -> "UPDATE dbo.AiDelegatedSession SET RevokedAt=SYSUTCDATETIME(),RevocationReason='SELF'";
+                            default -> throw new AssertionError(change);
+                        });
+                    }}
+                }
+            }catch(Exception failure){throw new java.io.IOException("Synthetic authority change failed");}
+            new MinimizedCaseEncoder().encode(result,correlation,out);
+        });
+        assertThrows(IntegrationReadException.class,()->read.overview(IntegrationInvocation.overview(context,System.nanoTime()+9_000_000_000L),100L,buffer->0));
+        try(var c=owner(db)) {
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.AuditLog WHERE FieldName='Case.Overview.Read'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Stage='TERMINAL' AND Outcome='DENIED'"));
+        }
+    }
+
     @Test void disclosureSuppressedParentCannotReleaseEvenEmptySearchAndNoEmergencySpool()throws Exception {
         var context=disclosureFixture();
         try(var c=owner(db)){sql(c,"CREATE TRIGGER dbo.SuppressAccess ON dbo.IntegrationAccessAuditLog INSTEAD OF INSERT AS RETURN;");}

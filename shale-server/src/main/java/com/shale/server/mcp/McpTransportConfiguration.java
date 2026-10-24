@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 @Configuration(proxyBeanMethods=false)
-@Import(McpSearchConfiguration.class)
+@Import({McpSearchConfiguration.class,McpOverviewConfiguration.class})
 @EnableConfigurationProperties({McpTransportProperties.class,McpOAuthProperties.class})
 public class McpTransportConfiguration {
     static JacksonMcpJsonMapper mapper() {
@@ -48,9 +48,12 @@ public class McpTransportConfiguration {
         return server(version,mapper,null);
     }
     static McpServer server(String version,JacksonMcpJsonMapper mapper,McpSearchHandler search) {
+        return server(version,mapper,search,null);
+    }
+    static McpServer server(String version,JacksonMcpJsonMapper mapper,McpSearchHandler search,McpOverviewHandler overview) {
         return McpServer.builder().serverInfo(McpSchema.Implementation.builder("shale-mcp",version).build())
                 .supportedVersions(List.of(McpGate.PROTOCOL)).jsonMapper(mapper)
-                .feature(new McpCatalog(search,McpSchema.Implementation.builder("shale-mcp",version).build())).build();
+                .feature(new McpCatalog(search,overview,McpSchema.Implementation.builder("shale-mcp",version).build())).build();
     }
     @Bean @Order(0)
     SecurityFilterChain mcpTransportChain(HttpSecurity http, McpTransportProperties transport, McpOAuthProperties identity,
@@ -99,11 +102,11 @@ public class McpTransportConfiguration {
     }
     @Bean
     @ConditionalOnProperty(name="shale.ai.mcp.enabled",havingValue="true")
-    ServletRegistrationBean<HttpServletMcpTransport> mcpServlet(ObjectProvider<BuildProperties> builds,ObjectProvider<McpSearchHandler> searches) {
+    ServletRegistrationBean<HttpServletMcpTransport> mcpServlet(ObjectProvider<BuildProperties> builds,ObjectProvider<McpSearchHandler> searches,ObjectProvider<McpOverviewHandler> overviews) {
         var build=builds.getIfAvailable();
         String version=build == null ? "development" : build.getVersion();
         var mapper=mapper();
-        var servlet=HttpServletMcpTransport.builder(server(version,mapper,searches.getIfAvailable())).jsonMapper(mapper).endpoint("/mcp")
+        var servlet=HttpServletMcpTransport.builder(server(version,mapper,searches.getIfAvailable(),overviews.getIfAvailable())).jsonMapper(mapper).endpoint("/mcp")
                 .maxRequestSize(8192).keepAliveInterval(null)
                 // The namespace security gate uses exact configured Origin values before this servlet.
                 .httpHeaderValidator(headers->{})

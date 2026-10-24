@@ -1,0 +1,362 @@
+{
+  "phase": "3B.6",
+  "status": "COMPLETE (source/local synthetic protocol/client verification via hosted loopback fixtures)",
+  "baseSha": "ef44a0aa40a178dfd9511fbcfbc4ed177c9e0526",
+  "testedSha": "6fefbfd50337094376154eb4481f97a18f1bc786",
+  "focusedTestedSha": "b8b91b96862157a5e50ca58e0cd6f4cfb5e6da4b",
+  "branch": "codex/phase-3b6-overview",
+  "pr": "https://github.com/gseshadow/Shale/pull/1917",
+  "run": {
+    "id": 40100952797,
+    "url": "https://github.com/gseshadow/Shale/actions/runs/40100952797",
+    "jobId": 120892801749,
+    "conclusion": "success"
+  },
+  "priorRun": {
+    "id": 40099484551,
+    "url": "https://github.com/gseshadow/Shale/actions/runs/40099484551",
+    "jobId": 120888495542,
+    "conclusion": "failure",
+    "retainedPassingChecks": [
+      "compile",
+      "smoke",
+      "focused with both clients",
+      "selector Python",
+      "affected partitions 0-4"
+    ],
+    "failure": "Last 19-method SQL partition including parameterized matrices exceeded its 360-second outer budget; not counted as passing. One infrastructure retry retained successful receipts and split only unfinished methods in groups of two.",
+    "artifactId": 12563050555,
+    "artifactSha256": "1371fe6f999c24e563c4e719558740adc102c2bc1e2b20c82f69180845184a4e"
+  },
+  "artifact": {
+    "id": 12562234231,
+    "url": "https://github.com/gseshadow/Shale/actions/runs/40100952797/artifacts/12562234231",
+    "sha256": "126c5ef33af1e7cd9625f412ea96490b2801dc27423af426acf41fb47ddb5bdb",
+    "hashSource": "GitHub reported upload/download digest; not a local ZIP rehash",
+    "retentionDays": 14,
+    "expiresAtUtc": "2026-11-07T14:15:12Z"
+  },
+  "environment": {
+    "runner": "GitHub-hosted Ubuntu 24.04",
+    "java": "Temurin 21.0.12.1",
+    "maven": "3.10.0",
+    "sql": "task-owned loopback-only SQL Server 2022 Developer; synthetic Case shape and separate restricted runtime/bootstrap/owner identities; container removed"
+  },
+  "localMaven": {
+    "executedSuccessfully": false,
+    "reason": "Offline Boot 4.1.1 absent; one bounded online attempt failed Operation not permitted. No local runtime pass claimed."
+  },
+  "groupsOverlap": true,
+  "checks": {
+    "compilation": "PASS",
+    "smoke": {
+      "tests": 94,
+      "data": 44,
+      "server": 50,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "focused": {
+      "tests": 257,
+      "data": 91,
+      "server": 166,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "affected": {
+      "tests": 345,
+      "partitionTests": [
+        177,
+        20,
+        27,
+        41,
+        21,
+        5,
+        16,
+        2,
+        2,
+        25,
+        2,
+        2,
+        2,
+        2,
+        1
+      ],
+      "retainedPartitionsRun": 40099484551,
+      "retainedPartitionIndices": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "resumedPartitionsRun": 40100952797,
+      "resumedPartitionIndices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "sqlTests": 168,
+      "sqlMethods": 99,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "omittedMethods": []
+    },
+    "critical": {
+      "tests": 207,
+      "moduleTests": [
+        6,
+        114,
+        7,
+        8,
+        19,
+        53
+      ],
+      "allSevenModulesBuildSuccess": true,
+      "runs": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selectorPython": {
+      "tests": 27,
+      "local": "PASS",
+      "hosted": "PASS"
+    },
+    "typescript": {
+      "package": "@modelcontextprotocol/client",
+      "version": "2.4.0",
+      "protocol": "2026-07-28",
+      "overviewScenarios": 22,
+      "searchRegressionScenarios": 14,
+      "transportRegressionScenarios": 6,
+      "result": "PASS"
+    },
+    "python": {
+      "package": "mcp",
+      "version": "2.3.0",
+      "protocol": "2026-07-28",
+      "overviewScenarios": 22,
+      "searchRegressionScenarios": 14,
+      "transportRegressionScenarios": 6,
+      "result": "PASS"
+    },
+    "conformance": {
+      "fixture": "inherited no-handler transport fixture",
+      "perPass": {
+        "SUCCESS": 23,
+        "rawNotTestableFAILURE": 4,
+        "SKIPPEDSubscriptions": 5
+      },
+      "serverStatelessExit": 1,
+      "toolsListExit": 0,
+      "fullShaleConformanceClaimed": false
+    }
+  },
+  "commands": {
+    "compile": "mvn -B -ntp -U -pl shale-server -am -Dmaven.test.skip=true install",
+    "smoke": "mvn -B -ntp -pl shale-server -am -Dtest=McpOverviewTest,McpSearchTest,IntegrationCaseReadTest,McpSdkCompatibilityTest,McpTransportTest,McpFilterIsolationTest,McpJdbcDeadlineTest,OpenApiDocumentationTest,ShaleServerServiceConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test",
+    "focused": "mvn -B -ntp -pl shale-server -am '-Dtest=McpOverviewTest,McpSearchTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,MinimizedCaseReadControllerTest,RequestScopedDbSessionProviderTest,OAuth*Test,PinnedClientAssertionTest,ShaleOAuthHumanTest,Ai*ContractTest,IntegrationAccessContractTest,IntegrationCaseReadTest,AuthControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,ServerAuthSessionLogoutTest,DesktopSessionControllerTest,SessionControllerTest,OpenApiDocumentationTest,ApiReadControllerTest,ShaleServerServiceConfigurationTest' -Dsurefire.failIfNoSpecifiedTests=false test",
+    "selector": "python3 build/test-selection/select_tests.py --base ef44a0aa40a178dfd9511fbcfbc4ed177c9e0526 --head HEAD --format markdown --plan-output work/mcp-evidence/selection.json",
+    "affected": "Exact selected_maven_batches and annotated SQL inventory in affected-partitions.json; completed original indices 0-4 retained, unfinished index 5 split in two-method groups in affected-resume-plan.json. Both archived in final artifact.",
+    "critical": "timeout 900 xvfb-run -a mvn -B -ntp test",
+    "selectorPython": "python3 -m unittest discover -s build/test-selection -p test_select_tests.py",
+    "typescript": "node build/mcp-transport/overview-ts.mjs",
+    "python": "work/mcp-clients/bin/python build/mcp-transport/overview-python.py",
+    "static": [
+      "python3 work/check_contract.py",
+      "python3 work/check_docs.py",
+      "git diff --check ef44a0aa40a178dfd9511fbcfbc4ed177c9e0526 HEAD"
+    ]
+  },
+  "sqlMethodInventory": [
+    "migrationDefaultsOffRepeatsAndRejectsCatalogDrift",
+    "realRuntimeHasNoBypassOrDirectControlTableAuthority",
+    "tenantPolicyUsesCurrentAdminContextAndRowVersion",
+    "registrationCeilingAndForeignTenantAreEnforced",
+    "selfConsentIsOneUseBoundToActorAndCeiling",
+    "consentRacingRevokeAndScopeReductionCannotResurrectAuthority",
+    "globalTenantIntegrationAndUserRevocationAreLiveAcrossServiceInstances",
+    "typedContextRejectsSpoofedTenantUserSessionAndMissingGrant",
+    "keyRotationIsBoundedConcurrentAndRevocationInvalidatesSessions",
+    "expiredGrantFailsClosedAndDigestResolverRestoresItsCaller",
+    "rlsFiltersAndBlocksForeignRowsWithoutPrivilegedRuntime",
+    "auditFailureRollsBackMutationAndConsentConsumption",
+    "everyNewTenantTableFiltersAndBlocksAnOtherwiseValidForeignInsert",
+    "concurrentReservationsHaveOneWinnerAndReleaseNeverRefundsBudget",
+    "durableDailyRowAndSlidingMinuteBudgetsSurviveNewServiceInstances",
+    "concurrentScopeChangesAndRotationsRejectStaleVersions",
+    "dailyBudgetsApplyAcrossUsersIntegrationsAndNewProcesses",
+    "distributedConcurrencyCountsAllThreeOwners",
+    "slidingMinuteLimitsApplyToIntegrationAndTenant",
+    "actualReplacementJvmSeesCommittedAccounting",
+    "sameNonceAndSameInvocationRacesCannotDoubleSpend",
+    "bootstrapDefinitionAndCallerRestorationAreExactEvenOnFailure",
+    "migrationFailureRollsBackPartialDdlAndAmbiguousAuditAllowlist",
+    "expiredKeySessionAndConsentIntentCannotAcquireLiveContext",
+    "sessionFamilyRevocationIsSelfBoundPermanentAndAudited",
+    "oauthFreshClientLoaderAndSelfConsentBindEveryOwnerAndExactScopes",
+    "oauthCodeBindingRejectsChangedClientRedirectIssuerResourceAndVerifier",
+    "oauthCodeConsumeRaceHasExactlyOneWinnerAndReplacementJvmRejectsReplay",
+    "oauthCommittedRegistrationUserTenantAndGlobalDisablePreventCompletion",
+    "oauthGrantRevocationAndApprovalRaceNeverResurrectsRevokedAuthority",
+    "oauthScopeWideningDenialAndInjectedExpiryFailClosed",
+    "oauthAuditFailureRollsBackCodeGrantAndIntentConsumptionTogether",
+    "oauthStorageIsStrictTenantOwnedAndRuntimeCannotReadOrMutateItDirectly",
+    "oauthConfidentialPinnedKeyAndGrantRevocationPreventCodeUse",
+    "oauthNativeLoopbackPortIsConfinedAndExactIssuedRedirectCannotChange",
+    "exchangeMigrationRepeatsRejectsDriftAndRestrictsResolverAndReplayPermissions",
+    "exchangeReplayTableUsesActualNonBypassTenantFilterAndInsertBlock",
+    "exchangePublicExactBindingsFailureDoesNotConsumeAndRaceHasOneWinner",
+    "exchangeAssertionReplayRaceAcrossCodesHasOneWinnerAndFailedPkceDoesNotBurnJti",
+    "exchangeCommittedBindingExpiryOrRevocationDenies",
+    "exchangeAuditFailureRollsBackBothReplayAndConsume",
+    "exchangeCommittedRevocationAndEveryAuthorityDisableDenyWithoutConsumption",
+    "exchangeCommittedKeyRevokePreventsOldKeyAndReplacementKeySubstitution",
+    "credentialMigrationRepeatAndCatalogDriftFailClosed",
+    "credentialInitialRaceOneFamilyAndHashOnlyFiveMinuteLifetime",
+    "credentialRotationResponseLossRetryRevokesAllDescendantsPermanently",
+    "credentialConcurrentRefreshHasOneWinnerAndLoserRevokesFamily",
+    "credentialReuseRaceWithDescendantActivityLeavesNoActiveCredentials",
+    "credentialWrongClientAndAccessTokenCannotRefreshOrResolve",
+    "credentialCommittedRevocationDeniesAndReenableCannotRestore",
+    "credentialDeadlineClippingAndExpiredAuthorityFailClosed",
+    "credentialInitialAndRotationAuditFailureRollBackAllState",
+    "credentialRestartObservesAccessRefreshAndConsumedHistory",
+    "credentialConfidentialRefreshRequiresSameKeyFreshSharedJtiAndLiveKey",
+    "credentialCommittedRevokeBeforeRotationPreventsNewRows",
+    "credentialSecurityResetWebRevocationAuditsFamilyAndCannotResurrect",
+    "credentialReuseAuditFailureRollsBackRevocationAndRetriesFailClosed",
+    "credentialRevokeHoldingAuthorityLockPreventsConcurrentRefreshCommit",
+    "credentialEightHourIdleAndConsentAbsoluteMaximumNeverSlide",
+    "credentialInitialLiveAuthorityCannotCreateAnyFamily",
+    "credentialSameValidatedTransactionCannotIssueASecondFamily",
+    "credentialGlobalDisableCannotRestoreInternalSessionOrQuotaAuthority",
+    "revocationMigrationIsRepeatSafeAndDetectsDrift",
+    "revocationEitherCredentialRevokesAllDescendantsAndPreservesFirstHistory",
+    "revocationUnknownMalformedForeignAndWrongTenantHaveNoStateOrAuditEffects",
+    "revocationInactiveSubjectsRemainNonOracleAndPermanent",
+    "revocationAuditFailureRollsBackFamilyAndSharedReplayReservation",
+    "revocationUnknownConfidentialRequestConsumesSharedJtiAndCannotReplayAcrossRefresh",
+    "revocationRaceWithRefreshAndAccessDescendantActivityAlwaysEndsRevoked",
+    "revocationCommittedWhileRefreshAwaitsFinalizationPreventsNewCredentials",
+    "revocationRepeatedConcurrentRequestsAreIdempotentAndAuditOnce",
+    "revocationExpiredAccessAndRefreshHistoryStillRevokeFamily",
+    "revocationModulesRetainSeparateRestrictedSqlIdentities",
+    "disclosureMigrationRepeatDriftAndActualPermissions",
+    "disclosureSharedSearchOverviewAtomicAuditEmptyAndProtectedReview",
+    "disclosurePrivacyInspectsEveryPersistedColumnAndRequestedProbeDoesNotResolveCase",
+    "disclosureActualIntegrationAndPhiAuditFailuresRollBackAndDoNotRefund",
+    "disclosureRevokeBetweenCommitAndHandoffKeepsHistoryAndWithholdsBuffer",
+    "disclosureActualRlsBlocksAndAppendOnlyHistory",
+    "disclosureFailureForNowDisabledOwnerStillPersistsAndConsumesAttempt",
+    "disclosureFinalHandoffExpiryWhileActuallyBlockedUsesDatabaseUtc",
+    "disclosureCommitCloseAndAuthorizedHandoffBoundary",
+    "disclosureCommittedAuthorityReductionAfterReadPreventsHandoff",
+    "overviewCommittedAuthorityReductionAfterReadPreventsHandoff",
+    "disclosureSuppressedParentCannotReleaseEvenEmptySearchAndNoEmergencySpool",
+    "disclosureSingleSpidDistinctOwnersAndFaultCleanupRemainIsolated",
+    "accessMigrationRepeatsAndCumulativeVerifierDetectsDrift",
+    "accessOnlyFullBoundContextAndSafeFailures",
+    "accessOwnerBindingMismatchFailsClosed",
+    "accessCommittedAuthorityChangesPreventNewAndRecheckedContexts",
+    "accessConfidentialKeyBoundAndRevocationIsLive",
+    "accessRecheckNarrowsAndNeverExpandsSnapshotScopes",
+    "accessCommittedRevokeBetweenBootstrapAndGatePreventsContext",
+    "accessSingleSpidPoolReuseAndConcurrentAsyncCancellation",
+    "accessScopeReductionBetweenBootstrapAndGateDeniesAndDoesNotResurrect",
+    "accessExpiryWhileWaitingForFinalGateUsesDatabaseUtc",
+    "accessSetupMismatchAndStampFailureWithholdContextThenCleanNextBorrow",
+    "accessDistinctOwnersInterleaveThroughOnePhysicalSqlConnection",
+    "accessReplacementJvmObservesRevocationAndScopeReduction"
+  ],
+  "retainedSourceSha256": {
+    "build/mcp-transport/overview-python.py": "c9e4aaf56fab9544103d057f57d4a2f9a18941a5a4dc0c7d87c8d370b2141e03",
+    "build/mcp-transport/overview-ts.mjs": "53fc64341353f6400cae263ed1c8f7d35e0bc7da861cce66df2e12305c4d0eff",
+    "shale-data/src/main/java/com/shale/data/security/ai/IntegrationCaseReadService.java": "3462d33bd88683f1cd4b07b43bb28fd9ed8de3e5f2a68b33febcc3f824fc5ab0",
+    "shale-data/src/main/java/com/shale/data/security/ai/IntegrationInvocation.java": "cdadee6c71a8ce04ebdee8310fceae05bab42dda40b699caff959efedd1fa0f2",
+    "shale-data/src/test/java/com/shale/data/security/ai/AiSecurityLocalSqlServerTest.java": "0303ff9ea5076c13ca6e886c4a88a42ffbc18827368668e57ea42faba9709ebb",
+    "shale-data/src/test/java/com/shale/data/security/ai/IntegrationCaseReadTest.java": "5dc9927795208af314ecc5a1d3c2ce433a894fbce3467846048e510a34999614",
+    "shale-server/src/main/java/com/shale/server/mcp/McpCatalog.java": "a48133997078fca44d13e7a1644f4b611c8ca1d083c996ef54c1dd915b8b730c",
+    "shale-server/src/main/java/com/shale/server/mcp/McpGate.java": "b27cf7d241444ed0abf759963ca3e183614f14ee931205b252fdf1240ce8897b",
+    "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java": "75a5f2b89aa18d41fe95b5e5605728689cea8da2b90035143cacd92bcfc28e66",
+    "shale-server/src/main/java/com/shale/server/mcp/McpOverviewHandler.java": "83065e0103e8218970e1806847663c86c76cd09e4fca6e2a65ec7993b6df6b82",
+    "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java": "9a61622b58ce554e458902f337a8a880d39d21a028d707b0cf3cb13d00e163a6",
+    "shale-server/src/main/resources/application.properties": "253df5409a8d2888a367853b059c198237381fa29be9c84fdbb638320066f799",
+    "shale-server/src/main/resources/mcp/get-case-overview.json": "55db78ef3fd1b0e97e1a2d29b7f6a7cde11d1cd05f80f9033aac566c24e59951",
+    "shale-server/src/test/java/com/shale/server/mcp/McpOverviewClientFixture.java": "77059b09252d14375a37d0ee9c757b65801d066f0dfc35d4c5dfdecca79d83c0",
+    "shale-server/src/test/java/com/shale/server/mcp/McpOverviewTest.java": "75eae060f78a5a49e44b11a6bb926be51a068e247540dd06d03e1ba576cd040a",
+    "shale-server/src/test/java/com/shale/server/oauth/OAuthAuthorizationFlowTest.java": "b929ef45141ea462a63092b4950ad4ddf53cbc103f1f69632a3a21490fc91752"
+  },
+  "sameSourceAcrossRuns": "Successful resume checks git diff --exit-code b8b91b96862157a5e50ca58e0cd6f4cfb5e6da4b HEAD for core/data/server/client/selector paths before receipt reuse. Only temporary workflow differs.",
+  "scopeMatrix": {
+    "cases.search": [
+      "search_cases"
+    ],
+    "cases.overview.read": [
+      "get_case_overview"
+    ],
+    "both": [
+      "search_cases",
+      "get_case_overview"
+    ],
+    "neither": []
+  },
+  "perClientSqlProof": {
+    "overviewWorkerCalls": 7,
+    "successfulReads": 2,
+    "phiRows": 2,
+    "allowedReadParents": 2,
+    "returnedCaseChildren": 2,
+    "unavailableOutcomes": 5,
+    "invalidInputOutcomes": 3,
+    "throttledOutcomes": 1,
+    "reservedRowCost": 7,
+    "attemptRecords": 11,
+    "requestedChildren": 6,
+    "malformedInputResourceChildren": 0,
+    "phiAppendFailureCommittedPhiAndSuccess": 0
+  },
+  "bounds": {
+    "structuredBytes": 8192,
+    "fullMcpBytes": 32768,
+    "searchUnchanged": [
+      32768,
+      65536
+    ],
+    "requestDeadlineSeconds": 10
+  },
+  "evidenceClassification": [
+    "compiled source/unit and deterministic JDBC fault injection",
+    "actual restricted synthetic loopback SQL",
+    "mounted modern MCP SDK plus freshly issued synthetic OAuth ACCESS",
+    "independent pinned TypeScript and Python clients",
+    "not authoritative Case schema/RLS/production acceptance"
+  ],
+  "remainingBlockers": [
+    "approved authoritative Case artifact absent",
+    "deployed non-bypass RLS/permissions and audit protection acceptance",
+    "SDK prerelease production acceptance",
+    "serving TLS/proxy, operational/client/load and tenant/legal retention acceptance"
+  ],
+  "next": "3B.7 adversarial/local acceptance only, with authoritative artifact prerequisite; keep defaults OFF and no real tenant until separate accepted enablement.",
+  "explicitExclusions": [
+    "no other MCP Case/domain tools",
+    "no real tenant/integration enabled",
+    "no production/Azure SQL",
+    "no deployment",
+    "no installer/version publication",
+    "no SQL migration/tool-specific persistence"
+  ],
+  "cleanup": "Temporary workflow removed; sixteen retained production/test/client blobs unchanged from passing tested source. No repeat reactor claimed for documentation/scaffolding cleanup."
+}

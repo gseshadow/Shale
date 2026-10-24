@@ -40,6 +40,21 @@ class IntegrationCaseReadTest {
             assertEquals(overview?1:10,f.cost); assertEquals(1,f.releases);
         }
     }
+    @Test void overviewOriginalDeadlineAndBothByteCeilingsAreMandatory() {
+        Fake expired=new Fake("");
+        assertEquals(IntegrationAccessAudit.Reason.DEADLINE,assertThrows(IntegrationReadException.class,()->expired.service(new MinimizedCaseEncoder()).overview(
+                IntegrationInvocation.overview(context(7,72),System.nanoTime()-1),100L,b->0)).reason());
+        assertEquals(0,expired.reads);
+        for(int full:List.of(32768,32769)) {
+            Fake f=new Fake("");var service=f.service(new MinimizedCaseEncoder());
+            var invocation=IntegrationInvocation.overview(context(7,72),System.nanoTime()+9_000_000_000L);
+            if(full==32768)assertTrue(service.overview(invocation,100L,b->full).size()>0);
+            else {assertEquals(IntegrationAccessAudit.Reason.OVERSIZED,assertThrows(IntegrationReadException.class,()->service.overview(invocation,100L,b->full)).reason());assertEquals(2,f.gates);}
+            assertEquals(1,f.reads);assertEquals(1,f.cost);assertEquals(1,f.durablePhi);
+        }
+        Fake structured=new Fake("");
+        assertEquals(IntegrationAccessAudit.Reason.OVERSIZED,assertThrows(IntegrationReadException.class,()->structured.service((v,c,o)->o.write(new byte[8193])).overview(context(7,72),100)).reason());
+    }
     @Test void zeroSearchIsAuditedAndProbeIsNeverAnAuditResource() {
         Fake f=new Fake("EMPTY"); f.service(new MinimizedCaseEncoder()).search(context(7,72),"literal",9);
         var args=f.auditCalls.getFirst(); assertEquals(0,args.get(11));
@@ -79,6 +94,29 @@ class IntegrationCaseReadTest {
         try {
             var error=assertThrows(IntegrationReadException.class,()->{
                 if(fault.equals("PHI"))service.overview(context(7,72),72); else service.search(context(7,72),"SECRET_QUERY",0);
+            },fault);
+            assertNull(error.getCause()); assertEquals("Integration read unavailable.",error.getMessage());
+            assertTrue(f.reads<=1,"No automatic sensitive read replay");
+            if(Set.of("LOSTACK","CLOSE","SERIALIZE","OVERSIZE","HANDOFF","CANCEL_ENCODER").contains(fault))
+                assertEquals(1,f.durableAllowed,"Committed server-access history survives later failure");
+            else assertEquals(0,f.durableAllowed);
+            assertTrue(f.auditCalls.stream().anyMatch(a->!"ALLOWED_READ".equals(a.get(9))),"A verified failure attempts a separate bounded outcome");
+            for(var args:f.auditCalls)for(Object value:args.values())if(value instanceof String text)
+                for(String privateText:List.of("SECRET_CASE","SECRET_QUERY","private exception","http://","access_token","email@"))assertFalse(text.contains(privateText));
+        } finally { Thread.interrupted(); }
+    }
+    @ParameterizedTest @ValueSource(strings={"READ","AUDIT_ZERO","PARENT","CHILD","PHI","PRECOMMIT","COMMIT","LOSTACK","CLOSE","SERIALIZE","OVERSIZE","GATE","HANDOFF","CANCEL_READ","CANCEL_ENCODER","QUOTA"})
+    void overviewPreHandoffFaultsWithholdPhiAndCaseWithoutReplay(String fault) {
+        Fake f=new Fake(fault);
+        var service=f.service((value,correlation,out)->{
+            if(fault.equals("SERIALIZE"))throw new java.io.IOException("private exception SQL URL token");
+            if(fault.equals("OVERSIZE")) { out.write(new byte[32769]); return; }
+            if(fault.equals("CANCEL_ENCODER"))Thread.currentThread().interrupt();
+            new MinimizedCaseEncoder().encode(value,correlation,out);
+        });
+        try {
+            var error=assertThrows(IntegrationReadException.class,()->{
+                service.overview(IntegrationInvocation.overview(context(7,72),System.nanoTime()+9_000_000_000L),72L,v->0);
             },fault);
             assertNull(error.getCause()); assertEquals("Integration read unavailable.",error.getMessage());
             assertTrue(f.reads<=1,"No automatic sensitive read replay");
