@@ -1,5 +1,10 @@
 # Minimized Case reads: disposable local SQL verification
 
+**2026-10-24 Phase 3B.7:** the approved authoritative offline Case artifact remains unavailable.
+The [adversarial acceptance record](phase3b7-adversarial-acceptance.md) retains the historical
+source hash, fresh independent evidence and exact remaining candidate/RLS/permission gaps.
+3B.7 is BLOCKED and Phase 3B remains IN PROGRESS; no synthetic artifact substitutes for this input.
+
 ## Phase 1R candidate — 2026-10-21
 
 **Candidate implemented; synthetic acceptance recorded below; authoritative Case SQL acceptance BLOCKED.**

@@ -603,6 +603,11 @@ profiles refuse forced activation. No migration or real tenant/integration enabl
 and authoritative Case SQL/non-bypass deployed permission/RLS, SDK prerelease, tenant/legal and live gates
 remain open. Aggregate Phase 3B remains IN PROGRESS.
 
+Phase 3B.7 has now been attempted and is **BLOCKED — authoritative Case artifact unavailable**;
+its [acceptance ledger](testing/phase3b7-adversarial-acceptance.md) also records remaining full-stack,
+TLS/proxy, client, conformance and performance limits. Independent synthetic checks do not authorize
+this future sequence or real enablement. No migration/configuration/deployment change is part of 3B.7.
+
 This is a cumulative future operator sequence, **not authorization to deploy, run production/Azure SQL,
 enable a tenant, publish an installer/version or perform live acceptance in this task**. Keep every AI
 startup/global/tenant switch OFF until independently authorized acceptance. Existing WEB/DESKTOP
