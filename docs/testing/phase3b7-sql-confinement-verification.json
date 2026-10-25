@@ -1,0 +1,1006 @@
+{
+  "task": "Phase 3B.7 SQL runtime-confinement remediation review",
+  "classification": "BLOCKED",
+  "implementationStatus": "No runtime fix implemented; both requested SQL vulnerabilities remain unresolved",
+  "aggregatePhase3B7": "FAILED",
+  "aggregatePhase3B": "IN PROGRESS",
+  "date": "2026-10-25",
+  "baseCommit": "99bfec0458cfa690235397dfb57d36fb45e97d0f",
+  "branch": "codex/phase3b7-sql-confinement",
+  "historicalEvidence": "Merged PR #1919; its actual SQL observations were inspected, not reproduced here",
+  "blockers": [
+    "Recommended separate AI principal plus database-authenticated protected operation changes current proof-discarding, Java-composed transaction/shared-query contracts; design requires architecture review and implementation",
+    "Authoritative source, derived and candidate SQL inputs from #1919 are absent from this environment; cannot recompute hashes or run required authoritative probes"
+  ],
+  "recommendedArchitecture": "Separate AI data principal/pool, no old AiIntegrationRuntime membership, procedure-only protected access, database-validated ACCESS proof on every exposed operation, SQL-owned atomic Overview PHI/integration audit",
+  "actualGrantChanges": [],
+  "migration": null,
+  "mutableSessionContextBypass": "STILL PRESENT in existing runtime; not classified fixed",
+  "phiAuditBoundary": "Existing direct INSERT grant and FILTER-only policy unchanged; foreign insertion remains unresolved",
+  "authoritativeInput": {
+    "sourceSha256Expected": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+    "sourceBytesExpected": 728862,
+    "derivedSha256Expected": "6e571b96915e6b80436898b664a516c3782caddec78efca13336cc08bcaab290",
+    "candidateSha256Expected": "621e8013f417108e556e056723ec9d4e424d66632e5e0ace5fd23a4a9f4e331d",
+    "sourceBytesReadThisExecution": false,
+    "hashesRecomputed": false,
+    "sqlExecuted": false,
+    "launcherPreflight": {
+      "exit": 2,
+      "output": "REFUSED: invalid prerequisites or unavailable local tooling; no diagnostics or credentials dumped.",
+      "command": [
+        "python3",
+        "build/case-read-verification/run.py",
+        "--opt-in",
+        "LOCAL_DISPOSABLE_CASE_READS",
+        "--schema",
+        "/workspace/attachments/c051e076-a559-494d-ba96-3b4b7b8b7b97/shale-schema-source.sql",
+        "--schema-sha256",
+        "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+        "--schema-source",
+        "operator-recovered-source",
+        "--port",
+        "14333",
+        "--maven",
+        "/workspace/.tools/bin/mvn"
+      ],
+      "scope": "Missing-input guard only; source is not the derived candidate and this command is not a replacement for candidate preparation/harness execution"
+    }
+  },
+  "requiredAdversarialProof": {
+    "bothKeysToB": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "tenantOnly": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "userOnly": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "clearReapply": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "foreignPhiInsert": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "directCaseBypass": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "directAuditControlModification": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "existingAuthorityDenials": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "legitimateSearchOverviewPhi": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "pooledReuse": "NOT RUN: authoritative input absent; no confined runtime implementation",
+    "setupFailureClosed": "NOT RUN: authoritative input absent; no confined runtime implementation"
+  },
+  "checks": [
+    {
+      "check": "focused",
+      "result": "PASS",
+      "command": [
+        "/workspace/.tools/bin/mvn",
+        "-B",
+        "-pl",
+        "shale-data,shale-server",
+        "-am",
+        "-Dtest=IntegrationCaseReadTest,McpSearchTest,McpOverviewTest,AiAccessContractTest,AiOAuthCredentialContractTest,AiOAuthExchangeContractTest,AiOAuthRevocationContractTest,OAuthConfigurationTest,OAuthFilterIsolationTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest,AuthControllerTest,SqlRememberCredentialStoreTest,CaseSummaryDaoContractTest,CaseReadVerificationSafetyTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "counts": {
+        "tests": 120,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "classes": [
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.verification.CaseReadVerificationSafetyTest"
+        },
+        {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseSummaryDaoContractTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthRevocationContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthExchangeContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthCredentialContractTest"
+        },
+        {
+          "tests": 44,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.IntegrationCaseReadTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiAccessContractTest"
+        },
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.mcp.McpSearchTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.mcp.McpOverviewTest"
+        },
+        {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.controller.AuthControllerTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthCodeExchangePolicyTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthRevocationPolicyTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthConfigurationTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthFilterIsolationTest"
+        },
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.RequestScopedDbSessionProviderTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.ServerSessionSkeletonTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.SqlRememberCredentialStoreTest"
+        }
+      ],
+      "scope": "Existing application/source/JDBC regressions; no authoritative or new-confinement SQL acceptance"
+    },
+    {
+      "check": "ordinary",
+      "result": "PASS",
+      "command": [
+        "/workspace/.tools/bin/mvn",
+        "-B",
+        "-pl",
+        "shale-data,shale-server,shale-desktop",
+        "-am",
+        "-Dtest=AuthControllerTest,DesktopSessionControllerTest,SessionControllerTest,MinimizedCaseReadControllerTest,CaseSummaryDaoContractTest,CaseSummaryServerProjectionContractTest,CaseSummarySearchContractTest,ShaleServerServiceConfigurationTest,RuntimeSessionServiceTimingTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest,DesktopRuntimeSessionLifecycleTest,DesktopRememberedRecoveryTest,ShaleLauncherTest,SqlRememberCredentialStoreTest,OAuthConfigurationTest,OAuthMetadataTest,OAuthClientMappingTest,OAuthFilterIsolationTest,ShaleOAuthHumanTest,PinnedClientAssertionTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "counts": {
+        "tests": 106,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "classes": [
+        {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseSummaryDaoContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseSummarySearchContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseSummaryServerProjectionContractTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.runtime.RuntimeSessionServiceTimingTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.desktop.ShaleLauncherTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.desktop.session.DesktopRuntimeSessionLifecycleTest"
+        },
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.desktop.session.DesktopRememberedRecoveryTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.config.ShaleServerServiceConfigurationTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.controller.SessionControllerTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.controller.DesktopSessionControllerTest"
+        },
+        {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.controller.AuthControllerTest"
+        },
+        {
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.controller.MinimizedCaseReadControllerTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.PinnedClientAssertionTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthClientMappingTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthCodeExchangePolicyTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthRevocationPolicyTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthMetadataTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.ShaleOAuthHumanTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthConfigurationTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthFilterIsolationTest"
+        },
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.RequestScopedDbSessionProviderTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.ServerSessionSkeletonTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.SqlRememberCredentialStoreTest"
+        }
+      ],
+      "scope": "Existing application/source/JDBC regressions; no authoritative or new-confinement SQL acceptance"
+    },
+    {
+      "check": "affected",
+      "result": "PASS",
+      "command": [
+        "/workspace/.tools/bin/mvn",
+        "-o",
+        "-B",
+        "-pl",
+        "shale-core,shale-data,shale-server",
+        "-am",
+        "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "counts": {
+        "tests": 121,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "classes": [
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.core.security.ai.AiScopeTest"
+        },
+        {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.EntityActionAuditEventTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.EntityActionAuditMigrationContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseAggregateTransactionTest"
+        },
+        {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.ContactMutationContractTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseLifecycleAuditContractTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.ContactAggregateMutationContractTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthRevocationContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthExchangeContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.IntegrationAccessContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthCredentialContractTest"
+        },
+        {
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiSecurityLocalSqlServerTest"
+        },
+        {
+          "tests": 44,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.IntegrationCaseReadTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiAccessContractTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiSecurityContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.auth.AuthUserLifecycleSecurityTest"
+        },
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.auth.AuthCredentialLookupTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.auth.PreTenantAuthenticationModuleContractTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.runtime.RuntimeSessionServiceTimingTest"
+        },
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.RequestScopedDbSessionProviderTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.ServerSessionSkeletonTest"
+        }
+      ],
+      "scope": "Existing application/source/JDBC regressions; no authoritative or new-confinement SQL acceptance"
+    },
+    {
+      "check": "critical",
+      "result": "PASS",
+      "command": [
+        "/workspace/.tools/bin/mvn",
+        "-B",
+        "test"
+      ],
+      "counts": {
+        "tests": 207,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "classes": [
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.core.security.ai.AiScopeTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.core.platform.AppPathsTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.service.adapter.AuthServiceAdapterTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.FieldConfirmationDaoTriggerIntegrationTest"
+        },
+        {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.EntityActionAuditEventTest"
+        },
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseDateDaoMutationContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.EntityActionAuditMigrationContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseAggregateTransactionTest"
+        },
+        {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.ContactMutationContractTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.CaseLifecycleAuditContractTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.ContactAggregateMutationContractTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.TaskDaoCompletionStatusSynchronizationTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.dao.UserManagementRemovalContractTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthRevocationContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthExchangeContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.IntegrationAccessContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiOAuthCredentialContractTest"
+        },
+        {
+          "tests": 44,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.IntegrationCaseReadTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiAccessContractTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.security.ai.AiSecurityContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.data.auth.AuthUserLifecycleSecurityTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.ui.notification.NotificationPrivacyProjectorTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.ui.services.CaseDatesLiveUpdateContractTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.updater.MainTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.updater.platform.MacPlatformSupportTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.updater.InstallServiceTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.desktop.ShaleLauncherTest"
+        },
+        {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.desktop.identity.MachineIdentityProviderTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.desktop.identity.MachineIdentityUpgradeContractTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.desktop.update.DesktopUiUpdateLauncherTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.desktop.update.DesktopUpdateLauncherTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.config.ShaleServerServiceConfigurationTest"
+        },
+        {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.controller.AuthControllerTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.controller.HealthControllerTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.PinnedClientAssertionTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthClientMappingTest"
+        },
+        {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthCodeExchangePolicyTest"
+        },
+        {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthRevocationPolicyTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthMetadataTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.ShaleOAuthHumanTest"
+        },
+        {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthConfigurationTest"
+        },
+        {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.oauth.OAuthFilterIsolationTest"
+        },
+        {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.RequestScopedDbSessionProviderTest"
+        },
+        {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "name": "com.shale.server.runtime.ServerSessionSkeletonTest"
+        }
+      ],
+      "scope": "Existing application/source/JDBC regressions; no authoritative or new-confinement SQL acceptance"
+    }
+  ],
+  "python": [
+    {
+      "check": "selector",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "build/test-selection",
+        "-p",
+        "test_select_tests.py"
+      ],
+      "tests": 27,
+      "skipped": 0,
+      "result": "PASS"
+    },
+    {
+      "check": "case",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "build/case-read-verification",
+        "-p",
+        "test_*.py"
+      ],
+      "tests": 4,
+      "skipped": 0,
+      "result": "PASS"
+    },
+    {
+      "check": "phase1r",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "build/phase1r-verification",
+        "-p",
+        "test_*.py"
+      ],
+      "tests": 3,
+      "skipped": 0,
+      "result": "PASS"
+    },
+    {
+      "check": "auth",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "build/auth-verification",
+        "-p",
+        "test_*.py"
+      ],
+      "tests": 43,
+      "skipped": 8,
+      "result": "PASS"
+    }
+  ],
+  "selector": {
+    "selectedAreas": [
+      "security-data"
+    ],
+    "fullSuiteEscalation": false,
+    "command": [
+      "python3",
+      "build/test-selection/select_tests.py",
+      "--base",
+      "99bfec0458cfa690235397dfb57d36fb45e97d0f",
+      "--head",
+      "HEAD",
+      "--format",
+      "markdown",
+      "--plan-output",
+      "work/confinement/committed-selection.json"
+    ],
+    "scope": "Committed selection checked against the precommit changed-path plan; affected Maven argv unchanged"
+  },
+  "static": {
+    "all42AiRoleExecuteGrantsRepresented": true,
+    "newMarkdownLinksAndFences": "PASS",
+    "jsonValidation": "PASS",
+    "gitDiffCheck": "PASS",
+    "mcpSchemasAndToolsUnchanged": true,
+    "historicalSqlMigrationsUnchanged": true,
+    "originalCheckoutPreserved": true
+  },
+  "environmentNotes": [
+    "Initial sandboxed fetch could not reach proxy; per-command network permission allowed current-base fetch",
+    "Initial offline focused/ordinary Maven attempts lacked dependencies; online per-command network runs passed",
+    "Critical reactor executed once; no Actions tests",
+    "Docker local daemon reachable with network permission; no task SQL container started or database accessed",
+    "No broader Phase 3B.7 acceptance matrix or serving expiry drill resumed"
+  ],
+  "productionSqlExecuted": false,
+  "deploymentPerformed": false,
+  "realTenantOrIntegrationEnabled": false
+}

@@ -74,6 +74,15 @@ read_only=1; pooled context switching needs independent non-dbo verification. Th
 not the runtime initializer. Pre-tenant authentication and approved global control-plane operations
 are distinct bounded paths; tenant domain access must remain initialized. Security acceptance OPEN.
 
+SQL Server permits ordinary users to set their own session context. Neither these mutable keys nor
+caller-selected values marked read-only authenticate tenant/user authority to the database. Merged
+[#1919](https://github.com/gseshadow/Shale/pull/1919) demonstrates the shared runtime credential reading
+another tenant after restamping and inserting foreign PHI history under A context. The
+[SQL confinement review](../docs/testing/phase3b7-sql-confinement-review.md) inventories the authority
+graph and evaluates a separate, procedure-only AI principal with database-validated invocation proof.
+That design is not implemented; both failures remain open. Do not apply read_only to ordinary pooled
+providers or treat a new login with the old grants as a confinement fix.
+
 ### User release announcement state
 
 `dbo.UserReleaseState` is strict tenant-owned data. It has a non-null `ShaleClientId`, a tenant-qualified user
