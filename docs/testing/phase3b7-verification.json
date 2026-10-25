@@ -1,20 +1,24 @@
 {
   "phase": "3B.7",
-  "classification": "BLOCKED",
-  "reason": "authoritative Case artifact unavailable",
+  "classification": "FAILED",
+  "reason": "Unresolved shared-runtime tenant/user context and PHI audit INSERT capabilities; serving expiry drill fails",
   "aggregatePhase3B": "IN PROGRESS",
-  "baseCommit": "90580f11dcfd3371cac3b7f4bb9dd4819ec5e181",
-  "baseTree": "856b031cab8c6c0a375b1f96acf089a4dde93d89",
-  "branch": "codex/phase-3b7-adversarial-acceptance",
+  "baseCommit": "0a467caf55c0c1eab89abdf45292388352875296",
+  "baseTree": "790a53e86e2169067908dbd341806631927b105b",
+  "branch": "codex/phase3b7-authoritative-acceptance",
   "authoritativeCaseArtifact": {
-    "source": "historically approved user-supplied schema-only SSMS export shale-schema-source.sql; existing Case verification runbook",
-    "path": null,
-    "recordedSourceSha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
-    "sourceBytesReadThisExecution": false,
-    "derivedSha256": null,
-    "candidateSha256": null,
-    "equivalentApproved": false,
-    "rlsPermissionAcceptance": "BLOCKED"
+    "path": "/workspace/attachments/c051e076-a559-494d-ba96-3b4b7b8b7b97/shale-schema-source.sql",
+    "filename": "shale-schema-source.sql",
+    "bytes": 728862,
+    "sha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+    "provenance": "operator-supplied recovered authoritative artifact",
+    "sourceBytesReadThisExecution": true,
+    "sourceHashGate": "MATCH",
+    "sourceImmutable": true,
+    "derivedSha256": "6e571b96915e6b80436898b664a516c3782caddec78efca13336cc08bcaab290",
+    "candidateSha256": "621e8013f417108e556e056723ec9d4e424d66632e5e0ace5fd23a4a9f4e331d",
+    "rlsPermissionAcceptance": "Case/RLS scenarios PASS; requested raw runtime permission acceptance FAILED",
+    "historicalProvenanceRecomputed": false
   },
   "productionChanges": [],
   "tools": [
@@ -32,24 +36,616 @@
     "updatedAt"
   ],
   "local": {
-    "mavenOffline": "BLOCKED: Boot 4.1.1 BOM absent",
-    "mavenOneOnlineRetry": "BLOCKED: Operation not permitted",
-    "selectorPython": {
-      "pass": 27
-    },
-    "caseLauncherPython": {
-      "pass": 4
-    },
-    "phase1rLauncherPython": {
-      "pass": 3
-    },
-    "authLauncherPython": {
-      "pass": 35,
-      "skip": 8
-    },
-    "staticSchema": {
-      "pass": 64,
-      "scope": "JSON Schema only; no runtime inference"
+    "execution": "Current task: Maven online retry resolved missing Boot BOM with required network permission; local execution available; no Actions used",
+    "verification": {
+      "affected": {
+        "mode": "affected",
+        "command": [
+          "/workspace/.tools/bin/mvn",
+          "-o",
+          "-B",
+          "-pl",
+          "shale-core,shale-data,shale-server",
+          "-am",
+          "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.verification.CaseReadLocalSqlServerTest,com.shale.data.verification.CaseReadVerificationSafety,com.shale.data.verification.CaseReadVerificationSafetyTest,com.shale.server.mcp.McpOverviewClientFixture,com.shale.server.oauth.AuthoritativeCaseMcpLocalSqlServerTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "exit": 0,
+        "counts": {
+          "tests": 130,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3
+        },
+        "classes": [
+          {
+            "class": "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.runtime.ServerSessionSkeletonTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.AuthoritativeCaseMcpLocalSqlServerTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 2
+          },
+          {
+            "class": "com.shale.core.security.ai.AiScopeTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.IntegrationAccessContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseAggregateTransactionTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.EntityActionAuditEventTest",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.runtime.RuntimeSessionServiceTimingTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseLifecycleAuditContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.auth.AuthCredentialLookupTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthCredentialContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.verification.CaseReadLocalSqlServerTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 1
+          },
+          {
+            "class": "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthRevocationContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiSecurityContractTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.IntegrationCaseReadTest",
+            "tests": 44,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.EntityActionAuditMigrationContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.ContactAggregateMutationContractTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.verification.CaseReadVerificationSafetyTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.auth.PreTenantAuthenticationModuleContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.ContactMutationContractTest",
+            "tests": 7,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiSecurityLocalSqlServerTest",
+            "tests": 0,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiAccessContractTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ]
+      },
+      "critical": {
+        "mode": "critical",
+        "command": [
+          "/workspace/.tools/bin/mvn",
+          "-B",
+          "test"
+        ],
+        "exit": 0,
+        "counts": {
+          "tests": 207,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "classes": [
+          {
+            "class": "com.shale.updater.InstallServiceTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.updater.MainTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.updater.platform.MacPlatformSupportTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.controller.AuthControllerTest",
+            "tests": 10,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.runtime.ServerSessionSkeletonTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.PinnedClientAssertionTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthRevocationPolicyTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.config.ShaleServerServiceConfigurationTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthFilterIsolationTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.ShaleOAuthHumanTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthMetadataTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthConfigurationTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.controller.HealthControllerTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthCodeExchangePolicyTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthClientMappingTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.ui.services.CaseDatesLiveUpdateContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.ui.notification.NotificationPrivacyProjectorTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.core.security.ai.AiScopeTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.core.platform.AppPathsTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.IntegrationAccessContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseAggregateTransactionTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.EntityActionAuditEventTest",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseDateDaoMutationContractTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseLifecycleAuditContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthCredentialContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.service.adapter.AuthServiceAdapterTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.TaskDaoCompletionStatusSynchronizationTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthRevocationContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiSecurityContractTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.IntegrationCaseReadTest",
+            "tests": 44,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.EntityActionAuditMigrationContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.ContactAggregateMutationContractTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.UserManagementRemovalContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.ContactMutationContractTest",
+            "tests": 7,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.FieldConfirmationDaoTriggerIntegrationTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiAccessContractTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.ShaleLauncherTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.identity.MachineIdentityProviderTest",
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.update.DesktopUiUpdateLauncherTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.identity.MachineIdentityUpgradeContractTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.update.DesktopUpdateLauncherTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ]
+      },
+      "python": [
+        {
+          "suite": "selector",
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "build/test-selection",
+            "-p",
+            "test_select_tests.py"
+          ],
+          "exit": 0,
+          "summary": [
+            "Ran 27 tests in 1.257s",
+            "",
+            "OK"
+          ]
+        },
+        {
+          "suite": "case-launcher",
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "build/case-read-verification",
+            "-p",
+            "test_*.py"
+          ],
+          "exit": 0,
+          "summary": [
+            "Ran 4 tests in 0.001s",
+            "",
+            "OK"
+          ]
+        },
+        {
+          "suite": "phase1r-launcher",
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "build/phase1r-verification",
+            "-p",
+            "test_*.py"
+          ],
+          "exit": 0,
+          "summary": [
+            "Ran 3 tests in 0.000s",
+            "",
+            "OK"
+          ]
+        },
+        {
+          "suite": "auth-launcher",
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "build/auth-verification",
+            "-p",
+            "test_*.py"
+          ],
+          "exit": 0,
+          "summary": [
+            "Ran 43 tests in 0.077s",
+            "",
+            "OK (skipped=8)"
+          ]
+        }
+      ]
     }
   },
   "hostedMain": {
@@ -807,13 +1403,21 @@
     }
   },
   "remainingGaps": [
-    "approved authoritative artifact and actual Case/read-dependency RLS/permissions",
-    "complete serving OAuth/two-tool/two-client main adversarial matrix",
-    "full-stack lock-wait expiry and every live-gate race",
-    "true serving TLS/trusted proxy execution",
-    "finished two-tool conformance applicability and required-scenario execution",
-    "exact source-data response byte boundaries and authoritative invalid-source compatibility",
-    "tools/list endpoint and separately isolated audit/quota transaction performance"
+    "runtime-confinement \u2014 FAILED: Shared non-bypass SQL login can overwrite both context keys and read B rows, and can INSERT a B PHI audit row while A context is stamped (rolled back). MCP tenant/user arguments remain rejected. No new confinement/PHI write model was approved or installed.",
+    "expiry-serving \u2014 FAILED: Both clients receive successful Overview in the final-gate drill although the test observes a SQL lock wait and confirms the injected idle deadline expired before unlock. No terminal denial. Root cause unresolved; this is not an expiry pass.",
+    "tls-proxy-and-serving-oauth \u2014 OPEN: MCP served loopback HTTP; OAuth maintained servlet filters and synthetic human WEB store. No configured trusted TLS/reverse-proxy execution or fully serving human/OAuth flow.",
+    "complete-identical-client-corpus \u2014 OPEN: 18-record authoritative core matrix and revocation race execute on both clients, not the entire historical authentication/assertion/protocol/punctuation/depth/type corpus, neither/live scope reduction, every kill switch/race point, or closed-status search on each finished client.",
+    "response-boundaries \u2014 OPEN: Oversized source is rejected; exhaustive real-source just-below/exact/above boundaries, every Unicode/color/timestamp edge and full-envelope combination remain unexecuted.",
+    "pool-async \u2014 OPEN: Authoritative single-SPID A1/A2/B1/A1, failed second-key setup/close/reborrow pass; complete serving async/rejected-task/cancellation/timeout interleavings remain unexecuted.",
+    "replicas-quota-restart \u2014 OPEN: Prior synthetic SQL/replacement-JVM evidence retained. Full authoritative serving multi-replica quota stress, process replacement and SQL Server restart are not exercised.",
+    "audit-faults-and-review \u2014 OPEN: Authoritative PHI failure and standalone real DENY/precommit/lost-ack pass. Full serving integration-audit permission DENY/outage/uncertain-commit/close-fault corpus, authoritative admin review and prompt/privacy corpus remain incomplete; PHI write authority fails separately.",
+    "finished-conformance \u2014 OPEN: Finished two-tool server runs tools-list/server-stateless only; four raw failures require unsupported diagnostic tools and five checks skip. No full conformance claim or extra tools.",
+    "performance \u2014 OPEN: Local complete-request timings only. No representative plan/load/threshold acceptance or isolated audit/quota timings.",
+    "source-vs-deployed-parity \u2014 OPEN: Recovered bytes/hash do not prove historical source identifier collation, owners or deployed catalog parity. Disposable collation is SQL_Latin1_General_CP1_CI_AS; explicit dbo schema authorization is a local derivation requirement, not reconstructed historical provenance.",
+    "deployed-auth-and-runtime \u2014 OPEN: Stage A/B deployment/identity grants, compatible installed callers and API/JAR, old-caller drain, fleet/native Windows and operational monitoring evidence remain separate operator gates; no live checks.",
+    "retention-legal \u2014 OPEN: tenant/legal retention sign-off: OPEN. No repository evidence closes it; blocks real pilot.",
+    "sdk-production-approval \u2014 OPEN: Official v2.2.0-M1 release remains prerelease. Stable v2.1.0 also exists; no dependency upgrade or production approval.",
+    "deployment-live-acceptance \u2014 OPEN: No deployment or enablement authorized/performed; R4/live configuration, operational and tenant/security-owner acceptance remain separate. No real enablement recommendation."
   ],
   "retention": {
     "proposedYears": 7,
@@ -830,7 +1434,9 @@
       1269,
       1198
     ],
-    "dependencyChange": false
+    "dependencyChange": false,
+    "releaseStatusRechecked": true,
+    "officialRelease": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v2.2.0-M1"
   },
   "defaults": {
     "globalAi": false,
@@ -1316,21 +1922,21 @@
     }
   ],
   "requirementCoverage": {
-    "authoritativeArtifact": "BLOCKED",
-    "authoritativeCaseRlsPermissions": "BLOCKED",
-    "nonBypassIdentitySql": "synthetic SQL; full serving identity separation not accepted",
+    "authoritativeArtifact": "MATCHED recovered immutable source; source/derived/candidate hashes recorded",
+    "authoritativeCaseRlsPermissions": "Case/RLS PASS; raw runtime context/PHI audit capabilities FAILED",
+    "nonBypassIdentitySql": "Actual distinct local runtime/bootstrap identities; AI/integration/global denial proof PASS; raw SQL tenant/user stamping and PHI write confinement FAILED",
     "completeServingOAuthMcpCasePath": "partial: maintained OAuth servlet + serving MCP; no TLS",
     "tools": "exactly search_cases and get_case_overview; synthetic handler execution",
-    "twoClients": "per-tool/no-handler matrices; complete final two-tool matrix OPEN",
+    "twoClients": "18-record core plus post-commit revoke PASS per client on authoritative two-tool server; final matrix FAILS expiry drill",
     "authentication": "layered unit/SQL/servlet; exhaustive per-client complete-stack matrix OPEN",
     "assertions": "pinned RS256 unit, servlet and SQL/replacement replay coverage",
     "codeRefresh": "synthetic SQL and maintained endpoint lifecycle coverage",
-    "tenantUserScope": "synthetic SQL and separate unit/catalog/client coverage; authoritative/full-client OPEN",
+    "tenantUserScope": "Authoritative A/B/NULL and actor Case harness PASS; raw SQL credential switching FAILED; full client identity corpus remains OPEN",
     "killSwitchesRevocation": "synthetic SQL races and gates; full transport race matrix OPEN",
-    "expiry": "real internal SQL lock wait; full serving stack repetition OPEN",
-    "search": "unit/JDBC/SQL and independent search-client coverage; full final-server corpus OPEN",
-    "overview": "unit/JDBC/SQL and independent Overview-client coverage; authoritative BLOCKED",
-    "outputContract": "64 static schema cases plus runtime regressions; authoritative source compatibility OPEN",
+    "expiry": "FAILED serving final-gate expiry drill on both clients; root cause unresolved",
+    "search": "Authoritative page0/page9/probe/window/zero/literal/tenant corpus PASS; full corpus remains OPEN",
+    "overview": "Authoritative same/unassigned/foreign/missing/deleted core PASS; PHI-failure suppression PASS; expiry drill returns success unexpectedly",
+    "outputContract": "Same eight-field client schemas and oversized source PASS; exhaustive authoritative source-width/color/timestamp and exact-boundary corpus OPEN",
     "promptInjection": "13-vector synthetic SQL test includes all three exact instruction strings; full wire repetition OPEN",
     "sqlInjectionWildcards": "13-vector synthetic SQL test covers all requested punctuation classes; full wire/candidate repetition OPEN",
     "quotaConcurrency": "durable synthetic SQL, real races and replacement JVMs; full serving stress OPEN",
@@ -1338,18 +1944,18 @@
     "protocol": "actual SDK servlet + no-handler clients; full final two-tool conformance OPEN",
     "originProxyTls": "servlet/canonical configuration coverage; true serving TLS/proxy OPEN",
     "bytes": "deterministic encoder/envelope fault coverage; exhaustive real-data exact boundaries OPEN",
-    "auditAtomicityFailurePrivacyReview": "unit/injected + real synthetic SQL; authoritative permission and full transport faults OPEN",
+    "auditAtomicityFailurePrivacyReview": "One PHI/parent/RETURNED child per committed Overview and PHI failure rollback PASS; direct PHI INSERT authority FAILED; exhaustive serving faults/review OPEN",
     "lostCommitAck": "injected after actual commit; no delivery/replay claim",
-    "poolAsync": "actual synthetic SQL single-SPID + unit async; authoritative/complete serving matrix OPEN",
+    "poolAsync": "Authoritative single-SPID owner rotation and failed setup/clean reborrow PASS; full async matrix OPEN",
     "restWebDesktopOAuth": "server and desktop source regressions; no installed/native acceptance",
     "sdk": "2.2.0-M1 prerelease; no upgrade or production approval",
-    "conformance": "0.2.0-alpha.12 no-handler fixture only; raw failures/skips retained",
+    "conformance": "Finished two-tool tools-list/server-stateless raw checks retained; four missing diagnostic-tool failures/five skips; full conformance OPEN",
     "performance": "5 samples each ACCESS/shared search/shared Overview; tools/list and isolated audit/quota OPEN",
     "retentionLegal": "proposed 7 years; tenant/legal retention sign-off OPEN",
     "deploymentConfiguration": "cumulative migration order reviewed; deployed receipt/application status UNKNOWN; no execution",
     "defaults": "all packaged AI/OAuth/MCP/handlers false; SQL global false, missing tenant false",
     "defects": "no material production defect established; incomplete evidence is not defect absence proof",
-    "completion": "BLOCKED; Phase 3B IN PROGRESS; no real enablement recommendation"
+    "completion": "FAILED; Phase 3B IN PROGRESS; no real enablement recommendation"
   },
   "totalSyntheticSql": {
     "annotatedMethods": 101,
@@ -1358,5 +1964,3055 @@
     "error": 0,
     "skip": 0,
     "classification": "99 unchanged methods/168 invocations in main plus 2 added methods/14 invocations in supplement; no authoritative Case evidence"
-  }
+  },
+  "priorAttempt": {
+    "classification": "BLOCKED",
+    "reason": "authoritative Case artifact unavailable",
+    "baseCommit": "90580f11dcfd3371cac3b7f4bb9dd4819ec5e181",
+    "baseTree": "856b031cab8c6c0a375b1f96acf089a4dde93d89",
+    "branch": "codex/phase-3b7-adversarial-acceptance",
+    "authoritativeCaseArtifact": {
+      "source": "historically approved user-supplied schema-only SSMS export shale-schema-source.sql; existing Case verification runbook",
+      "path": null,
+      "recordedSourceSha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+      "sourceBytesReadThisExecution": false,
+      "derivedSha256": null,
+      "candidateSha256": null,
+      "equivalentApproved": false,
+      "rlsPermissionAcceptance": "BLOCKED"
+    },
+    "local": {
+      "mavenOffline": "BLOCKED: Boot 4.1.1 BOM absent",
+      "mavenOneOnlineRetry": "BLOCKED: Operation not permitted",
+      "selectorPython": {
+        "pass": 27
+      },
+      "caseLauncherPython": {
+        "pass": 4
+      },
+      "phase1rLauncherPython": {
+        "pass": 3
+      },
+      "authLauncherPython": {
+        "pass": 35,
+        "skip": 8
+      },
+      "staticSchema": {
+        "pass": 64,
+        "scope": "JSON Schema only; no runtime inference"
+      }
+    },
+    "remainingGaps": [
+      "approved authoritative artifact and actual Case/read-dependency RLS/permissions",
+      "complete serving OAuth/two-tool/two-client main adversarial matrix",
+      "full-stack lock-wait expiry and every live-gate race",
+      "true serving TLS/trusted proxy execution",
+      "finished two-tool conformance applicability and required-scenario execution",
+      "exact source-data response byte boundaries and authoritative invalid-source compatibility",
+      "tools/list endpoint and separately isolated audit/quota transaction performance"
+    ]
+  },
+  "resumedAuthoritativeAcceptance": {
+    "classification": "FAILED",
+    "base": "0a467caf55c0c1eab89abdf45292388352875296",
+    "manifest": {
+      "source": {
+        "path": "/workspace/attachments/c051e076-a559-494d-ba96-3b4b7b8b7b97/shale-schema-source.sql",
+        "filename": "shale-schema-source.sql",
+        "bytes": 728862,
+        "sha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+        "provenance": "operator-supplied recovered authoritative artifact"
+      },
+      "derived": {
+        "path": "/workspace/work/phase3b7-authoritative/work/authoritative-derived.sql",
+        "bytes": 297598,
+        "sha256": "6e571b96915e6b80436898b664a516c3782caddec78efca13336cc08bcaab290"
+      },
+      "selectedTables": [
+        "AdministrativeReadAuditLog",
+        "ApplicationInstances",
+        "ApplicationReleases",
+        "CalendarCaseDateTypeMappings",
+        "CalendarEventTypes",
+        "CaseDateConfirmationTargets",
+        "CaseDatePresentationConfigurations",
+        "CaseDatePresentationSelections",
+        "CaseDateSemanticRoles",
+        "CaseDateTypeSemanticRoleMappings",
+        "CaseDateTypes",
+        "CaseDates",
+        "CaseLinkShares",
+        "CaseLinks",
+        "CaseOverviewConfigurations",
+        "CaseOverviewDateSelections",
+        "CaseStatuses",
+        "CaseTeamMemberRoles",
+        "CaseTeamRoleDefinitions",
+        "CaseUsers",
+        "Cases",
+        "ContactAddresses",
+        "ContactContactTypes",
+        "ContactCredentials",
+        "ContactEmailAddresses",
+        "ContactPhoneNumbers",
+        "ContactSpecialties",
+        "ContactTypes",
+        "Contacts",
+        "CredentialDefinitions",
+        "EntityActionAuditLog",
+        "ExternalLinks",
+        "FieldConfirmationPolicies",
+        "FirmWideRoleDefinitions",
+        "FormConfigurationSections",
+        "FormConfigurations",
+        "FormConfiguredFields",
+        "FormFieldPolicyKeys",
+        "GlobalControlPlaneAuditLog",
+        "IntakePhoneAvailability",
+        "LinkTypes",
+        "MaterialItems",
+        "MaterialRequestFollowUps",
+        "MaterialRequestUpdates",
+        "MaterialRequests",
+        "MaterialTypes",
+        "Notifications",
+        "OrganizationAddresses",
+        "OrganizationEmailAddresses",
+        "OrganizationOrganizationTypes",
+        "OrganizationPhoneNumbers",
+        "OrganizationTypes",
+        "OrganizationWebsites",
+        "Organizations",
+        "PracticeAreas",
+        "RequestMethods",
+        "RequestStatuses",
+        "Roles",
+        "SavedValueConfirmationRequirements",
+        "SavedValueConfirmations",
+        "SessionSecurityAuditLog",
+        "ShaleClients",
+        "Specialties",
+        "Statuses",
+        "TaskPolicyConfigurations",
+        "UserDictionaryWords",
+        "UserFirmWideRoleAssignments",
+        "UserPreferences",
+        "UserReleaseState",
+        "UserSessions",
+        "Users",
+        "auditLog"
+      ],
+      "excludedTables": [
+        "ApplicationPolicy",
+        "ApplicationReleaseItems",
+        "AuthConfig",
+        "CalendarEvents",
+        "CaseContacts",
+        "CaseOrganizations",
+        "CaseParties",
+        "CaseTimelineEvents",
+        "CaseUpdates",
+        "Categories",
+        "Counters",
+        "DesktopRememberCredentials",
+        "Facilities",
+        "PartyRoles",
+        "PartySides",
+        "Priorities",
+        "Providers",
+        "TaskAssignments",
+        "TaskCategories",
+        "TaskStatuses",
+        "TaskTimelineEvents",
+        "TaskUpdates",
+        "Tasks",
+        "UserBoardLanePreferences"
+      ],
+      "excludedBatchIndices": [
+        29,
+        32,
+        41,
+        47,
+        53,
+        83,
+        92,
+        107,
+        110,
+        116,
+        143,
+        149,
+        158,
+        227,
+        230,
+        236,
+        239,
+        269,
+        272,
+        278,
+        281,
+        284,
+        287,
+        290,
+        314,
+        315,
+        316,
+        318,
+        320,
+        321,
+        328,
+        330,
+        331,
+        332,
+        333,
+        340,
+        341,
+        342,
+        343,
+        369,
+        370,
+        371,
+        372,
+        374,
+        375,
+        376,
+        377,
+        395,
+        396,
+        404,
+        424,
+        432,
+        434,
+        512,
+        514,
+        516,
+        520,
+        522,
+        524,
+        526,
+        527,
+        529,
+        554,
+        555,
+        556,
+        557,
+        558,
+        559,
+        560,
+        561,
+        562,
+        563,
+        564,
+        565,
+        566,
+        567,
+        569,
+        571,
+        593,
+        594,
+        595,
+        596,
+        600,
+        601,
+        602,
+        607,
+        608,
+        609,
+        610,
+        611,
+        615,
+        616,
+        617,
+        618,
+        643,
+        644,
+        645,
+        648,
+        649,
+        650,
+        663,
+        664,
+        665,
+        669,
+        699,
+        700,
+        704,
+        705,
+        706,
+        769,
+        770,
+        771,
+        772,
+        773,
+        778,
+        779,
+        780,
+        781,
+        782,
+        783,
+        812,
+        813,
+        817,
+        818,
+        819,
+        820,
+        821,
+        822,
+        823,
+        824,
+        825,
+        826,
+        827,
+        828,
+        853,
+        854,
+        855,
+        856,
+        857,
+        858,
+        859,
+        860,
+        861,
+        862,
+        863,
+        864,
+        865,
+        866,
+        867,
+        868,
+        869,
+        870,
+        889,
+        890,
+        891,
+        892,
+        893,
+        894,
+        895,
+        896,
+        897,
+        898,
+        899,
+        900,
+        901,
+        902,
+        905,
+        906,
+        979,
+        980,
+        981,
+        982,
+        983,
+        984,
+        1001,
+        1002,
+        1003,
+        1004,
+        1005,
+        1006,
+        1007,
+        1008,
+        1037,
+        1038,
+        1039,
+        1040,
+        1041,
+        1042,
+        1055,
+        1056,
+        1139,
+        1140,
+        1141,
+        1142,
+        1157,
+        1158,
+        1323,
+        1324,
+        1325,
+        1326,
+        1357,
+        1358,
+        1359,
+        1360,
+        1361,
+        1362,
+        1363,
+        1364,
+        1365,
+        1366,
+        1369,
+        1370,
+        1371,
+        1372,
+        1373,
+        1374,
+        1375,
+        1376,
+        1377,
+        1378,
+        1379,
+        1380,
+        1381,
+        1382,
+        1383,
+        1384,
+        1431,
+        1432,
+        1433,
+        1434,
+        1435,
+        1436,
+        1437,
+        1438,
+        1439,
+        1440,
+        1441,
+        1442,
+        1443,
+        1444,
+        1445,
+        1446,
+        1447,
+        1448,
+        1489,
+        1490,
+        1491,
+        1492,
+        1701,
+        1702,
+        1703,
+        1704,
+        1705,
+        1706
+      ],
+      "batches": 1489,
+      "scalarReviewedUtf8LfHash": "4a66a56b195010136d90909b62a241066f3f10a8089798e4ce99b8673732d10b",
+      "transformation": "Separate UTF-8 derivation; selected DDL preserved, full source policy and all functions; complete policy/FK closure; SET-only groups separated. Explicit dbo schema authorization preserves the reviewed disposable preparation ownership when the importer runs as its temporary db_owner login. Source schemas omit AUTHORIZATION; no historical owner claim. Source unchanged. Source database identifier collation unknown.",
+      "candidate": {
+        "path": "/workspace/work/phase3b7-authoritative/work/authoritative-candidate.sql",
+        "bytes": 297863,
+        "sha256": "621e8013f417108e556e056723ec9d4e424d66632e5e0ace5fd23a4a9f4e331d",
+        "delta": "Only Phase1R reviewed Users/auditLog strict FILTER and Statuses tenant/global FILTER; migration APPLY and POSTCHECK passed in fresh disposable preparation database. Re-scripted final policy; no migration receipt impersonated."
+      },
+      "preparationReview": {
+        "Collation": "SQL_Latin1_General_CP1_CI_AS",
+        "StrictHash": "E799588E89C10670DCB949A4DAEE1272036F986771C354B2CF4CADE32B74D478",
+        "OverlayHash": "11867E2DA0E3E86B2AEF1B801F95E1E67B30AF49C3799014BA1FB1558F16E6E6",
+        "OtherHash": "1244A37F8731F31347C028132E6C35317E7B12D3CC33B513169598AE0C644FD9",
+        "sourceIdentifierCollation": "Not established by column collations or this run",
+        "sourceMissingTargetFilters": 3,
+        "candidateTargetFilters": 3
+      }
+    },
+    "caseHarness": "CASE_READ_VERIFY PASS setup\nCASE_READ_VERIFY PASS fixtures\nCASE_READ_VERIFY PASS pooled_context\nCASE_READ_VERIFY PASS rls_enforcement\nCASE_READ_VERIFY PASS search_assigned_overview\nCASE_READ_VERIFY PASS foreign_join_protection\nCASE_READ_VERIFY PASS actor_authority\nCASE_READ_VERIFY PASS overview_audit\nCASE_READ_VERIFY PASS audit_insert_denied\nCASE_READ_VERIFY PASS failure_before_commit\nCASE_READ_VERIFY PASS commit_lost_ack\nCASE_READ_VERIFY PASS cleanup\nPASS: local SQL integration only; deployed Azure acceptance remains open.\n",
+    "clients": {
+      "ts": {
+        "authoritative-permissions": {
+          "nonBypass": true,
+          "protectedAiTablesDirectSelect": "DENIED SQL 229",
+          "integrationAuditDirectInsert": "DENIED SQL 229 (parent and child)",
+          "globalControlPlaneExecute": "DENIED SQL 229",
+          "dboImpersonationAndBootstrapExecute": "DENIED",
+          "foreignCaseWithAContext": 0,
+          "readGrants": [
+            "Cases",
+            "Users",
+            "CaseUsers",
+            "CaseStatuses",
+            "Statuses",
+            "PracticeAreas",
+            "UserSessions",
+            "ShaleClients"
+          ],
+          "phiAuditInsertGrant": true,
+          "tenantControlExecuteGrant": 1,
+          "schemaPolicyAlter": false,
+          "foreignPhiAuditDirectInsert": "ALLOWED (rolled back): INSERT grant plus FILTER-only policy does not guard writes",
+          "arbitrarySqlContextSwitch": "ALLOWED: same runtime login can stamp B/82 and read B Case; MCP arguments cannot do this",
+          "requestedPermissionAcceptance": "FAILED: shared SQL credential does not confine tenant/user stamping or arbitrary PHI audit INSERT"
+        },
+        "authoritative-audits-races": {
+          "expiryLockWaitObserved": true,
+          "databaseUtcExpiryCrossedBeforeUnlock": true,
+          "revocationTerminalDenied": 1,
+          "expiryTerminalDenied": 0,
+          "phiOverviewRows": 4,
+          "allowedOverviewParents": 4,
+          "oneReturnedChildPerOverview": true,
+          "injectedPhiFailureDurableRows": 0
+        },
+        "overview-operations-authoritative": [
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 270.263527,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 32.442088,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 49.784054,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 40.721789,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 27.713608,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 26.253116,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 19.497173,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 21.787121,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 406.646879,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 67.551881,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 53.799442,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 47.413695,
+            "outcome": "INVALID_INPUT",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 32.757321,
+            "outcome": "INVALID_INPUT",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 23.794074,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 58.052228,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 244.733737,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 56.626593,
+            "outcome": "PAYLOAD_TOO_LARGE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 22.056324,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 64.496464,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 69.460577,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 45.482431,
+            "outcome": "CASE_UNAVAILABLE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 51.10645,
+            "outcome": "CASE_UNAVAILABLE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 39.70366,
+            "outcome": "CASE_UNAVAILABLE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 16.161845,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 57.40429,
+            "outcome": "AUDIT_UNAVAILABLE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 16.358761,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 104.400344,
+            "outcome": "FORBIDDEN",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 19.916947,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 2139.066885,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          }
+        ],
+        "clientReceipts": [
+          {
+            "client": "@modelcontextprotocol/client",
+            "version": "2.4.0",
+            "protocol": "2026-07-28",
+            "phase": "core-matrix",
+            "records": [
+              "SEARCH_TOKEN-catalog",
+              "OVERVIEW_TOKEN-catalog",
+              "BOTH_TOKEN-catalog",
+              "revoked-access",
+              "page-0-eleventh-row",
+              "page-9-eleventh-row",
+              "zero-results",
+              "INVALID_INPUT",
+              "INVALID_INPUT",
+              "literal-wildcard-escaping",
+              "both-tools-same-server",
+              "PAYLOAD_TOO_LARGE",
+              "same-tenant-unassigned-100",
+              "same-tenant-unassigned-1000",
+              "CASE_UNAVAILABLE",
+              "CASE_UNAVAILABLE",
+              "CASE_UNAVAILABLE",
+              "AUDIT_UNAVAILABLE"
+            ]
+          },
+          {
+            "phase": "RACE_REVOKE_TOKEN",
+            "records": [
+              "SEARCH_TOKEN-catalog",
+              "OVERVIEW_TOKEN-catalog",
+              "BOTH_TOKEN-catalog",
+              "revoked-access",
+              "page-0-eleventh-row",
+              "page-9-eleventh-row",
+              "zero-results",
+              "INVALID_INPUT",
+              "INVALID_INPUT",
+              "literal-wildcard-escaping",
+              "both-tools-same-server",
+              "PAYLOAD_TOO_LARGE",
+              "same-tenant-unassigned-100",
+              "same-tenant-unassigned-1000",
+              "CASE_UNAVAILABLE",
+              "CASE_UNAVAILABLE",
+              "CASE_UNAVAILABLE",
+              "AUDIT_UNAVAILABLE",
+              "FORBIDDEN",
+              "RACE_REVOKE_TOKEN-post-commit-final-gate"
+            ]
+          }
+        ]
+      },
+      "python": {
+        "authoritative-permissions": {
+          "nonBypass": true,
+          "protectedAiTablesDirectSelect": "DENIED SQL 229",
+          "integrationAuditDirectInsert": "DENIED SQL 229 (parent and child)",
+          "globalControlPlaneExecute": "DENIED SQL 229",
+          "dboImpersonationAndBootstrapExecute": "DENIED",
+          "foreignCaseWithAContext": 0,
+          "readGrants": [
+            "Cases",
+            "Users",
+            "CaseUsers",
+            "CaseStatuses",
+            "Statuses",
+            "PracticeAreas",
+            "UserSessions",
+            "ShaleClients"
+          ],
+          "phiAuditInsertGrant": true,
+          "tenantControlExecuteGrant": 1,
+          "schemaPolicyAlter": false,
+          "foreignPhiAuditDirectInsert": "ALLOWED (rolled back): INSERT grant plus FILTER-only policy does not guard writes",
+          "arbitrarySqlContextSwitch": "ALLOWED: same runtime login can stamp B/82 and read B Case; MCP arguments cannot do this",
+          "requestedPermissionAcceptance": "FAILED: shared SQL credential does not confine tenant/user stamping or arbitrary PHI audit INSERT"
+        },
+        "authoritative-audits-races": {
+          "expiryLockWaitObserved": true,
+          "databaseUtcExpiryCrossedBeforeUnlock": true,
+          "revocationTerminalDenied": 1,
+          "expiryTerminalDenied": 0,
+          "phiOverviewRows": 4,
+          "allowedOverviewParents": 4,
+          "oneReturnedChildPerOverview": true,
+          "injectedPhiFailureDurableRows": 0
+        },
+        "overview-operations-authoritative": [
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 96.875664,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 55.146581,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 24.158383,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 15.923708,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 14.365799,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 18.810483,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 9.662587,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 7.644863,
+            "outcome": "PROTOCOL",
+            "method": "null"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 15.827685,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 187.227082,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 14.543467,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 55.832911,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 38.302103,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 30.088307,
+            "outcome": "INVALID_INPUT",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 21.247102,
+            "outcome": "INVALID_INPUT",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 20.103865,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 40.919629,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 17.666526,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 178.557334,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 37.921983,
+            "outcome": "PAYLOAD_TOO_LARGE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 16.731597,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 44.681227,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 15.330728,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 41.339254,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 34.81303,
+            "outcome": "CASE_UNAVAILABLE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 38.853376,
+            "outcome": "CASE_UNAVAILABLE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 40.120023,
+            "outcome": "CASE_UNAVAILABLE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 16.364581,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 46.609532,
+            "outcome": "AUDIT_UNAVAILABLE",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 15.213803,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 93.244261,
+            "outcome": "FORBIDDEN",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 14.801754,
+            "outcome": "PROTOCOL",
+            "method": "server/discover"
+          },
+          {
+            "caseOperations": 1,
+            "elapsedMillis": 2074.58747,
+            "outcome": "SUCCESS",
+            "method": "tools/call"
+          },
+          {
+            "caseOperations": 0,
+            "elapsedMillis": 14.642325,
+            "outcome": "PROTOCOL",
+            "method": "tools/list"
+          }
+        ],
+        "clientReceipts": [
+          {
+            "client": "mcp",
+            "version": "2.3.0",
+            "protocol": "2026-07-28",
+            "phase": "core-matrix",
+            "records": [
+              "SEARCH_TOKEN-catalog",
+              "OVERVIEW_TOKEN-catalog",
+              "BOTH_TOKEN-catalog",
+              "revoked-access",
+              "page-0-eleventh-row",
+              "page-9-eleventh-row",
+              "zero-results",
+              "INVALID_INPUT",
+              "INVALID_INPUT",
+              "literal-wildcard-escaping",
+              "both-tools-same-server",
+              "PAYLOAD_TOO_LARGE",
+              "same-tenant-unassigned-100",
+              "same-tenant-unassigned-1000",
+              "CASE_UNAVAILABLE",
+              "CASE_UNAVAILABLE",
+              "CASE_UNAVAILABLE",
+              "AUDIT_UNAVAILABLE"
+            ]
+          },
+          {
+            "phase": "RACE_REVOKE_TOKEN",
+            "records": [
+              "SEARCH_TOKEN-catalog",
+              "OVERVIEW_TOKEN-catalog",
+              "BOTH_TOKEN-catalog",
+              "revoked-access",
+              "page-0-eleventh-row",
+              "page-9-eleventh-row",
+              "zero-results",
+              "INVALID_INPUT",
+              "INVALID_INPUT",
+              "literal-wildcard-escaping",
+              "both-tools-same-server",
+              "PAYLOAD_TOO_LARGE",
+              "same-tenant-unassigned-100",
+              "same-tenant-unassigned-1000",
+              "CASE_UNAVAILABLE",
+              "CASE_UNAVAILABLE",
+              "CASE_UNAVAILABLE",
+              "AUDIT_UNAVAILABLE",
+              "FORBIDDEN",
+              "RACE_REVOKE_TOKEN-post-commit-final-gate"
+            ]
+          }
+        ]
+      }
+    },
+    "conformance": [
+      {
+        "report": "work/mcp-evidence/authoritative-conformance/server-server-stateless-2026-10-24T23-02-36-369Z/checks.json",
+        "counts": {
+          "SUCCESS": 21,
+          "FAILURE": 4,
+          "SKIPPED": 5
+        },
+        "checks": [
+          {
+            "id": "sep-2575-request-meta-invalid-missing-meta",
+            "name": "RequestMetaInvalid",
+            "description": "Rejects request with missing _meta with -32602 Invalid params",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "fieldIssue": "missing-meta",
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 101,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-meta-invalid-400",
+            "name": "HttpServerMetaInvalid400",
+            "description": "Rejections of requests missing required _meta fields use HTTP 400 Bad Request.",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "fieldIssue": "missing-meta",
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 101,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-request-meta-invalid-missing-protocol-version",
+            "name": "RequestMetaInvalid",
+            "description": "Rejects request with _meta missing io.modelcontextprotocol/protocolVersion",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "fieldIssue": "missing-protocol-version",
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 102,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-meta-invalid-400",
+            "name": "HttpServerMetaInvalid400",
+            "description": "Rejections of requests missing required _meta fields use HTTP 400 Bad Request.",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "fieldIssue": "missing-protocol-version",
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 102,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-request-meta-invalid-missing-client-capabilities",
+            "name": "RequestMetaInvalid",
+            "description": "Rejects request with _meta missing io.modelcontextprotocol/clientCapabilities",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "fieldIssue": "missing-client-capabilities",
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 104,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-meta-invalid-400",
+            "name": "HttpServerMetaInvalid400",
+            "description": "Rejections of requests missing required _meta fields use HTTP 400 Bad Request.",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "fieldIssue": "missing-client-capabilities",
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 104,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-request-meta-client-info-optional",
+            "name": "RequestMetaClientInfoOptional",
+            "description": "Serves requests whose _meta omits io.modelcontextprotocol/clientInfo (clientInfo is a SHOULD).",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 105,
+                "result": {
+                  "supportedVersions": [
+                    "2026-07-28"
+                  ],
+                  "capabilities": {
+                    "tools": {
+                      "listChanged": false
+                    }
+                  },
+                  "ttlMs": 0,
+                  "cacheScope": "private",
+                  "resultType": "complete",
+                  "_meta": {
+                    "io.modelcontextprotocol/serverInfo": {
+                      "name": "shale-mcp",
+                      "version": "development"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-server-implements-discover",
+            "name": "ServerImplementsDiscover",
+            "description": "Servers MUST implement server/discover.",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "result": {
+                "supportedVersions": [
+                  "2026-07-28"
+                ],
+                "capabilities": {
+                  "tools": {
+                    "listChanged": false
+                  }
+                },
+                "ttlMs": 0,
+                "cacheScope": "private",
+                "resultType": "complete",
+                "_meta": {
+                  "io.modelcontextprotocol/serverInfo": {
+                    "name": "shale-mcp",
+                    "version": "development"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-server-identifies-in-result-meta",
+            "name": "ServerIdentifiesInResultMeta",
+            "description": "Servers SHOULD identify themselves via _meta['io.modelcontextprotocol/serverInfo'] on responses (spec PR #3002).",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "serverInfo": {
+                "name": "shale-mcp",
+                "version": "development"
+              }
+            }
+          },
+          {
+            "id": "sep-2575-server-declares-prompts-in-discover",
+            "name": "ServerDeclaresPromptsInDiscover",
+            "description": "Servers that support prompts MUST declare the prompts capability in their DiscoverResult.",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "discoverCapabilities": {
+                "tools": {
+                  "listChanged": false
+                }
+              },
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 203,
+                "error": {
+                  "code": -32601,
+                  "message": "Method not found"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-discover-capabilities-match-handlers",
+            "name": "DiscoverCapabilitiesMatchHandlers",
+            "description": "capabilities matches what the server honors on real RPC calls",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 202,
+                "result": {
+                  "tools": [
+                    {
+                      "name": "search_cases",
+                      "description": "Find active Cases by a literal Case-name substring in your authorized Shale tenant. Use at least three letters or digits. Returns at most ten minimized summaries per page, pages 0 through 9. No blank browse or export. If windowExhausted is true, stop and narrow the query; do not request another page. No documents, narratives or Case Dates are returned.",
+                      "inputSchema": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "query"
+                        ],
+                        "properties": {
+                          "query": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 100
+                          },
+                          "page": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9,
+                            "default": 0
+                          }
+                        }
+                      },
+                      "outputSchema": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "items",
+                          "page",
+                          "size",
+                          "hasMore",
+                          "windowExhausted",
+                          "correlationId"
+                        ],
+                        "properties": {
+                          "items": {
+                            "type": "array",
+                            "maxItems": 10,
+                            "items": {
+                              "$ref": "#/$defs/Case"
+                            }
+                          },
+                          "page": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9
+                          },
+                          "size": {
+                            "const": 10
+                          },
+                          "hasMore": {
+                            "type": "boolean"
+                          },
+                          "windowExhausted": {
+                            "type": "boolean"
+                          },
+                          "correlationId": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "$defs": {
+                          "Case": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "caseId",
+                              "caseNumber",
+                              "caseName",
+                              "status",
+                              "practiceArea",
+                              "responsibleAttorney",
+                              "primaryLegalAssistant",
+                              "updatedAt"
+                            ],
+                            "properties": {
+                              "caseId": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 2147483647
+                              },
+                              "caseNumber": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 200
+                              },
+                              "caseName": {
+                                "type": "string",
+                                "maxLength": 255
+                              },
+                              "status": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "color"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 2147483647
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "maxLength": 255
+                                  },
+                                  "color": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "pattern": "^#[0-9a-fA-F]{6}$",
+                                    "maxLength": 7
+                                  }
+                                }
+                              },
+                              "practiceArea": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 2147483647
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "maxLength": 255
+                                  }
+                                }
+                              },
+                              "responsibleAttorney": {
+                                "$ref": "#/$defs/CaseUser"
+                              },
+                              "primaryLegalAssistant": {
+                                "$ref": "#/$defs/CaseUser"
+                              },
+                              "updatedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "minLength": 16,
+                                "maxLength": 29,
+                                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,9})?)?$"
+                              }
+                            }
+                          },
+                          "CaseUser": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": false,
+                            "required": [
+                              "userId",
+                              "displayName"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 2147483647
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "maxLength": 255
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "annotations": {
+                        "readOnlyHint": true,
+                        "destructiveHint": false,
+                        "openWorldHint": false
+                      }
+                    },
+                    {
+                      "name": "get_case_overview",
+                      "description": "Read one active Case's minimized overview in your authorized Shale tenant by Case ID. Returns name, number, status, practice area, responsible attorney, primary legal assistant and stored local update time only. This is not full Case detail and includes no documents, narratives, chronology or Case Dates. An unavailable Case has no disclosed existence or tenant information.",
+                      "inputSchema": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "caseId"
+                        ],
+                        "properties": {
+                          "caseId": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                          }
+                        }
+                      },
+                      "outputSchema": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "case",
+                          "correlationId"
+                        ],
+                        "properties": {
+                          "case": {
+                            "$ref": "#/$defs/Case"
+                          },
+                          "correlationId": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "$defs": {
+                          "Case": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "caseId",
+                              "caseNumber",
+                              "caseName",
+                              "status",
+                              "practiceArea",
+                              "responsibleAttorney",
+                              "primaryLegalAssistant",
+                              "updatedAt"
+                            ],
+                            "properties": {
+                              "caseId": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 2147483647
+                              },
+                              "caseNumber": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 200
+                              },
+                              "caseName": {
+                                "type": "string",
+                                "maxLength": 255
+                              },
+                              "status": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "color"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 2147483647
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "maxLength": 255
+                                  },
+                                  "color": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "pattern": "^#[0-9a-fA-F]{6}$",
+                                    "maxLength": 7
+                                  }
+                                }
+                              },
+                              "practiceArea": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 2147483647
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "maxLength": 255
+                                  }
+                                }
+                              },
+                              "responsibleAttorney": {
+                                "$ref": "#/$defs/CaseUser"
+                              },
+                              "primaryLegalAssistant": {
+                                "$ref": "#/$defs/CaseUser"
+                              },
+                              "updatedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "minLength": 16,
+                                "maxLength": 29,
+                                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,9})?)?$"
+                              }
+                            }
+                          },
+                          "CaseUser": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": false,
+                            "required": [
+                              "userId",
+                              "displayName"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 2147483647
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "maxLength": 255
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "annotations": {
+                        "readOnlyHint": true,
+                        "destructiveHint": false,
+                        "openWorldHint": false
+                      }
+                    }
+                  ],
+                  "ttlMs": 0,
+                  "cacheScope": "private",
+                  "resultType": "complete",
+                  "_meta": {
+                    "io.modelcontextprotocol/serverInfo": {
+                      "name": "shale-mcp",
+                      "version": "development"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-server-unsupported-version-error",
+            "name": "ServerUnsupportedVersionError",
+            "description": "If the server does not implement the requested version (whether the version is unknown to the server, or is a known version the server has chosen not to support), it MUST respond with an UnsupportedProtocolVersionError listing the versions it does support; the error data carries the supported versions and echoes the requested version.",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 301,
+                "error": {
+                  "code": -32022,
+                  "message": "Protocol error",
+                  "data": {
+                    "supported": [
+                      "2026-07-28"
+                    ],
+                    "requested": "v999.0.0"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-unsupported-version-400",
+            "name": "HttpServerUnsupportedVersion400",
+            "description": "If the server does not implement the requested protocol version, it MUST respond with 400 Bad Request and an UnsupportedProtocolVersionError listing its supported versions.",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 301,
+                "error": {
+                  "code": -32022,
+                  "message": "Protocol error",
+                  "data": {
+                    "supported": [
+                      "2026-07-28"
+                    ],
+                    "requested": "v999.0.0"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-header-mismatch-400",
+            "name": "HttpServerHeaderMismatch400",
+            "description": "If the values do not match, the server MUST reject the request with 400 Bad Request and a HeaderMismatch JSON-RPC error.",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 302,
+                "error": {
+                  "code": -32020,
+                  "message": "Header mismatch"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-server-rejects-undeclared-capability",
+            "name": "ServerRejectsUndeclaredCapability",
+            "description": "A server MUST NOT rely on capabilities the client has not declared. If processing a request requires a capability the client did not include in io.modelcontextprotocol/clientCapabilities, the server MUST return a MissingRequiredClientCapabilityError (-32021).",
+            "status": "FAILURE",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "errorMessage": "Not testable: server does not list the diagnostic tool 'test_missing_capability' in tools/list and the probe call did not exercise it (required for the undeclared-capability rejection)",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "untestable": true,
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 401,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-missing-capability-http-400",
+            "name": "MissingCapabilityHttp400",
+            "description": "On HTTP, the response status MUST be 400 Bad Request [for MissingRequiredClientCapabilityError].",
+            "status": "FAILURE",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "errorMessage": "Not testable: server does not list the diagnostic tool 'test_missing_capability' in tools/list, so the -32021 HTTP status could not be validated",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "untestable": true,
+              "httpStatus": 400
+            }
+          },
+          {
+            "id": "sep-2575-http-server-method-not-found-404-initialize",
+            "name": "HttpServerMethodNotFound404initialize",
+            "description": "If the server does not implement the removed RPC method 'initialize', it MUST respond with 404 Not Found and a JSON-RPC error with code -32601 (Method not found).",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 500,
+                "error": {
+                  "code": -32601,
+                  "message": "Method not found"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-method-not-found-404-ping",
+            "name": "HttpServerMethodNotFound404ping",
+            "description": "If the server does not implement the removed RPC method 'ping', it MUST respond with 404 Not Found and a JSON-RPC error with code -32601 (Method not found).",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 500,
+                "error": {
+                  "code": -32601,
+                  "message": "Method not found"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-method-not-found-404-logging-setlevel",
+            "name": "HttpServerMethodNotFound404loggingsetLevel",
+            "description": "If the server does not implement the removed RPC method 'logging/setLevel', it MUST respond with 404 Not Found and a JSON-RPC error with code -32601 (Method not found).",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 500,
+                "error": {
+                  "code": -32601,
+                  "message": "Method not found"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-method-not-found-404-resources-subscribe",
+            "name": "HttpServerMethodNotFound404resourcessubscribe",
+            "description": "If the server does not implement the removed RPC method 'resources/subscribe', it MUST respond with 404 Not Found and a JSON-RPC error with code -32601 (Method not found).",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 500,
+                "error": {
+                  "code": -32601,
+                  "message": "Method not found"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-method-not-found-404-resources-unsubscribe",
+            "name": "HttpServerMethodNotFound404resourcesunsubscribe",
+            "description": "If the server does not implement the removed RPC method 'resources/unsubscribe', it MUST respond with 404 Not Found and a JSON-RPC error with code -32601 (Method not found).",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 500,
+                "error": {
+                  "code": -32601,
+                  "message": "Method not found"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-method-not-found-404",
+            "name": "HttpServerMethodNotFound404",
+            "description": "If the server does not implement the requested RPC method, it MUST respond with 404 Not Found and a JSON-RPC error with code -32601 (Method not found).",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 601,
+                "error": {
+                  "code": -32601,
+                  "message": "Method not found"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-http-server-no-independent-requests-on-stream",
+            "name": "HttpServerNoIndependentRequestsOnStream",
+            "description": "Request stream contains only IncompleteResult, never independent JSON-RPC requests",
+            "status": "FAILURE",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "errorMessage": "Not testable: server does not list the diagnostic tool 'test_streaming_elicitation' in tools/list, so the response stream could not be exercised",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "untestable": true,
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 1792882956820,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-server-no-log-without-loglevel",
+            "name": "ServerNoLogWithoutLogLevel",
+            "description": "No notifications/message for requests that didn't set _meta.../logLevel",
+            "status": "FAILURE",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "errorMessage": "Not testable: server does not list the diagnostic tool 'test_logging_tool' in tools/list, so the no-log-without-logLevel requirement could not be exercised",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "untestable": true,
+              "response": {
+                "jsonrpc": "2.0",
+                "id": 1792882956842,
+                "error": {
+                  "code": -32602,
+                  "message": "Invalid parameters"
+                }
+              }
+            }
+          },
+          {
+            "id": "sep-2575-server-sends-subscription-ack",
+            "name": "ServerSendsSubscriptionAck",
+            "description": "notifications/subscriptions/acknowledged is the first message on a subscriptions/listen stream",
+            "status": "SKIPPED",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "note": "Server advertises no subscription-delivered capability; subscriptions/listen is not applicable."
+            }
+          },
+          {
+            "id": "sep-2575-server-tags-subscription-id",
+            "name": "ServerTagsSubscriptionId",
+            "description": "Listen-stream notifications carry _meta.../subscriptionId",
+            "status": "SKIPPED",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "note": "Server advertises no subscription-delivered capability; subscriptions/listen is not applicable."
+            }
+          },
+          {
+            "id": "sep-2575-server-honors-notification-filter",
+            "name": "ServerHonorsNotificationFilter",
+            "description": "Server doesn't send notification types the client didn't request",
+            "status": "SKIPPED",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "note": "Server advertises no subscription-delivered capability; subscriptions/listen is not applicable."
+            }
+          },
+          {
+            "id": "sep-2575-server-sends-prompts-list-changed-on-subscription",
+            "name": "ServerSendsPromptsListChangedOnSubscription",
+            "description": "List-changed-capable servers notify listen streams with promptsListChanged: true (SHOULD)",
+            "status": "SKIPPED",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "note": "Server did not declare prompts.listChanged capability in server/discover"
+            }
+          },
+          {
+            "id": "sep-2575-server-sends-tools-list-changed-on-subscription",
+            "name": "ServerSendsToolsListChangedOnSubscription",
+            "description": "List-changed-capable servers notify listen streams with toolsListChanged: true (SHOULD)",
+            "status": "SKIPPED",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ],
+            "details": {
+              "note": "Server did not declare tools.listChanged capability in server/discover"
+            }
+          },
+          {
+            "id": "sep-2575-http-server-error-jsonrpc-id",
+            "name": "HttpServerErrorJsonrpcId",
+            "description": "All error responses carry the request JSON-RPC id",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:36.372Z",
+            "details": {
+              "errorResponsesObserved": 13
+            },
+            "specReferences": [
+              {
+                "id": "SEP-2575",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2575"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "report": "work/mcp-evidence/authoritative-conformance/server-tools-list-2026-10-24T23-02-37-240Z/checks.json",
+        "counts": {
+          "SUCCESS": 4
+        },
+        "checks": [
+          {
+            "id": "tools-list",
+            "name": "ToolsList",
+            "description": "Server lists available tools with valid structure",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:37.344Z",
+            "specReferences": [
+              {
+                "id": "MCP-Tools-List",
+                "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools#listing-tools"
+              }
+            ],
+            "details": {
+              "toolCount": 2,
+              "tools": [
+                "search_cases",
+                "get_case_overview"
+              ]
+            }
+          },
+          {
+            "id": "tools-name-format",
+            "name": "ToolsNameFormat",
+            "description": "Tool names SHOULD be 1-128 characters and match ^[A-Za-z0-9_.-]+$",
+            "specReferences": [
+              {
+                "id": "MCP-Tool-Names",
+                "url": "https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool-names"
+              },
+              {
+                "id": "MCP-Tool-Names-Draft",
+                "url": "https://modelcontextprotocol.io/specification/draft/server/tools#tool-names"
+              },
+              {
+                "id": "SEP-986-History",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/issues/986"
+              },
+              {
+                "id": "SEP-986-Spec-Integration",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1603"
+              }
+            ],
+            "timestamp": "2026-10-24T23:02:37.344Z",
+            "status": "SUCCESS",
+            "details": {
+              "toolCount": 2,
+              "results": {
+                "search_cases": "valid",
+                "get_case_overview": "valid"
+              }
+            }
+          },
+          {
+            "id": "tools-list-deterministic-order",
+            "name": "ToolsListDeterministicOrder",
+            "description": "Consecutive tools/list requests return the same tools in the same order",
+            "specReferences": [
+              {
+                "id": "MCP-Tools-Deterministic-Order",
+                "url": "https://modelcontextprotocol.io/specification/2026-07-28/server/tools#capabilities"
+              }
+            ],
+            "source": {
+              "introducedIn": "2026-07-28"
+            },
+            "timestamp": "2026-10-24T23:02:37.392Z",
+            "status": "SUCCESS",
+            "details": {
+              "toolCount": 2,
+              "probes": 3,
+              "orders": [
+                [
+                  "search_cases",
+                  "get_case_overview"
+                ],
+                [
+                  "search_cases",
+                  "get_case_overview"
+                ],
+                [
+                  "search_cases",
+                  "get_case_overview"
+                ]
+              ]
+            }
+          },
+          {
+            "id": "wire-schema-valid",
+            "name": "WireSchemaValid",
+            "description": "Every JSON-RPC message the implementation sent is valid per the spec JSON schema for the negotiated spec version",
+            "status": "SUCCESS",
+            "timestamp": "2026-10-24T23:02:37.392Z",
+            "specReferences": [
+              {
+                "id": "MCP-Schema",
+                "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/draft/schema.json"
+              }
+            ],
+            "details": {
+              "messagesValidated": 6,
+              "violations": []
+            }
+          }
+        ]
+      }
+    ],
+    "verification": {
+      "affected": {
+        "mode": "affected",
+        "command": [
+          "/workspace/.tools/bin/mvn",
+          "-o",
+          "-B",
+          "-pl",
+          "shale-core,shale-data,shale-server",
+          "-am",
+          "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.verification.CaseReadLocalSqlServerTest,com.shale.data.verification.CaseReadVerificationSafety,com.shale.data.verification.CaseReadVerificationSafetyTest,com.shale.server.mcp.McpOverviewClientFixture,com.shale.server.oauth.AuthoritativeCaseMcpLocalSqlServerTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "exit": 0,
+        "counts": {
+          "tests": 130,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3
+        },
+        "classes": [
+          {
+            "class": "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.runtime.ServerSessionSkeletonTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.AuthoritativeCaseMcpLocalSqlServerTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 2
+          },
+          {
+            "class": "com.shale.core.security.ai.AiScopeTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.IntegrationAccessContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseAggregateTransactionTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.EntityActionAuditEventTest",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.runtime.RuntimeSessionServiceTimingTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseLifecycleAuditContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.auth.AuthCredentialLookupTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthCredentialContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.verification.CaseReadLocalSqlServerTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 1
+          },
+          {
+            "class": "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthRevocationContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiSecurityContractTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.IntegrationCaseReadTest",
+            "tests": 44,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.EntityActionAuditMigrationContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.ContactAggregateMutationContractTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.verification.CaseReadVerificationSafetyTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.auth.PreTenantAuthenticationModuleContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.ContactMutationContractTest",
+            "tests": 7,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiSecurityLocalSqlServerTest",
+            "tests": 0,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiAccessContractTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ]
+      },
+      "critical": {
+        "mode": "critical",
+        "command": [
+          "/workspace/.tools/bin/mvn",
+          "-B",
+          "test"
+        ],
+        "exit": 0,
+        "counts": {
+          "tests": 207,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "classes": [
+          {
+            "class": "com.shale.updater.InstallServiceTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.updater.MainTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.updater.platform.MacPlatformSupportTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.controller.AuthControllerTest",
+            "tests": 10,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.runtime.ServerSessionSkeletonTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.PinnedClientAssertionTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthRevocationPolicyTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.config.ShaleServerServiceConfigurationTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthFilterIsolationTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.ShaleOAuthHumanTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthMetadataTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthConfigurationTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.controller.HealthControllerTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthCodeExchangePolicyTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.server.oauth.OAuthClientMappingTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.ui.services.CaseDatesLiveUpdateContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.ui.notification.NotificationPrivacyProjectorTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.core.security.ai.AiScopeTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.core.platform.AppPathsTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.IntegrationAccessContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseAggregateTransactionTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.EntityActionAuditEventTest",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseDateDaoMutationContractTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.CaseLifecycleAuditContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthCredentialContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.service.adapter.AuthServiceAdapterTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.TaskDaoCompletionStatusSynchronizationTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthRevocationContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiSecurityContractTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.IntegrationCaseReadTest",
+            "tests": 44,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.EntityActionAuditMigrationContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.ContactAggregateMutationContractTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.UserManagementRemovalContractTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.ContactMutationContractTest",
+            "tests": 7,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.dao.FieldConfirmationDaoTriggerIntegrationTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.data.security.ai.AiAccessContractTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.ShaleLauncherTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.identity.MachineIdentityProviderTest",
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.update.DesktopUiUpdateLauncherTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.identity.MachineIdentityUpgradeContractTest",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "com.shale.desktop.update.DesktopUpdateLauncherTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ],
+        "attempts": 1
+      },
+      "python": [
+        {
+          "suite": "selector",
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "build/test-selection",
+            "-p",
+            "test_select_tests.py"
+          ],
+          "exit": 0,
+          "summary": [
+            "Ran 27 tests in 1.257s",
+            "",
+            "OK"
+          ]
+        },
+        {
+          "suite": "case-launcher",
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "build/case-read-verification",
+            "-p",
+            "test_*.py"
+          ],
+          "exit": 0,
+          "summary": [
+            "Ran 4 tests in 0.001s",
+            "",
+            "OK"
+          ]
+        },
+        {
+          "suite": "phase1r-launcher",
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "build/phase1r-verification",
+            "-p",
+            "test_*.py"
+          ],
+          "exit": 0,
+          "summary": [
+            "Ran 3 tests in 0.000s",
+            "",
+            "OK"
+          ]
+        },
+        {
+          "suite": "auth-launcher",
+          "command": [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "build/auth-verification",
+            "-p",
+            "test_*.py"
+          ],
+          "exit": 0,
+          "summary": [
+            "Ran 43 tests in 0.077s",
+            "",
+            "OK (skipped=8)"
+          ]
+        }
+      ],
+      "authoritativeCase": {
+        "exit": 0,
+        "junitTests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "scenarioPassLines": 12,
+        "scope": "One authoritative SQL scenario method plus six safety tests; all schema/control/FK changes preserved; final candidate hash bound"
+      },
+      "authoritativeMcp": {
+        "exit": 1,
+        "junitTests": 2,
+        "failures": 2,
+        "errors": 0,
+        "skips": 0,
+        "coreMatrixRecordsPerClient": 18,
+        "postCommitRevokePassPerClient": true,
+        "expiryAcceptance": "FAILED (successful response rather than FORBIDDEN)",
+        "scope": "Both clients; final sequential matrix; no pass for failed expiry"
+      },
+      "static": {
+        "markdownFiles": [
+          "docs/architecture/ai-integration-and-mcp.md",
+          "docs/sql/ai-integration/README.md",
+          "docs/sql/phase1r/README.md",
+          "docs/testing/case-read-local-security-verification.md",
+          "docs/testing/phase3b7-adversarial-acceptance.md"
+        ],
+        "relativeLinksAndAnchorsChecked": 113,
+        "jsonValid": true,
+        "sourceDerivedCandidateHashesRechecked": true,
+        "productionMigrationsDependenciesConfigUnchanged": true,
+        "onlyTwoToolsAndEightFields": true,
+        "diffCheck": "PASS"
+      },
+      "existingClientRegression": {
+        "command": [
+          "/workspace/.tools/bin/mvn",
+          "-o",
+          "-B",
+          "-pl",
+          "shale-server",
+          "-am",
+          "-Dtest=OAuthAuthorizationFlowTest#syntheticOverviewIndependentClientsUseFreshAccessRealSqlAndOneWorker,McpOverviewTest,McpSearchTest,McpJdbcDeadlineTest",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "exit": 0,
+        "counts": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "scope": "Existing unchanged synthetic Overview clients and adjacent handler/deadline regressions; not authoritative evidence"
+      }
+    },
+    "remainingItems": [
+      {
+        "id": "runtime-confinement",
+        "status": "FAILED",
+        "reason": "Shared non-bypass SQL login can overwrite both context keys and read B rows, and can INSERT a B PHI audit row while A context is stamped (rolled back). MCP tenant/user arguments remain rejected. No new confinement/PHI write model was approved or installed."
+      },
+      {
+        "id": "expiry-serving",
+        "status": "FAILED",
+        "reason": "Both clients receive successful Overview in the final-gate drill although the test observes a SQL lock wait and confirms the injected idle deadline expired before unlock. No terminal denial. Root cause unresolved; this is not an expiry pass."
+      },
+      {
+        "id": "tls-proxy-and-serving-oauth",
+        "status": "OPEN",
+        "reason": "MCP served loopback HTTP; OAuth maintained servlet filters and synthetic human WEB store. No configured trusted TLS/reverse-proxy execution or fully serving human/OAuth flow."
+      },
+      {
+        "id": "complete-identical-client-corpus",
+        "status": "OPEN",
+        "reason": "18-record authoritative core matrix and revocation race execute on both clients, not the entire historical authentication/assertion/protocol/punctuation/depth/type corpus, neither/live scope reduction, every kill switch/race point, or closed-status search on each finished client."
+      },
+      {
+        "id": "response-boundaries",
+        "status": "OPEN",
+        "reason": "Oversized source is rejected; exhaustive real-source just-below/exact/above boundaries, every Unicode/color/timestamp edge and full-envelope combination remain unexecuted."
+      },
+      {
+        "id": "pool-async",
+        "status": "OPEN",
+        "reason": "Authoritative single-SPID A1/A2/B1/A1, failed second-key setup/close/reborrow pass; complete serving async/rejected-task/cancellation/timeout interleavings remain unexecuted."
+      },
+      {
+        "id": "replicas-quota-restart",
+        "status": "OPEN",
+        "reason": "Prior synthetic SQL/replacement-JVM evidence retained. Full authoritative serving multi-replica quota stress, process replacement and SQL Server restart are not exercised."
+      },
+      {
+        "id": "audit-faults-and-review",
+        "status": "OPEN",
+        "reason": "Authoritative PHI failure and standalone real DENY/precommit/lost-ack pass. Full serving integration-audit permission DENY/outage/uncertain-commit/close-fault corpus, authoritative admin review and prompt/privacy corpus remain incomplete; PHI write authority fails separately."
+      },
+      {
+        "id": "finished-conformance",
+        "status": "OPEN",
+        "reason": "Finished two-tool server runs tools-list/server-stateless only; four raw failures require unsupported diagnostic tools and five checks skip. No full conformance claim or extra tools."
+      },
+      {
+        "id": "performance",
+        "status": "OPEN",
+        "reason": "Local complete-request timings only. No representative plan/load/threshold acceptance or isolated audit/quota timings."
+      },
+      {
+        "id": "source-vs-deployed-parity",
+        "status": "OPEN",
+        "reason": "Recovered bytes/hash do not prove historical source identifier collation, owners or deployed catalog parity. Disposable collation is SQL_Latin1_General_CP1_CI_AS; explicit dbo schema authorization is a local derivation requirement, not reconstructed historical provenance."
+      },
+      {
+        "id": "deployed-auth-and-runtime",
+        "status": "OPEN",
+        "reason": "Stage A/B deployment/identity grants, compatible installed callers and API/JAR, old-caller drain, fleet/native Windows and operational monitoring evidence remain separate operator gates; no live checks."
+      },
+      {
+        "id": "retention-legal",
+        "status": "OPEN",
+        "reason": "tenant/legal retention sign-off: OPEN. No repository evidence closes it; blocks real pilot."
+      },
+      {
+        "id": "sdk-production-approval",
+        "status": "OPEN",
+        "reason": "Official v2.2.0-M1 release remains prerelease. Stable v2.1.0 also exists; no dependency upgrade or production approval."
+      },
+      {
+        "id": "deployment-live-acceptance",
+        "status": "OPEN",
+        "reason": "No deployment or enablement authorized/performed; R4/live configuration, operational and tenant/security-owner acceptance remain separate. No real enablement recommendation."
+      }
+    ],
+    "sdk": {
+      "version": "2.2.0-M1",
+      "prerelease": true,
+      "officialRelease": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v2.2.0-M1",
+      "upgrade": false
+    },
+    "productionSourceChanges": false,
+    "allPackagedActivationDefaultsOff": true,
+    "noProductionAzureDeploymentEnablementOrPublication": true,
+    "currentSourceManifest": [
+      {
+        "path": "build/mcp-transport/authoritative-python.py",
+        "gitBlob": "c37d4e9f66afa319116324fea19d17de233e81fa",
+        "sha256": "829ef398cf6ea49d166c1d8aa4e190de46b672920413077a76da389bbe67ba40"
+      },
+      {
+        "path": "build/mcp-transport/authoritative-ts.mjs",
+        "gitBlob": "1b9da24f858ebf7ba2a80c7f6be44dde3850b4a5",
+        "sha256": "154a693b1da289201b16f5be6d722f84c77c1576887267749d031437805e0753"
+      },
+      {
+        "path": "shale-data/src/test/java/com/shale/data/verification/CaseReadLocalSqlServerTest.java",
+        "gitBlob": "18d58891530ae697aa2a5251a1ec21961f47f34d",
+        "sha256": "2b5e601e94a3c7268aec03d570dfc6f086d89653603ee7475d6f2795c662f5cc"
+      },
+      {
+        "path": "shale-data/src/test/java/com/shale/data/verification/CaseReadVerificationSafety.java",
+        "gitBlob": "96ed18d5cca27f8e4380338c24d36bb7b220f1f2",
+        "sha256": "f4fa151a1c60dcfa46f1fdb76ad2b05fe5cdfdad070eb6ee7d90baba92c62fda"
+      },
+      {
+        "path": "shale-data/src/test/java/com/shale/data/verification/CaseReadVerificationSafetyTest.java",
+        "gitBlob": "59998e6870ce82184846e455e175ed46a08dd7aa",
+        "sha256": "cff666ce89d87065fa100eb5ea5d27fd469dba5faf27f675b0725a9bb668e12b"
+      },
+      {
+        "path": "shale-server/src/test/java/com/shale/server/mcp/McpOverviewClientFixture.java",
+        "gitBlob": "dd4c96ff1b11457953305943fa9462ee4de54ac7",
+        "sha256": "8e5ab834e11842534574953aeb96be7d1e09f00caaf77bfad41b7985af13f6e6"
+      },
+      {
+        "path": "shale-server/src/test/java/com/shale/server/oauth/AuthoritativeCaseMcpLocalSqlServerTest.java",
+        "gitBlob": "70a4309fbd39971d0ecf40869195062c73c800ae",
+        "sha256": "11ad7630fbd51f1a590180052070d924c40485cddeb34cbd71b19b836f104e5d"
+      }
+    ],
+    "requestPerformance": {
+      "ts": {
+        "tools/list": {
+          "samples": 3,
+          "minMillis": 26.253116,
+          "medianMillis": 32.442088,
+          "maxMillis": 40.721789,
+          "scope": "Loopback full request, includes ACCESS/seam; tools/call includes deliberately blocked expiry sample"
+        },
+        "tools/call": {
+          "samples": 16,
+          "minMillis": 32.757321,
+          "medianMillis": 57.728259,
+          "maxMillis": 2139.066885,
+          "scope": "Loopback full request, includes ACCESS/seam; tools/call includes deliberately blocked expiry sample"
+        },
+        "server/discover": {
+          "samples": 10,
+          "minMillis": 16.161845,
+          "medianMillis": 21.9217225,
+          "maxMillis": 270.263527,
+          "scope": "Loopback full request, includes ACCESS/seam; tools/call includes deliberately blocked expiry sample"
+        }
+      },
+      "python": {
+        "tools/list": {
+          "samples": 7,
+          "minMillis": 14.543467,
+          "medianMillis": 15.923708,
+          "maxMillis": 55.146581,
+          "scope": "Loopback full request, includes ACCESS/seam; tools/call includes deliberately blocked expiry sample"
+        },
+        "tools/call": {
+          "samples": 16,
+          "minMillis": 21.247102,
+          "medianMillis": 41.1294415,
+          "maxMillis": 2074.58747,
+          "scope": "Loopback full request, includes ACCESS/seam; tools/call includes deliberately blocked expiry sample"
+        },
+        "server/discover": {
+          "samples": 10,
+          "minMillis": 9.662587,
+          "medianMillis": 16.096133000000002,
+          "maxMillis": 96.875664,
+          "scope": "Loopback full request, includes ACCESS/seam; tools/call includes deliberately blocked expiry sample"
+        }
+      }
+    },
+    "environment": {
+      "sql": {
+        "ProductVersion": "16.0.4305.5",
+        "Edition": "Developer Edition (64-bit)",
+        "EngineEdition": 3
+      },
+      "sqlImageDigest": "sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718",
+      "java": "Temurin 21.0.12.1",
+      "maven": "3.9.11",
+      "python": "3.12.14",
+      "typescriptClient": "@modelcontextprotocol/client 2.4.0",
+      "pythonClient": "mcp 2.3.0",
+      "conformance": "0.2.0-alpha.12",
+      "transport": "Serving loopback HTTP; no TLS/proxy acceptance"
+    },
+    "cleanup": {
+      "exactContainerId": "a0b4dbb02e427a676b026555b401726034d85ba5366d64bf112e48a82dc9d384",
+      "ownershipLabelVerified": true,
+      "containerRemoved": true,
+      "generatedCredentialFileRemoved": true,
+      "unrelatedContainersTouched": false
+    },
+    "handoffDate": "2026-10-25"
+  },
+  "sourceManifestScope": "Historical #1918 hosted/source evidence; original commit scopes retained. Current source identity is recorded in resumedAuthoritativeAcceptance."
 }
