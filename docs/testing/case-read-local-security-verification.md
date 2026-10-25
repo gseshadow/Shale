@@ -1,9 +1,23 @@
 # Minimized Case reads: disposable local SQL verification
 
-**2026-10-24 Phase 3B.7:** the approved authoritative offline Case artifact remains unavailable.
-The [adversarial acceptance record](phase3b7-adversarial-acceptance.md) retains the historical
-source hash, fresh independent evidence and exact remaining candidate/RLS/permission gaps.
-3B.7 is BLOCKED and Phase 3B remains IN PROGRESS; no synthetic artifact substitutes for this input.
+**2026-10-24 recovered-input closeout:** the supplied authoritative source passes the hard SHA-256
+gate. The [current acceptance ledger](phase3b7-adversarial-acceptance.md#resumed-authoritative-acceptance--recovered-input-2026-10-24)
+records separate derived/candidate hashes and passing hardened Case/RLS scenarios. **3B.7 is FAILED**:
+raw runtime credential confinement/PHI INSERT requirements and the serving expiry drill fail.
+Phase 3B remains IN PROGRESS; no activation recommendation. Earlier unavailable-input records below
+are historical and do not override the recovered-input evidence.
+
+The importer now accepts SSMS CREATE FUNCTION whitespace, exact required index SET options and FK
+referential actions. Scalar acceptance is hash-pinned to the reviewed ToBitNV body, not a general
+scalar importer. Derived SET-only groups must still be separated. Explicit dbo schema authorization
+is required for the reviewed disposable owner model: otherwise CREATE SCHEMA without AUTHORIZATION
+runs under the temporary db_owner importer and leaves its eventual runtime login with schema control.
+The strengthened runtime test rejects schema CONTROL/policy ALTER. This local owner requirement does
+not reconstruct historical source ownership omitted by the export. Fixture values now match recovered
+Code/address/computed email/required Case-bit/tenant Roles/FK definitions; no constraints/defaults change.
+Fixed fixture-step labels and numeric SQL error codes are the only new diagnostics; no exception text,
+SQL, values or credentials are disclosed. Second-key setup failure closes the lease and authoritative
+single-SPID reborrow overwrites both keys. Current tool/test boundaries remain local/disposable only.
 
 ## Phase 1R candidate — 2026-10-21
 

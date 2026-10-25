@@ -19,8 +19,9 @@ Before DDL, repository schema/migrations and affected tests were inspected at li
 | `dbo.GlobalControlPlaneAuditLog` | Existing operator/global entity/action, UTC and bounded metadata; capability events reuse this schema. |
 | Existing session/runtime patterns | Both SQL context keys on each lease, explicit UTC JDBC conversion, hash-only random credentials, immutable ownership, RowVer and same-transaction audit. Ordinary UserSessions remains unchanged. |
 
-These are source dependencies and local catalog checks, not claims about a deployed database. The missing
-approved authoritative **Case** artifact remains a separate blocker; no Case object is a dependency here.
+These are source dependencies and local catalog checks, not claims about a deployed database. The **Case**
+artifact was recovered in the [resumed 3B.7 acceptance](../../testing/phase3b7-adversarial-acceptance.md#resumed-authoritative-acceptance--recovered-input-2026-10-24);
+runtime permission/serving expiry acceptance fails. No Case object is a foundation dependency here.
 
 ## Candidate application
 

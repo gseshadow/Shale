@@ -86,6 +86,16 @@ all predicates and receipt atomically.
 
 ## Offline schema evidence
 
+**Recovered-input execution, 2026-10-24:** source hash gate and hardened authoritative Case/RLS
+scenarios now pass. See the [resumed acceptance ledger](../../testing/phase3b7-adversarial-acceptance.md#resumed-authoritative-acceptance--recovered-input-2026-10-24)
+for independent source/derived/candidate hashes, full dependency/owner qualifications, runtime permission
+failures and the unresolved serving expiry drill. 3B.7 is FAILED, with no real enablement recommendation.
+The importer has bounded SSMS/ToBitNV compatibility support and derived schemas explicitly assign dbo
+schema ownership; runtime must not retain schema CONTROL/policy ALTER after temporary db_owner removal.
+Source bytes and both derived SQL files remain outside Git/PR artifacts. Only the three existing FILTER
+changes are installed in the local candidate. The unavailable-input statements below are historical.
+
+
 Original source SHA-256 recorded by the previous assessment:
 `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`.
 The original `shale-schema-source.sql` (UTF-16LE, 728,862 bytes) is unavailable in this task's workspace.

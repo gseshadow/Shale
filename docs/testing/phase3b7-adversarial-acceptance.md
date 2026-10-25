@@ -1,5 +1,161 @@
 # Phase 3B.7 adversarial/local acceptance — 2026-10-24
 
+## Resumed authoritative acceptance — recovered input, 2026-10-24
+
+**3B.7 FAILED — runtime permission requirements and serving expiry acceptance fail.
+Phase 3B remains IN PROGRESS. No production acceptance or real enablement recommendation.**
+
+Current base is merged #1918, `0a467caf55c0c1eab89abdf45292388352875296`.
+The clean original checkout is preserved. A sandboxed fetch failed at the configured proxy;
+one bounded fetch with required network permission succeeded. Separate worktree:
+`/workspace/work/phase3b7-authoritative`; branch `codex/phase3b7-authoritative-acceptance`.
+Only test tooling/fixtures/clients and documentation change; production, migrations,
+dependencies, eight-field projection, tool catalog and activation defaults are unchanged.
+
+| Immutable/derived input | Recorded evidence |
+| --- | --- |
+| Recovered source | `shale-schema-source.sql`, 728,862 bytes; `/workspace/attachments/c051e076-a559-494d-ba96-3b4b7b8b7b97/shale-schema-source.sql` |
+| Source SHA-256 | `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`; hard gate computed **before parsing/copying/transformation/execution**, exact match |
+| Provenance | Operator-supplied recovered authoritative artifact. Hash establishes byte identity only; no historical provenance/owner/collation claims reconstructed. |
+| Derived UTF-8 schema | `6e571b96915e6b80436898b664a516c3782caddec78efca13336cc08bcaab290`; 297,598 bytes |
+| Final candidate schema | `621e8013f417108e556e056723ec9d4e424d66632e5e0ace5fd23a4a9f4e331d`; 297,863 bytes |
+
+Source bytes remain unchanged. Source, derived and candidate SQL stay private in task-owned
+locations, outside Git and PR artifacts. The receipt contains hashes/metadata, never those SQL files.
+Derivation retains 72 tables (all original policy targets, selected read/control dependencies and
+transitive FKs), all six source functions including exact `dbo.ToBitNV`, full policy, constraints,
+computed columns, indexes, column collations and authoritative names. Twenty-four unrelated tables
+are excluded. SSMS SET groups are split; schema authorization is explicitly dbo to preserve the
+reviewed disposable preparation ownership when imported by the temporary db_owner login. The raw
+export omits AUTHORIZATION, so this is **not** historical owner evidence. Disposable identifier
+collation is `SQL_Latin1_General_CP1_CI_AS`; source identifier collation remains unestablished.
+
+The reviewed Phase1R engine APPLY/POSTCHECK passes in a fresh preparation database. Only Users and
+`auditLog` strict FILTERs plus the Statuses tenant/global FILTER are re-scripted into the candidate.
+Exact source function definitions and original unrelated predicates are checked before migration;
+the final candidate input is hashed separately. No production migration runs.
+
+### Test-tool compatibility and invalidated fixture assumptions
+
+The existing importer is retained with bounded support for SSMS CREATE whitespace, exact safe index
+SET options and FK referential actions. Scalar support is limited to the reviewed ToBitNV definition's
+UTF-8/LF hash, not arbitrary scalar bodies. Original executable definitions remain intact. Safety
+regressions preserve DML/EXEC/server-action refusal. The authoritative import is its positive scalar test.
+
+Fixture-only corrections use actual tenant address/Code fields, omit computed `email_norm`, supply
+required Case booleans, qualify Roles ownership and use top-level IDENTITY_INSERT session batches.
+The recovered composite Case/PracticeArea FK rejects global-area assignment: fixture Cases use valid
+tenant areas while raw overlay visibility remains tested. No FK/default is loosened or synthesized.
+The old importer also left schemas owned by its runtime login; explicit dbo authorization plus runtime
+schema CONTROL/policy ALTER denials closes that **harness** authority leak. Earlier weaker passes do
+not substitute for the final hardened run. Historical synthetic evidence retains its labelled scope.
+
+### Runtime results and unresolved security/correctness findings
+
+The authoritative Case launcher passes setup/fixtures, same-SPID A1 → A2 → B1 → A1, second-key setup
+failure/lease close/clean reborrow, A/B/NULL strict reads, global/tenant overlays, actor/current-status/
+assignment/foreign joins, paging/literal matching, unassigned/closed/deleted/unavailable behavior,
+required Overview append, actual denied INSERT, precommit rollback and injected lost commit ACK.
+The last fault performs a real commit and retains its audit row while withholding output; it is an
+injected acknowledgment loss, not an observed network outage. Cases have no independent IsActive field;
+accepted Case policy is not-deleted, with closed-status Cases still readable.
+
+Both pinned independent clients execute the authoritative **two-tool** server through fresh maintained
+OAuth code/self-consent/S256 exchange → ACCESS → MCP → VerifiedIntegrationContext/IntegrationInvocation
+→ quota/audit/shared Case operation → final gate. OAuth/human WEB identity remains the existing servlet
+fixture; MCP actually serves loopback HTTP. Eighteen core records per client cover exact search-only/
+overview-only/both catalogs, revoked ACCESS, page 0/page 9/eleventh-row hasMore/windowExhausted, zero,
+no browse-all/tenant argument, literal wildcard exclusion, both tools, oversized source, same-tenant
+unassigned Overview, identical foreign/missing/deleted CASE_UNAVAILABLE and PHI failure suppression.
+Every valid operation reaches exactly one existing shared Case SQL operation; no independent borrow
+or child hydration. The full historical adversarial corpus is not claimed complete.
+
+Each successful/committed Overview has one existing PHI row, one ALLOWED_READ parent and one RETURNED
+child in its read transaction. PHI fault leaves zero durable PHI rows/no protected result. Read-committed
+history survives subsequent handoff denial. Both clients pass post-commit revocation suppression.
+
+**FAILED permission acceptance:** an actual generated runtime login with AiIntegrationRuntime/shared
+Case read + PHI INSERT grants, no dbo/sysadmin/db_owner/ShaleAdmins/operator authority, is denied direct
+SELECT on all 14 AI/control/audit tables (SQL 229), direct integration parent/child/entity/global audit
+INSERT (229), global control-plane execution (229), bootstrap execution, dbo impersonation and policy
+ALTER. A-stamped raw reads exclude B. However, that same login can INSERT a B PHI `auditLog` row under
+A context (test transaction rolled back), and can overwrite both mutable context keys to B/82 and read
+B's Case. Tenant control procedures also carry EXECUTE grants with application actor checks. These
+are concrete failures against the requested SQL-credential confinement/audit-write requirements, not
+an MCP tenant/user argument bypass. The approved shared-runtime trust model does not resolve them.
+No new production permission model, BLOCK/grant migration or workaround is invented in this task.
+
+**FAILED expiry drill:** both clients receive successful Overview in the final-handoff drill despite
+a positively observed SQL lock wait and an injected IdleExpiresAt crossing database UTC before unlock.
+The drill targets the final AiGateCaseReadV1 Handoff call; committed PHI/parent/child history remains,
+with zero expiry terminal denials. Root cause remains unresolved, including independent review of the
+injection. This is a failing acceptance reproduction, not proof that a timeout passed or a repaired
+production expiry gate. The new opt-in JUnit matrix intentionally remains red; it is not weakened.
+
+Finished-server conformance runs only server-stateless/tools-list: raw successes, four missing-diagnostic
+tool failures and five skips remain in the structured receipt. No diagnostic tools are added. Local full
+request timings cover metadata/ACCESS/quota/audit/Case/handoff together; they are small-sample sanity
+evidence, not isolated audit/quota benchmarks, load acceptance or representative query plans.
+
+SDK official release v2.2.0-M1 still has prerelease=true (v2.1.0 stable also exists); no upgrade.
+**tenant/legal retention sign-off: OPEN**; production approval remains separate.
+
+### Remaining FAILED/OPEN items
+
+- **runtime-confinement — FAILED**: Shared non-bypass SQL login can overwrite both context keys and read B rows, and can INSERT a B PHI audit row while A context is stamped (rolled back). MCP tenant/user arguments remain rejected. No new confinement/PHI write model was approved or installed.
+- **expiry-serving — FAILED**: Both clients receive successful Overview in the final-gate drill although the test observes a SQL lock wait and confirms the injected idle deadline expired before unlock. No terminal denial. Root cause unresolved; this is not an expiry pass.
+- **tls-proxy-and-serving-oauth — OPEN**: MCP served loopback HTTP; OAuth maintained servlet filters and synthetic human WEB store. No configured trusted TLS/reverse-proxy execution or fully serving human/OAuth flow.
+- **complete-identical-client-corpus — OPEN**: 18-record authoritative core matrix and revocation race execute on both clients, not the entire historical authentication/assertion/protocol/punctuation/depth/type corpus, neither/live scope reduction, every kill switch/race point, or closed-status search on each finished client.
+- **response-boundaries — OPEN**: Oversized source is rejected; exhaustive real-source just-below/exact/above boundaries, every Unicode/color/timestamp edge and full-envelope combination remain unexecuted.
+- **pool-async — OPEN**: Authoritative single-SPID A1/A2/B1/A1, failed second-key setup/close/reborrow pass; complete serving async/rejected-task/cancellation/timeout interleavings remain unexecuted.
+- **replicas-quota-restart — OPEN**: Prior synthetic SQL/replacement-JVM evidence retained. Full authoritative serving multi-replica quota stress, process replacement and SQL Server restart are not exercised.
+- **audit-faults-and-review — OPEN**: Authoritative PHI failure and standalone real DENY/precommit/lost-ack pass. Full serving integration-audit permission DENY/outage/uncertain-commit/close-fault corpus, authoritative admin review and prompt/privacy corpus remain incomplete; PHI write authority fails separately.
+- **finished-conformance — OPEN**: Finished two-tool server runs tools-list/server-stateless only; four raw failures require unsupported diagnostic tools and five checks skip. No full conformance claim or extra tools.
+- **performance — OPEN**: Local complete-request timings only. No representative plan/load/threshold acceptance or isolated audit/quota timings.
+- **source-vs-deployed-parity — OPEN**: Recovered bytes/hash do not prove historical source identifier collation, owners or deployed catalog parity. Disposable collation is SQL_Latin1_General_CP1_CI_AS; explicit dbo schema authorization is a local derivation requirement, not reconstructed historical provenance.
+- **deployed-auth-and-runtime — OPEN**: Stage A/B deployment/identity grants, compatible installed callers and API/JAR, old-caller drain, fleet/native Windows and operational monitoring evidence remain separate operator gates; no live checks.
+- **retention-legal — OPEN**: tenant/legal retention sign-off: OPEN. No repository evidence closes it; blocks real pilot.
+- **sdk-production-approval — OPEN**: Official v2.2.0-M1 release remains prerelease. Stable v2.1.0 also exists; no dependency upgrade or production approval.
+- **deployment-live-acceptance — OPEN**: No deployment or enablement authorized/performed; R4/live configuration, operational and tenant/security-owner acceptance remain separate. No real enablement recommendation.
+
+### Verification receipt
+
+| Final sequential check | Result |
+| --- | --- |
+| Focused importer safety | 6 PASS; authoritative scalar/import path additionally exercised by the SQL harness |
+| Selector affected suite | 127 PASS, 3 explicit opt-in skips; 130 reported tests, no failures/errors |
+| Authoritative SQL launcher | PASS; all 12 scenario PASS lines, cleanup/exit 0; 7 JUnit tests including safety, no skips |
+| Authoritative MCP client matrix | **FAIL**; 2 parameter invocations fail the expiry expectation, zero skips. Per client: 18 core records and post-commit revocation pass |
+| Existing shared client/handler/deadline regressions | 16 PASS, including both original Overview clients; explicitly synthetic regression evidence |
+| One critical reactor | **207 PASS**, zero failures/errors/skips, all seven modules BUILD SUCCESS; no reactor retry |
+| Selector Python | 27 PASS |
+| Case / Phase1R launcher Python | 4 / 3 PASS |
+| Auth launcher Python | 35 PASS, 8 native-platform skips; no native Windows acceptance |
+| Documentation/static/diff | Current receipt validation and changed-document links/fences checked separately; see structured receipt |
+
+Exact selector-selected Maven argv and all current class/count receipts are retained in the JSON.
+`python build/test-selection/select_tests.py --base 0a467caf55c0c1eab89abdf45292388352875296 --head HEAD`
+selects cases/security-data and directly changed fixtures. Unknown new client-script paths recommend
+`-Pall-tests` informationally only; no unrelated full suite is run. Scope justification: importer/runtime
+and required-audit changes route Case/tenant/auth contracts; serving helpers/clients route direct fixtures.
+Maven runs are sequential for final evidence. An earlier overlapping diagnostic compile produced a
+missing-class error and was discarded/retried sequentially; it is not security evidence. No GitHub Actions
+workflow is added or run because local Maven now works. Initial fixture/importer development failures are
+superseded only by the explicitly passing final Case/safety runs; the expiry failures remain unresolved.
+
+See [phase3b7-verification.json](phase3b7-verification.json), `resumedAuthoritativeAcceptance`, for
+the final command/count receipts, raw conformance checks, per-request operation/timing records,
+permission capabilities, atomicity and race observations. The prior attempt below remains historical.
+
+On October 25, the exact task-owned SQL container ID and ownership label were verified before removal;
+its generated credential file was erased. Unrelated containers/work remain untouched.
+
+No real tenant/integration enabled; no production/Azure SQL, deployment, JAR, OAuth/MCP activation,
+installer/version publication or aggregate Phase 3B completion. Only search_cases and
+get_case_overview exist; the original eight Case fields and every packaged flag remain unchanged/OFF.
+
+## Prior merged #1918 record (historical)
+
 **3B.7 BLOCKED — authoritative Case artifact unavailable. Phase 3B IN PROGRESS.**
 
 This is an acceptance attempt against `codex/latest` commit
@@ -88,6 +244,7 @@ retention 14 days. The exact container was removed at job end.
 | SDK/transport/schema/disclosure/startup smoke | 94 PASS: 44 data + 50 server; zero failures/errors/skips |
 | Focused OAuth/ACCESS/shared Case/REST/WEB/DESKTOP server regressions | 257 PASS: 91 data + 166 server; zero failures/errors/skips |
 | Broad acceptance partitions | 451 PASS: 283 non-SQL tests plus all 168 SQL invocations across 99 annotated methods, in 51 bounded partitions; zero failures/errors/skips/omissions |
+| Existing shared client/handler/deadline regressions | 16 PASS, including both original Overview clients; explicitly synthetic regression evidence |
 | One critical reactor | 207 PASS, all seven modules BUILD SUCCESS; zero failures/errors/skips; no reactor retry |
 | Final selector coverage | All 22 selected security-data classes accounted across main focused/partition/critical receipts and the separate nine-test closeout. The two added SQL methods pass separately. |
 | TypeScript 2.4.0 | 6 no-handler transport records, 14 search records, 22 Overview records PASS |

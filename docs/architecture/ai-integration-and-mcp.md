@@ -1721,9 +1721,11 @@ No permissive policy decision is deferred to coding: the pilot has a chosen issu
 profile, tenant/self-delegation model, scopes, resource policy, audit representation, limits and wire schemas.
 The following are **closed-gate implementation/operational inputs**, not optional bypasses:
 
-* Authoritative Case SQL acceptance remains BLOCKED by absent approved offline artifact; Phase 1R is merged
-  with local/synthetic validation only. Preserve Stage A/B compatibility/deployment/fleet, deployed non-bypass
-  RLS/grants, audit append-only/admin protection and representative performance gates. No production RLS activation.
+* Recovered authoritative Case bytes now match the approved hash and the hardened Case/RLS harness passes;
+  [Phase 3B.7 remains FAILED](../testing/phase3b7-adversarial-acceptance.md#resumed-authoritative-acceptance--recovered-input-2026-10-24)
+  because raw runtime tenant/user stamping, foreign PHI audit INSERT and serving expiry acceptance are
+  unresolved. Preserve Stage A/B compatibility/deployment/fleet, deployed grants, audit append-only/admin
+  protection and representative performance gates. No production RLS activation.
 * Select exact maintained OAuth/SDK versions with 2026-07-28 compatibility and actual two-client evidence.
   If current clients cannot use preregistration/current revision, the smallest decision is a separately
   reviewed compatibility profile/version adapter; no ad-hoc static token or weaker tenant/user model.
@@ -4228,3 +4230,31 @@ activation; deploying a test profile is not an approved activation mechanism.
 Exactly search_cases and get_case_overview, unchanged eight-field Case projection,
 all defaults OFF. No real tenant/integration enabled; no production/Azure SQL,
 deployment, installer/version publication or aggregate Phase 3B completion.
+
+
+### 10.29 Phase 3B.7 recovered authoritative artifact — 2026-10-24
+
+**3B.7 FAILED. Phase 3B IN PROGRESS.** The prior absent-artifact blocker in §10.28 is superseded
+by [the resumed ledger](../testing/phase3b7-adversarial-acceptance.md#resumed-authoritative-acceptance--recovered-input-2026-10-24)
+and [structured receipt](../testing/phase3b7-verification.json). The source hash matches before any
+parsing; source bytes stay immutable/private, and derived/candidate hashes are recorded independently.
+Only the reviewed Phase1R three-FILTER candidate is applied in disposable local SQL. The existing
+importer has bounded test-tool compatibility fixes and the runtime schema-owner leak is eliminated
+in the derivation. Actual source constraints/computed columns/collations/names remain intact.
+
+Authoritative Case/RLS/current-actor/status/audit/denied-INSERT and pooled setup-failure/reborrow pass.
+Both pinned clients pass the two-tool authoritative core and post-commit revocation check; the full
+matrix remains red on the final-gate expiry drill despite observed lock wait/expired database UTC.
+Root cause remains unresolved. Raw runtime probes additionally demonstrate arbitrary context switching
+and foreign PHI audit INSERT authority; protected AI tables/integration audits/global control remain
+denied. These requested confinement/write requirements are not established by the shared trusted-backend
+SQL model or by MCP argument rejection. No unreviewed permission model or production fix is substituted.
+
+The existing PHI event and supplemental parent/child schema are retained; committed Overview audit
+atomicity and PHI failure rollback pass. No new application audit schema/events or broader projection.
+Finished two-tool conformance retains raw diagnostic-tool failures/skips; local request timings are not
+representative load/plan acceptance. TLS/trusted proxy, full corpus/async/replica faults, deployed
+permissions/fleet/operations and tenant/legal retention remain OPEN. SDK 2.2.0-M1 is still prerelease;
+no dependency upgrade or production approval. Only search_cases/get_case_overview and eight original
+fields; packaged flags OFF, no real tenant/integration enabled, no production/Azure SQL/deployment or
+installer/version publication. Do not recommend real enablement or mark aggregate Phase 3B complete.
