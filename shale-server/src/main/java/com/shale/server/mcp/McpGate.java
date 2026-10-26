@@ -21,12 +21,13 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 /** Namespace-only admission. All authority is a request attribute removed in finally; never a session. */
 final class McpGate extends OncePerRequestFilter {
     static final String PROTOCOL="2026-07-28", AUTHORITY=McpGate.class.getName()+".authority";
+    static final String ACCESS=McpGate.class.getName()+".access";
     static final String DEADLINE=McpGate.class.getName()+".deadline";
     private static final long MAX_NANOS=10_000_000_000L;
     private final McpTransportProperties properties;
     private final McpOAuthProperties identity;
     private final boolean global;
-    private final java.util.function.BiFunction<String,Long,VerifiedIntegrationContext> authenticate;
+    private final java.util.function.BiFunction<String,Long,?> authenticate;
     private final Semaphore active=new Semaphore(5);
     private final java.util.function.LongSupplier nanoTime;
     private final io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper mapper=McpTransportConfiguration.mapper();
@@ -39,7 +40,7 @@ final class McpGate extends OncePerRequestFilter {
         this(properties,identity,global,(token,deadline)->authenticate.apply(token),nanoTime);
     }
     McpGate(McpTransportProperties properties,McpOAuthProperties identity,boolean global,
-            java.util.function.BiFunction<String,Long,VerifiedIntegrationContext> authenticate,java.util.function.LongSupplier nanoTime) {
+            java.util.function.BiFunction<String,Long,?> authenticate,java.util.function.LongSupplier nanoTime) {
         this.properties=properties;this.identity=identity;this.global=global;this.authenticate=authenticate;this.nanoTime=nanoTime;
     }
     @Override protected boolean shouldNotFilterAsyncDispatch() { return false; }
@@ -61,12 +62,15 @@ final class McpGate extends OncePerRequestFilter {
         try { headers(request); }
         catch (Rejected rejected) { fail(response,rejected.status,rejected.code);return; }
         if (!active.tryAcquire()) { response.setHeader("Retry-After","1");fail(response,429,"throttled");return; }
+        com.shale.data.security.ai.AiCaseDataRequest access=null;
         try {
             check(deadline);
             VerifiedIntegrationContext authority;
             try {
                 if (!global || request.getQueryString()!=null || request.getCookies()!=null && request.getCookies().length>0) throw new SecurityException();
-                authority=authenticate.apply(AiBearerParser.extract(Collections.list(request.getHeaders("Authorization"))),deadline);
+                Object authenticated=authenticate.apply(AiBearerParser.extract(Collections.list(request.getHeaders("Authorization"))),deadline);
+                if(authenticated instanceof com.shale.data.security.ai.AiCaseDataRequest owned) { access=owned;authority=owned.authority(); }
+                else authority=(VerifiedIntegrationContext)authenticated;
                 if (authority==null || authority.credentialId()==null) throw new SecurityException();
             } catch (RuntimeException denied) {
                 check(deadline);
@@ -100,6 +104,7 @@ final class McpGate extends OncePerRequestFilter {
                 rpc(response,400,null,-32600,"Invalid request");return;
             }
             request.setAttribute(AUTHORITY,authority);
+            if(access!=null)request.setAttribute(ACCESS,access);
             request.setAttribute(DEADLINE,deadline);
             var buffered=new ContentCachingResponseWrapper(response);
             try {chain.doFilter(new BodyRequest(request,body),buffered);}
@@ -134,7 +139,7 @@ final class McpGate extends OncePerRequestFilter {
         } catch (Rejected rejected) { fail(response,rejected.status,rejected.code); }
         catch (IOException disconnected) { throw disconnected; }
         catch (Exception unavailable) { fail(response,503,"unavailable"); }
-        finally { request.removeAttribute(AUTHORITY);request.removeAttribute(DEADLINE);active.release(); }
+        finally { if(access!=null)access.close();request.removeAttribute(ACCESS);request.removeAttribute(AUTHORITY);request.removeAttribute(DEADLINE);active.release(); }
     }
     private void headers(HttpServletRequest request) {
         for (var header:Map.of("Authorization",50,"Origin",240,"MCP-Protocol-Version",32,"Accept",256,

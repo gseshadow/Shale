@@ -41,9 +41,10 @@ final class McpCatalog implements McpFeature {
             if(tools(authority).stream().noneMatch(tool->tool.name().equals(name)))
                 return Mono.error(io.modelcontextprotocol.modern.McpException.invalidParams("Unknown or disabled tool"));
             long deadline=(Long)context.transportContext().get(McpGate.DEADLINE);
+            var access=(com.shale.data.security.ai.AiCaseDataRequest)context.transportContext().get(McpGate.ACCESS);
             if("search_cases".equals(name))
-                return Mono.fromCallable(()->McpAsyncResponse.result(search.call(authority,deadline,context.requestId(),params,serverInfo)));
-            return Mono.fromCallable(()->McpAsyncResponse.result(overview.call(authority,deadline,context.requestId(),params,serverInfo)));
+                return Mono.fromCallable(()->McpAsyncResponse.result(search.call(authority,deadline,context.requestId(),params,serverInfo,access)));
+            return Mono.fromCallable(()->McpAsyncResponse.result(overview.call(authority,deadline,context.requestId(),params,serverInfo,access)));
         }
         return Mono.just(McpAsyncResponse.result(McpSchema.ListToolsResult.builder(tools(authority)).ttlMs(0L).build()));
     }

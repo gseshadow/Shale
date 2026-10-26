@@ -4,17 +4,110 @@ This directory owns the additive SQL candidate and operator instructions, not an
 The [canonical contract and implementation record](../../architecture/ai-integration-and-mcp.md#1013-phase-3b1-integration-persistence-and-security-foundation)
 owns status and evidence. Nothing here authorizes production execution or enablement.
 
-## Phase 3B.7 SQL confinement review — BLOCKED
+## Phase 3B.7 confined Case data candidate
 
-The [2026-10-25 review](../../testing/phase3b7-sql-confinement-review.md) records the exact current
-runtime EXECUTE/table authority and the proposed separate AI principal/proof-validating protected
-operation. No confinement migration is included or installed. The shared runtime can still choose
-tenant/user context and directly append foreign PHI history; 3B.7 remains FAILED. A new reviewed
-additive migration and internal proof/transaction boundary are required, along with the missing
-authoritative Case source/candidate for actual adversarial verification. Historical migrations,
-receipts and ordinary runtime grants are unchanged. Do not grant AiIntegrationRuntime to the proposed
-AI data principal or enable AI using the ordinary runtime as a fallback. See the review for migration,
-verification and fail-closed rollback requirements; none is a production execution instruction.
+The approved [confinement contract](../../architecture/phase3b7-sql-confinement-contract.md) is implemented
+by additive `phase3b7-confinement.sql`, after `phase3b3.sql`. Historical migrations and receipts are
+unchanged. The earlier [review](../../testing/phase3b7-sql-confinement-review.md) describes the vulnerable
+shared-runtime baseline; it is historical evidence, not the new execution boundary. This candidate does
+not complete Phase 3B.7 or resume its broader OPEN acceptance ledger.
+
+Apply manually as dbo in a fresh autocommit session with both tenant/user context keys NULL, only in a
+separately approved disposable database. No application startup installs SQL or grants permissions.
+The migration refuses incompatible authoritative Case/RLS shape, altered historical dependencies,
+unsafe TRUSTWORTHY/cross-database chaining, unreceipted new objects, or receipt drift. A matching rerun
+is a no-op. `verify.sql` selects the latest installed cumulative verifier; the standalone
+`phase3b7-confinement-verify.sql` is read-only and identical to the packaged startup catalog verifier.
+Never overwrite receipts to approve drift.
+
+The source schema used for local proof is the supplied `shale-schema-source.sql`, SHA-256
+`4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`.
+It is external evidence and must not be edited or committed. The candidate retains its authoritative
+Case definitions and the reviewed Users/auditLog strict and Statuses overlay predicates. The migration
+pins their portable structural catalog independently of database object IDs. A different catalog needs
+review and a new additive migration, not edits to historical SQL.
+
+| Identity | Membership / effective application authority |
+| --- | --- |
+| AI Case application login | Only own SQL user, `public`, `AiCaseDataRuntime`; six object EXECUTEs below. No other role, ownership, delegation, impersonation, cross-database route, direct table or column access. Unavoidable SQL public connection/encryption-key-definition metadata rights and public CONNECT on the four non-admin default TSQL endpoints are explicitly bounded. |
+| `AiCaseDataRuntime` | EXECUTE only `AiDataAuthenticateV1`, `AiDataSearchCasesV1`, `AiDataGetCaseOverviewV1`, `AiDataRecordCaseFailureV1`, `AiDataFinishCaseQuotaV1`, `AiDataAuthorizeCaseHandoffV1`. Explicit direct-table and 42 legacy-procedure denials. No wildcard EXECUTE. |
+| Catalog verifier | Separate governed login in empty `AiCaseDataCatalogVerifier`: VIEW DEFINITION, SELECT on `sys.sql_expression_dependencies` and the four noncredential deployment/Unicode reference tables. No Case/PHI/control/credential access. Needs separately provisioned server VIEW ANY DEFINITION and VIEW ANY DATABASE; startup checks specific server grants and cross-database AI access. Never give this role to the AI application login. |
+| Ordinary runtime/auth/bootstrap/operator | Existing separately governed identities and grants. Never a fallback for protected MCP Case reads. |
+
+Provision logins/users and role membership separately; the migration creates empty roles and no login.
+The application login must not own schemas, objects, roles or modules. Exclude direct or inherited
+`AiIntegrationRuntime`, `AiIntegrationBootstrap`, `AiCapabilityOperator`, `ShaleAdmins`, SQL fixed
+reader/writer/owner/admin roles, and all equivalent custom/bypass authority. Review actual login tokens
+and effective permissions, including public, column grants, views/functions/synonyms and server grants.
+A direct SQL permission denial is required for the two #1919 attacks; a rolled-back successful statement
+is a failure.
+
+Enabled isolated test composition requires these independent properties (or the documented AI pool
+environment aliases in `Config`):
+
+```properties
+shale.ai.data.jdbc-url=jdbc:sqlserver://<host>:1433;databaseName=<expected-database>
+shale.ai.data.username=<restricted-ai-login>
+shale.ai.data.password=<secret>
+shale.ai.data.database=<expected-database>
+shale.ai.data.verifier.jdbc-url=jdbc:sqlserver://<host>:1433;databaseName=<expected-database>
+shale.ai.data.verifier.username=<separate-catalog-login>
+shale.ai.data.verifier.password=<secret>
+```
+
+Omit TLS/authentication/timeout/MARS options from these URLs: protected settings cannot be overridden.
+The AI pool requires encrypted certificate-validated SQL, uses independent `ai-case-data-pool`
+metrics/lifecycle and never replaces ordinary pools. Its missing/partial configuration prevents handler
+activation. Packaged OFF mode requires none of these properties. Actual self-signed loopback tests use
+explicit test-owned datasource objects and still run the complete live identity/catalog attestation.
+
+Separately governed provisioning must insert exactly one `AiCaseDataDeployment` row, Id=1,
+Contract=`case-read-v1`, canonical Issuer/Resource, the existing JVM local JavaTimeZone and corresponding
+SQL TimeZone. The table starts empty and cannot be changed/deleted after provisioning; configuration
+changes require drained pools and a reviewed additive migration. It contains no tenant enablement.
+Local fixtures use UTC. Startup checks live SIDs against ordinary/auth/bootstrap identities, database,
+exact tokens and permissions, source/catalog/module receipts, call graph, owners, predicates/triggers,
+reference data and SQL/Java wall-time mapping. Failure removes readiness; no unchecked file attestation.
+Pool rotation must drain AI leases and reattest before accepting work; each protected request rechecks.
+
+`ProofDigest` retains a defensive mutable digest copy outside `VerifiedIntegrationContext`, exposes only
+scoped JDBC binary binding, clears bindings and request storage in finally, and survives cancellation
+through bounded failure/quota cleanup. Never log it, serialize it, add it to MDC/DTOs/audits, or enable
+JDBC parameter tracing, APM bind capture, RPC parameter capture or heap/debug capture in this boundary.
+Application JDBC JUL and SLF4J payload logging are suppressed; privileged diagnostics remain an
+operational trust boundary. Raw ACCESS is never sent to SQL and stored digests are never returned.
+
+Only the tiny private locator runs as owner to locate retained immutable digest lineage through RLS.
+It returns provisional IDs to caller-executed static same-owner modules. It is not executable by the AI
+login. All other modules retain non-bypass caller execution; static ownership chaining permits only the
+reviewed body. Derived context is overwritten/read back/restored as defense in depth; connection faults
+physically discard the lease. Context alone authorizes no protected operation.
+
+Search/Overview each commit durable quota admission separately, then atomically commit minimized read,
+required success audits and invocation READ state. Overview alone appends existing PHI history in that
+read transaction. Failures preserve committed charges, audit only retained proof-bound history, and
+release concurrency without refund. A fresh data-free one-shot final gate reauthenticates after all
+locks, releases quota tentatively, samples database UTC after housekeeping waits, and commits only a
+positive conservative remaining-life receipt. Java consumes query/commit/drain/close time from that
+receipt before the private buffer handoff; no SQL transaction spans network output.
+
+Regenerate reviewed SQL/resources with JDK 21 on PATH:
+
+```bash
+python3 build/sql-confinement/generate.py
+```
+
+Generated Unicode ranges/lowercase/word-break tables implement the supported JDK Locale.ROOT contract;
+changes require executable DAO/SQL parity, not source comparison. `AiCaseDataLocalSqlServerTest` requires
+explicit disposable loopback opt-in and the hash-gated authoritative candidate. Independent clients use
+`AuthoritativeCaseMcpLocalSqlServerTest`, maintained OAuth issuance and the actual restricted AI login.
+Skipped tests are not acceptance evidence.
+
+Rollback is containment: turn handler/transport flags OFF, revoke the dedicated login's connect and six
+EXECUTEs, drain/close the AI pool, retain invocation/accounting/audits and receipts for investigation.
+Do not enable shared-runtime fallback, drop history, restore broad grants or automatically uninstall
+SQL. Ordinary Shale behavior continues through its original identities. No production/Azure SQL,
+real tenant/integration enablement, deployment or installer/version publication is authorized here.
 
 ## Dependencies and authority inventory
 

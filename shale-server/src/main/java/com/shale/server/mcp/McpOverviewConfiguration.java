@@ -1,8 +1,5 @@
 package com.shale.server.mcp;
 
-import com.shale.core.service.CaseServicePort;
-import com.shale.data.config.DataSources;
-import com.shale.data.security.ai.IntegrationCaseReadService;
 import com.shale.server.oauth.McpOAuthProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.*;
@@ -13,11 +10,10 @@ import org.springframework.core.env.Profiles;
 @Configuration(proxyBeanMethods=false)
 @ConditionalOnProperty(name={"shale.ai.mcp.enabled","shale.ai.enabled","shale.ai.mcp.get-case-overview-enabled"},havingValue="true")
 public class McpOverviewConfiguration {
-    @Bean McpOverviewHandler mcpOverviewHandler(Environment environment,McpOAuthProperties identity,DataSources sources,CaseServicePort cases) {
+    @Bean McpOverviewHandler mcpOverviewHandler(Environment environment,McpOAuthProperties identity,McpAiCaseData data) {
         if(!environment.acceptsProfiles(Profiles.of("test")) || identity.identity()!=McpOAuthProperties.Identity.TEST
                 || environment.acceptsProfiles(Profiles.of("prod","azure")))
             throw new IllegalStateException("Overview handler requires isolated test configuration.");
-        return new McpOverviewHandler(deadline->new IntegrationCaseReadService(new McpJdbcDeadline(sources.runtime(),deadline),
-                McpJdbcDeadline.failureAudit(sources.runtime()),cases,true));
+        return new McpOverviewHandler(data::reader);
     }
 }

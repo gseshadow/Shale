@@ -11,10 +11,14 @@ import java.util.function.LongFunction;
 /** Sole bounded Case tool. Identity and completed disclosure come exclusively from the integration seam. */
 final class McpSearchHandler {
     static final McpSchema.Tool TOOL=contract();
-    private final LongFunction<IntegrationCaseReadService> services;
-    McpSearchHandler(LongFunction<IntegrationCaseReadService> services) { this.services=Objects.requireNonNull(services); }
+    private final java.util.function.BiFunction<Long,AiCaseDataRequest,IntegrationCaseReader> services;
+    McpSearchHandler(LongFunction<IntegrationCaseReadService> services) { Objects.requireNonNull(services);this.services=(deadline,request)->services.apply(deadline); }
+    McpSearchHandler(java.util.function.BiFunction<Long,AiCaseDataRequest,IntegrationCaseReader> services) { this.services=Objects.requireNonNull(services); }
 
     McpSchema.CallToolResult call(VerifiedIntegrationContext authority,long deadline,Object requestId,Object params,McpSchema.Implementation serverInfo) {
+        return call(authority,deadline,requestId,params,serverInfo,null);
+    }
+    McpSchema.CallToolResult call(VerifiedIntegrationContext authority,long deadline,Object requestId,Object params,McpSchema.Implementation serverInfo,AiCaseDataRequest access) {
         var invocation=IntegrationInvocation.search(authority,deadline);
         try {
             Map<?,?> request=params instanceof Map<?,?> m?m:Map.of();
@@ -25,7 +29,7 @@ final class McpSearchHandler {
             String query=valid?(String)args.get("query"):null;
             Integer page=valid?(args.containsKey("page")?((Number)args.get("page")).intValue():0):null;
             var mapper=McpTransportConfiguration.mapper();
-            DisclosureBuffer buffer=services.apply(deadline).search(invocation,query,page,completed->{
+            DisclosureBuffer buffer=services.apply(deadline,access).search(invocation,query,page,completed->{
                 try {
                     var envelope=new LinkedHashMap<String,Object>(mapper.getJsonMapper().convertValue(success(completed),Map.class));
                     // Modern SDK stamps this fixed public identity on every result. Include its actual bytes.

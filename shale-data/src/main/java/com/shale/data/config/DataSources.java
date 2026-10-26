@@ -11,6 +11,8 @@ public final class DataSources implements AutoCloseable {
 
 	private final HikariDataSource auth;
 	private volatile HikariDataSource runtime; // lazy
+    private HikariDataSource aiCaseData; // independent, lazy, guarded by this
+    private boolean closed;
 
 	public DataSources(Config cfg) {
 		this.cfg = cfg;
@@ -47,8 +49,48 @@ public final class DataSources implements AutoCloseable {
 		return ds;
 	}
 
+    /** Independently configured SQL identity. Absence fails; ordinary pools are never candidates. */
+    public synchronized DataSource aiCaseData() {
+        if (closed) throw new IllegalStateException("Datasources are closed.");
+        if (aiCaseData == null) {
+            // Resolve all required settings before constructing a pool; no partial initialization.
+            String url = cfg.aiCaseDataJdbcUrl();
+            // TLS, identity and timeout settings cannot be overridden by JDBC URL precedence.
+            if (!url.startsWith("jdbc:sqlserver://") || java.util.regex.Pattern.compile(
+                    "(?i);\\s*(encrypt|trustServerCertificate|hostNameInCertificate|user|userName|password|integratedSecurity|authentication|accessToken|multipleActiveResultSets|loginTimeout|socketTimeout)\\s*=")
+                    .matcher(url).find()) throw new IllegalStateException("AI JDBC URL contains a protected connection setting.");
+            String user = cfg.aiCaseDataUser();
+            String password = cfg.aiCaseDataPassword();
+            HikariConfig c = new HikariConfig();
+            c.setJdbcUrl(url);
+            c.setUsername(user);
+            c.setPassword(password);
+            c.setPoolName("ai-case-data-pool");
+            c.setMinimumIdle(0);
+            c.setMaximumPoolSize(10);
+            c.setConnectionTimeout(3000);
+            c.setValidationTimeout(1000);
+            c.setInitializationFailTimeout(-1);
+            c.setMaxLifetime(15 * 60 * 1000L);
+            c.addDataSourceProperty("encrypt", "true");
+            c.addDataSourceProperty("trustServerCertificate", "false");
+            c.addDataSourceProperty("loginTimeout", "3");
+            c.addDataSourceProperty("socketTimeout", "5000");
+            c.addDataSourceProperty("applicationName", "ShaleAiCaseData");
+            aiCaseData = new HikariDataSource(c);
+        }
+        return aiCaseData;
+    }
+
+    /** Rotation drains only AI connections. Enabled composition must reattest before readiness. */
+    public synchronized void resetAiCaseData() {
+        if (aiCaseData != null) { aiCaseData.close(); aiCaseData = null; }
+    }
+
 	@Override
-	public void close() {
+	public synchronized void close() {
+		closed = true;
+        resetAiCaseData();
 		if (auth != null)
 			auth.close();
 		resetRuntime();

@@ -50,3 +50,8 @@ com.shale.server.oauth.OAuthRevocationPolicyTest
 com.shale.data.security.ai.AiAccessContractTest
 com.shale.data.security.ai.IntegrationAccessContractTest
 com.shale.data.security.ai.IntegrationCaseReadTest
+
+com.shale.data.config.DataSourcesAiCaseDataTest
+com.shale.data.security.ai.ProofDigestTest
+com.shale.data.security.ai.AiCaseDataAccessTest
+com.shale.data.security.ai.AiCaseDataMigrationContractTest
