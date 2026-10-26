@@ -4,6 +4,18 @@ This directory owns the additive SQL candidate and operator instructions, not an
 The [canonical contract and implementation record](../../architecture/ai-integration-and-mcp.md#1013-phase-3b1-integration-persistence-and-security-foundation)
 owns status and evidence. Nothing here authorizes production execution or enablement.
 
+## Phase 3B.7 SQL confinement review — BLOCKED
+
+The [2026-10-25 review](../../testing/phase3b7-sql-confinement-review.md) records the exact current
+runtime EXECUTE/table authority and the proposed separate AI principal/proof-validating protected
+operation. No confinement migration is included or installed. The shared runtime can still choose
+tenant/user context and directly append foreign PHI history; 3B.7 remains FAILED. A new reviewed
+additive migration and internal proof/transaction boundary are required, along with the missing
+authoritative Case source/candidate for actual adversarial verification. Historical migrations,
+receipts and ordinary runtime grants are unchanged. Do not grant AiIntegrationRuntime to the proposed
+AI data principal or enable AI using the ordinary runtime as a fallback. See the review for migration,
+verification and fail-closed rollback requirements; none is a production execution instruction.
+
 ## Dependencies and authority inventory
 
 Before DDL, repository schema/migrations and affected tests were inspected at live base
