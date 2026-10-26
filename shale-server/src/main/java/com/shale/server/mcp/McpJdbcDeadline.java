@@ -6,7 +6,7 @@ import java.lang.reflect.*;
 import java.util.logging.Logger;
 
 /** JDBC-only decoration, never tool dispatch. The request deadline travels explicitly in each lease.
- * Uses the existing runtime pool with Hikari 5.1's bounded borrow; ordinary pool settings are untouched. */
+ * Uses the explicitly supplied pool with Hikari 5.1's bounded borrow; pool settings are untouched. */
 final class McpJdbcDeadline implements DataSource {
     private final DataSource source;
     private final long deadline;
@@ -34,6 +34,10 @@ final class McpJdbcDeadline implements DataSource {
             int previous=connection.getNetworkTimeout();
             connection.setNetworkTimeout(Runnable::run,remaining());
             return (Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(proxy,method,args)->{
+                if(method.getName().equals("abort")) {
+                    if(source instanceof com.zaxxer.hikari.HikariDataSource pool) { pool.evictConnection(connection); return null; }
+                    return invoke(connection,method,args);
+                }
                 if(method.getName().equals("close")) {
                     try {connection.setNetworkTimeout(Runnable::run,previous);}
                     finally {connection.close();}return null;

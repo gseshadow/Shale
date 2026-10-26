@@ -33,7 +33,8 @@ public final class IntegrationInvocation {
     private IntegrationInvocation(VerifiedIntegrationContext context, Operation operation, long admissionDeadline) {
         if (context==null || context.credentialId()==null) throw new SecurityException("Verified ACCESS required.");
         authority=context; this.operation=Objects.requireNonNull(operation);
-        invocationId=UUID.randomUUID(); correlationId=UUID.randomUUID();
+        invocationId=context.invocationId()==null ? UUID.randomUUID() : context.invocationId();
+        correlationId=context.invocationId()==null ? UUID.randomUUID() : context.correlationId();
         long remaining=Math.max(0,Math.min(10_000_000_000L,admissionDeadline-System.nanoTime()));
         Instant maximum=Instant.now().plusNanos(remaining);
         deadline=context.deadline().isBefore(maximum) ? context.deadline() : maximum;

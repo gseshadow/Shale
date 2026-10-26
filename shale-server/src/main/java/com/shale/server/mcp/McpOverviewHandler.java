@@ -11,10 +11,14 @@ import java.util.function.LongFunction;
 /** Bounded single-Case Overview adapter. Identity and completed disclosure come exclusively from the integration seam. */
 final class McpOverviewHandler {
     static final McpSchema.Tool TOOL=contract();
-    private final LongFunction<IntegrationCaseReadService> services;
-    McpOverviewHandler(LongFunction<IntegrationCaseReadService> services) { this.services=Objects.requireNonNull(services); }
+    private final java.util.function.BiFunction<Long,AiCaseDataRequest,IntegrationCaseReader> services;
+    McpOverviewHandler(LongFunction<IntegrationCaseReadService> services) { Objects.requireNonNull(services);this.services=(deadline,request)->services.apply(deadline); }
+    McpOverviewHandler(java.util.function.BiFunction<Long,AiCaseDataRequest,IntegrationCaseReader> services) { this.services=Objects.requireNonNull(services); }
 
     McpSchema.CallToolResult call(VerifiedIntegrationContext authority,long deadline,Object requestId,Object params,McpSchema.Implementation serverInfo) {
+        return call(authority,deadline,requestId,params,serverInfo,null);
+    }
+    McpSchema.CallToolResult call(VerifiedIntegrationContext authority,long deadline,Object requestId,Object params,McpSchema.Implementation serverInfo,AiCaseDataRequest access) {
         var invocation=IntegrationInvocation.overview(authority,deadline);
         try {
             Map<?,?> request=params instanceof Map<?,?> m?m:Map.of();
@@ -25,7 +29,7 @@ final class McpOverviewHandler {
             // JSON Schema integer admits 1.0; the wire contract deliberately rejects floating tokens.
             Long caseId=(value instanceof Integer || value instanceof Long) ? ((Number)value).longValue():null;
             var mapper=McpTransportConfiguration.mapper();
-            DisclosureBuffer buffer=services.apply(deadline).overview(invocation,caseId,completed->{
+            DisclosureBuffer buffer=services.apply(deadline,access).overview(invocation,caseId,completed->{
                 try {
                     var envelope=new LinkedHashMap<String,Object>(mapper.getJsonMapper().convertValue(success(completed),Map.class));
                     // Modern SDK stamps this fixed public identity on every result. Include its actual bytes.

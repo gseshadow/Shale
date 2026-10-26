@@ -18,8 +18,20 @@ final class McpPayloadLogFilter extends TurboFilter {
             }
         }
     }
+    static void installSqlProtection() {
+        install();
+        java.util.logging.Logger.getLogger("com.microsoft.sqlserver.jdbc").setLevel(java.util.logging.Level.OFF);
+        var manager=java.util.logging.LogManager.getLogManager();var names=manager.getLoggerNames();
+        while(names.hasMoreElements()) {
+            String name=names.nextElement();
+            if(name.startsWith("com.microsoft.sqlserver.jdbc")) {
+                var logger=manager.getLogger(name);
+                if(logger!=null){logger.setLevel(java.util.logging.Level.OFF);logger.setFilter(record->false);}
+            }
+        }
+    }
     @Override public FilterReply decide(Marker marker,Logger logger,Level level,String format,Object[] params,Throwable failure) {
-        if(logger.getName().startsWith("io.modelcontextprotocol.modern."))return FilterReply.DENY;
+        if(logger.getName().startsWith("com.microsoft.sqlserver.jdbc") || logger.getName().startsWith("io.modelcontextprotocol.modern."))return FilterReply.DENY;
         // Security 7's request-line DEBUG/TRACE includes the query string before the gate rejects it.
         // Suppress MCP query lines, including a context prefix; leave ordinary OAuth operation logs alone.
         if(logger.getName().equals("org.springframework.security.web.FilterChainProxy")) {

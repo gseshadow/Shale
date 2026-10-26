@@ -4258,3 +4258,34 @@ permissions/fleet/operations and tenant/legal retention remain OPEN. SDK 2.2.0-M
 no dependency upgrade or production approval. Only search_cases/get_case_overview and eight original
 fields; packaged flags OFF, no real tenant/integration enabled, no production/Azure SQL/deployment or
 installer/version publication. Do not recommend real enablement or mark aggregate Phase 3B complete.
+
+### 10.30 Phase 3B.7 SQL confinement implementation — 2026-10-26
+
+The approved [SQL-confinement contract](phase3b7-sql-confinement-contract.md) now has an additive
+implementation and [scoped verification record](../testing/phase3b7-sql-confinement-implementation.md).
+**SQL confinement: FIXED. Expiry serving: FIXED at the recorded local scope.** The two #1919 direct
+SQL statements are denied as the actual dedicated AI login, and both independent clients deny the
+observed blocked-expiry handoff after database UTC crosses the persisted expiry. This supersedes
+§10.29's unresolved causes for these three failures; it does not complete the broader 3B.7 OPEN ledger.
+
+Protected Case handlers use `DataSources.aiCaseData()` and only six proof-validating `AiData*V1`
+procedures. A separately owned mutable proof holder survives bounded cleanup; credential bytes never
+enter the verified context. SQL owns admission, read/audit atomicity and fresh one-shot final handoff.
+Mutable session context is defense in depth, with no direct Case/join/PHI authority for the AI principal.
+Only the private provisional lineage locator runs as owner; ordinary WEB/DESKTOP/REST/OAuth query,
+identity and audit paths remain separate. Live complete catalog/effective-grant attestation is required
+before handler readiness; no startup installation or grant occurs. Strategy B parity executes the
+ordinary DAO and separate protected SQL against the same hash-gated authoritative fixture.
+
+Audit compatibility preserves the existing PHI event and integration parent/resource vocabulary.
+New invocation state is operational ownership/lifecycle history, contains no proof/query/projection,
+and never substitutes for authorization or success audit. Admission and cleanup retain established
+quota/no-refund semantics. Migration/provisioning and read-only attestation introduce no application
+entity mutation or new PHI event; deployment changes remain separately governed operator work.
+
+Focused confinement, client/OAuth and ordinary regressions pass. The critical reactor ran once with
+215 passing tests; selector Python has 27 passing checks. The evidence record distinguishes standard
+affected-suite skips and a bounded, incomplete all-opt-in legacy SQL run from the actual passing new
+SQL proofs. No full 3B.7 acceptance matrix is resumed. Packaged transport/handlers remain OFF; no real
+tenant/integration, production/Azure SQL, deployment or installer/version publication. Phase 3B remains
+IN PROGRESS; broader acceptance and separately authorized operational enablement remain OPEN.

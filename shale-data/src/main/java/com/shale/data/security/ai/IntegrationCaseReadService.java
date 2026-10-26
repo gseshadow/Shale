@@ -12,7 +12,7 @@ import static com.shale.data.security.ai.IntegrationAccessAudit.*;
 /** Internal only: no bean, route, transport, token parser, servlet or ordinary-user fallback.
  * One existing shared operation; required audits commit and lease closes before encoding.
  * SQL finalizes authorization before exactly one completed immutable buffer is returned. */
-public final class IntegrationCaseReadService {
+public final class IntegrationCaseReadService implements IntegrationCaseReader {
     @FunctionalInterface interface Encoder {
         void encode(Object minimizedResult, UUID correlationId, OutputStream destination) throws IOException;
     }

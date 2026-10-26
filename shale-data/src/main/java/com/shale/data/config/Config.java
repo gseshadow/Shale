@@ -3,6 +3,15 @@ package com.shale.data.config;
 import java.util.Arrays;
 
 public final class Config {
+    private final java.util.function.Function<String,String> aiProperties;
+    public Config() { this(Config::get); }
+    public Config(java.util.function.Function<String,String> aiProperties) { this.aiProperties=java.util.Objects.requireNonNull(aiProperties); }
+    private String aiRequired(String key,String environmentKey) {
+        String value=aiProperties.apply(key);
+        if(value==null || value.isBlank()) value=aiProperties.apply(environmentKey);
+        if(value==null || value.isBlank()) throw new IllegalStateException("Missing required AI datasource configuration: "+key);
+        return value;
+    }
 	public String appJdbcUrl() {
 		return must("SHALE_APP_DB_URL", "SHALE_APP_JDBC_URL");
 	}
@@ -26,6 +35,11 @@ public final class Config {
 	public String rtPass() {
 		return must("SHALE_RT_DB_PASSWORD", "SHALE_RT_PASS");
 	}
+
+    // No aliases to ordinary runtime, auth or bootstrap credentials.
+    public String aiCaseDataJdbcUrl() { return aiRequired("shale.ai.data.jdbc-url", "SHALE_AI_DATA_JDBC_URL"); }
+    public String aiCaseDataUser() { return aiRequired("shale.ai.data.username", "SHALE_AI_DATA_USERNAME"); }
+    public String aiCaseDataPassword() { return aiRequired("shale.ai.data.password", "SHALE_AI_DATA_PASSWORD"); }
 
 	public int maxPoolSize() {
 		return intVal("DB_MAX_POOL_SIZE", 10);

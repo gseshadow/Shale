@@ -57,7 +57,7 @@ public class McpTransportConfiguration {
     }
     @Bean @Order(0)
     SecurityFilterChain mcpTransportChain(HttpSecurity http, McpTransportProperties transport, McpOAuthProperties identity,
-            Environment env, ObjectProvider<AiAccessTokenValidator> validators, ObjectProvider<DeadlineAccess> bounded) throws Exception {
+            Environment env, ObjectProvider<AiAccessTokenValidator> validators, ObjectProvider<DeadlineAccess> bounded, ObjectProvider<McpAiCaseData> confined) throws Exception {
         transport.validate(identity);
         http.securityMatcher(request -> {
             String path=request.getRequestURI().substring(request.getContextPath().length());
@@ -70,8 +70,16 @@ public class McpTransportConfiguration {
                 .sessionManagement(c->c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(c->c.anyRequest().permitAll());
         http.addFilterBefore(new McpGate(transport,identity,env.getProperty("shale.ai.enabled",Boolean.class,false),
-                (token,deadline)->{var fixture=validators.getIfAvailable();return fixture!=null?fixture.validate(token):bounded.getObject().validate(token,deadline);},System::nanoTime),SecurityContextHolderFilter.class);
+                (token,deadline)->{var protectedData=confined.getIfAvailable();if(protectedData!=null)return protectedData.authenticate(token,deadline);var fixture=validators.getIfAvailable();return fixture!=null?fixture.validate(token):bounded.getObject().validate(token,deadline);},System::nanoTime),SecurityContextHolderFilter.class);
         return http.build();
+    }
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${shale.ai.enabled:false}' == 'true' && '${shale.ai.mcp.enabled:false}' == 'true' && ('${shale.ai.mcp.search-cases-enabled:false}' == 'true' || '${shale.ai.mcp.get-case-overview-enabled:false}' == 'true')")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(McpAiCaseData.class)
+    McpAiCaseData mcpAiCaseData(Environment env,McpOAuthProperties identity,DataSources sources) {
+        if(!env.acceptsProfiles(org.springframework.core.env.Profiles.of("test")) || identity.identity()!=McpOAuthProperties.Identity.TEST || env.acceptsProfiles(org.springframework.core.env.Profiles.of("prod","azure")))
+            throw new IllegalStateException("Case handlers require isolated test configuration.");
+        return new McpAiCaseData(env,identity,sources);
     }
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({AiAccessTokenValidator.class,DeadlineAccess.class})
@@ -110,8 +118,11 @@ public class McpTransportConfiguration {
                 .maxRequestSize(8192).keepAliveInterval(null)
                 // The namespace security gate uses exact configured Origin values before this servlet.
                 .httpHeaderValidator(headers->{})
-                .contextExtractor(request->McpTransportContext.create(Map.of(McpGate.AUTHORITY,request.getAttribute(McpGate.AUTHORITY),
-                        McpGate.DEADLINE,request.getAttribute(McpGate.DEADLINE))))
+                .contextExtractor(request->{
+                    var context=new java.util.HashMap<String,Object>();context.put(McpGate.AUTHORITY,request.getAttribute(McpGate.AUTHORITY));context.put(McpGate.DEADLINE,request.getAttribute(McpGate.DEADLINE));
+                    if(request.getAttribute(McpGate.ACCESS)!=null)context.put(McpGate.ACCESS,request.getAttribute(McpGate.ACCESS));
+                    return McpTransportContext.create(context);
+                })
                 .build();
         var registration=new ServletRegistrationBean<>(servlet,"/mcp");
         registration.setName("shaleMcp");registration.setAsyncSupported(true);registration.setLoadOnStartup(1);

@@ -142,8 +142,8 @@ public class ShaleServerServiceConfiguration {
 
     @Bean
     @Profile({"dev", "local", "prod", "azure"})
-    DataSources serverDataSources() {
-        return new DataSources(new Config());
+    DataSources serverDataSources(org.springframework.core.env.Environment environment) {
+        return new DataSources(new Config(environment::getProperty));
     }
 
     @Bean

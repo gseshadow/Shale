@@ -152,6 +152,12 @@ class McpTransportTest {
         var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger("io.modelcontextprotocol.modern.JsonRpc");
         var previous=logger.getLevel();try {logger.setLevel(ch.qos.logback.classic.Level.DEBUG);assertFalse(logger.isDebugEnabled());}finally {logger.setLevel(previous);}
     }
+    @Test void sqlProofParameterLoggingIsDeniedEvenUnderDebug() {
+        McpPayloadLogFilter.installSqlProtection();
+        var jdbc=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger("com.microsoft.sqlserver.jdbc.SQLServerPreparedStatement");
+        var previous=jdbc.getLevel();try{jdbc.setLevel(ch.qos.logback.classic.Level.TRACE);assertFalse(jdbc.isTraceEnabled());assertFalse(jdbc.isErrorEnabled());}finally{jdbc.setLevel(previous);}
+        assertFalse(java.util.logging.Logger.getLogger("com.microsoft.sqlserver.jdbc.internals.TDS.Writer").isLoggable(java.util.logging.Level.FINEST));
+    }
     @Test void processCeilingRejectsImmediatelyAndReleasesAfterFailure()throws Exception {
         var entered=new CountDownLatch(5);var release=new CountDownLatch(1);
         gate=new McpGate(new McpTransportProperties(true,Set.of()),identity,true,t->{entered.countDown();try {release.await(5,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}throw new SecurityException();});

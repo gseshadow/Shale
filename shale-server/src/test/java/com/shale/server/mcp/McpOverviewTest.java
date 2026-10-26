@@ -84,7 +84,7 @@ class McpOverviewTest {
             var env=new org.springframework.mock.env.MockEnvironment();env.setActiveProfiles("test",profile);
             if(profile.equals("local"))env.setActiveProfiles("local");
             assertThrows(IllegalStateException.class,()->new McpOverviewConfiguration().mcpOverviewHandler(env,
-                    new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false),null,null));
+                    new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false),null));
         }
     }
     @Test void errorsAreClosedAndUnavailableCategoriesHaveOneShape()throws Exception {

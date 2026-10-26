@@ -69,7 +69,7 @@ class McpSearchTest {
         var config=new McpSearchConfiguration();
         for(String profile:List.of("prod","azure","local")) {
             var env=new org.springframework.mock.env.MockEnvironment();env.setActiveProfiles(profile);
-            assertThrows(IllegalStateException.class,()->config.mcpSearchHandler(env,new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false),null,null));
+            assertThrows(IllegalStateException.class,()->config.mcpSearchHandler(env,new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false),null));
         }
     }
     @Test void duplicateTextEscapingCanExceedFullEnvelopeWhileStructuredContentFits()throws Exception {
