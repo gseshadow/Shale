@@ -1,5 +1,142 @@
 # Phase 3B.7 adversarial/local acceptance — 2026-10-24
 
+## Current acceptance status after merged #1922 — 2026-10-26
+
+**3B.7 OPEN pending remaining local/adversarial acceptance; Phase 3B IN PROGRESS.**
+Execution classification: **BLOCKED** while required Category A evidence cannot execute.
+Base: `0eed0e4a709e4d858065893b5889a603feb8d91a`; branch `codex/phase3b7-local-acceptance`.
+
+The authoritative artifact was recovered and hash-verified in #1919 and #1922:
+728,862 bytes, SHA-256 `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`.
+**Runtime confinement FIXED; expiry serving FIXED at #1922's recorded local scope.**
+The [implementation receipt](phase3b7-sql-confinement-implementation.md) supersedes the
+earlier failed findings below. No regression evidence has reopened either finding.
+Earlier failure text, commands, hashes and receipts remain historical evidence, not current failures.
+
+This environment does not contain the private source or derived/candidate SQL. The recorded
+`/workspace/attachments/c051e076-a559-494d-ba96-3b4b7b8b7b97/shale-schema-source.sql`
+path is absent. Repository and mounted-file searches found no replacement. That is a **fresh
+execution prerequisite**, not a reversal of the recorded artifact recovery or a security failure.
+Do not synthesize an authoritative schema, weaken catalog hashes, or count opt-in skips as passes.
+
+### Every remaining ledger gate: local A versus deployment B
+
+Category A must pass before `3B.7 COMPLETE (local/adversarial acceptance)` and
+`Phase 3B COMPLETE at pre-deployment/local acceptance scope`. Category B remains OPEN before
+real pilot even if A completes. Mixed historical rows are split explicitly below.
+
+| Remaining ledger item | Category | Rationale and required evidence |
+| --- | --- | --- |
+| tls-proxy-and-serving-oauth: isolated serving TLS/proxy and local OAuth composition | A — OPEN | Roadmap §10.11 explicitly requires serving server/TLS/proxy in 3B.7. Header-only servlet tests do not close real TLS, canonical origin, hostile Host/Forwarded/X-Forwarded/Origin and HTTPS enforcement. The finished confined server requires the private candidate. |
+| tls-proxy-and-serving-oauth: actual public deployment and real human/tenant flow | B — OPEN | Real ingress certificates, proxy trust/configuration and identity integration are environment/operator acceptance; no live tenant is permitted in this task. |
+| complete-identical-client-corpus | A — OPEN | Both finished clients must execute the same complete authentication, catalog, search, Overview and live-authority matrix. #1922's narrower two-client expiry proof remains FIXED but does not close this corpus. |
+| response-boundaries | A — OPEN | Deterministic source/encoding/full-envelope below/exact/above limits, Unicode expansion, nulls and valid/invalid source widths protect disclosure; unit injection alone does not close finished serving acceptance. Search 32/64 KiB; Overview 8/32 KiB. |
+| pool-async | A — OPEN | New dedicated AI pool must pass concurrent A/B, before/during-SQL cancellation, timeout, rejected task, reuse after failure, close/cleanup faults and interruption without proof/tenant/actor/invocation leakage. Legacy shared-pool evidence is supplemental. |
+| replicas-quota-restart: bounded replicas/replacement JVM and replay | A — OPEN | Durable row/rate/concurrency accounting, replacement process, new ACCESS/grant and consumed/released invocation replay are local security requirements. Synthetic legacy quota tests cannot establish the entire new protected serving path. |
+| replicas-quota-restart: fleet stress, database failover/restart operations | B — OPEN | Production-scale load, operational SQL restart/failover and installed fleet topology are deployment acceptance. Replacement JVM accounting is retained in A; this split does not waive durability. |
+| audit-faults-and-review | A — OPEN | Finished protected path must suppress every requested parent/child/PHI/quota/commit/lost-ACK/close/outage fault, preserve actual commits, avoid duplicate ALLOWED_READ/reread, inspect persisted privacy, and enforce authoritative admin review/page <=100/history IDs. |
+| finished-conformance | A — OPEN | Run applicable current suite on actual two-tool server; preserve SUCCESS/FAILURE/SKIP/NOT TESTABLE counts. Missing diagnostic tools are unsupported scenarios, never invented tools or passing scenarios. |
+| performance: bounded local sanity and available representative plans | A — OPEN | Detect obvious regressions in ACCESS, list, search, Overview, quota/audit and handoff. Collect protected query plans when available; no SLA claim or requirement for full production load. |
+| performance: production SLA/capacity | B — OPEN | Requires deployed topology, volumes and operator thresholds; bounded local samples cannot certify it. |
+| source-vs-deployed-parity: local source identity/candidate/catalog | A — prerequisite BLOCKED | Historical hash gate passed. Fresh authoritative runs require the same immutable bytes and reviewed derivation/catalog; receipt hashes alone cannot recreate SQL. |
+| source-vs-deployed-parity: historical provenance/deployed owners/collation/catalog | B — OPEN | Hash identity does not establish historical ownership/collation or current deployed catalog. Must verify during governed deployment, without inventing provenance. |
+| deployed-auth-and-runtime | B — OPEN | Production/Azure SQL, Stage A/B permissions, installed API/JAR/caller compatibility, old-caller drain, fleet/native Windows parity and monitoring require operator/deployment evidence. Ordinary local WEB/DESKTOP/REST/OAuth regression checks remain A. |
+| retention-legal | B — OPEN | **tenant/legal retention sign-off: OPEN**. Roadmap §10.12 requires it before real-data enablement; no approval is invented for synthetic local testing. |
+| sdk-production-approval | B — OPEN | Prerelease approval concerns production suitability; any concrete technical defect would still block A. Recheck official releases without changing dependencies during acceptance. |
+| deployment-live-acceptance | B — OPEN | R4/live configuration, real tenant/integration enablement, operator/security/tenant-owner safe-pilot approval and separately authorized configuration changes are deployment gates. §10.11's owner authorization sentence remains a pilot gate; it does not authorize enablement here. |
+| required regressions, including unfinished all-opt-in coverage | A — OPEN until recorded | Focused, ordinary, affected, mandatory SQL subsets, critical once, selector Python and static checks must be reported honestly. Partition the prior timed-out legacy SQL suite into bounded complete groups; never treat that timeout as a pass. |
+
+The runtime-confinement and expiry-serving rows are **FIXED**, not remaining OPEN gates.
+All deployment gates remain OPEN; nothing here authorizes SQL against production/Azure, JAR upload,
+global/MCP/handler/tenant enablement, live credentials, installer or version publication.
+
+### Current-run evidence
+
+**Final classification: BLOCKED. 3B.7 remains OPEN; Phase 3B IN PROGRESS.**
+No new confinement or expiry regression was observed; #1922's FIXED scope is retained.
+The private authoritative source/candidate is absent, and preparation fails before decoding/SQL.
+No artifact is reconstructed from assumptions or historical hashes.
+
+| Executed local check | Result |
+| --- | --- |
+| focused | 90 PASS; 0 skips; 0 failures / 0 errors |
+| ordinary | 55 PASS; 0 skips; 0 failures / 0 errors |
+| affected-1 | 192 PASS; 2 skips; 0 failures / 0 errors |
+| desktop-and-http | 58 PASS; 0 skips; 0 failures / 0 errors |
+| document-affected-1 | 129 PASS; 0 skips; 0 failures / 0 errors |
+| critical | 215 PASS; 0 skips; 0 failures / 0 errors |
+| All 13 bounded legacy SQL groups | 182 PASS; 0 skips; 0 failures / 0 errors; all 101 declared methods and parameterized cases selected |
+| Selector Python | 27 PASS |
+| Case / Phase1R launcher Python | 4 / 3 PASS |
+| Auth launcher Python | 35 PASS, 8 native-platform skips |
+| Docs/static, historical receipt equality, JSON, diff | PASS |
+
+`affected-1` reproduces #1922's selector against #1921 base. `document-affected-1` is the standard
+security-data selector for this documentation delta. Exact Maven argv, every legacy method partition,
+counts and per-group durations are in `currentLocalAcceptance` in the
+[verification JSON](phase3b7-verification.json). Counts overlap; they are not additive unique coverage.
+The two authoritative-client skips in `affected-1` are **not** SQL/client acceptance. No all-tests
+profile or GitHub Actions was substituted. The critical reactor ran once across all seven modules.
+
+The old #1922 all-opt-in 360-second timeout remains incomplete, never a pass. Its legacy class was
+material because it covers durable budgets/replacement JVMs, OAuth lineage/replay, audit/expiry and
+pool behavior used by the new boundary. This run executes all 101 current declared methods as 13
+independent groups of at most eight methods, each capped at 340 seconds. Every group completes.
+This closes that legacy unexecuted-coverage question, while preserving the new serving-path gaps.
+
+| Remaining finished-server acceptance | TypeScript / Python or local result |
+| --- | --- |
+| Identical authentication/catalog/search/Overview/live-authority corpus | Both BLOCKED / NOT EXECUTED; complete minimum-vector inventory in JSON. #1922's narrower client/expiry pass is historical FIXED evidence, not a complete corpus. |
+| Search boundaries: structured 32 KiB; full 64 KiB | Complete below/exact/above/source/Unicode matrix BLOCKED; existing unit/envelope regressions pass. |
+| Overview boundaries: structured 8 KiB; full 32 KiB | Complete below/exact/above/source/null/max-width matrix BLOCKED; existing unit/fault regressions pass. |
+| Dedicated AI pool/async/cancellation | Full concurrent A/B, before/during SQL, timeout/rejection, reuse, close/cleanup/interruption matrix OPEN. Unit proof-lifetime/fault tests pass; legacy pool tests do not close it. |
+| Quota/restart/replay | Legacy actual-SQL multiple service instances, replacement JVM, row/rate/concurrency and no-refund/replay tests pass. Complete confined serving/new ACCESS/grant/invocation replay matrix remains OPEN. |
+| Audit faults/privacy/review | Legacy real-SQL audit rollback, lost-ACK/close, append-only/privacy and same-tenant admin/non-admin/foreign-history isolation pass. Full new serving-path faults, all specified privacy sentinels and authoritative <=100 admin review remain OPEN. No new audit schema or event vocabulary. |
+| TLS/proxy | Category A isolated finished-server TLS execution remains BLOCKED under §10.11; header-only tests are supplemental. Actual public ingress remains Category B OPEN. |
+| Protected component performance/plans | OPEN: no finished tools/list, isolated quota/audit or handoff timing, or authoritative protected query plans. No SLA/capacity claim. |
+
+Conformance registry check: alpha tag remains `0.2.0-alpha.12`; latest tag is the older `0.1.16`.
+Applicable pinned suite: `@modelcontextprotocol/conformance 0.2.0-alpha.12`, protocol `2026-07-28`.
+Fresh finished-server conformance is **NOT TESTABLE** because the authoritative server cannot start;
+there are no fresh scenario counts to report. Historical #1919 raw totals remain **25 SUCCESS,
+4 FAILURE, 5 SKIP**. The four failures require unavailable diagnostic tools: undeclared-capability
+rejection/HTTP-400, independent-request-on-stream and log-without-loglevel checks. These scenarios
+are NOT TESTABLE with this two-tool profile; raw failures are retained. Five subscription/listChanged
+checks skip unsupported advertised capabilities. No diagnostic tools added; no full-conformance claim.
+
+Supplemental performance: five samples per operation, actual synthetic internal legacy service,
+milliseconds shown as min / median / max. Search/Overview include quota, audit and handoff together;
+these are neither new confined-server measurements nor isolated transaction timings.
+
+| Operation | Milliseconds: min / median / max |
+| --- | --- |
+| accessValidation | 15.36 / 16.54 / 23.99 |
+| searchIncludingQuotaAuditAndHandoff | 34.14 / 52.52 / 203.86 |
+| overviewIncludingQuotaAuditAndHandoff | 45.94 / 48.55 / 193.63 |
+
+Official Java SDK releases were rechecked on 2026-10-26: `v2.2.0-M1` still has `prerelease=true`;
+stable `v2.1.0` exists but its release does not supply the modern stateless server introduced by M1.
+No newer supported stable modern-server release was found in the current release listing.
+Dependency unchanged; SDK production approval remains Category B OPEN. A future stable migration
+should be a dedicated compatibility task, not an acceptance-run upgrade.
+**tenant/legal retention sign-off: OPEN** (Category B).
+
+Exact Category B gates remaining before real pilot: production/Azure SQL and deployed source/catalog/
+owner/collation parity; Stage A/B permission/effective-identity state; installed API/JAR/caller parity,
+old-caller drain and native fleet checks; real public TLS/proxy/canonical-origin/HTTPS and edge/logging
+policy; real human OAuth/tenant/integration/redirect/key/credential inventory; R4/live operator/security/
+tenant-owner safe-pilot approval and separately authorized configuration; monitoring, shared quota/disable
+propagation, containment, operational restart/failover and capacity; legal retention sign-off; SDK
+prerelease production approval (or a separately reviewed stable modern-server compatibility change).
+
+The owned loopback SQL container was removed after checking its exact ID and task label; its generated
+credential file was erased. Original checkout/unrelated work preserved. No production/Azure SQL,
+JAR deployment, real enablement/credentials, installer/version publication or activation-default change.
+Next local action is to supply the immutable private source, reproduce its reviewed candidate and finish
+Category A. No deployment/live-acceptance sequence is recommended while local acceptance is BLOCKED.
+
+## Historical #1919 authoritative attempt — superseded failures, evidence retained
+
 ## Resumed authoritative acceptance — recovered input, 2026-10-24
 
 **3B.7 FAILED — runtime permission requirements and serving expiry acceptance fail.

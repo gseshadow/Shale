@@ -1,24 +1,23 @@
 {
   "phase": "3B.7",
-  "classification": "FAILED",
-  "reason": "Unresolved shared-runtime tenant/user context and PHI audit INSERT capabilities; serving expiry drill fails",
+  "classification": "BLOCKED",
+  "reason": "Remaining Category A local acceptance cannot complete without private hash-gated authoritative source/candidate; #1922 fixes retained",
   "aggregatePhase3B": "IN PROGRESS",
-  "baseCommit": "0a467caf55c0c1eab89abdf45292388352875296",
-  "baseTree": "790a53e86e2169067908dbd341806631927b105b",
-  "branch": "codex/phase3b7-authoritative-acceptance",
+  "baseCommit": "0eed0e4a709e4d858065893b5889a603feb8d91a",
+  "baseTree": "8b7be69fd9786202834659a41a63d99d9f38880a",
+  "branch": "codex/phase3b7-local-acceptance",
   "authoritativeCaseArtifact": {
-    "path": "/workspace/attachments/c051e076-a559-494d-ba96-3b4b7b8b7b97/shale-schema-source.sql",
     "filename": "shale-schema-source.sql",
     "bytes": 728862,
     "sha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
-    "provenance": "operator-supplied recovered authoritative artifact",
-    "sourceBytesReadThisExecution": true,
-    "sourceHashGate": "MATCH",
-    "sourceImmutable": true,
-    "derivedSha256": "6e571b96915e6b80436898b664a516c3782caddec78efca13336cc08bcaab290",
-    "candidateSha256": "621e8013f417108e556e056723ec9d4e424d66632e5e0ace5fd23a4a9f4e331d",
-    "rlsPermissionAcceptance": "Case/RLS scenarios PASS; requested raw runtime permission acceptance FAILED",
-    "historicalProvenanceRecomputed": false
+    "recoveryStatus": "RECOVERED AND HASH-VERIFIED at #1919/#1922 recorded scope",
+    "sourceBytesReadThisExecution": false,
+    "pathAvailableThisExecution": false,
+    "sourceHashGate": "Not recomputed this execution; no bytes available",
+    "rlsPermissionAcceptance": "FIXED at #1922 recorded local scope; no regression evidence",
+    "implementationReceipt": "docs/testing/phase3b7-sql-confinement-implementation.md",
+    "requiredDerivedSha256": "40a665caefb3203a6c364d0caac3fadcc1a58d24a66a994f48e058b73ae6f243",
+    "requiredCandidateSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f"
   },
   "productionChanges": [],
   "tools": [
@@ -1403,21 +1402,7 @@
     }
   },
   "remainingGaps": [
-    "runtime-confinement \u2014 FAILED: Shared non-bypass SQL login can overwrite both context keys and read B rows, and can INSERT a B PHI audit row while A context is stamped (rolled back). MCP tenant/user arguments remain rejected. No new confinement/PHI write model was approved or installed.",
-    "expiry-serving \u2014 FAILED: Both clients receive successful Overview in the final-gate drill although the test observes a SQL lock wait and confirms the injected idle deadline expired before unlock. No terminal denial. Root cause unresolved; this is not an expiry pass.",
-    "tls-proxy-and-serving-oauth \u2014 OPEN: MCP served loopback HTTP; OAuth maintained servlet filters and synthetic human WEB store. No configured trusted TLS/reverse-proxy execution or fully serving human/OAuth flow.",
-    "complete-identical-client-corpus \u2014 OPEN: 18-record authoritative core matrix and revocation race execute on both clients, not the entire historical authentication/assertion/protocol/punctuation/depth/type corpus, neither/live scope reduction, every kill switch/race point, or closed-status search on each finished client.",
-    "response-boundaries \u2014 OPEN: Oversized source is rejected; exhaustive real-source just-below/exact/above boundaries, every Unicode/color/timestamp edge and full-envelope combination remain unexecuted.",
-    "pool-async \u2014 OPEN: Authoritative single-SPID A1/A2/B1/A1, failed second-key setup/close/reborrow pass; complete serving async/rejected-task/cancellation/timeout interleavings remain unexecuted.",
-    "replicas-quota-restart \u2014 OPEN: Prior synthetic SQL/replacement-JVM evidence retained. Full authoritative serving multi-replica quota stress, process replacement and SQL Server restart are not exercised.",
-    "audit-faults-and-review \u2014 OPEN: Authoritative PHI failure and standalone real DENY/precommit/lost-ack pass. Full serving integration-audit permission DENY/outage/uncertain-commit/close-fault corpus, authoritative admin review and prompt/privacy corpus remain incomplete; PHI write authority fails separately.",
-    "finished-conformance \u2014 OPEN: Finished two-tool server runs tools-list/server-stateless only; four raw failures require unsupported diagnostic tools and five checks skip. No full conformance claim or extra tools.",
-    "performance \u2014 OPEN: Local complete-request timings only. No representative plan/load/threshold acceptance or isolated audit/quota timings.",
-    "source-vs-deployed-parity \u2014 OPEN: Recovered bytes/hash do not prove historical source identifier collation, owners or deployed catalog parity. Disposable collation is SQL_Latin1_General_CP1_CI_AS; explicit dbo schema authorization is a local derivation requirement, not reconstructed historical provenance.",
-    "deployed-auth-and-runtime \u2014 OPEN: Stage A/B deployment/identity grants, compatible installed callers and API/JAR, old-caller drain, fleet/native Windows and operational monitoring evidence remain separate operator gates; no live checks.",
-    "retention-legal \u2014 OPEN: tenant/legal retention sign-off: OPEN. No repository evidence closes it; blocks real pilot.",
-    "sdk-production-approval \u2014 OPEN: Official v2.2.0-M1 release remains prerelease. Stable v2.1.0 also exists; no dependency upgrade or production approval.",
-    "deployment-live-acceptance \u2014 OPEN: No deployment or enablement authorized/performed; R4/live configuration, operational and tenant/security-owner acceptance remain separate. No real enablement recommendation."
+    "Current exhaustive Category A/B OPEN ledger: docs/testing/phase3b7-adversarial-acceptance.md; runtime confinement and expiry serving FIXED at #1922 recorded scope"
   ],
   "retention": {
     "proposedYears": 7,
@@ -5014,5 +4999,1153 @@
     },
     "handoffDate": "2026-10-25"
   },
-  "sourceManifestScope": "Historical #1918 hosted/source evidence; original commit scopes retained. Current source identity is recorded in resumedAuthoritativeAcceptance."
+  "sourceManifestScope": "Historical #1918 hosted/source evidence; original commit scopes retained. Current source identity is recorded in resumedAuthoritativeAcceptance.",
+  "historical1919TopLevelStatus": {
+    "classification": "FAILED",
+    "reason": "Unresolved shared-runtime tenant/user context and PHI audit INSERT capabilities; serving expiry drill fails",
+    "baseCommit": "0a467caf55c0c1eab89abdf45292388352875296",
+    "baseTree": "790a53e86e2169067908dbd341806631927b105b",
+    "branch": "codex/phase3b7-authoritative-acceptance",
+    "remainingGaps": [
+      "runtime-confinement \u2014 FAILED: Shared non-bypass SQL login can overwrite both context keys and read B rows, and can INSERT a B PHI audit row while A context is stamped (rolled back). MCP tenant/user arguments remain rejected. No new confinement/PHI write model was approved or installed.",
+      "expiry-serving \u2014 FAILED: Both clients receive successful Overview in the final-gate drill although the test observes a SQL lock wait and confirms the injected idle deadline expired before unlock. No terminal denial. Root cause unresolved; this is not an expiry pass.",
+      "tls-proxy-and-serving-oauth \u2014 OPEN: MCP served loopback HTTP; OAuth maintained servlet filters and synthetic human WEB store. No configured trusted TLS/reverse-proxy execution or fully serving human/OAuth flow.",
+      "complete-identical-client-corpus \u2014 OPEN: 18-record authoritative core matrix and revocation race execute on both clients, not the entire historical authentication/assertion/protocol/punctuation/depth/type corpus, neither/live scope reduction, every kill switch/race point, or closed-status search on each finished client.",
+      "response-boundaries \u2014 OPEN: Oversized source is rejected; exhaustive real-source just-below/exact/above boundaries, every Unicode/color/timestamp edge and full-envelope combination remain unexecuted.",
+      "pool-async \u2014 OPEN: Authoritative single-SPID A1/A2/B1/A1, failed second-key setup/close/reborrow pass; complete serving async/rejected-task/cancellation/timeout interleavings remain unexecuted.",
+      "replicas-quota-restart \u2014 OPEN: Prior synthetic SQL/replacement-JVM evidence retained. Full authoritative serving multi-replica quota stress, process replacement and SQL Server restart are not exercised.",
+      "audit-faults-and-review \u2014 OPEN: Authoritative PHI failure and standalone real DENY/precommit/lost-ack pass. Full serving integration-audit permission DENY/outage/uncertain-commit/close-fault corpus, authoritative admin review and prompt/privacy corpus remain incomplete; PHI write authority fails separately.",
+      "finished-conformance \u2014 OPEN: Finished two-tool server runs tools-list/server-stateless only; four raw failures require unsupported diagnostic tools and five checks skip. No full conformance claim or extra tools.",
+      "performance \u2014 OPEN: Local complete-request timings only. No representative plan/load/threshold acceptance or isolated audit/quota timings.",
+      "source-vs-deployed-parity \u2014 OPEN: Recovered bytes/hash do not prove historical source identifier collation, owners or deployed catalog parity. Disposable collation is SQL_Latin1_General_CP1_CI_AS; explicit dbo schema authorization is a local derivation requirement, not reconstructed historical provenance.",
+      "deployed-auth-and-runtime \u2014 OPEN: Stage A/B deployment/identity grants, compatible installed callers and API/JAR, old-caller drain, fleet/native Windows and operational monitoring evidence remain separate operator gates; no live checks.",
+      "retention-legal \u2014 OPEN: tenant/legal retention sign-off: OPEN. No repository evidence closes it; blocks real pilot.",
+      "sdk-production-approval \u2014 OPEN: Official v2.2.0-M1 release remains prerelease. Stable v2.1.0 also exists; no dependency upgrade or production approval.",
+      "deployment-live-acceptance \u2014 OPEN: No deployment or enablement authorized/performed; R4/live configuration, operational and tenant/security-owner acceptance remain separate. No real enablement recommendation."
+    ],
+    "authoritativeCaseArtifact": {
+      "path": "/workspace/attachments/c051e076-a559-494d-ba96-3b4b7b8b7b97/shale-schema-source.sql",
+      "filename": "shale-schema-source.sql",
+      "bytes": 728862,
+      "sha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+      "provenance": "operator-supplied recovered authoritative artifact",
+      "sourceBytesReadThisExecution": true,
+      "sourceHashGate": "MATCH",
+      "sourceImmutable": true,
+      "derivedSha256": "6e571b96915e6b80436898b664a516c3782caddec78efca13336cc08bcaab290",
+      "candidateSha256": "621e8013f417108e556e056723ec9d4e424d66632e5e0ace5fd23a4a9f4e331d",
+      "rlsPermissionAcceptance": "Case/RLS scenarios PASS; requested raw runtime permission acceptance FAILED",
+      "historicalProvenanceRecomputed": false
+    }
+  },
+  "historicalEvidenceScope": "authoritativeCaseArtifact, local, hosted*, performance, resumedAuthoritativeAcceptance and other prior receipts retain their original #1918/#1919 execution scopes; current execution is currentLocalAcceptance",
+  "currentLocalAcceptance": {
+    "date": "2026-10-26",
+    "phaseStatus": "OPEN pending remaining local acceptance",
+    "classification": "BLOCKED",
+    "sqlConfinement": "FIXED at #1922 recorded scope",
+    "expiryServing": "FIXED at #1922 recorded scope",
+    "artifactRecovery": "recovered and hash-verified historically; absent from current mounts",
+    "mergedPRsReviewed": [
+      1919,
+      1920,
+      1921,
+      1922
+    ],
+    "tests": [
+      {
+        "name": "focused",
+        "command": [
+          "mvn",
+          "-B",
+          "-pl",
+          "shale-server",
+          "-am",
+          "-Dtest=AiCaseDataMigrationContractTest,AiCaseDataAccessTest,ProofDigestTest,DataSourcesAiCaseDataTest,AiAccessContractTest,IntegrationCaseReadTest,IntegrationAccessContractTest,McpSearchTest,McpOverviewTest,McpTransportTest,McpJdbcDeadlineTest,OAuthAuthorizationFlowTest",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "exit": 0,
+        "counts": {
+          "tests": 90,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "name": "ordinary",
+        "command": [
+          "mvn",
+          "-B",
+          "-pl",
+          "shale-server,shale-desktop",
+          "-am",
+          "-Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,RuntimeSessionServiceTest,RuntimeSessionServiceTimingTest,RequestScopedDbSessionProviderTest,ServerSessionSkeletonTest,ServerSessionResolverTest,ShaleAuthTokenServiceTest,ServerAuthSessionServiceTest,DurableSessionTokenValidatorTest,MinimizedCaseReadControllerTest,MinimizedCaseReadJdbcTest,CaseOverviewAuditTest,OAuthAuthorizationFlowTest,OAuthRevocationPolicyTest,AuthServiceTest",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "exit": 0,
+        "counts": {
+          "tests": 55,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "name": "affected-1",
+        "command": [
+          "mvn",
+          "-B",
+          "-pl",
+          "shale-core,shale-data,shale-server",
+          "-am",
+          "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.ConfinedExpiryDrill,com.shale.server.mcp.McpConfinedClientFixture,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpSearchTest,com.shale.server.mcp.McpTransportTest,com.shale.server.oauth.AuthoritativeCaseMcpFixture,com.shale.server.oauth.AuthoritativeCaseMcpLocalSqlServerTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "exit": 0,
+        "durationSeconds": 17.397,
+        "counts": {
+          "tests": 194,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2
+        }
+      },
+      {
+        "name": "desktop-and-http",
+        "command": [
+          "mvn",
+          "-B",
+          "-pl",
+          "shale-server,shale-desktop",
+          "-am",
+          "-Dtest=DesktopRuntimeSessionLifecycleTest,DesktopSessionEnrollmentLifecycleTest,DesktopSessionEnrollmentClientTest,SessionPolicyInvalidationCoordinatorTest,AuthControllerTest,SessionControllerTest,DesktopSessionControllerTest,OAuthAuthorizationFlowTest,OAuthFilterIsolationTest,MinimizedCaseReadControllerTest",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "exit": 0,
+        "durationSeconds": 21.486,
+        "counts": {
+          "tests": 58,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "name": "document-affected-1",
+        "command": [
+          "mvn",
+          "-B",
+          "-pl",
+          "shale-core,shale-data,shale-server",
+          "-am",
+          "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "exit": 0,
+        "durationSeconds": 12.947,
+        "counts": {
+          "tests": 129,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "name": "critical",
+        "command": [
+          "mvn",
+          "-B",
+          "test"
+        ],
+        "exit": 0,
+        "durationSeconds": 24.501,
+        "counts": {
+          "tests": 215,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    ],
+    "noDeploymentOrRealEnablement": true,
+    "requiredFinishedClientMatrix": {
+      "status": "BLOCKED / NOT EXECUTED this run for both TypeScript and Python; not a negative security result",
+      "typescript": "@modelcontextprotocol/client 2.4.0",
+      "python": "mcp 2.3.0",
+      "protocol": "2026-07-28",
+      "vectors": {
+        "authentication": [
+          "valid ACCESS",
+          "expired ACCESS",
+          "revoked ACCESS",
+          "random opaque bearer",
+          "REFRESH as ACCESS",
+          "authorization code as ACCESS",
+          "WEB bearer",
+          "duplicate Authorization",
+          "malformed bearer",
+          "oversized bearer",
+          "wrong resource",
+          "wrong issuer",
+          "wrong client"
+        ],
+        "catalog": [
+          "search only",
+          "Overview only",
+          "both",
+          "neither",
+          "live scope reduction"
+        ],
+        "search": [
+          "valid",
+          "zero",
+          "page 0",
+          "page 9",
+          "hasMore",
+          "windowExhausted",
+          "blank",
+          "short",
+          "wildcard-only",
+          "literal wildcard-looking strings",
+          "oversized",
+          "bad page",
+          "additional property",
+          "Unicode"
+        ],
+        "overview": [
+          "same-tenant",
+          "unassigned",
+          "missing",
+          "foreign",
+          "deleted",
+          "malformed/invalid IDs",
+          "additional property"
+        ],
+        "liveAuthority": [
+          "tenant off",
+          "integration revoke",
+          "grant revoke",
+          "session revoke",
+          "user disable",
+          "credential expiry",
+          "credential revoke"
+        ]
+      }
+    },
+    "responseBoundaries": {
+      "status": "OPEN; existing unit/injected regressions only, complete source/serving matrix BLOCKED",
+      "search": {
+        "structuredBytes": 32768,
+        "fullResponseBytes": 65536
+      },
+      "overview": {
+        "structuredBytes": 8192,
+        "fullResponseBytes": 32768
+      },
+      "requiredVectors": [
+        "just below",
+        "exact where practical",
+        "above",
+        "escaped Unicode expansion",
+        "null fields",
+        "max-length valid fields",
+        "invalid overlength source values",
+        "no partial protected output"
+      ]
+    },
+    "dedicatedAiPoolMatrix": {
+      "status": "OPEN; full new dedicated serving pool matrix BLOCKED",
+      "requiredVectors": [
+        "concurrent tenant A/B",
+        "cancellation before SQL",
+        "cancellation during SQL wait",
+        "timeout",
+        "rejected task",
+        "failed request then successful reuse",
+        "connection close failure",
+        "cleanup failure",
+        "request interruption",
+        "no proof/tenant/actor/invocation leakage"
+      ]
+    },
+    "auditMatrix": {
+      "status": "OPEN; authoritative finished-path execution BLOCKED",
+      "faults": [
+        "integration parent append",
+        "child append",
+        "PHI append",
+        "quota accounting",
+        "commit",
+        "lost commit ACK",
+        "close",
+        "failure-audit outage"
+      ],
+      "invariants": [
+        "no protected disclosure",
+        "no duplicate ALLOWED_READ",
+        "actual committed history retained",
+        "no automatic reread"
+      ],
+      "persistedAuditExclusions": [
+        "query",
+        "Case name",
+        "Case number",
+        "bearer",
+        "ProofDigest",
+        "OAuth assertion",
+        "JSON-RPC ID",
+        "exception text",
+        "SQL text",
+        "arbitrary metadata"
+      ],
+      "adminReview": [
+        "same-tenant active admin allowed",
+        "non-admin denied",
+        "foreign-tenant history denied",
+        "page <=100",
+        "no generic dump",
+        "historical Case resource IDs only as designed"
+      ]
+    },
+    "sdk": {
+      "checkedDate": "2026-10-26",
+      "url": "https://api.github.com/repos/modelcontextprotocol/java-sdk/releases?per_page=10",
+      "releases": [
+        {
+          "tag": "v2.2.0-M1",
+          "prerelease": true,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v2.2.0-M1",
+          "publishedAt": "2026-10-16T12:48:12Z",
+          "modernServer": true
+        },
+        {
+          "tag": "v2.1.0",
+          "prerelease": false,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v2.1.0",
+          "publishedAt": "2026-10-16T11:55:36Z",
+          "modernServer": false
+        },
+        {
+          "tag": "v1.1.5",
+          "prerelease": false,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v1.1.5",
+          "publishedAt": "2026-10-16T13:23:08Z",
+          "modernServer": false
+        },
+        {
+          "tag": "v0.18.5",
+          "prerelease": false,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v0.18.5",
+          "publishedAt": "2026-10-16T13:23:42Z",
+          "modernServer": false
+        },
+        {
+          "tag": "v2.0.1",
+          "prerelease": false,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v2.0.1",
+          "publishedAt": "2026-08-19T13:47:03Z",
+          "modernServer": false
+        },
+        {
+          "tag": "v1.1.4",
+          "prerelease": false,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v1.1.4",
+          "publishedAt": "2026-08-19T13:45:33Z",
+          "modernServer": false
+        },
+        {
+          "tag": "v0.18.4",
+          "prerelease": false,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v0.18.4",
+          "publishedAt": "2026-08-19T13:44:47Z",
+          "modernServer": false
+        },
+        {
+          "tag": "v2.0.0",
+          "prerelease": false,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v2.0.0",
+          "publishedAt": "2026-06-11T15:43:52Z",
+          "modernServer": false
+        },
+        {
+          "tag": "v0.18.3",
+          "prerelease": false,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v0.18.3",
+          "publishedAt": "2026-06-09T13:39:01Z",
+          "modernServer": false
+        },
+        {
+          "tag": "v2.0.0-RC1",
+          "prerelease": true,
+          "draft": false,
+          "url": "https://github.com/modelcontextprotocol/java-sdk/releases/tag/v2.0.0-RC1",
+          "publishedAt": "2026-06-04T14:38:25Z",
+          "modernServer": false
+        }
+      ]
+    },
+    "conformance": {
+      "suite": "@modelcontextprotocol/conformance 0.2.0-alpha.12",
+      "registryAlphaTag": "0.2.0-alpha.12",
+      "registryLatestTag": "0.1.16",
+      "execution": "NOT TESTABLE this run: finished authoritative server cannot start without candidate",
+      "freshScenarioCounts": null,
+      "historical1919RawCounts": {
+        "SUCCESS": 25,
+        "FAILURE": 4,
+        "SKIP": 5
+      },
+      "historicalUnsupportedDiagnosticCasesNotTestable": [
+        "sep-2575-server-rejects-undeclared-capability",
+        "sep-2575-missing-capability-http-400",
+        "sep-2575-http-server-no-independent-requests-on-stream",
+        "sep-2575-server-no-log-without-loglevel"
+      ],
+      "fullConformanceClaim": false,
+      "diagnosticToolsAdded": false
+    },
+    "tlsProxy": {
+      "localCategory": "A",
+      "localStatus": "OPEN / BLOCKED finished-server execution",
+      "authority": "docs/architecture/ai-integration-and-mcp.md section 10.11 explicitly requires serving server/TLS/proxy",
+      "deploymentCategory": "B",
+      "deploymentStatus": "OPEN",
+      "headerOnlyAcceptanceClaim": false
+    },
+    "legalRetention": {
+      "category": "B",
+      "status": "tenant/legal retention sign-off: OPEN"
+    },
+    "deploymentGates": [
+      "production/Azure SQL execution and source/deployed catalog/owner/collation parity",
+      "deployed Stage A/B permissions and effective identity/grant verification",
+      "installed API/JAR/compatible caller parity, old-caller drain and native fleet evidence",
+      "actual public TLS/reverse-proxy/canonical-origin/HTTPS configuration and edge/logging policy",
+      "real human OAuth, tenant/integration enablement, redirect/key inventory and real credentials",
+      "R4/live operator/security/tenant-owner safe-pilot approval and explicit configuration authorization",
+      "operator monitoring, quota/disable propagation, rollout/containment and operational restart/failover/capacity",
+      "tenant/legal retention sign-off",
+      "SDK prerelease production approval or dedicated stable modern-server compatibility task"
+    ],
+    "testImpactReview": {
+      "productionSymbolsChanged": [],
+      "productionSqlAndMcpSchemasChanged": false,
+      "auditSchemaChanged": false,
+      "changedDocuments": [
+        "architecture/tenancy-and-rls.md",
+        "docs/architecture/ai-integration-and-mcp.md",
+        "docs/architecture/phase3b7-sql-confinement-contract.md",
+        "docs/testing/phase3b7-adversarial-acceptance.md",
+        "docs/testing/phase3b7-verification.json"
+      ],
+      "existingTestOwnersInspected": [
+        "AiCaseDataLocalSqlServerTest",
+        "AiCaseDataAccessTest",
+        "AiCaseDataMigrationContractTest",
+        "DataSourcesAiCaseDataTest",
+        "ProofDigestTest",
+        "IntegrationCaseReadTest",
+        "AiSecurityLocalSqlServerTest",
+        "AuthoritativeCaseMcpLocalSqlServerTest",
+        "McpConfinedClientFixture",
+        "McpSearchTest",
+        "McpOverviewTest",
+        "McpTransportTest",
+        "McpJdbcDeadlineTest",
+        "OAuthAuthorizationFlowTest",
+        "both authoritative and confined client scripts"
+      ],
+      "selectedAreaRationale": "tenancy architecture routes security-data; additionally reproduce #1922 affected selection and ordinary auth/Case/desktop compatibility; no obsolete behavioral expectations changed"
+    },
+    "authoritativePreflight": {
+      "command": [
+        "python3",
+        "build/sql-confinement/prepare-authoritative-fixture.py",
+        "/workspace/attachments/c051e076-a559-494d-ba96-3b4b7b8b7b97/shale-schema-source.sql",
+        "work/phase3b7/private-fixture"
+      ],
+      "exit": 1,
+      "result": "FileNotFoundError before decode/hash/SQL/credential creation; no schema substitution"
+    },
+    "verificationLimit": "Local regression and synthetic legacy SQL success cannot close the absent authoritative finished-server corpus, new dedicated-pool interleavings, source boundaries, fault/privacy/admin review, conformance, TLS/proxy or component performance gates.",
+    "artifactSearch": {
+      "readableRoots": [
+        "/workspace",
+        "/tmp",
+        "/codex/browser/projectless/0094-repository-gseshadow-shale-pr-base-codex-latest-"
+      ],
+      "hiddenInclusive": true,
+      "globs": [
+        "*shale*schema*",
+        "*authoritative*.sql",
+        "*.dacpac",
+        "*.bacpac"
+      ],
+      "matchingPrivateArtifactFiles": 0,
+      "oldRecordedPathExists": false,
+      "sharedLibraryScratchInput": "No source in accessible library-files/shared/downloads/scratch; absence does not claim inaccessible operator archives were searched"
+    },
+    "mergedHistory": {
+      "1919": "99bfec0458cfa690235397dfb57d36fb45e97d0f",
+      "1920": "aa4277563e2f0f0832ebd68f0ddcaaa58f05bcce",
+      "1921": "06f30fa083c1e0e2753fff5d26d9beea991d7be1",
+      "1922": "0eed0e4a709e4d858065893b5889a603feb8d91a"
+    },
+    "legacySqlPartitions": {
+      "scope": "actual restricted SQL identities on synthetic legacy prerequisites; not the new confined authoritative serving path",
+      "prior1922Timeout": "360-second all-opt-in run remains INCOMPLETE / NOT PASS",
+      "completion": "All 101 declared test methods explicitly selected, including all parameterized invocations; every bounded group complete",
+      "perGroupTimeoutSeconds": 340,
+      "groups": [
+        {
+          "name": "legacy-1",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#migrationDefaultsOffRepeatsAndRejectsCatalogDrift+realRuntimeHasNoBypassOrDirectControlTableAuthority+tenantPolicyUsesCurrentAdminContextAndRowVersion+registrationCeilingAndForeignTenantAreEnforced+selfConsentIsOneUseBoundToActorAndCeiling+consentRacingRevokeAndScopeReductionCannotResurrectAuthority+globalTenantIntegrationAndUserRevocationAreLiveAcrossServiceInstances+typedContextRejectsSpoofedTenantUserSessionAndMissingGrant",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 19.097,
+          "counts": {
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-2",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#keyRotationIsBoundedConcurrentAndRevocationInvalidatesSessions+expiredGrantFailsClosedAndDigestResolverRestoresItsCaller+rlsFiltersAndBlocksForeignRowsWithoutPrivilegedRuntime+auditFailureRollsBackMutationAndConsentConsumption+everyNewTenantTableFiltersAndBlocksAnOtherwiseValidForeignInsert+concurrentReservationsHaveOneWinnerAndReleaseNeverRefundsBudget+durableDailyRowAndSlidingMinuteBudgetsSurviveNewServiceInstances+concurrentScopeChangesAndRotationsRejectStaleVersions",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 24.007,
+          "counts": {
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-3",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#dailyBudgetsApplyAcrossUsersIntegrationsAndNewProcesses+distributedConcurrencyCountsAllThreeOwners+slidingMinuteLimitsApplyToIntegrationAndTenant+actualReplacementJvmSeesCommittedAccounting+sameNonceAndSameInvocationRacesCannotDoubleSpend+bootstrapDefinitionAndCallerRestorationAreExactEvenOnFailure+migrationFailureRollsBackPartialDdlAndAmbiguousAuditAllowlist+expiredKeySessionAndConsentIntentCannotAcquireLiveContext",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 21.567,
+          "counts": {
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-4",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#sessionFamilyRevocationIsSelfBoundPermanentAndAudited+oauthFreshClientLoaderAndSelfConsentBindEveryOwnerAndExactScopes+oauthCodeBindingRejectsChangedClientRedirectIssuerResourceAndVerifier+oauthCodeConsumeRaceHasExactlyOneWinnerAndReplacementJvmRejectsReplay+oauthCommittedRegistrationUserTenantAndGlobalDisablePreventCompletion+oauthGrantRevocationAndApprovalRaceNeverResurrectsRevokedAuthority+oauthScopeWideningDenialAndInjectedExpiryFailClosed+oauthAuditFailureRollsBackCodeGrantAndIntentConsumptionTogether",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 21.513,
+          "counts": {
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-5",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#oauthStorageIsStrictTenantOwnedAndRuntimeCannotReadOrMutateItDirectly+oauthConfidentialPinnedKeyAndGrantRevocationPreventCodeUse+oauthNativeLoopbackPortIsConfinedAndExactIssuedRedirectCannotChange+exchangeMigrationRepeatsRejectsDriftAndRestrictsResolverAndReplayPermissions+exchangeReplayTableUsesActualNonBypassTenantFilterAndInsertBlock+exchangePublicExactBindingsFailureDoesNotConsumeAndRaceHasOneWinner+exchangeAssertionReplayRaceAcrossCodesHasOneWinnerAndFailedPkceDoesNotBurnJti+exchangeCommittedBindingExpiryOrRevocationDenies",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 42.687,
+          "counts": {
+            "tests": 15,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-6",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#exchangeAuditFailureRollsBackBothReplayAndConsume+exchangeCommittedRevocationAndEveryAuthorityDisableDenyWithoutConsumption+exchangeCommittedKeyRevokePreventsOldKeyAndReplacementKeySubstitution+credentialMigrationRepeatAndCatalogDriftFailClosed+credentialInitialRaceOneFamilyAndHashOnlyFiveMinuteLifetime+credentialRotationResponseLossRetryRevokesAllDescendantsPermanently+credentialConcurrentRefreshHasOneWinnerAndLoserRevokesFamily+credentialReuseRaceWithDescendantActivityLeavesNoActiveCredentials",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 36.95,
+          "counts": {
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-7",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#credentialWrongClientAndAccessTokenCannotRefreshOrResolve+credentialCommittedRevocationDeniesAndReenableCannotRestore+credentialDeadlineClippingAndExpiredAuthorityFailClosed+credentialInitialAndRotationAuditFailureRollBackAllState+credentialRestartObservesAccessRefreshAndConsumedHistory+credentialConfidentialRefreshRequiresSameKeyFreshSharedJtiAndLiveKey+credentialCommittedRevokeBeforeRotationPreventsNewRows+credentialSecurityResetWebRevocationAuditsFamilyAndCannotResurrect",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 79.088,
+          "counts": {
+            "tests": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-8",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#credentialReuseAuditFailureRollsBackRevocationAndRetriesFailClosed+credentialRevokeHoldingAuthorityLockPreventsConcurrentRefreshCommit+credentialEightHourIdleAndConsentAbsoluteMaximumNeverSlide+credentialInitialLiveAuthorityCannotCreateAnyFamily+credentialSameValidatedTransactionCannotIssueASecondFamily+credentialGlobalDisableCannotRestoreInternalSessionOrQuotaAuthority+revocationMigrationIsRepeatSafeAndDetectsDrift+revocationEitherCredentialRevokesAllDescendantsAndPreservesFirstHistory",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 62.986,
+          "counts": {
+            "tests": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-9",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#revocationUnknownMalformedForeignAndWrongTenantHaveNoStateOrAuditEffects+revocationInactiveSubjectsRemainNonOracleAndPermanent+revocationAuditFailureRollsBackFamilyAndSharedReplayReservation+revocationUnknownConfidentialRequestConsumesSharedJtiAndCannotReplayAcrossRefresh+revocationRaceWithRefreshAndAccessDescendantActivityAlwaysEndsRevoked+revocationCommittedWhileRefreshAwaitsFinalizationPreventsNewCredentials+revocationRepeatedConcurrentRequestsAreIdempotentAndAuditOnce+revocationExpiredAccessAndRefreshHistoryStillRevokeFamily",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 39.67,
+          "counts": {
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-10",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#revocationModulesRetainSeparateRestrictedSqlIdentities+phase3b7LiteralAndInstructionTextRemainsCaseDataWithoutAuditPayload+phase3b7SyntheticPerformanceSanityRecordsActualAccessAndSharedReadSamples+disclosureMigrationRepeatDriftAndActualPermissions+disclosureSharedSearchOverviewAtomicAuditEmptyAndProtectedReview+disclosurePrivacyInspectsEveryPersistedColumnAndRequestedProbeDoesNotResolveCase+disclosureActualIntegrationAndPhiAuditFailuresRollBackAndDoNotRefund+disclosureRevokeBetweenCommitAndHandoffKeepsHistoryAndWithholdsBuffer",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 123.564,
+          "counts": {
+            "tests": 20,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-11",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#disclosureActualRlsBlocksAndAppendOnlyHistory+disclosureFailureForNowDisabledOwnerStillPersistsAndConsumesAttempt+disclosureFinalHandoffExpiryWhileActuallyBlockedUsesDatabaseUtc+disclosureCommitCloseAndAuthorizedHandoffBoundary+disclosureCommittedAuthorityReductionAfterReadPreventsHandoff+overviewCommittedAuthorityReductionAfterReadPreventsHandoff+disclosureSuppressedParentCannotReleaseEvenEmptySearchAndNoEmergencySpool+disclosureSingleSpidDistinctOwnersAndFaultCleanupRemainIsolated",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 151.908,
+          "counts": {
+            "tests": 25,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-12",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#accessMigrationRepeatsAndCumulativeVerifierDetectsDrift+accessOnlyFullBoundContextAndSafeFailures+accessOwnerBindingMismatchFailsClosed+accessCommittedAuthorityChangesPreventNewAndRecheckedContexts+accessConfidentialKeyBoundAndRevocationIsLive+accessRecheckNarrowsAndNeverExpandsSnapshotScopes+accessCommittedRevokeBetweenBootstrapAndGatePreventsContext+accessSingleSpidPoolReuseAndConcurrentAsyncCancellation",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 140.62,
+          "counts": {
+            "tests": 31,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "name": "legacy-13",
+          "command": [
+            "mvn",
+            "-B",
+            "-pl",
+            "shale-data",
+            "-am",
+            "-Dtest=AiSecurityLocalSqlServerTest#accessScopeReductionBetweenBootstrapAndGateDeniesAndDoesNotResurrect+accessExpiryWhileWaitingForFinalGateUsesDatabaseUtc+accessSetupMismatchAndStampFailureWithholdContextThenCleanNextBorrow+accessDistinctOwnersInterleaveThroughOnePhysicalSqlConnection+accessReplacementJvmObservesRevocationAndScopeReduction",
+            "-Dsurefire.failIfNoSpecifiedTests=false",
+            "test"
+          ],
+          "exit": 0,
+          "durationSeconds": 33.843,
+          "counts": {
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "partitionMethodInventory": {
+        "methods": 101,
+        "groups": [
+          [
+            "migrationDefaultsOffRepeatsAndRejectsCatalogDrift",
+            "realRuntimeHasNoBypassOrDirectControlTableAuthority",
+            "tenantPolicyUsesCurrentAdminContextAndRowVersion",
+            "registrationCeilingAndForeignTenantAreEnforced",
+            "selfConsentIsOneUseBoundToActorAndCeiling",
+            "consentRacingRevokeAndScopeReductionCannotResurrectAuthority",
+            "globalTenantIntegrationAndUserRevocationAreLiveAcrossServiceInstances",
+            "typedContextRejectsSpoofedTenantUserSessionAndMissingGrant"
+          ],
+          [
+            "keyRotationIsBoundedConcurrentAndRevocationInvalidatesSessions",
+            "expiredGrantFailsClosedAndDigestResolverRestoresItsCaller",
+            "rlsFiltersAndBlocksForeignRowsWithoutPrivilegedRuntime",
+            "auditFailureRollsBackMutationAndConsentConsumption",
+            "everyNewTenantTableFiltersAndBlocksAnOtherwiseValidForeignInsert",
+            "concurrentReservationsHaveOneWinnerAndReleaseNeverRefundsBudget",
+            "durableDailyRowAndSlidingMinuteBudgetsSurviveNewServiceInstances",
+            "concurrentScopeChangesAndRotationsRejectStaleVersions"
+          ],
+          [
+            "dailyBudgetsApplyAcrossUsersIntegrationsAndNewProcesses",
+            "distributedConcurrencyCountsAllThreeOwners",
+            "slidingMinuteLimitsApplyToIntegrationAndTenant",
+            "actualReplacementJvmSeesCommittedAccounting",
+            "sameNonceAndSameInvocationRacesCannotDoubleSpend",
+            "bootstrapDefinitionAndCallerRestorationAreExactEvenOnFailure",
+            "migrationFailureRollsBackPartialDdlAndAmbiguousAuditAllowlist",
+            "expiredKeySessionAndConsentIntentCannotAcquireLiveContext"
+          ],
+          [
+            "sessionFamilyRevocationIsSelfBoundPermanentAndAudited",
+            "oauthFreshClientLoaderAndSelfConsentBindEveryOwnerAndExactScopes",
+            "oauthCodeBindingRejectsChangedClientRedirectIssuerResourceAndVerifier",
+            "oauthCodeConsumeRaceHasExactlyOneWinnerAndReplacementJvmRejectsReplay",
+            "oauthCommittedRegistrationUserTenantAndGlobalDisablePreventCompletion",
+            "oauthGrantRevocationAndApprovalRaceNeverResurrectsRevokedAuthority",
+            "oauthScopeWideningDenialAndInjectedExpiryFailClosed",
+            "oauthAuditFailureRollsBackCodeGrantAndIntentConsumptionTogether"
+          ],
+          [
+            "oauthStorageIsStrictTenantOwnedAndRuntimeCannotReadOrMutateItDirectly",
+            "oauthConfidentialPinnedKeyAndGrantRevocationPreventCodeUse",
+            "oauthNativeLoopbackPortIsConfinedAndExactIssuedRedirectCannotChange",
+            "exchangeMigrationRepeatsRejectsDriftAndRestrictsResolverAndReplayPermissions",
+            "exchangeReplayTableUsesActualNonBypassTenantFilterAndInsertBlock",
+            "exchangePublicExactBindingsFailureDoesNotConsumeAndRaceHasOneWinner",
+            "exchangeAssertionReplayRaceAcrossCodesHasOneWinnerAndFailedPkceDoesNotBurnJti",
+            "exchangeCommittedBindingExpiryOrRevocationDenies"
+          ],
+          [
+            "exchangeAuditFailureRollsBackBothReplayAndConsume",
+            "exchangeCommittedRevocationAndEveryAuthorityDisableDenyWithoutConsumption",
+            "exchangeCommittedKeyRevokePreventsOldKeyAndReplacementKeySubstitution",
+            "credentialMigrationRepeatAndCatalogDriftFailClosed",
+            "credentialInitialRaceOneFamilyAndHashOnlyFiveMinuteLifetime",
+            "credentialRotationResponseLossRetryRevokesAllDescendantsPermanently",
+            "credentialConcurrentRefreshHasOneWinnerAndLoserRevokesFamily",
+            "credentialReuseRaceWithDescendantActivityLeavesNoActiveCredentials"
+          ],
+          [
+            "credentialWrongClientAndAccessTokenCannotRefreshOrResolve",
+            "credentialCommittedRevocationDeniesAndReenableCannotRestore",
+            "credentialDeadlineClippingAndExpiredAuthorityFailClosed",
+            "credentialInitialAndRotationAuditFailureRollBackAllState",
+            "credentialRestartObservesAccessRefreshAndConsumedHistory",
+            "credentialConfidentialRefreshRequiresSameKeyFreshSharedJtiAndLiveKey",
+            "credentialCommittedRevokeBeforeRotationPreventsNewRows",
+            "credentialSecurityResetWebRevocationAuditsFamilyAndCannotResurrect"
+          ],
+          [
+            "credentialReuseAuditFailureRollsBackRevocationAndRetriesFailClosed",
+            "credentialRevokeHoldingAuthorityLockPreventsConcurrentRefreshCommit",
+            "credentialEightHourIdleAndConsentAbsoluteMaximumNeverSlide",
+            "credentialInitialLiveAuthorityCannotCreateAnyFamily",
+            "credentialSameValidatedTransactionCannotIssueASecondFamily",
+            "credentialGlobalDisableCannotRestoreInternalSessionOrQuotaAuthority",
+            "revocationMigrationIsRepeatSafeAndDetectsDrift",
+            "revocationEitherCredentialRevokesAllDescendantsAndPreservesFirstHistory"
+          ],
+          [
+            "revocationUnknownMalformedForeignAndWrongTenantHaveNoStateOrAuditEffects",
+            "revocationInactiveSubjectsRemainNonOracleAndPermanent",
+            "revocationAuditFailureRollsBackFamilyAndSharedReplayReservation",
+            "revocationUnknownConfidentialRequestConsumesSharedJtiAndCannotReplayAcrossRefresh",
+            "revocationRaceWithRefreshAndAccessDescendantActivityAlwaysEndsRevoked",
+            "revocationCommittedWhileRefreshAwaitsFinalizationPreventsNewCredentials",
+            "revocationRepeatedConcurrentRequestsAreIdempotentAndAuditOnce",
+            "revocationExpiredAccessAndRefreshHistoryStillRevokeFamily"
+          ],
+          [
+            "revocationModulesRetainSeparateRestrictedSqlIdentities",
+            "phase3b7LiteralAndInstructionTextRemainsCaseDataWithoutAuditPayload",
+            "phase3b7SyntheticPerformanceSanityRecordsActualAccessAndSharedReadSamples",
+            "disclosureMigrationRepeatDriftAndActualPermissions",
+            "disclosureSharedSearchOverviewAtomicAuditEmptyAndProtectedReview",
+            "disclosurePrivacyInspectsEveryPersistedColumnAndRequestedProbeDoesNotResolveCase",
+            "disclosureActualIntegrationAndPhiAuditFailuresRollBackAndDoNotRefund",
+            "disclosureRevokeBetweenCommitAndHandoffKeepsHistoryAndWithholdsBuffer"
+          ],
+          [
+            "disclosureActualRlsBlocksAndAppendOnlyHistory",
+            "disclosureFailureForNowDisabledOwnerStillPersistsAndConsumesAttempt",
+            "disclosureFinalHandoffExpiryWhileActuallyBlockedUsesDatabaseUtc",
+            "disclosureCommitCloseAndAuthorizedHandoffBoundary",
+            "disclosureCommittedAuthorityReductionAfterReadPreventsHandoff",
+            "overviewCommittedAuthorityReductionAfterReadPreventsHandoff",
+            "disclosureSuppressedParentCannotReleaseEvenEmptySearchAndNoEmergencySpool",
+            "disclosureSingleSpidDistinctOwnersAndFaultCleanupRemainIsolated"
+          ],
+          [
+            "accessMigrationRepeatsAndCumulativeVerifierDetectsDrift",
+            "accessOnlyFullBoundContextAndSafeFailures",
+            "accessOwnerBindingMismatchFailsClosed",
+            "accessCommittedAuthorityChangesPreventNewAndRecheckedContexts",
+            "accessConfidentialKeyBoundAndRevocationIsLive",
+            "accessRecheckNarrowsAndNeverExpandsSnapshotScopes",
+            "accessCommittedRevokeBetweenBootstrapAndGatePreventsContext",
+            "accessSingleSpidPoolReuseAndConcurrentAsyncCancellation"
+          ],
+          [
+            "accessScopeReductionBetweenBootstrapAndGateDeniesAndDoesNotResurrect",
+            "accessExpiryWhileWaitingForFinalGateUsesDatabaseUtc",
+            "accessSetupMismatchAndStampFailureWithholdContextThenCleanNextBorrow",
+            "accessDistinctOwnersInterleaveThroughOnePhysicalSqlConnection",
+            "accessReplacementJvmObservesRevocationAndScopeReduction"
+          ]
+        ]
+      },
+      "counts": {
+        "tests": 182,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "python": [
+      {
+        "command": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "build/test-selection",
+          "-p",
+          "test_*.py"
+        ],
+        "tests": 27,
+        "pass": 27,
+        "skipped": 0
+      },
+      {
+        "command": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "build/case-read-verification",
+          "-p",
+          "test_*.py"
+        ],
+        "tests": 4,
+        "pass": 4,
+        "skipped": 0
+      },
+      {
+        "command": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "build/phase1r-verification",
+          "-p",
+          "test_*.py"
+        ],
+        "tests": 3,
+        "pass": 3,
+        "skipped": 0
+      },
+      {
+        "command": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "build/auth-verification",
+          "-p",
+          "test_*.py"
+        ],
+        "tests": 43,
+        "pass": 35,
+        "skipped": 8
+      }
+    ],
+    "sqlEnvironment": {
+      "endpoint": "127.0.0.1:14339",
+      "imageDigest": "sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718",
+      "syntheticDataOnly": true,
+      "ownedContainerRemoved": true,
+      "generatedCredentialFileErased": true
+    },
+    "performance": {
+      "status": "OPEN for protected finished path and component timings; supplemental legacy synthetic samples only",
+      "raw": {
+        "unit": "nanoseconds",
+        "samplesPerOperation": 5,
+        "scope": "synthetic internal shared service; not transport or SLA",
+        "samples": {
+          "accessValidation": [
+            18050043,
+            23990412,
+            15566026,
+            15359714,
+            16543545
+          ],
+          "searchIncludingQuotaAuditAndHandoff": [
+            203855003,
+            52523590,
+            62955522,
+            50799830,
+            34142733
+          ],
+          "overviewIncludingQuotaAuditAndHandoff": [
+            193625435,
+            48552706,
+            45940976,
+            47509423,
+            49207253
+          ]
+        }
+      },
+      "milliseconds": {
+        "accessValidation": {
+          "min": 15.359714,
+          "median": 16.543545,
+          "max": 23.990412
+        },
+        "searchIncludingQuotaAuditAndHandoff": {
+          "min": 34.142733,
+          "median": 52.52359,
+          "max": 203.855003
+        },
+        "overviewIncludingQuotaAuditAndHandoff": {
+          "min": 45.940976,
+          "median": 48.552706,
+          "max": 193.625435
+        }
+      },
+      "toolsList": "NOT MEASURED this run",
+      "isolatedQuotaAuditTransaction": "NOT MEASURED this run",
+      "isolatedFinalHandoff": "NOT MEASURED this run",
+      "protectedQueryPlans": "NOT AVAILABLE without authoritative candidate",
+      "productionSlaClaim": false
+    },
+    "gateClassifications": [
+      {
+        "item": "tls-proxy-and-serving-oauth: isolated serving TLS/proxy and local OAuth composition",
+        "categoryAndStatus": "A \u2014 OPEN",
+        "rationale": "Roadmap \u00a710.11 explicitly requires serving server/TLS/proxy in 3B.7. Header-only servlet tests do not close real TLS, canonical origin, hostile Host/Forwarded/X-Forwarded/Origin and HTTPS enforcement. The finished confined server requires the private candidate."
+      },
+      {
+        "item": "tls-proxy-and-serving-oauth: actual public deployment and real human/tenant flow",
+        "categoryAndStatus": "B \u2014 OPEN",
+        "rationale": "Real ingress certificates, proxy trust/configuration and identity integration are environment/operator acceptance; no live tenant is permitted in this task."
+      },
+      {
+        "item": "complete-identical-client-corpus",
+        "categoryAndStatus": "A \u2014 OPEN",
+        "rationale": "Both finished clients must execute the same complete authentication, catalog, search, Overview and live-authority matrix. #1922's narrower two-client expiry proof remains FIXED but does not close this corpus."
+      },
+      {
+        "item": "response-boundaries",
+        "categoryAndStatus": "A \u2014 OPEN",
+        "rationale": "Deterministic source/encoding/full-envelope below/exact/above limits, Unicode expansion, nulls and valid/invalid source widths protect disclosure; unit injection alone does not close finished serving acceptance. Search 32/64 KiB; Overview 8/32 KiB."
+      },
+      {
+        "item": "pool-async",
+        "categoryAndStatus": "A \u2014 OPEN",
+        "rationale": "New dedicated AI pool must pass concurrent A/B, before/during-SQL cancellation, timeout, rejected task, reuse after failure, close/cleanup faults and interruption without proof/tenant/actor/invocation leakage. Legacy shared-pool evidence is supplemental."
+      },
+      {
+        "item": "replicas-quota-restart: bounded replicas/replacement JVM and replay",
+        "categoryAndStatus": "A \u2014 OPEN",
+        "rationale": "Durable row/rate/concurrency accounting, replacement process, new ACCESS/grant and consumed/released invocation replay are local security requirements. Synthetic legacy quota tests cannot establish the entire new protected serving path."
+      },
+      {
+        "item": "replicas-quota-restart: fleet stress, database failover/restart operations",
+        "categoryAndStatus": "B \u2014 OPEN",
+        "rationale": "Production-scale load, operational SQL restart/failover and installed fleet topology are deployment acceptance. Replacement JVM accounting is retained in A; this split does not waive durability."
+      },
+      {
+        "item": "audit-faults-and-review",
+        "categoryAndStatus": "A \u2014 OPEN",
+        "rationale": "Finished protected path must suppress every requested parent/child/PHI/quota/commit/lost-ACK/close/outage fault, preserve actual commits, avoid duplicate ALLOWED_READ/reread, inspect persisted privacy, and enforce authoritative admin review/page <=100/history IDs."
+      },
+      {
+        "item": "finished-conformance",
+        "categoryAndStatus": "A \u2014 OPEN",
+        "rationale": "Run applicable current suite on actual two-tool server; preserve SUCCESS/FAILURE/SKIP/NOT TESTABLE counts. Missing diagnostic tools are unsupported scenarios, never invented tools or passing scenarios."
+      },
+      {
+        "item": "performance: bounded local sanity and available representative plans",
+        "categoryAndStatus": "A \u2014 OPEN",
+        "rationale": "Detect obvious regressions in ACCESS, list, search, Overview, quota/audit and handoff. Collect protected query plans when available; no SLA claim or requirement for full production load."
+      },
+      {
+        "item": "performance: production SLA/capacity",
+        "categoryAndStatus": "B \u2014 OPEN",
+        "rationale": "Requires deployed topology, volumes and operator thresholds; bounded local samples cannot certify it."
+      },
+      {
+        "item": "source-vs-deployed-parity: local source identity/candidate/catalog",
+        "categoryAndStatus": "A \u2014 prerequisite BLOCKED",
+        "rationale": "Historical hash gate passed. Fresh authoritative runs require the same immutable bytes and reviewed derivation/catalog; receipt hashes alone cannot recreate SQL."
+      },
+      {
+        "item": "source-vs-deployed-parity: historical provenance/deployed owners/collation/catalog",
+        "categoryAndStatus": "B \u2014 OPEN",
+        "rationale": "Hash identity does not establish historical ownership/collation or current deployed catalog. Must verify during governed deployment, without inventing provenance."
+      },
+      {
+        "item": "deployed-auth-and-runtime",
+        "categoryAndStatus": "B \u2014 OPEN",
+        "rationale": "Production/Azure SQL, Stage A/B permissions, installed API/JAR/caller compatibility, old-caller drain, fleet/native Windows parity and monitoring require operator/deployment evidence. Ordinary local WEB/DESKTOP/REST/OAuth regression checks remain A."
+      },
+      {
+        "item": "retention-legal",
+        "categoryAndStatus": "B \u2014 OPEN",
+        "rationale": "**tenant/legal retention sign-off: OPEN**. Roadmap \u00a710.12 requires it before real-data enablement; no approval is invented for synthetic local testing."
+      },
+      {
+        "item": "sdk-production-approval",
+        "categoryAndStatus": "B \u2014 OPEN",
+        "rationale": "Prerelease approval concerns production suitability; any concrete technical defect would still block A. Recheck official releases without changing dependencies during acceptance."
+      },
+      {
+        "item": "deployment-live-acceptance",
+        "categoryAndStatus": "B \u2014 OPEN",
+        "rationale": "R4/live configuration, real tenant/integration enablement, operator/security/tenant-owner safe-pilot approval and separately authorized configuration changes are deployment gates. \u00a710.11's owner authorization sentence remains a pilot gate; it does not authorize enablement here."
+      },
+      {
+        "item": "required regressions, including unfinished all-opt-in coverage",
+        "categoryAndStatus": "A \u2014 OPEN until recorded",
+        "rationale": "Focused, ordinary, affected, mandatory SQL subsets, critical once, selector Python and static checks must be reported honestly. Partition the prior timed-out legacy SQL suite into bounded complete groups; never treat that timeout as a pass."
+      }
+    ],
+    "staticChecks": {
+      "documentLinksAndFences": "PASS",
+      "receiptJson": "PASS",
+      "historicalEvidenceUnchanged": "PASS; compared original local/hosted/priorAttempt/resumed/source/coverage/SQL/performance objects and preserved original top-level failure status",
+      "gitDiffCheck": "PASS",
+      "sourceScope": "Only five architecture/acceptance documents/receipt change; no production/test/migration/dependency/config changes"
+    },
+    "remainingLocalRequirements": "All required finished-server vectors listed above remain OPEN/BLOCKED; passing legacy and unit regressions are supplemental. Recover exact private input, reproduce reviewed candidate, extend and execute complete matrices before any local COMPLETE decision."
+  }
 }

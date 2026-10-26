@@ -1,6 +1,10 @@
 # Phase 3B7 SQL confinement architecture contract
 
-Date: 2026-10-26. Design decision for implementation review only.
+Date: 2026-10-26. Design decision; original review-stage status below is historical.
+
+Current implementation: [#1922 scoped receipt](../testing/phase3b7-sql-confinement-implementation.md).
+SQL confinement and expiry serving are FIXED at that recorded local scope; remaining 3B.7 local
+acceptance is OPEN. Proposed-object and FAILED statements below describe the original design baseline.
 
 **Classification remains `3B.7 FAILED / Phase 3B IN PROGRESS`.** No migration, runtime change, production SQL, deployment, or real tenant/integration enablement is authorized here. Implementation and adversarial evidence are prerequisites to FIXED. Every name introduced below is proposed, not an installed database object.
 
