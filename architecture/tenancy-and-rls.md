@@ -267,3 +267,18 @@ to Cases. Active same-tenant SQL admin revalidation gates the separate typed rev
 no existing PHI viewer grants or authority are reused. Retained ownership permits failure append after
 revocation without restoring read eligibility. All live gates stamp/check both existing context keys and
 carry integration/grant identity only in immutable application objects. No production acceptance is inferred.
+
+### Dedicated AI Case SQL confinement
+
+The [approved contract](../docs/architecture/phase3b7-sql-confinement-contract.md) and
+[implementation evidence](../docs/testing/phase3b7-sql-confinement-implementation.md) define the separate
+AI Case trust boundary. `AiCaseDataRuntime` receives only six exact public procedure EXECUTEs and no
+direct Case/join/PHI/control-table authority. Every protected operation derives tenant/actor from fresh
+32-byte credential proof and live database lineage, not caller-set `SESSION_CONTEXT`. Procedures set
+and restore derived context only for RLS defense in depth. The tiny private owner-executed locator
+cannot be invoked by the AI login; data/audit modules retain caller execution and explicit tenant predicates.
+
+The additive migration owns the strict invocation ledger and new-module receipts, requires the reviewed
+existing Case/RLS catalog, and leaves ordinary runtime queries, grants and PHI semantics unchanged.
+Actual restricted-login tests deny both context-switched Case SELECT and foreign PHI INSERT at the
+statement itself. These scoped fixes do not establish broader Phase 3B.7 or live enablement acceptance.

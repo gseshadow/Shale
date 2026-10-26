@@ -109,6 +109,9 @@ Do not enable shared-runtime fallback, drop history, restore broad grants or aut
 SQL. Ordinary Shale behavior continues through its original identities. No production/Azure SQL,
 real tenant/integration enablement, deployment or installer/version publication is authorized here.
 
+See the [scoped implementation evidence](../../testing/phase3b7-sql-confinement-implementation.md) for
+actual restricted-login denials, parity, audit/expiry/client results and the exact verification limits.
+
 ## Dependencies and authority inventory
 
 Before DDL, repository schema/migrations and affected tests were inspected at live base

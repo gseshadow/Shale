@@ -102,8 +102,16 @@ class AiCaseDataLocalSqlServerTest {
             assertEquals(229,assertThrows(SQLException.class,()->sql(c,"INSERT dbo.auditLog(ShaleClientId,userId,objectTypeId,objectId,fieldName,fieldCode,stringValue) VALUES(8,82,1,200,'Case.Overview.Read',4,'action=READ;screen=Case.Overview')")).getErrorCode(),"#1919 foreign PHI INSERT must fail, independently of rollback");
             assertThrows(SQLException.class,()->sql(c,"EXECUTE AS USER='dbo'"));assertThrows(SQLException.class,()->sql(c,"ALTER ROLE db_datareader ADD MEMBER ["+prefix+"_ai]"));
             assertThrows(SQLException.class,()->sql(c,"ALTER SECURITY POLICY sec.TenantFilter WITH(STATE=OFF)"));
-            assertThrows(SQLException.class,()->sql(c,"EXEC dbo.AiDataLocateAccessOwnerV1 @ProofDigest=NULL"));
-            for(String name:legacyProcedures())assertEquals(0,count(c,"SELECT COALESCE(HAS_PERMS_BY_NAME('dbo."+name+"','OBJECT','EXECUTE'),0)"),name);
+            for(String helper:List.of("AiDataLocateAccessOwnerV1","AiDataLoadAuthorityV1","AiDataAppendAccessV1","AiDataAdmitV1"))
+                assertEquals(229,assertThrows(SQLException.class,()->sql(c,"EXEC dbo."+helper)).getErrorCode(),"Private helper execution itself must be denied: "+helper);
+            assertEquals(229,assertThrows(SQLException.class,()->sql(c,"SELECT dbo.AiDataNormalizeV1(N'Literal')")).getErrorCode());
+            for(String name:legacyProcedures()) {
+                assertEquals(0,count(c,"SELECT COALESCE(HAS_PERMS_BY_NAME('dbo."+name+"','OBJECT','EXECUTE'),0)"),name);
+                assertEquals(229,assertThrows(SQLException.class,()->sql(c,"EXEC dbo."+name)).getErrorCode(),"Legacy EXEC itself must be denied before binding: "+name);
+            }
+            for(String table:List.of("IntegrationAccessAuditLog","IntegrationAccessAuditResource","AiCaseDataInvocation"))
+                assertEquals(229,assertThrows(SQLException.class,()->sql(c,"INSERT dbo."+table+" DEFAULT VALUES")).getErrorCode(),table);
+            assertEquals(229,assertThrows(SQLException.class,()->sql(c,"SELECT CredentialHash FROM dbo.AiOAuthCredential")).getErrorCode());
         }
         try(var c=owner(db)){assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.auditLog"));}
     }
@@ -139,6 +147,7 @@ class AiCaseDataLocalSqlServerTest {
         try(var c=owner(db)){assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.auditLog WHERE ShaleClientId=7 AND UserId=72 AND ObjectId=100"));assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.auditLog WHERE ShaleClientId=8 OR UserId=82 OR ObjectId=200"));}
     }
     @Test void malformedProofWrongInvocationAndForeignDigestFailBeforeCaseWork()throws Exception {
+        assertThrows(SecurityException.class,()->authenticate(AiOAuthCredentialStore.opaque()),"Unknown well-formed digest must fail closed");
         byte[] digest=AiOAuthCredentialStore.digest(token),foreign=AiOAuthCredentialStore.digest(foreignToken);
         try(var request=authenticate(token);var c=connection("ai",8,82)) {
             for(int length:List.of(-1,0,31,33,64))for(String procedure:List.of("AiDataAuthenticateV1","AiDataSearchCasesV1","AiDataGetCaseOverviewV1","AiDataRecordCaseFailureV1","AiDataFinishCaseQuotaV1","AiDataAuthorizeCaseHandoffV1")) {
