@@ -82,7 +82,7 @@ another tenant after restamping and inserting foreign PHI history under A contex
 graph and evaluates a separate, procedure-only AI principal with database-validated invocation proof.
 The dedicated proof-bound design is implemented by [#1922](https://github.com/gseshadow/Shale/pull/1922);
 both failures are FIXED for that independent AI boundary at its [recorded local scope](../docs/testing/phase3b7-sql-confinement-implementation.md).
-The ordinary shared-runtime trust boundary remains distinct. Do not apply read_only to ordinary pooled
+Recovered-input [3B.7 local/adversarial acceptance](../docs/testing/phase3b7-local-acceptance-closeout.md) now passes; deployed permissions/catalog and pilot authorization remain OPEN. The ordinary shared-runtime trust boundary remains distinct. Do not apply read_only to ordinary pooled
 providers or treat a new login with the old grants as a confinement fix.
 
 ### User release announcement state

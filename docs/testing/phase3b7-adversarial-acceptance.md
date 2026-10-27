@@ -1,6 +1,18 @@
 # Phase 3B.7 adversarial/local acceptance — 2026-10-24
 
-## Current acceptance status after merged #1922 — 2026-10-26
+## Current recovered-input acceptance — 2026-10-26
+
+**3B.7 COMPLETE (local/adversarial acceptance).**
+**Phase 3B COMPLETE at pre-deployment/local acceptance scope.** All ten Category A gates pass;
+eight Category B deployment/live gates remain OPEN. Authoritative input is reattached/hash-verified;
+runtime confinement and expiry serving remain FIXED at #1922 recorded scope.
+See the [current complete receipt, gate table and next deployment sequence](phase3b7-local-acceptance-closeout.md)
+and `recoveredInputAcceptance` in [the verification JSON](phase3b7-verification.json).
+The blocked/failed receipts below are historical and preserved; none authorizes deployment or real enablement.
+
+<a id="current-acceptance-status-after-merged-1922--2026-10-26"></a>
+
+## Historical pre-reattachment acceptance after merged #1922 — 2026-10-26
 
 **3B.7 OPEN pending remaining local/adversarial acceptance; Phase 3B IN PROGRESS.**
 Execution classification: **BLOCKED** while required Category A evidence cannot execute.

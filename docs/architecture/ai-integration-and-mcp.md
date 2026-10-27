@@ -1,6 +1,6 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL locally verified at #1922 recorded scope; Phase 3A security contract COMPLETE; Phase 3B implementation IN PROGRESS; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); 3B.7 OPEN pending remaining local acceptance; current run BLOCKED on fresh evidence (§10.31); transport and both handlers default OFF.
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL locally verified at #1922 recorded scope; Phase 3A security contract COMPLETE; Phase 3B COMPLETE at pre-deployment/local acceptance scope; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); 3B.7 COMPLETE (local/adversarial acceptance, §10.32); deployment/live gates OPEN; transport and both handlers default OFF.
 
 **Last reviewed:** 2026-10-26 (post-#1922 reconciliation; artifact recovered/hash-verified; confinement and expiry FIXED at recorded local scope; remaining local acceptance OPEN; defaults OFF)
 
@@ -112,8 +112,7 @@ synthetic tests establish implementation; the R4 ledger records bounded user-rep
 acceptance. Two-tenant/non-dbo/pooled-context, audit-failure/commit uncertainty, deployed protection and
 performance gates remain open. Phase 1R is merged and its three-FILTER candidate passed local synthetic SQL
 validation. The authoritative export was subsequently recovered/hash-verified and #1922 records scoped
-authoritative SQL acceptance (§10.30). Fresh broader local acceptance remains OPEN (§10.31); this run
-lacks the private source/candidate. Phase 1S proves the
+authoritative SQL acceptance (§10.30). The reattached source now passes broader local/adversarial acceptance (§10.32); deployed protection and operational gates remain OPEN. Phase 1S proves the
 shared source boundary separately (§9.3); it does not rerun or activate Phase 1R.
 
 * RLS coverage is not uniformly established. The Contacts roadmap explicitly records that the parent
@@ -215,8 +214,7 @@ to repeat completed rehearsals or retirement.
   Case-read security prerequisites. Explicit minimized-query predicates remain valuable; the gap is
   not a demonstrated API leak. The older claim that the offline schema was never supplied is obsolete:
   the supplied export confirmed the gap. #1919/#1922 subsequently recovered and hash-verified it and
-  recorded local authoritative candidate evidence; deployed activation remains OPEN. The private
-  source/candidate is absent from this new environment, blocking fresh broader execution (§10.31).
+  recorded local authoritative candidate evidence; deployed activation remains OPEN. The reattached source/candidate reproduces the approved hashes and broader local acceptance now passes (§10.32).
 * Last reported runtime authority included Users password-hash SELECT/UPDATE and audit SELECT/INSERT/
   UPDATE/DELETE. Stage B restricts hash **SELECT**, not password-management writes or audit CRUD.
   Auth base-table restrictions, broader runtime grants, append-only audit enforcement, authoritative
@@ -371,7 +369,7 @@ Curtis & Co.'s local client uses this same contract.
 | Implementation dependency acceptance | §10.3 pins protocol/security behavior. 3B.2/3B.4 must demonstrate a maintained OAuth implementation and MCP Java SDK compatible with the actual server dependencies and independent clients; no custom OAuth parser or permissive fallback. |
 | Persistent schema and enforcement | §10.8 is a concrete proposal, not installed schema. Verify authoritative shapes, confined bootstrap lookup, RLS/grants, concurrency, quotas and audits in isolated SQL before activation. |
 | Operational acceptance | Exact issuer/resource URLs, approved proxy/TLS/origins, client redirect/key inventory, audit retention sign-off and performance evidence must be recorded before pilot enablement. Missing configuration fails closed. |
-| Authoritative Case SQL | Recovered/hash-verified; scoped #1922 local evidence. Fresh broader acceptance requires the private source/candidate; deployed parity remains OPEN (§10.31). |
+| Authoritative Case SQL | Recovered/hash-verified; confinement/expiry FIXED at #1922 scope; recovered-input local/adversarial acceptance COMPLETE (§10.32). Deployed parity remains OPEN. |
 | Document/timeline expansion | No authoritative document-content boundary or equivalent secured bounded chronology operation; both remain deferred. |
 
 ## 5. Audit compatibility review
@@ -702,7 +700,7 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Phase 3B.4 MCP transport/discovery | COMPLETE (source/local protocol/client verification) | §10.25: default-OFF modern transport, empty catalog, real synthetic ACCESS/two-client proof and applicable conformance/regressions. Prerelease SDK remains a production-acceptance item; 3B.4 itself adds no Case handler. |
 | Phase 3B.5 search_cases | COMPLETE (source/local synthetic protocol/client verification) | §10.26; sole scope-filtered synthetic/test search handler, quota/audit/final gate, two independent clients and affected/critical checks; defaults OFF. |
 | Phase 3B.6 get_case_overview | COMPLETE (source/local synthetic protocol/client verification) | §10.27; independent scope, exact minimized Overview/PHI/integration atomicity, byte limits, fault/race and two-client proof; defaults OFF. |
-| Phase 3B.7 adversarial/local acceptance | OPEN pending remaining local acceptance; current run BLOCKED | Artifact recovered/hash-verified; confinement/expiry FIXED at #1922 scope. [Current A/B gates](#1031-phase-3b7-post-1922-local-acceptance-reconciliation--2026-10-26). Phase 3B IN PROGRESS; no real enablement. |
+| Phase 3B.7 adversarial/local acceptance | COMPLETE (local/adversarial acceptance) | All ten Category A gates PASS; eight Category B deployment/live gates OPEN. Artifact recovered/hash-verified; confinement/expiry FIXED at #1922 scope. [Current receipt](#1032-phase-3b7-recovered-input-local-acceptance-closeout--2026-10-26). Phase 3B COMPLETE at pre-deployment/local acceptance scope; defaults OFF. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
 | Phase 5 administration experience | NOT STARTED | Minimum controls first, then pilot feedback. |
 | Phase 6 optional controlled writes | NOT STARTED | Read-only maturity and per-command approval. |
@@ -717,18 +715,18 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | AI read/failure audit | COMPLETE (source/local synthetic verification); deployed acceptance OPEN | §10.22 supplementary parent/resources, same-transaction audits, protected review and fault/race checks; no production permission acceptance. |
 | Phase 1R three-FILTER migration / exact rollback | MERGED #1898; SYNTHETIC LOCAL acceptance | [Owning runbook](../testing/case-read-local-security-verification.md#phase-1r-candidate--2026-10-21): transactional/idempotent candidate, drift/atomic-failure tests, confined V1/V2 and real SQL session/controller compatibility; no production activation. |
 | Phase 1S shared minimized Case boundary | COMPLETE (source/synthetic proof) | §9.3: existing three JavaFX-free operations retained, direct service/context/audit/paging and REST/OpenAPI checks pass. No broad API, live SQL or MCP acceptance. |
-| Local Case-read SQL security execution | BLOCKED (authoritative input) | Approved original export is absent; derived/candidate schema artifacts and hashes remain unavailable. Authoritative Case RLS/audit acceptance is unexecuted; §10.22's labelled synthetic Case seam/fault proof does not close this gate. |
+| Local Case-read SQL security execution | COMPLETE at recorded local/adversarial scope | Original/derived/candidate hashes reproduce; distinct restricted principals, authoritative Case/RLS/audit/admin, both clients and regressions PASS (§10.32). Deployed permissions/catalog acceptance remains OPEN. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
-**Phase 3A COMPLETE (design); Phase 3B IN PROGRESS, with 3B.1 COMPLETE at source/synthetic scope (§10.13); MCP inactive.**
+**Phase 3A COMPLETE (design); Phase 3B COMPLETE at pre-deployment/local acceptance scope (§10.32); MCP inactive.**
 Phase 1S shared Case source/synthetic proof and selected Phase 2 REST completion are retained.
 Broader REST review remains IN PROGRESS. Phase 1R is merged and its three-FILTER candidate locally/
-synthetically validated; authoritative Case SQL remains **BLOCKED** by unavailable approved offline input.
+synthetically validated; subsequently recovered authoritative Case SQL now passes at the recorded local scope (§10.32).
 Production activation, Stage A/B deployment/fleet evidence, non-bypass grants/RLS and operational acceptance
 remain independent gates. Phase 3A does not close or redesign them. Web/phone delivery remains independent.
 Phase 3B.1 is COMPLETE at its recorded scope (§10.13); the supported Spring prerequisite is recorded in §10.15.
 PR #1904 is merged and its supported baseline is verified. 3B.2A source/local evidence is in §10.16;
-durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is COMPLETE at source/local protocol/client scope (§10.25), with transport default OFF and prerelease production acceptance still open; 3B.5 is COMPLETE at source/local synthetic protocol/client scope (§10.26); 3B.6 is COMPLETE at source/local synthetic protocol/client scope (§10.27); 3B.7 is BLOCKED — authoritative Case artifact unavailable (§10.28).
+durable usable OAuth credential lifecycle is COMPLETE at source/local synthetic scope (§10.19). 3B.2A is COMPLETE at foundation scope; 3B.2B is COMPLETE at source/local synthetic scope (§10.17); 3B.2C.1 is COMPLETE at source/local synthetic scope (§10.18), aggregate 3B.2C and 3B.2C.2 are COMPLETE; authenticated revocation closeout is recorded in §10.20; 3B.2D is COMPLETE (source/local synthetic verification, §10.21); 3B.3 progress is recorded in §10.22; 3B.4 is COMPLETE at source/local protocol/client scope (§10.25), with transport default OFF and prerelease production acceptance still open; 3B.5 is COMPLETE at source/local synthetic protocol/client scope (§10.26); 3B.6 is COMPLETE at source/local synthetic protocol/client scope (§10.27); 3B.7 is COMPLETE at local/adversarial scope (§10.32); §10.28's missing-input evidence is historical.
 All capability/tenant flags remain off.
 
 ### 9.1 Ready-to-run Codex prompt — Phase 1R
@@ -4300,6 +4298,8 @@ IN PROGRESS; broader acceptance and separately authorized operational enablement
 
 ### 10.31 Phase 3B.7 post-#1922 local acceptance reconciliation — 2026-10-26
 
+Historical pre-reattachment reconciliation; superseded by §10.32. The BLOCKED execution below is retained.
+
 **3B.7 OPEN pending remaining local acceptance; Phase 3B IN PROGRESS. Current run BLOCKED.**
 The authoritative artifact was recovered and hash-verified. Runtime confinement and expiry serving
 are FIXED at #1922's recorded local scope (§10.30); no fresh regression has reopened them.
@@ -4316,3 +4316,38 @@ Only all Category A passes permit local 3B.7/Phase 3B completion. Stage A/B depl
 production/Azure SQL, installed JAR/fleet parity, real TLS/proxy ingress, tenant/integration enablement,
 monitoring, legal retention sign-off, SDK production approval and owner/operator pilot acceptance
 remain OPEN before real pilot. No deployment or enablement is performed or authorized by this record.
+
+
+### 10.32 Phase 3B.7 recovered-input local acceptance closeout — 2026-10-26
+
+**3B.7 COMPLETE (local/adversarial acceptance).**
+**Phase 3B COMPLETE at pre-deployment/local acceptance scope.**
+All ten Category A gates PASS. Eight Category B deployment/live gates remain OPEN before real pilot.
+The reattached source is hash-verified and reproduces the #1922 derived/candidate receipts. SQL confinement
+and expiry serving remain FIXED at #1922 recorded scope; failed/blocked historical evidence in
+§§10.28–10.31 is retained, not erased or presented as current.
+
+The [complete closeout and individual A/B gate table](../testing/phase3b7-local-acceptance-closeout.md)
+and [machine-readable evidence](../testing/phase3b7-verification.json) record the identical 66-vector
+TypeScript/Python corpus, authoritative SQL/response/admin proofs, dedicated pool/faults, durable
+quota/replacement JVMs, real isolated Caddy TLS, applicable finished-server conformance, bounded timings,
+sanitized query plans and focused/ordinary/affected/critical/Python checks. Conformance retains raw
+unsupported/diagnostic failures with individual NOT TESTABLE/not-applicable rationale; no full
+conformance or production SLA claim is made. Exact Overview limits unreachable with valid source are
+proved by source width plus conservative envelope bounds, separately from injected measurement tests.
+The earlier all-opt-in timeout remains incomplete evidence; all 101 legacy methods subsequently pass
+in 13 bounded groups (182 invocations), supplementing the new authoritative boundary tests.
+
+Production/Azure SQL, deployed Stage A/B and effective grants, source/deployed owner/collation/catalog
+and installed JAR/API/caller/fleet/native parity, public ingress and real human OAuth/tenant enablement,
+operator monitoring/restart/failover/capacity and R4/safe-pilot authorization remain OPEN. **tenant/legal
+retention sign-off: OPEN.** SDK 2.2.0-M1 remains prerelease; production approval remains OPEN, with any
+future stable modern-server upgrade reserved for a dedicated compatibility task. Local technical
+completion is not security/tenant-owner approval or permission to change configuration. Current
+production enablement remains rejected; a separately reviewed production composition path is required.
+No deployment, real credentials, installer/version publication or enablement is performed. Defaults OFF.
+
+Audit compatibility uses the existing integration parent/resource and PHI schema: exact committed history
+survives uncertain ACK/close/cleanup outcomes, every fault withholds protected output without reread,
+persisted values exclude payload/proof/request/exception/SQL metadata, and bounded same-tenant admin
+review retains intentional historical Case IDs. No audit migration, new tool or production code changes.
