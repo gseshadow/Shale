@@ -215,6 +215,9 @@ public final class AiCaseDataAttestation {
     // cannot select the model: INSTANCE, EXTERNAL, group, certificate and WITHOUT LOGIN users fail.
     private static void contained(Connection session,Connection review,Identity identity)throws SQLException {
         if(identity.userId()<=4||!identity.user().equals(identity.login()))throw refused();
+        // Prove how THIS session authenticated, not just how a same-named catalog user was
+        // provisioned. Own-session visibility needs no VIEW DATABASE STATE/server role.
+        requireOne(session,"SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE session_id=@@SPID AND authenticating_database_id=DB_ID() AND original_security_id=(SELECT sid FROM sys.database_principals WHERE principal_id=USER_ID())");
         String sql="SELECT sid,type,authentication_type FROM sys.database_principals WHERE principal_id=? AND name=?";
         for(Connection c:List.of(session,review))try(var p=c.prepareStatement(sql)) {
             p.setQueryTimeout(3);p.setInt(1,identity.userId());p.setString(2,identity.user());

@@ -18,7 +18,13 @@ Use **SQL-authenticated database-contained users** for AI and verifier on Azure 
 `sys.database_principals.type='S' AND authentication_type=2`. Require non-dbo/non-system principal
 IDs, nonempty database SIDs, original authenticated name equal to the current database user, and
 agreement between the session's own principal row and the independent verifier's row (SID, type,
-authentication type, ID and name). Database evidence is queried from SQL; caller-set session context
+authentication type, ID and name). Also require this connection's own
+`sys.dm_exec_sessions.authenticating_database_id=DB_ID()` and original security SID equal to the
+current database user's SID. A matching contained catalog row alone must not disguise a session
+authenticated through a login or impersonation. [Microsoft's session DMV](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-sessions-transact-sql?view=sql-server-ver17)
+distinguishes login authentication (0) from contained database authentication. Only the own-session
+row is read; no database/server state privilege or other-session inventory is granted. Missing
+own-session evidence fails closed and must be investigated in live Azure acceptance. Database evidence is queried from SQL; caller-set session context
 and configuration names cannot supply it. Login-mapped SQL users (`authentication_type=1`), external
 users/groups, users without login, certificates and keys are not alternate acceptable models.
 
@@ -53,7 +59,7 @@ Test names below identify required evidence, not assertions that an unexecuted t
 
 | Current check / scope | Why it exists | Azure equivalent | Security property preserved | Residual risk / test evidence |
 | --- | --- | --- | --- | --- |
-| `SUSER_SID`, `ORIGINAL_LOGIN`, `IS_SRVROLEMEMBER('sysadmin')` / S,A | Exclude shared/bypass login and impersonated sessions | Own database SID, original name, non-dbo ID, S/DATABASE type confirmed independently; database/server equality | Dedicated authenticated non-bypass identity | Actual Azure principal semantics require live read-only gate; focused routing/identity rejection tests supplement it |
+| `SUSER_SID`, `ORIGINAL_LOGIN`, `IS_SRVROLEMEMBER('sysadmin')` / S,A | Exclude shared/bypass login and impersonated sessions | Own database SID, original name, non-dbo ID, S/DATABASE type confirmed independently and own-session authenticating database/SID; database/server equality | Dedicated authenticated non-bypass identity | Actual Azure principal semantics require live read-only gate; focused routing/identity rejection tests supplement it |
 | AI and verifier `sys.login_token` / S,A | Exclude inherited groups/server roles | No login authority under contained SQL authentication; exact database user token and contained type | No inherited server/group privilege path | Login-based and Entra models refused; no assertion about Azure login-token rows. Routing test proves no query is issued |
 | `fn_my_permissions(NULL,'SERVER')` / S,A | No server control, tracing, DDL or impersonation authority | Contained model plus exact database authority allowlist and metadata permission closure | Principal cannot elevate through server grants | Does not attest privileged operators/host diagnostics; those remain external governance |
 | Verifier `VIEW ANY DEFINITION` and `VIEW ANY DATABASE` / S,A | Avoid incomplete server inventory/cross-DB enumeration | Database `VIEW DEFINITION` prerequisite, exact verifier token/grants and retained catalog receipt | Complete reviewed target-database metadata without data authority | Scoped credentials have a different visibility rule; separate gate below |

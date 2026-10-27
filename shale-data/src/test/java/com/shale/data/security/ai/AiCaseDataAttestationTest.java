@@ -41,6 +41,15 @@ class AiCaseDataAttestationTest {
                     source(azure("ai",10,observed,2,type)),source(azure("catalog",11,observed)),List.of(),"db","issuer","resource").verify());
         }
     }
+    @Test void containedCatalogUserDoesNotSubstituteForActualSessionAuthentication() {
+        for(Integer authenticated:Arrays.asList(null,0)) {
+            var observed=new ArrayList<String>();
+            var failure=assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(
+                    source(azure("ai",10,observed,2,"S",authenticated)),source(azure("catalog",11,observed)),List.of(),"db","issuer","resource").verify());
+            assertTrue(failure.getMessage().contains("IDENTITY"),failure.getMessage());
+            assertFalse(observed.stream().anyMatch(q->q.contains("sys.external_data_sources")));
+        }
+    }
     @Test void visibilityMustBeCompleteBeforeExternalInventory() {
         for(Integer visible:Arrays.asList(null,0))assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.azureIsolation(connection(q->rows(visible))));
     }
@@ -70,10 +79,12 @@ class AiCaseDataAttestationTest {
         assertFalse(executable.contains("SELECT *"));assertFalse(executable.contains("credential_identity"));assertFalse(executable.contains("location"));
     }
     private static Connection azure(String name,int id,List<String> observed) {return azure(name,id,observed,2,"S");}
-    private static Connection azure(String name,int id,List<String> observed,int authentication,String type) {
+    private static Connection azure(String name,int id,List<String> observed,int authentication,String type) {return azure(name,id,observed,authentication,type,1);}
+    private static Connection azure(String name,int id,List<String> observed,int authentication,String type,Integer authenticated) {
         return connection(q->{
             observed.add(q);
             if(q.contains("EngineEdition"))return rows(5);
+            if(q.contains("sys.dm_exec_sessions"))return rows(authenticated);
             if(q.startsWith("SELECT sid,ORIGINAL_LOGIN"))return List.<Object[]>of(new Object[]{new byte[]{(byte)id},name,"db",name,id,"logical-server"});
             if(q.startsWith("SELECT sid,type,authentication_type")) {
                 int principal=Integer.parseInt(q.substring(q.indexOf("/*first=")+8,q.indexOf("*/")));
