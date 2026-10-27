@@ -352,6 +352,200 @@ class AiCaseDataLocalSqlServerTest {
             }
         }
     }
+    @Test void authoritativeSourceMaximumCannotReachOverviewByteCeilingsAndOverlengthStillFails()throws Exception {
+        seedParity();boundaryRelationships();
+        try(var c=owner(db);var p=c.prepareStatement("UPDATE dbo.Cases SET Name=?,CaseNumber=? WHERE Id=400")) {p.setString(1,"\u0001".repeat(255));p.setString(2,"\u0001".repeat(100));p.executeUpdate();}
+        int maximum;
+        try(var request=authenticate(token)) {
+            var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);
+            var result=new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,400L,b->0);maximum=result.size();
+            // Reserve 64 bytes for maximal integer IDs and timestamp text. The entire
+            // request body is capped at 8192 bytes, conservatively bounding its echoed ID.
+            assertTrue(maximum+64<8192,"Valid authoritative source widths cannot reach 8 KiB");
+            assertTrue(3L*(maximum+64)+1024+8192<32768,
+                    "Duplicate text, fixed envelope, maximal scalar widths and request ID fit below 32 KiB");
+        }
+        try(var c=owner(db);var p=c.prepareStatement("UPDATE dbo.Cases SET Name=? WHERE Id=400")){p.setString(1,"\u0001".repeat(256));p.executeUpdate();}
+        try(var request=authenticate(token)) {
+            var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);
+            assertEquals(IntegrationAccessAudit.Reason.OVERSIZED,assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,400L,b->fail("Overlength source must never reach encoding"))).reason());
+        }
+        Files.createDirectories(Path.of("../work/phase3b7"));Files.writeString(Path.of("../work/phase3b7/overview-source-maximum.json"),"{\"maximumStructuredBytes\":"+maximum+",\"conservativeEnvelopeUpperBound\":"+(3L*(maximum+64)+1024+8192)+",\"caseNumberUnits\":100,\"caseNameUnits\":255,\"statusUnits\":50,\"practiceAreaUnits\":150,\"userDisplayUnits\":101,\"structured8191Through8193Reachable\":false,\"full32767Through32769Reachable\":false}\n");
+    }
+    @Test void exactSearchStructuredBoundariesUseValidAuthoritativeSourceAndRetainCommittedHistory()throws Exception {
+        seedParity();boundaryRelationships();
+        try(var c=owner(db)) {
+            for(int n=0;n<10;n++) {
+                insertCase(c,500+n,7,"BND"+"a".repeat(252),false);
+                sql(c,"UPDATE dbo.Cases SET CaseNumber=REPLICATE(N'a',100),PracticeAreaId=(SELECT PracticeAreaId FROM dbo.Cases WHERE Id=400) WHERE Id="+(500+n));
+                sql(c,"INSERT dbo.CaseStatuses(CaseId,StatusId,EffectiveDate,IsPrimary,CreatedAt,UpdatedAt) SELECT "+(500+n)+",StatusId,EffectiveDate,IsPrimary,CreatedAt,UpdatedAt FROM dbo.CaseStatuses WHERE CaseId=400");
+                sql(c,"INSERT dbo.CaseUsers(ShaleClientId,CaseId,UserId,RoleId,IsPrimary,CreatedAt,UpdatedAt) SELECT ShaleClientId,"+(500+n)+",UserId,RoleId,IsPrimary,CreatedAt,UpdatedAt FROM dbo.CaseUsers WHERE CaseId=400");
+            }
+        }
+        var dao=new CaseSummaryDao(provider("runtime",7,72));
+        var base=new java.io.ByteArrayOutputStream();new MinimizedCaseEncoder().encode(dao.searchMinimizedCases("BND",7,72,0,10),new UUID(0,0),base);
+        int initial=base.size();assertTrue(initial<32767&&initial+5*3520>32769,"Real source shape must permit exact search boundaries");
+        for(int target:List.of(32767,32768,32769)) {
+            int extra=target-initial,controls=extra/5,unicode=extra%5,position=0;
+            try(var c=owner(db);var p=c.prepareStatement("UPDATE dbo.Cases SET Name=?,CaseNumber=? WHERE Id=?")) {
+                for(int n=0;n<10;n++) {
+                    var name=new StringBuilder("BND");var number=new StringBuilder();
+                    for(int k=0;k<352;k++,position++) {char ch=position<controls?'\u0001':position<controls+unicode?'é':'a';if(k<252)name.append(ch);else number.append(ch);}
+                    p.setString(1,name.toString());p.setString(2,number.toString());p.setInt(3,500+n);p.executeUpdate();
+                }
+            }
+            // Fixture-only ordinary summary measurement; never an automatic reread of a failed protected call.
+            var measured=new java.io.ByteArrayOutputStream();new MinimizedCaseEncoder().encode(dao.searchMinimizedCases("BND",7,72,0,10),new UUID(0,0),measured);assertEquals(target,measured.size());
+            try(var request=authenticate(token)) {
+                var i=IntegrationInvocation.search(request.authority(),System.nanoTime()+9_000_000_000L);
+                var access=new AiCaseDataAccess(source("ai"),source("ai"),request);
+                if(target<=32768)assertEquals(target,access.search(i,"BND",0,b->0).size());
+                else assertEquals(IntegrationAccessAudit.Reason.OVERSIZED,assertThrows(IntegrationReadException.class,()->access.search(i,"BND",0,b->fail("No partial encoded buffer may escape"))).reason());
+            }
+        }
+        try(var c=owner(db)){assertEquals(3,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));assertEquals(30,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));}
+    }
+    @Test void exactFullResponseMeasurementCeilingsWithActualProtectedRpcAndNoReplay()throws Exception {
+        for(boolean overview:List.of(false,true))for(int delta:List.of(-1,0,1)) {
+            int maximum=overview?32768:65536;
+            try(var request=authenticate(token)) {
+                var access=new AiCaseDataAccess(source("ai"),source("ai"),request);
+                var i=overview?IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L):IntegrationInvocation.search(request.authority(),System.nanoTime()+9_000_000_000L);
+                java.util.function.Supplier<DisclosureBuffer> call=()->overview?access.overview(i,100L,b->maximum+delta):access.search(i,"Literal",0,b->maximum+delta);
+                if(delta<=0)assertTrue(call.get().size()>0);else assertEquals(IntegrationAccessAudit.Reason.OVERSIZED,assertThrows(IntegrationReadException.class,call::get).reason());
+            }
+        }
+        try(var c=owner(db)){assertEquals(6,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));assertEquals(3,count(c,"SELECT COUNT(*) FROM dbo.auditLog WHERE FieldName='Case.Overview.Read'"));assertEquals(33,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));}
+    }
+    @Test void authoritativeAdminReviewIsTenantBoundPagedAndRetainsHistoricalCaseIds()throws Exception {
+        try(var request=authenticate(token)){var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,100L,b->0);}
+        var review=new IntegrationAccessReview(provider("runtime",7,71));var rows=review.page(0,100);
+        assertEquals(1,rows.size());assertEquals(100,rows.getFirst().caseId());
+        assertThrows(IllegalStateException.class,()->new IntegrationAccessReview(provider("runtime",7,72)).page(0,100));
+        assertTrue(new IntegrationAccessReview(provider("runtime",8,81)).page(0,100).isEmpty(),"Foreign admin must not receive A's history");
+        assertThrows(IllegalArgumentException.class,()->review.page(0,101));
+        try(var c=owner(db)){sql(c,"DELETE dbo.Cases WHERE Id=100");}
+        assertEquals(100,review.page(0,100).getFirst().caseId(),"Historical resource IDs deliberately survive Case deletion without a Case FK/dump");
+    }
+    @Test void concurrentDedicatedPoolRequestsAndFailedReuseKeepAuthorityAndAuditSeparated()throws Exception {
+        var config=new com.zaxxer.hikari.HikariConfig();config.setDataSource(source("ai"));config.setMaximumPoolSize(2);config.setMinimumIdle(0);config.setConnectionTimeout(2000);
+        try(var pool=new com.zaxxer.hikari.HikariDataSource(config);var executor=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var barrier=new java.util.concurrent.CyclicBarrier(2);var tasks=new ArrayList<java.util.concurrent.Future<Integer>>();
+            for(String proof:List.of(token,foreignToken))tasks.add(executor.submit(()->{
+                try(var request=AiCaseDataAccess.authenticate(pool,proof,ISSUER,RESOURCE,System.nanoTime()+9_000_000_000L)) {
+                    barrier.await(3,java.util.concurrent.TimeUnit.SECONDS);long id=request.authority().shaleClientId()==7?100:200;
+                    var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
+                    return new AiCaseDataAccess(pool,pool,request).overview(i,id,b->0).size();
+                }
+            }));
+            for(var task:tasks)assertTrue(task.get(8,java.util.concurrent.TimeUnit.SECONDS)>0);
+            try(var request=AiCaseDataAccess.authenticate(pool,token,ISSUER,RESOURCE,System.nanoTime()+9_000_000_000L)) {
+                var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
+                assertEquals(IntegrationAccessAudit.Reason.CASE_UNAVAILABLE,assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(pool,pool,request).overview(i,200L,b->fail("Foreign data must never be encoded"))).reason());
+            }
+            for(String proof:List.of(foreignToken,token))try(var request=AiCaseDataAccess.authenticate(pool,proof,ISSUER,RESOURCE,System.nanoTime()+9_000_000_000L)) {
+                var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);assertTrue(new AiCaseDataAccess(pool,pool,request).overview(i,proof.equals(token)?100L:200L,b->0).size()>0);
+            }
+            try(var lease=pool.getConnection()){assertEquals(0,count(lease,"SELECT CASE WHEN SESSION_CONTEXT(N'ShaleClientId') IS NULL AND SESSION_CONTEXT(N'PrincipalUserId') IS NULL THEN 0 ELSE 1 END"));}
+        }
+        try(var c=owner(db)) {
+            assertEquals(4,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditResource r JOIN dbo.IntegrationAccessAuditLog a ON a.Id=r.EventId WHERE r.Relation='RETURNED' AND ((a.ShaleClientId=7 AND r.CaseId<>100) OR (a.ShaleClientId=8 AND r.CaseId<>200))"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.auditLog WHERE (ShaleClientId=7 AND (UserId<>72 OR ObjectId<>100)) OR (ShaleClientId=8 AND (UserId<>82 OR ObjectId<>200))"));
+        }
+    }
+    @Test void protectedQuotaSurvivesReplacementJvmAndNewAccessGrantWithoutReplayOrConcurrentOverspend()throws Exception {
+        try(var request=authenticate(token)) {var i=IntegrationInvocation.search(request.authority(),System.nanoTime()+9_000_000_000L);new AiCaseDataAccess(source("ai"),source("ai"),request).search(i,"Literal",0,b->0);}
+        replacementProbe(false);
+        try(var c=owner(db)){assertEquals(11,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));}
+        // Owner-only past-accounting fixture reaches exactly 200 durable user rows without resetting history.
+        try(var request=authenticate(token);var c=owner(db);var p=c.prepareStatement("INSERT dbo.AiQuotaReservation(ShaleClientId,IntegrationId,UserId,GrantId,SessionId,InvocationId,Operation,RowCost,Admitted,AdmittedAt,LeaseExpiresAt,ReleasedAt) VALUES(7,?,72,?,?,NEWID(),?,?,1,DATEADD(hour,-1,SYSUTCDATETIME()),DATEADD(second,-3590,SYSUTCDATETIME()),DATEADD(second,-3595,SYSUTCDATETIME()))")) {
+            p.setObject(1,request.authority().integrationId());p.setObject(2,request.authority().grantId());p.setObject(3,request.authority().delegatedSessionId());
+            for(int n=0;n<27;n++){p.setString(4,n<18?"SEARCH":"OVERVIEW");p.setInt(5,n<18?10:1);p.executeUpdate();}
+        }
+        replacementProbe(true);
+        String newAccessAndGrant=issue(7,72);
+        try(var request=authenticate(newAccessAndGrant)){var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);assertEquals(IntegrationAccessAudit.Outcome.THROTTLED,assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,100L,b->fail("New credentials must not reset user accounting"))).outcome());}
+        try(var c=owner(db)){assertEquals(200,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation WHERE ShaleClientId=7 AND UserId=72"));}
+        // Two new service instances share one user lease; private encoded output waits before handoff.
+        String other=issue(7,73);var entered=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
+        try(var executor=java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var first=executor.submit(()->{try(var request=authenticate(other)){var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);return new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,100L,b->{entered.countDown();try{assertTrue(release.await(5,java.util.concurrent.TimeUnit.SECONDS));}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}return 0;}).size();}});
+            try {
+                assertTrue(entered.await(3,java.util.concurrent.TimeUnit.SECONDS));
+                try(var request=authenticate(other)){var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);assertEquals(IntegrationAccessAudit.Outcome.THROTTLED,assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,100L,b->fail("Distributed concurrency may not overspend"))).outcome());}
+            }finally{release.countDown();}
+            assertTrue(first.get(5,java.util.concurrent.TimeUnit.SECONDS)>0);
+        }
+        try(var request=authenticate(other);var c=connection("ai",null,null)) {
+            byte[] digest=AiOAuthCredentialStore.digest(other);var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);
+            try {new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,100L,b->0);assertThrows(SQLException.class,()->AiSql.call(c,"AiDataGetCaseOverviewV1",r->true,digest,i.invocationId(),i.correlationId(),100));assertThrows(SQLException.class,()->AiSql.call(c,"AiDataAuthorizeCaseHandoffV1",r->true,digest,i.invocationId(),i.correlationId()));}
+            finally{Arrays.fill(digest,(byte)0);}
+        }
+    }
+    private void replacementProbe(boolean denied)throws Exception {
+        var command=List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-cp",System.getProperty("surefire.test.class.path"),ConfinedRestartProbe.class.getName(),Boolean.toString(denied));
+        var builder=new ProcessBuilder(command).redirectErrorStream(true);builder.environment().put("AI_PROBE_URL",url(db));builder.environment().put("AI_PROBE_USER",prefix+"_ai");builder.environment().put("AI_PROBE_PASSWORD",secrets.get("ai"));builder.environment().put("AI_PROBE_ACCESS",token);
+        var process=builder.start();try{assertTrue(process.waitFor(20,java.util.concurrent.TimeUnit.SECONDS));assertEquals(0,process.exitValue(),"Replacement JVM must observe persisted protected accounting");}finally{if(process.isAlive()){process.destroyForcibly();process.waitFor();}}
+    }
+    @Test void protectedCallRateSurvivesReplacementJvmAndFreshGrant()throws Exception {
+        for(int n=0;n<10;n++)try(var request=authenticate(token)){var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,100L,b->0);}
+        replacementProbe(true);
+        String fresh=issue(7,72);assertProtectedThrottle(fresh);
+        try(var c=owner(db)){assertEquals(10,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));assertEquals(10,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));assertEquals(12,count(c,"SELECT COUNT(*) FROM dbo.AiQuotaReservation"));}
+    }
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"rows","rate","concurrency"})
+    void protectedAggregateQuotaCeilingsApplyAcrossUsersIntegrationsAndInstances(String dimension)throws Exception {
+        try(var c=owner(db)){sql(c,"SET IDENTITY_INSERT dbo.Users ON; INSERT dbo.Users(id,ShaleClientId,is_admin,is_deleted,IsRemoved,name_first,email) VALUES(74,7,0,0,0,N'Quota74',N'quota74@example.invalid'),(75,7,0,0,0,N'Quota75',N'quota75@example.invalid'),(76,7,0,0,0,N'Quota76',N'quota76@example.invalid'),(77,7,0,0,0,N'Quota77',N'quota77@example.invalid'),(78,7,0,0,0,N'Quota78',N'quota78@example.invalid'); SET IDENTITY_INSERT dbo.Users OFF");}
+        AiIntegrationSecurityService.Registration first;try(var request=authenticate(token)){first=controls(7,71).inspectRegistrations().stream().filter(r->r.integrationId().equals(request.authority().integrationId())).findFirst().orElseThrow();}
+        String a73=issueWithRegistration(7,73,first),a74=issueWithRegistration(7,74,first);
+        int age=dimension.equals("rows")?3600:5;boolean active=dimension.equals("concurrency");if(active)age=0;
+        seedProtectedQuota(a73,dimension.equals("rows")?20:dimension.equals("rate")?10:1,dimension.equals("rows")?10:1,age,active);
+        seedProtectedQuota(a74,dimension.equals("rows")?20:dimension.equals("rate")?10:1,dimension.equals("rows")?10:1,age,active);
+        if(dimension.equals("rows"))seedProtectedQuota(issueWithRegistration(7,75,first),10,10,age,false);
+        assertProtectedThrottle(token); // 500 integration rows / 20 calls / 2 active leases; user 72 itself has none.
+        var second=controls(7,71).register("Aggregate second",false,AiScope.fromMask(3),1,List.of(URI.create(CALLBACK)));
+        var third=controls(7,71).register("Aggregate third",false,AiScope.fromMask(3),1,List.of(URI.create(CALLBACK)));
+        if(dimension.equals("rows")) {
+            seedProtectedQuota(issueWithRegistration(7,76,second),20,10,age,false);seedProtectedQuota(issueWithRegistration(7,77,second),20,10,age,false);seedProtectedQuota(issueWithRegistration(7,78,third),10,10,age,false);
+        } else if(dimension.equals("rate")) {
+            seedProtectedQuota(issueWithRegistration(7,75,second),10,1,age,false);seedProtectedQuota(issueWithRegistration(7,76,second),9,1,age,false);seedProtectedQuota(issueWithRegistration(7,77,third),10,1,age,false);seedProtectedQuota(issueWithRegistration(7,78,third),10,1,age,false);
+        } else {
+            seedProtectedQuota(issueWithRegistration(7,75,second),1,1,0,true);seedProtectedQuota(issueWithRegistration(7,76,second),1,1,0,true);seedProtectedQuota(issueWithRegistration(7,77,third),1,1,0,true);
+        }
+        var fourth=controls(7,71).register("Aggregate fresh",false,AiScope.fromMask(3),1,List.of(URI.create(CALLBACK)));
+        String fresh=issueWithRegistration(7,72,fourth);assertProtectedThrottle(fresh); // tenant 1000 rows / 60 calls / 5 active leases.
+        try(var c=owner(db)) {
+            if(dimension.equals("rows"))assertEquals(1000,count(c,"SELECT SUM(CONVERT(int,RowCost)) FROM dbo.AiQuotaReservation"));
+            if(dimension.equals("rate"))assertEquals(61,count(c,"SELECT COUNT(*) FROM dbo.AiQuotaReservation WHERE AdmittedAt>DATEADD(second,-60,SYSUTCDATETIME())"));
+            if(dimension.equals("concurrency"))assertEquals(5,count(c,"SELECT COUNT(*) FROM dbo.AiQuotaReservation WHERE Admitted=1 AND ReleasedAt IS NULL AND LeaseExpiresAt>SYSUTCDATETIME()"));
+            assertEquals(0,count(c,"SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Outcome='ALLOWED_READ'"));
+        }
+    }
+    private void assertProtectedThrottle(String proof) {
+        try(var request=authenticate(proof)){var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+9_000_000_000L);assertEquals(IntegrationAccessAudit.Outcome.THROTTLED,assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(source("ai"),source("ai"),request).overview(i,100L,b->fail("Durable aggregate budget must withhold output"))).outcome());}
+    }
+    private void seedProtectedQuota(String proof,int rows,int cost,int ageSeconds,boolean active)throws Exception {
+        try(var request=authenticate(proof);var c=owner(db);var p=c.prepareStatement("DECLARE @at datetime2(7)=DATEADD(second,?,SYSUTCDATETIME()); INSERT dbo.AiQuotaReservation(ShaleClientId,IntegrationId,UserId,GrantId,SessionId,InvocationId,Operation,RowCost,Admitted,AdmittedAt,LeaseExpiresAt,ReleasedAt) VALUES(?,?,?,?,?,NEWID(),?,?,1,@at,DATEADD(second,15,@at),CASE WHEN ?=1 THEN NULL ELSE DATEADD(second,1,@at) END)")) {
+            p.setInt(1,-ageSeconds);p.setInt(2,request.authority().shaleClientId());p.setObject(3,request.authority().integrationId());p.setInt(4,request.authority().actingUserId());p.setObject(5,request.authority().grantId());p.setObject(6,request.authority().delegatedSessionId());p.setString(7,cost==10?"SEARCH":"OVERVIEW");p.setInt(8,cost);p.setBoolean(9,active);
+            for(int n=0;n<rows;n++)p.executeUpdate();
+        }
+    }
+    public static final class ConfinedRestartProbe {
+        public static void main(String[] args)throws Exception {
+            var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();source.setURL(System.getenv("AI_PROBE_URL"));source.setUser(System.getenv("AI_PROBE_USER"));source.setPassword(System.getenv("AI_PROBE_PASSWORD"));
+            try(var request=AiCaseDataAccess.authenticate(source,System.getenv("AI_PROBE_ACCESS"),ISSUER,RESOURCE,System.nanoTime()+9_000_000_000L)) {
+                var i=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);var access=new AiCaseDataAccess(source,source,request);
+                if(Boolean.parseBoolean(args[0]))assertEquals(IntegrationAccessAudit.Outcome.THROTTLED,assertThrows(IntegrationReadException.class,()->access.overview(i,100L,b->0)).outcome());else assertTrue(access.overview(i,100L,b->0).size()>0);
+            }
+        }
+    }
+    private void boundaryRelationships()throws Exception {
+        try(var c=owner(db)) {
+            sql(c,"UPDATE dbo.Statuses SET Name=REPLICATE(NCHAR(1),50) WHERE SystemKey='parity'; UPDATE dbo.PracticeAreas SET Name=REPLICATE(NCHAR(1),150) WHERE SystemKey='parity'");
+            sql(c,"UPDATE dbo.Users SET name_first=REPLICATE(NCHAR(1),50),name_last=REPLICATE(NCHAR(1),50) WHERE ShaleClientId=7 AND Id IN(72,73)");
+        }
+    }
     private static Object invoke(Object target,java.lang.reflect.Method method,Object[] args)throws Throwable {
         try{return method.invoke(target,args);}catch(java.lang.reflect.InvocationTargetException e){throw e.getCause();}
     }
@@ -360,6 +554,9 @@ class AiCaseDataLocalSqlServerTest {
     AiIntegrationSecurityService controls(int tenant,int user){return new AiIntegrationSecurityService(provider("runtime",tenant,user),true,ISSUER,RESOURCE);}
     String issue(int tenant,int user)throws Exception {
         var registration=controls(tenant,tenant==7?71:81).register("Synthetic confinement",false,AiScope.fromMask(3),1,List.of(URI.create(CALLBACK)));
+        return issueWithRegistration(tenant,user,registration);
+    }
+    String issueWithRegistration(int tenant,int user,AiIntegrationSecurityService.Registration registration)throws Exception {
         UUID web=UUID.randomUUID(),tx=UUID.randomUUID();String code=AiOAuthCredentialStore.opaque(),nonce=AiOAuthCredentialStore.opaque();
         try(var c=owner(db);var p=c.prepareStatement("INSERT dbo.UserSessions(SessionId,ShaleClientId,UserId,ClientType,CurrentAccessJti,IssuedAt,ExpiresAt) VALUES(?,?,?,'WEB',?,SYSUTCDATETIME(),DATEADD(hour,2,SYSUTCDATETIME()))")){p.setObject(1,web);p.setInt(2,tenant);p.setInt(3,user);p.setObject(4,UUID.randomUUID());p.executeUpdate();}
         var store=new AiOAuthTransactionStore(provider("runtime",tenant,user),true,ISSUER,RESOURCE);

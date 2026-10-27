@@ -80,7 +80,9 @@ caller-selected values marked read-only authenticate tenant/user authority to th
 another tenant after restamping and inserting foreign PHI history under A context. The
 [SQL confinement review](../docs/testing/phase3b7-sql-confinement-review.md) inventories the authority
 graph and evaluates a separate, procedure-only AI principal with database-validated invocation proof.
-That design is not implemented; both failures remain open. Do not apply read_only to ordinary pooled
+The dedicated proof-bound design is implemented by [#1922](https://github.com/gseshadow/Shale/pull/1922);
+both failures are FIXED for that independent AI boundary at its [recorded local scope](../docs/testing/phase3b7-sql-confinement-implementation.md).
+Recovered-input [3B.7 local/adversarial acceptance](../docs/testing/phase3b7-local-acceptance-closeout.md) now passes; deployed permissions/catalog and pilot authorization remain OPEN. The ordinary shared-runtime trust boundary remains distinct. Do not apply read_only to ordinary pooled
 providers or treat a new login with the old grants as a confinement fix.
 
 ### User release announcement state

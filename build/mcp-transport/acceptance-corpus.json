@@ -1,0 +1,510 @@
+{
+  "protocol": "2026-07-28",
+  "vectors": [
+    {
+      "id": "auth-valid",
+      "action": "raw",
+      "status": 200
+    },
+    {
+      "id": "auth-expired",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "auth-revoked",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "auth-random",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "auth-refresh",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "auth-code",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "auth-web",
+      "action": "raw",
+      "status": 400
+    },
+    {
+      "id": "auth-duplicate",
+      "action": "raw",
+      "status": 400
+    },
+    {
+      "id": "auth-malformed",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "auth-oversized",
+      "action": "raw",
+      "status": 400
+    },
+    {
+      "id": "auth-wrong-resource",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "auth-wrong-issuer",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "auth-wrong-client",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "catalog-search",
+      "action": "catalog",
+      "names": [
+        "search_cases"
+      ]
+    },
+    {
+      "id": "catalog-overview",
+      "action": "catalog",
+      "names": [
+        "get_case_overview"
+      ]
+    },
+    {
+      "id": "catalog-both",
+      "action": "catalog",
+      "names": [
+        "search_cases",
+        "get_case_overview"
+      ]
+    },
+    {
+      "id": "catalog-neither",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "catalog-live-reduction",
+      "action": "reduction"
+    },
+    {
+      "id": "search-valid",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "MCP literal"
+      },
+      "expected": "page0"
+    },
+    {
+      "id": "search-zero",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "no matches"
+      },
+      "expected": "zero"
+    },
+    {
+      "id": "search-page0",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "MCP literal",
+        "page": 0
+      },
+      "expected": "page0"
+    },
+    {
+      "id": "search-page9",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "MCP literal",
+        "page": 9
+      },
+      "expected": "page9"
+    },
+    {
+      "id": "search-blank",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": ""
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "search-short",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "ab"
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "search-wildcard-only",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "%_["
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "search-literal-wildcards",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "literal %_["
+      },
+      "expected": "literal"
+    },
+    {
+      "id": "search-oversized-query",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "search-bad-page",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "MCP literal",
+        "page": 10
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "search-additional-property",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "MCP literal",
+        "tenantId": 8
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "search-unicode",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "É漢𐐀"
+      },
+      "expected": "unicode"
+    },
+    {
+      "id": "search-overlength-source",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "Oversized"
+      },
+      "expected": "PAYLOAD_TOO_LARGE"
+    },
+    {
+      "id": "overview-same-tenant",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "overview"
+    },
+    {
+      "id": "overview-unassigned",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 1000
+      },
+      "expected": "overview"
+    },
+    {
+      "id": "overview-missing",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 999
+      },
+      "expected": "CASE_UNAVAILABLE"
+    },
+    {
+      "id": "overview-foreign",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 9001
+      },
+      "expected": "CASE_UNAVAILABLE"
+    },
+    {
+      "id": "overview-deleted",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 9002
+      },
+      "expected": "CASE_UNAVAILABLE"
+    },
+    {
+      "id": "overview-zero",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 0
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "overview-negative",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": -1
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "overview-string",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": "100"
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "overview-too-large",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 2147483648
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "overview-null",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": null
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "overview-additional-property",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100,
+        "tenantId": 8
+      },
+      "expected": "INVALID_INPUT"
+    },
+    {
+      "id": "live-tenant-off",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "live-integration-revoke",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "live-grant-revoke",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "live-session-revoke",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "live-user-disable",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "live-credential-expiry",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "live-credential-revoke",
+      "action": "raw",
+      "status": 401
+    },
+    {
+      "id": "fault-parent",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-child",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-phi",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-quota",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-commit",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-lost-ack",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-close",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-failure-audit",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-cancel-before",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-cancel-during",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-timeout",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-rejected-task",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-cleanup",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "fault-interruption",
+      "action": "fault",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "closed"
+    },
+    {
+      "id": "reuse-after-failures",
+      "action": "call",
+      "tool": "get_case_overview",
+      "arguments": {
+        "caseId": 100
+      },
+      "expected": "overview"
+    },
+    {
+      "id": "privacy-assertion-metadata",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "OAuth.assertion ProofDigest JSON-RPC-ID exception text SELECT arbitrary metadata"
+      },
+      "expected": "zero"
+    },
+    {
+      "id": "privacy-bearer-query",
+      "action": "call",
+      "tool": "search_cases",
+      "arguments": {
+        "query": "$ACCESS_SENTINEL"
+      },
+      "expected": "zero"
+    }
+  ]
+}
