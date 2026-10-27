@@ -58,7 +58,7 @@ Azure privilege-fault tests require a separately owned disposable Azure database
 independent users and the exact authoritative fixture. Never enable local owner/fault harnesses on
 production. This candidate does not claim such an Azure mutation fixture was provisioned.
 
-The fresh commands/results are recorded below. Maven uses task-owned Maven 3.9.11/JDK 21, an
+The fresh commands/results are recorded below and in the [verification JSON](azure-sql-case-attestation-verification.json). Counts overlap and are not additive. The tested source is `09f2593f42958c130e21cb224d7ef97a708271bc`; subsequent receipt-only edits do not change that implementation. Maven uses task-owned Maven 3.9.11/JDK 21, an
 explicit workspace-local repository/proxy settings file and the system CA truststore. TLS remains
 validated. The normal command prefix below is `mvn -B`; actual launcher/setup paths are private
 scratch, not deployment dependencies. Skips/zero-test SQL classes are never counted as acceptance.
@@ -66,11 +66,11 @@ scratch, not deployment dependencies. Skips/zero-test SQL classes are never coun
 | Command / group | Fresh result |
 | --- | --- |
 | `mvn -B -pl shale-server -am -DskipTests package` | PASS; includes Boot executable JAR compilation/repackage, no deployment |
-| `mvn -B -pl shale-data -am -Dtest=AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataAccessTest,ProofDigestTest,DataSourcesAiCaseDataTest -Dsurefire.failIfNoSpecifiedTests=false test` | Final result recorded at closeout below |
-| Focused server command: same data tests plus `McpCaseCompositionTest,McpSearchTest,McpOverviewTest,McpFilterIsolationTest,OAuthAuthorizationFlowTest,OAuthConfigurationTest` with `-pl shale-server -am` | 41 PASS, 0 failures/errors/skips across data/server; opt-in OAuth SQL methods produce no live proof |
-| Selector affected command | Final result recorded at closeout below |
-| `mvn -B test` critical reactor | Final result recorded at closeout below |
-| `python3 -m unittest discover -s build/test-selection -p 'test_*.py'` | 27 PASS before selector inventory update; final rerun recorded below |
+| `mvn -B -pl shale-data -am -Dtest=AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataAccessTest,ProofDigestTest,DataSourcesAiCaseDataTest -Dsurefire.failIfNoSpecifiedTests=false test` | 16 PASS, 0 failures/errors/skips |
+| Focused server command: same data tests plus `McpCaseCompositionTest,McpSearchTest,McpOverviewTest,McpFilterIsolationTest,OAuthAuthorizationFlowTest,OAuthConfigurationTest` with `-pl shale-server -am` | 43 PASS, 0 failures/errors/skips across data/server; opt-in OAuth SQL methods produce no live proof |
+| Selector affected command | 137 PASS, 2 explicit live-gate skips, 0 failures/errors (139 run) |
+| `mvn -B test` critical reactor | 226 PASS, 0 failures/errors/skips; all seven modules SUCCESS |
+| `python3 -m unittest discover -s build/test-selection -p 'test_*.py'` | 27 PASS after final selector inventory/source changes |
 | Authoritative Case/security, expanded live inherited faults, production Boot/SQL, final-handoff expiry, TypeScript 66/66, Python 66/66, TLS/proxy, durable SQL OAuth lifecycle | **NOT RUN**; missing original private schema input; no replacement/synthetic Case schema invented |
 | Azure SQL live read-only platform gate / production Stage 0 | **NOT RUN**; no configured authorized target connections |
 
@@ -78,7 +78,13 @@ Resolved setup/failed attempts are not passing evidence: initial shell fetch nee
 network execution path; Maven needed workspace-local cache/proxy configuration, a full JDK rather
 than the installed JRE, and the system CA store. The first static Stage 0 privacy assertion also
 incorrectly matched a comment saying no locations are emitted; the complete test was reviewed and
-changed to inspect executable SQL. It must pass before closeout.
+changed to inspect executable SQL. The corrected test passes in the final focused/affected runs.
+
+The selector recommends informational `mvn -Pall-tests test` solely because its inventory changed.
+That optional historical suite was not run; it cannot replace the focused/affected/critical gates.
+Changed-file-to-test review and a second search confirmed server surfaces remain behind the explicit
+SQL Server/MI branch, all private identity constructor callers compile, and source/catalog/module
+receipts and final-handoff code remain unchanged. Git diff checks pass.
 
 ## Exact read-only Stage 0 recheck, before provisioning
 
