@@ -1,0 +1,1298 @@
+{
+  "date": "2026-10-27",
+  "timezone": "America/Denver",
+  "classification": "BLOCKED",
+  "pullRequest": 1924,
+  "branch": "codex/production-mcp-case-composition",
+  "mergedBaseline": "b990a09212b9e5872858005e9385d4a2b0539c9f",
+  "publishedHeadAtStart": "e396af4026efd135c8201a3cf0648a2a993163c8",
+  "matchedInitialTree": "d8b0d83d1abbccbe04abbfb53aa42fd1f1449762",
+  "localVerifiedCodeCommit": "f8ab23722433d1676478ff0a574b98170a2dacf7",
+  "verifiedSourceFiles": [
+    {
+      "path": "build/test-selection/critical-tests.txt",
+      "sha256": "e23f553d2c45029925c5dd24073cc93e7b87a2c60b13401bd8847b766c616b94"
+    },
+    {
+      "path": "build/test-selection/test-areas.json",
+      "sha256": "f1e9fe36f7502d773a848f8b16dd7768363942df1616af312dee80ec908fdc61"
+    },
+    {
+      "path": "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+      "sha256": "aa3da2eab740f6def06ea47bf197c97b05518d3893650012aab6607f5652e924"
+    },
+    {
+      "path": "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java",
+      "sha256": "85eccef9e3138d85954286c4b38588e2947a05659fe3ec88987f794c0dd01b52"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+      "sha256": "51e3a9924a74d1648204ef640ae1f82a96ae5d14489b1d748fd6c96c66ae6d5c"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+      "sha256": "b578e007b34c54147efc7b5b4ec7d957221190ac4785fac4844a22350b9a60ce"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+      "sha256": "f6858951a29d0f8d0beb69bd2a3aa11db7822dca26b9944417e5083acaa2d1bf"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+      "sha256": "b227f79f921a04f831c0b1b087c167dae8c4021540e0a12ad7da51b4e4c7c61b"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+      "sha256": "521db51437281f51e44a1bae290883a580dc1bb1c8ff03f4c122bcf9da71de40"
+    },
+    {
+      "path": "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+      "sha256": "0959d19c8650758820d81547ef1c6607f7bbd8a3a2d72f501e6dbb5b8ea13406"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpCaseCompositionTest.java",
+      "sha256": "63db8eaefa6c024494d1b78dc816db76136f1de0816281633473c4980ac7e8b7"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpOverviewTest.java",
+      "sha256": "6003dbfa9274d3e851cdcf9abb5f66f63dfa0917ea63fd4ef7c183bc72e41049"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpProductionOffBootTest.java",
+      "sha256": "d8e0202df19b7b74254637dbe88735f208ba4103dfc6bd4c47b59a7496c63730"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpSearchTest.java",
+      "sha256": "e2ead16e15570245ec981ad0bd61afdd9bbf63c16d0eb10e00845fd4c9a9af6f"
+    }
+  ],
+  "authoritativeSource": {
+    "file": "shale-schema-source.sql",
+    "status": "ABSENT",
+    "actualSha256": null,
+    "expectedSha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+    "expectedDerivedSha256": "40a665caefb3203a6c364d0caac3fadcc1a58d24a66a994f48e058b73ae6f243",
+    "expectedCandidateSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f",
+    "derivedOrExecuted": false,
+    "substitutedOrReconstructed": false,
+    "searchScope": "Mounted attachment/shared/library areas and workspace/tmp filename search; only prior pasted text request mounted."
+  },
+  "runtime": {
+    "maven": "3.9.11",
+    "java": "21.0.12.1",
+    "springBoot": "4.1.1"
+  },
+  "dependencyRecovery": {
+    "firstCommand": [
+      "mvn",
+      "-B",
+      "-pl",
+      "shale-server",
+      "-am",
+      "test"
+    ],
+    "firstOutcome": "Dependency resolution failed: proxy socket denied, Operation not permitted.",
+    "concreteFix": "Command network permission enabled; configured proxy retained; socket reachability independently confirmed.",
+    "retryCommand": [
+      "mvn",
+      "-U",
+      "-B",
+      "-pl",
+      "shale-server",
+      "-am",
+      "test"
+    ],
+    "retryOutcome": "Dependencies resolved; real test compilation exposed MockEnvironment.setProperty void dereference at McpCaseCompositionTest.java:41.",
+    "fix": "Split chained setter calls; no production code change.",
+    "furtherDependencyRetries": 0
+  },
+  "checks": [
+    {
+      "name": "production-focused",
+      "command": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dtest=McpCaseCompositionTest,McpProductionOffBootTest,McpSearchTest,McpOverviewTest,McpFilterIsolationTest,OAuthConfigurationTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "exit": 0,
+      "counts": {
+        "tests": 28,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 28
+      },
+      "classes": [
+        {
+          "class": "com.shale.server.oauth.OAuthConfigurationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpCaseCompositionTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpSearchTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpProductionOffBootTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpOverviewTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpFilterIsolationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "zeroExecutionClasses": []
+    },
+    {
+      "name": "final-focused",
+      "command": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dtest=com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.security.ai.ProofDigestTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.mcp.McpTransportTest,com.shale.server.mcp.McpSearchTest,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpJdbcDeadlineTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "exit": 0,
+      "durationSeconds": 19.649,
+      "counts": {
+        "tests": 90,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 90
+      },
+      "classes": [
+        {
+          "class": "com.shale.data.security.ai.AiAccessContractTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiCaseDataMigrationContractTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.IntegrationCaseReadTest",
+          "tests": 44,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.ProofDigestTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiCaseDataAccessTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.config.DataSourcesAiCaseDataTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.IntegrationAccessContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpSearchTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpJdbcDeadlineTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpOverviewTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpTransportTest",
+          "tests": 18,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
+      "zeroExecutionClasses": [
+        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
+      ]
+    },
+    {
+      "name": "final-ordinary",
+      "command": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dtest=com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.service.adapter.MinimizedCaseReadJdbcTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.server.runtime.ServerSessionSkeletonTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.controller.MinimizedCaseReadControllerTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.OAuthAuthorizationFlowTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "exit": 0,
+      "durationSeconds": 16.13,
+      "counts": {
+        "tests": 55,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 55
+      },
+      "classes": [
+        {
+          "class": "com.shale.data.runtime.RuntimeSessionServiceTimingTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.service.adapter.MinimizedCaseReadJdbcTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.auth.AuthCredentialLookupTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.controller.MinimizedCaseReadControllerTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.runtime.ServerSessionSkeletonTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthRevocationPolicyTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
+      "zeroExecutionClasses": [
+        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
+      ]
+    },
+    {
+      "name": "final-desktop-and-http",
+      "command": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server,shale-desktop",
+        "-am",
+        "-Dtest=DesktopRuntimeSessionLifecycleTest,DesktopSessionEnrollmentLifecycleTest,DesktopSessionEnrollmentClientTest,SessionPolicyInvalidationCoordinatorTest,AuthControllerTest,SessionControllerTest,DesktopSessionControllerTest,OAuthAuthorizationFlowTest,OAuthFilterIsolationTest,MinimizedCaseReadControllerTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "exit": 0,
+      "durationSeconds": 25.244,
+      "counts": {
+        "tests": 58,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 58
+      },
+      "classes": [
+        {
+          "class": "com.shale.desktop.session.SessionPolicyInvalidationCoordinatorTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.desktop.session.DesktopRuntimeSessionLifecycleTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.desktop.session.DesktopSessionEnrollmentLifecycleTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.desktop.session.DesktopSessionEnrollmentClientTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.controller.AuthControllerTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.controller.MinimizedCaseReadControllerTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.controller.DesktopSessionControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.controller.SessionControllerTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthFilterIsolationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
+      "zeroExecutionClasses": [
+        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
+      ]
+    },
+    {
+      "name": "oauth-policy",
+      "command": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dtest=OAuthClientMappingTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,PinnedClientAssertionTest,OAuthFilterIsolationTest,OAuthMetadataTest,ShaleOAuthHumanTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "exit": 0,
+      "durationSeconds": 14.924,
+      "counts": {
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 20
+      },
+      "classes": [
+        {
+          "class": "com.shale.server.oauth.ShaleOAuthHumanTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.PinnedClientAssertionTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthCodeExchangePolicyTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthMetadataTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthClientMappingTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthFilterIsolationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthRevocationPolicyTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
+      "zeroExecutionClasses": []
+    },
+    {
+      "name": "affected",
+      "command": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-core,shale-data,shale-server",
+        "-am",
+        "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.McpCaseCompositionTest,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpProductionOffBootTest,com.shale.server.mcp.McpSearchTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "exit": 0,
+      "durationSeconds": 24.65,
+      "counts": {
+        "tests": 184,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 184
+      },
+      "classes": [
+        {
+          "class": "com.shale.core.security.ai.AiScopeTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiAccessContractTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.auth.PreTenantAuthenticationModuleContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.CaseAggregateTransactionTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.EntityActionAuditMigrationContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.CaseLifecycleAuditContractTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.runtime.RuntimeSessionServiceTimingTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiCaseDataMigrationContractTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.IntegrationCaseReadTest",
+          "tests": 44,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.ContactMutationContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiSecurityLocalSqlServerTest",
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.ProofDigestTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiCaseDataAccessTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiOAuthRevocationContractTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.config.DataSourcesAiCaseDataTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.EntityActionAuditEventTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.auth.AuthCredentialLookupTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiSecurityContractTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiOAuthCredentialContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiCaseDataLocalSqlServerTest",
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.ContactAggregateMutationContractTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.IntegrationAccessContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.ShaleOAuthHumanTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.PinnedClientAssertionTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpSearchTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.controller.AuthControllerTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthCodeExchangePolicyTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthConfigurationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpProductionOffBootTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthMetadataTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpOverviewTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthClientMappingTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.runtime.ServerSessionSkeletonTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthFilterIsolationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpCaseCompositionTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthRevocationPolicyTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
+      "zeroExecutionClasses": [
+        "com.shale.data.security.ai.AiSecurityLocalSqlServerTest",
+        "com.shale.data.security.ai.AiCaseDataLocalSqlServerTest",
+        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
+      ]
+    },
+    {
+      "name": "critical",
+      "command": [
+        "mvn",
+        "-B",
+        "test"
+      ],
+      "exit": 0,
+      "durationSeconds": 33.108,
+      "counts": {
+        "tests": 225,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 225
+      },
+      "classes": [
+        {
+          "class": "com.shale.updater.platform.MacPlatformSupportTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.updater.MainTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.updater.InstallServiceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.core.platform.AppPathsTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.core.security.ai.AiScopeTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiAccessContractTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.CaseAggregateTransactionTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.EntityActionAuditMigrationContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.CaseLifecycleAuditContractTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.service.adapter.AuthServiceAdapterTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiCaseDataMigrationContractTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.IntegrationCaseReadTest",
+          "tests": 44,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.ContactMutationContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.ProofDigestTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiCaseDataAccessTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiOAuthRevocationContractTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.config.DataSourcesAiCaseDataTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.EntityActionAuditEventTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.TaskDaoCompletionStatusSynchronizationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.CaseDateDaoMutationContractTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiSecurityContractTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.AiOAuthCredentialContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.FieldConfirmationDaoTriggerIntegrationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.ContactAggregateMutationContractTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.dao.UserManagementRemovalContractTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.data.security.ai.IntegrationAccessContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.desktop.identity.MachineIdentityProviderTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.desktop.update.DesktopUiUpdateLauncherTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.desktop.identity.MachineIdentityUpgradeContractTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.desktop.update.DesktopUpdateLauncherTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.desktop.ShaleLauncherTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.ui.notification.NotificationPrivacyProjectorTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.ui.services.CaseDatesLiveUpdateContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.ShaleOAuthHumanTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.config.ShaleServerServiceConfigurationTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.PinnedClientAssertionTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.controller.AuthControllerTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthCodeExchangePolicyTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthConfigurationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpProductionOffBootTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.controller.HealthControllerTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthMetadataTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthClientMappingTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.runtime.ServerSessionSkeletonTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthFilterIsolationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpCaseCompositionTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthRevocationPolicyTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
+      "zeroExecutionClasses": []
+    }
+  ],
+  "selectorPython": {
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "build/test-selection",
+      "-p",
+      "test_*.py"
+    ],
+    "passed": 27,
+    "failures": 0
+  },
+  "productionOffBoot": {
+    "status": "PASS",
+    "tests": 2,
+    "profiles": [
+      "azure",
+      "prod"
+    ],
+    "identity": "PRODUCTION",
+    "scope": "Full ShaleServerApplication Boot 4.1.1 embedded HTTP startup with real ordinary beans, DB-free health/auth-denial routes; no AI pool/boundary/handlers/servlet/bootstrap bean; ordinary pools target closed loopback port.",
+    "successfulDatabaseBackedOrdinaryFlows": "NOT RUN"
+  },
+  "readinessUnitAndWiring": {
+    "status": "PASS",
+    "scope": "Fresh mocked attestation states, exact three log messages, no error details, no bearer authentication or reader call; not authoritative SQL."
+  },
+  "blockedChecks": [
+    "Authoritative production-profile readiness-only Boot with SQL global/tenant OFF",
+    "Production-profile PRODUCTION-identity positive confined serving",
+    "Actual restricted AI and catalog-verifier tokens, SIDs and effective authority",
+    "#1922 actual SQL read/context/PHI/legacy/control/escalation attacks",
+    "Deterministic post-lock DB-UTC final-handoff expiry through both clients",
+    "Full TypeScript/Python production-like matrix (0 executed for each)",
+    "Real certificate/hostname-validated TLS/proxy production-like acceptance",
+    "Production-like durable OAuth SQL issuance, replay, refresh/reuse and revocation",
+    "Successful production-like ordinary database flows and after-readiness smoke"
+  ],
+  "ci": "Not used; repository rules explicitly prohibit automated tests in GitHub Actions; only workflow is static-web deployment.",
+  "sqlChanged": false,
+  "productionCodeChangedDuringResume": false,
+  "noProductionOrAzureSql": true,
+  "noAzureConfigurationChange": true,
+  "noJarDeployed": true,
+  "noRealTenantOrIntegrationEnabled": true,
+  "noProductionCredentialsIssued": true,
+  "packagedActivationDefaults": "OFF",
+  "interpretation": "Group counts overlap. Zero-execution opt-in classes provide no passing evidence. No isolated javac result is used as Maven/Boot acceptance."
+}

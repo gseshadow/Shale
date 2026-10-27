@@ -392,7 +392,8 @@
         "com.shale.server.oauth.OAuthRevocationPolicyTest",
         "com.shale.server.oauth.PinnedClientAssertionTest",
         "com.shale.server.oauth.OAuthAuthorizationFlowTest",
-        "com.shale.server.mcp.McpCaseCompositionTest"
+        "com.shale.server.mcp.McpCaseCompositionTest",
+        "com.shale.server.mcp.McpProductionOffBootTest"
       ]
     },
     "build-scripts": {

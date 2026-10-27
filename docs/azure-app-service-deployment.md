@@ -651,7 +651,8 @@ revoked descendants. Do not drop tables or restore pre-revocation database histo
 ## Production Case composition candidate
 
 The earlier synthetic-only/current-production-refusal passages describe the pre-composition baseline.
-A separate production/readiness candidate now exists, **BLOCKED pending compilation and actual
-production-profile authoritative/client/TLS acceptance**. It does not authorize deployment.
+A separate production/readiness candidate now exists. Maven/Boot compilation and production OFF
+startup are verified; it remains **BLOCKED pending production-profile authoritative/client/TLS acceptance**.
+The required immutable schema attachment is absent in the resumed verification environment. It does not authorize deployment.
 Use [the current staged preflight](production-mcp-deployment-preflight.md) and
 [verification limits](testing/production-mcp-case-composition.md). All packaged defaults remain OFF.

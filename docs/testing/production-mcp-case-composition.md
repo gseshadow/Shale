@@ -1,7 +1,91 @@
 # Production MCP Case composition candidate
 
 Base: `b990a09212b9e5872858005e9385d4a2b0539c9f`, merged #1922/#1923.
-Status: **BLOCKED / UNVERIFIED IMPLEMENTATION CANDIDATE**. This record does not close production acceptance.
+Status: **BLOCKED — Maven/Boot and production OFF startup verified; authoritative production-profile acceptance remains unexecuted.**
+
+
+## Resumed verification 2026-10-27
+
+PR #1924 was resumed in place at published `e396af4026efd135c8201a3cf0648a2a993163c8`.
+The initial local tree matched published tree `d8b0d83d1abbccbe04abbfb53aa42fd1f1449762`
+exactly before edits. Current origin/codex/latest is the baseline above. The original checkout is
+preserved. Full Git history was fetched after command network access was corrected.
+
+**Hard gate: the authoritative `shale-schema-source.sql` attachment is ABSENT.** Mounted inputs
+contain only the prior pasted request. Expected original SHA-256 is
+`4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`.
+No source was copied, decoded, derived, reconstructed, substituted or executed. Authoritative SQL,
+client and TLS acceptance stopped at this gate. The expected derived/candidate hashes remain those
+in #1922/#1923; neither was reproduced in this run. Reattach the original and hash its immutable
+bytes before any preparation. No earlier test-profile result closes this production-profile gate.
+
+### Actual Maven and Boot results
+
+The first `mvn -B -pl shale-server -am test` failed because the command sandbox denied the configured
+proxy socket. A network-permitted connectivity check succeeded. The one dependency-resolution retry,
+`mvn -U -B -pl shale-server -am test`, resolved dependencies and reached the real compiler. It exposed
+`McpCaseCompositionTest.java:41: void cannot be dereferenced`: the Spring 7 MockEnvironment setter
+cannot be chained. Splitting those calls fixed compilation without changing production behavior.
+No dependency version, migration or confinement implementation was redesigned.
+
+Actual Maven 3.9.11 / JDK 21.0.12.1 / Spring Boot 4.1.1 compilation and the following checks passed:
+
+| Executed group | Passed | Failures/errors | Reported skips |
+| --- | ---: | --- | ---: |
+| Composition/policy/readiness/logging, actual production OFF Boot, handler/filter/OAuth configuration | 28 | 0/0 | 0 |
+| Existing Case security/transport/disclosure contracts | 90 | 0/0 | 0 |
+| Ordinary JDBC-binding/auth/Case REST/session regressions | 55 | 0/0 | 0 |
+| Desktop/HTTP/session regressions | 58 | 0/0 | 0 |
+| OAuth profile/assertion/metadata policy regressions | 20 | 0/0 | 0 |
+| Selector affected cases/security-data/server suite | 184 | 0/0 | 0 |
+| Critical reactor, once after verification fixes, all seven modules | 225 | 0/0 | 0 |
+| Selector Python | 27 | 0/0 | 0 |
+
+Counts overlap and are not additive unique coverage. Opt-in `AiSecurityLocalSqlServerTest`,
+`AiCaseDataLocalSqlServerTest` and `OAuthAuthorizationFlowTest` reported zero executed tests where
+selected; they are explicitly **NOT RUN**, even though Surefire reports zero skips for those empty
+class suites. No SQL opt-in was supplied. Zero execution is never passing authoritative/OAuth SQL proof.
+Exact argv, per-class counts and verified source hashes are in the
+[resumed verification JSON](production-mcp-case-composition-verification.json).
+No isolated javac result is used to claim Maven/Boot completion. GitHub Actions testing remains disabled
+by repository policy; its only workflow deploys static web assets and was not used as a build fallback.
+
+### Production OFF and readiness scope
+
+New `McpProductionOffBootTest` starts the actual `ShaleServerApplication` and embedded HTTP server
+under **azure and prod**, PRODUCTION identity, all eight AI/OAuth/readiness/handler switches false,
+and no AI/verifier/bootstrap configuration. The two cases pass with real ordinary bearer/session/
+remembered-store beans, DB-free health 200, ordinary protected-route 401, and MCP/OAuth routes 404.
+There is no McpAiCaseData, AI pool, Case handler, MCP servlet, OAuth bootstrap or legacy MCP
+access-authenticator bean. Ordinary pools use isolated closed-loopback destinations; no successful
+SQL-backed ordinary workflow is claimed by this startup check.
+
+The actual Spring composition tests pass their shared-policy control matrix, isolated test mode,
+production missing-setting and ambiguity cases, readiness-only mocked wiring and handler refusal on
+attestation failure. New readiness log coverage emits exactly the three closed state strings and
+no Throwable/diagnostic payload, never authenticates a bearer or invokes a Case reader, and confirms
+fresh failure replaces prior success. This is **unit/wiring evidence**, not live SQL readiness.
+
+### Remaining mandatory acceptance
+
+The authoritative attachment gate leaves all of these **NOT RUN**:
+
+- Real readiness-only production Boot, restricted AI/verifier/bootstrap identities, immutable
+  deployment binding and SQL global/tenant capability OFF.
+- Production-profile/PRODUCTION-identity positive Case serving and actual absence of fallback under
+  confined SQL failure; completed production-specific serving harness evidence.
+- Actual restricted AI and verifier SID/token/effective-permission proofs, all #1922 direct attacks,
+  ownership/escalation/cross-database denials and catalog drift injection.
+- Post-lock DB-UTC final-handoff expiry through both official clients.
+- Full TypeScript/Python production-like corpus: **0 executed for each client** in this resume.
+- Real verified TLS/proxy/Host/Forwarded/Origin and canonical metadata/protected Overview.
+- Production-like durable OAuth SQL lifecycle/replay/rotation/revocation, and successful ordinary
+  database-backed flows plus the after-live-readiness ordinary smoke.
+
+No SQL file or migration changed; no production source changed during this resume. This is still
+**BLOCKED**, not READY or a completed production acceptance. Legal/SDK/operator/tenant-owner and the
+remaining Category B live/deployment gates stay OPEN. No production/Azure SQL, Azure changes,
+JAR deployment, real enablement or production credentials. Packaged defaults remain OFF.
 
 ## Original blocker and changed boundary
 
@@ -78,7 +162,7 @@ Pre-edit searches covered all callers of `mcpAiCaseData`, `mcpSearchHandler`, `m
 The mocked production context test proves wiring only. It does not prove SQL confinement, actual
 production-like credentials/TLS, client interoperability or authoritative acceptance.
 
-## Execution limits
+## Historical initial candidate execution limits
 
 The exact signed base commit/tree and source blobs were recovered through the GitHub connector
 because the executor's shell proxy was unavailable. All source and binary blobs were verified against their original Git object IDs.

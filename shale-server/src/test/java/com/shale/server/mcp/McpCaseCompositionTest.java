@@ -38,7 +38,8 @@ class McpCaseCompositionTest {
     }
 
     @Test void isolatedTestCompositionIsPreservedAndAmbiguousProfilesAreRejected() {
-        var env=environment("test");env.setProperty(GLOBAL,"true").setProperty(TRANSPORT,"true").setProperty(SEARCH,"true");
+        var env=environment("test");
+        env.setProperty(GLOBAL,"true");env.setProperty(TRANSPORT,"true");env.setProperty(SEARCH,"true");
         assertNotNull(new McpSearchConfiguration().mcpSearchHandler(new McpCaseCompositionPolicy(env,TEST),mock(McpAiCaseData.class)));
         assertThrows(IllegalStateException.class,()->new McpCaseCompositionPolicy(env,PRODUCTION).requireBoundary());
         for(String[] profiles:List.of(new String[]{"azure","test"},new String[]{"prod","dev"},new String[]{"prod","local"},new String[]{"local"})) {
@@ -87,6 +88,27 @@ class McpCaseCompositionTest {
                 assertTrue(response.getStatus()>=400);
             }
         }
+    }
+
+    @Test void readinessLogContainsOnlyClosedStateAndNeverDiagnosticDetails() {
+        var env=environment("azure");
+        var data=mock(McpAiCaseData.class);
+        var factory=new DefaultListableBeanFactory();factory.registerSingleton("boundary",data);
+        var readiness=new McpCaseReadiness(new McpCaseCompositionPolicy(env,PRODUCTION),factory.getBeanProvider(McpAiCaseData.class));
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(McpCaseReadiness.class);
+        var appender=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();logger.addAppender(appender);
+        try {
+            readiness.report();verifyNoInteractions(data);
+            env.setProperty(McpCaseCompositionPolicy.COMPOSITION,"true");readiness.report();
+            doThrow(new IllegalStateException("SQL username/hash/proof private-sentinel")).when(data).ready(anyLong());
+            readiness.report();
+            assertEquals(List.of("AI_CASE_SQL_READINESS disabled","AI_CASE_SQL_READINESS ready","AI_CASE_SQL_READINESS not-ready"),
+                    appender.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage).toList());
+            assertTrue(appender.list.stream().allMatch(event->event.getThrowableProxy()==null));
+            verify(data,never()).authenticate(anyString(),anyLong());
+            verify(data,never()).reader(anyLong(),any());
+        } finally {logger.detachAppender(appender);appender.stop();}
     }
 
     @Test void readinessOnlyHasNoOAuthOrMcpDisclosureSurface()throws Exception {
