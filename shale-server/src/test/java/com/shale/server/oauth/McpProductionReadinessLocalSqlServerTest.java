@@ -102,6 +102,12 @@ class McpProductionReadinessLocalSqlServerTest {
                     assertEquals("not-ready",readiness.state(),"Catalog verifier must reject inherited public Case read authority");
                 } finally {try(var c=h.owner(h.db)){sql(c,"REVOKE SELECT ON dbo.Cases FROM public");}}
                 assertEquals("ready",readiness.state());
+                for(String[] fault:com.shale.server.mcp.McpCatalogVerifierServingChecks.publicFaults()) {
+                    try(var c=h.owner(h.db)){sql(c,fault[0]);}
+                    try{assertEquals("not-ready",readiness.state(),fault[0]);}
+                    finally{try(var c=h.owner(h.db)){sql(c,fault[1]);}}
+                    assertEquals("ready",readiness.state(),"Each removed privilege fault requires fresh attestation");
+                }
                 // Live changes invalidate the previous success; restoration requires a new attestation.
                 try(var c=h.owner(h.db)){sql(c,"GRANT SELECT ON dbo.Cases(Name) TO ["+ai+"]");}
                 assertEquals("not-ready",readiness.state());

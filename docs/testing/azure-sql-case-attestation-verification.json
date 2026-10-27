@@ -1,0 +1,134 @@
+{
+  "classification": "BLOCKED",
+  "base": "efd8be8a350523344bf69b72bbc715f9e888589d",
+  "testedSource": "09f2593f42958c130e21cb224d7ef97a708271bc",
+  "productionConnections": 0,
+  "productionChanges": false,
+  "sqlMigrationRequired": false,
+  "groups": {
+    "package": {
+      "argv": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-DskipTests",
+        "package"
+      ],
+      "build": "PASS",
+      "run": 0,
+      "passed": 0,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "final-focused": {
+      "argv": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-data",
+        "-am",
+        "-Dtest=AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataAccessTest,ProofDigestTest,DataSourcesAiCaseDataTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "build": "PASS",
+      "run": 16,
+      "passed": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "affected": {
+      "argv": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-core,shale-data,shale-server",
+        "-am",
+        "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataAttestationTest,com.shale.data.security.ai.AiCaseDataAzureSqlDatabaseReadOnlyTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.mcp.McpCatalogVerifierServingChecks,com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "build": "PASS",
+      "run": 139,
+      "passed": 137,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2
+    },
+    "critical": {
+      "argv": [
+        "mvn",
+        "-B",
+        "test"
+      ],
+      "build": "PASS",
+      "run": 226,
+      "passed": 226,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "focused-server": {
+      "argv": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dtest=AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataAccessTest,ProofDigestTest,DataSourcesAiCaseDataTest,McpCaseCompositionTest,McpSearchTest,McpOverviewTest,McpFilterIsolationTest,OAuthAuthorizationFlowTest,OAuthConfigurationTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "build": "PASS",
+      "run": 43,
+      "passed": 43,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selector-python": {
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "build/test-selection",
+        "-p",
+        "test_*.py"
+      ],
+      "passed": 27
+    }
+  },
+  "selector": {
+    "argv": [
+      "python3",
+      "build/test-selection/select_tests.py",
+      "--base",
+      "efd8be8a350523344bf69b72bbc715f9e888589d",
+      "--head",
+      "09f2593f42958c130e21cb224d7ef97a708271bc"
+    ],
+    "affectedAreas": [
+      "security-data"
+    ],
+    "informationalFullSuiteRecommended": true,
+    "informationalFullSuiteExecuted": false,
+    "reason": "Selector inventory edit triggers optional informational escalation; focused, affected and critical checks executed."
+  },
+  "notRun": {
+    "authoritativeCaseSecurityAndInjectedAttacks": "Missing private authoritative schema attachment; no substitute schema used.",
+    "both66VectorClients": "Require exact authoritative fixture.",
+    "finalHandoffExpiry": "Requires exact authoritative fixture and live SQL locks.",
+    "productionBootSqlAndTlsProxy": "Require authoritative fixture and owned validated TLS setup.",
+    "durableSqlOAuthLifecycle": "Requires live SQL fixture.",
+    "azureReadOnlyNativePlatform": "No configured authorized Azure acceptance identities; default test skip is not evidence.",
+    "productionStage0": "Operator recheck command supplied, never executed in this task."
+  },
+  "countsOverlap": true,
+  "bootExecutableSha256": "29c24c33921f66b958fee9b7d180b1ef8bbddf1cc5d3362a3d59f6efda2c0fe1"
+}

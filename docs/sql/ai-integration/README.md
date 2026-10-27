@@ -4,6 +4,12 @@ This directory owns the additive SQL candidate and operator instructions, not an
 The [canonical contract and implementation record](../../architecture/ai-integration-and-mcp.md#1013-phase-3b1-integration-persistence-and-security-foundation)
 owns status and evidence. Nothing here authorizes production execution or enablement.
 
+Azure SQL Database successor: [platform and contained-principal contract](../../architecture/azure-sql-case-attestation.md),
+[acceptance status](../../testing/azure-sql-case-attestation.md). Server metadata prerequisites below
+apply to SQL Server/MI. Azure uses contained SQL users and database-scoped evidence; it must not
+receive broader server/control grants to satisfy the old model. The read-only Stage 0 dispatcher is
+`stage0-platform-verify.sql`; no historical migration or receipt is changed.
+
 ## Phase 3B.7 confined Case data candidate
 
 The approved [confinement contract](../../architecture/phase3b7-sql-confinement-contract.md) is implemented

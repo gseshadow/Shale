@@ -88,6 +88,54 @@ class AiCaseDataLocalSqlServerTest {
         production.verify();
     }
 
+    @Test void allPublicApplicationAuthorityAndGrantOptionsRemoveAttestation()throws Exception {
+        var production=new AiCaseDataAttestation(source("ai"),source("catalog"),
+                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true);
+        try(var c=owner(db)) {
+            sql(c,"CREATE VIEW dbo.AttestationView AS SELECT Id,Name FROM dbo.Cases");
+            sql(c,"CREATE FUNCTION dbo.AttestationFunction() RETURNS int AS BEGIN RETURN 1 END");
+        }
+        for(String permission:List.of("SELECT ON dbo.Cases","SELECT ON dbo.AttestationView",
+                "EXECUTE ON dbo.AiDataAuthenticateV1","EXECUTE ON dbo.AttestationFunction",
+                "SELECT ON SCHEMA::dbo","EXECUTE ON SCHEMA::dbo","SELECT","EXECUTE",
+                "SELECT ON dbo.Cases(Name)")) {
+            production.verify();
+            try(var c=owner(db)){sql(c,"GRANT "+permission+" TO public");}
+            try {assertThrows(IllegalStateException.class,production::verify,permission);}
+            finally {try(var c=owner(db)){sql(c,"REVOKE "+permission+" FROM public");}}
+            production.verify();
+        }
+        try(var c=owner(db)){sql(c,"GRANT SELECT ON dbo.Cases TO public WITH GRANT OPTION");}
+        try {assertThrows(IllegalStateException.class,production::verify,"Public grant option must never pass");}
+        finally {try(var c=owner(db)){sql(c,"REVOKE SELECT ON dbo.Cases FROM public CASCADE");}}
+        production.verify();
+        try(var c=owner(db)){sql(c,"DENY VIEW DEFINITION ON dbo.AttestationView TO public");}
+        try {assertThrows(IllegalStateException.class,production::verify,"Public DENY cannot conceal metadata from a complete verifier");}
+        finally {try(var c=owner(db)){sql(c,"REVOKE VIEW DEFINITION ON dbo.AttestationView FROM public");}}
+        production.verify();
+        for(String who:List.of("ai","catalog")) {
+            for(String permission:List.of("SELECT ON SCHEMA::dbo","SELECT","IMPERSONATE ON USER::dbo","CREATE TABLE","CONTROL","TAKE OWNERSHIP")) {
+                try(var c=owner(db)){sql(c,"GRANT "+permission+" TO ["+prefix+"_"+who+"]");}
+                try{assertThrows(IllegalStateException.class,production::verify,who+":"+permission);}
+                finally{try(var c=owner(db)){sql(c,"REVOKE "+permission+" FROM ["+prefix+"_"+who+"]");}}
+                production.verify();
+            }
+        }
+    }
+
+    @Test void azureStructuralInventoryRejectsUnprivilegedExternalRoutes()throws Exception {
+        // These database catalogs are shared structurally. This is not EngineEdition=5 evidence.
+        try(var c=source("catalog").getConnection()){AiCaseDataAttestation.azureIsolation(c);}
+        try(var c=owner(db)){sql(c,"CREATE EXTERNAL DATA SOURCE AttestationExternal WITH(TYPE=BLOB_STORAGE,LOCATION='https://example.invalid/container')");}
+        try{try(var c=source("catalog").getConnection()){assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.azureIsolation(c));}}
+        finally{try(var c=owner(db)){sql(c,"DROP EXTERNAL DATA SOURCE AttestationExternal");}}
+        // Unresolved external synonyms are refused without attempting a remote connection.
+        try(var c=owner(db)){sql(c,"CREATE SYNONYM dbo.AttestationSynonym FOR [UnrelatedDatabase].dbo.AttestationProbe");}
+        try{try(var c=source("catalog").getConnection()){assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.azureIsolation(c));}}
+        finally{try(var c=owner(db)){sql(c,"DROP SYNONYM dbo.AttestationSynonym");}}
+        try(var c=source("catalog").getConnection()){AiCaseDataAttestation.azureIsolation(c);}
+    }
+
     @Test void migrationRepeatAndLiveAttestationRejectDrift()throws Exception {
         try(var c=owner(db)) {sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b7-confinement.sql")));sql(c,Files.readString(Path.of("src/main/resources/ai/confinement-catalog.sql")));}
         try(var c=source("catalog").getConnection()){sql(c,Files.readString(Path.of("src/main/resources/ai/confinement-catalog.sql")));}
