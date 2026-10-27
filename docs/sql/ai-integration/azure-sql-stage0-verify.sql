@@ -20,7 +20,7 @@ DECLARE @sources int=(SELECT COUNT(*) FROM sys.external_data_sources),
 SELECT @public=COUNT(*) FROM sys.database_permissions p
  LEFT JOIN sys.all_objects o ON p.class=1 AND o.object_id=p.major_id
  WHERE p.grantee_principal_id=DATABASE_PRINCIPAL_ID('public')
- AND (p.state='D' AND p.permission_name='VIEW DEFINITION'
+ AND (p.state='D' AND p.permission_name LIKE '%DEFINITION%'
  OR p.state IN('G','W') AND (p.state='W' OR NOT(
  p.class=0 AND p.permission_name IN('CONNECT','VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION')
  OR p.class=1 AND p.permission_name IN('SELECT','EXECUTE','VIEW DEFINITION')

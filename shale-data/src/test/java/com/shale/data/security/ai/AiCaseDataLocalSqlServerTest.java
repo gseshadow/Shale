@@ -109,6 +109,10 @@ class AiCaseDataLocalSqlServerTest {
         try {assertThrows(IllegalStateException.class,production::verify,"Public grant option must never pass");}
         finally {try(var c=owner(db)){sql(c,"REVOKE SELECT ON dbo.Cases FROM public CASCADE");}}
         production.verify();
+        try(var c=owner(db)){sql(c,"DENY VIEW DEFINITION ON dbo.AttestationView TO public");}
+        try {assertThrows(IllegalStateException.class,production::verify,"Public DENY cannot conceal metadata from a complete verifier");}
+        finally {try(var c=owner(db)){sql(c,"REVOKE VIEW DEFINITION ON dbo.AttestationView FROM public");}}
+        production.verify();
         for(String who:List.of("ai","catalog")) {
             for(String permission:List.of("SELECT ON SCHEMA::dbo","SELECT","IMPERSONATE ON USER::dbo","CREATE TABLE","CONTROL","TAKE OWNERSHIP")) {
                 try(var c=owner(db)){sql(c,"GRANT "+permission+" TO ["+prefix+"_"+who+"]");}
