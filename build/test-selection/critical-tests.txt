@@ -55,3 +55,4 @@ com.shale.data.config.DataSourcesAiCaseDataTest
 com.shale.data.security.ai.ProofDigestTest
 com.shale.data.security.ai.AiCaseDataAccessTest
 com.shale.data.security.ai.AiCaseDataMigrationContractTest
+com.shale.server.mcp.McpCaseCompositionTest

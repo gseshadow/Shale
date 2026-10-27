@@ -63,6 +63,17 @@ class AiCaseDataLocalSqlServerTest {
     }
     @AfterAll void removeIdentities()throws Exception {if(prefix!=null)try(var c=owner("master")){for(String role:secrets.keySet())sql(c,"DROP LOGIN ["+prefix+"_"+role+"]");}}
 
+    @Test void productionInfrastructureRequiresSeparateCatalogAndBootstrapSids() {
+        assertDoesNotThrow(()->new AiCaseDataAttestation(source("ai"),source("catalog"),
+                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true).verify());
+        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),
+                List.of(source("runtime"),source("runtime"),source("runtime")),db,ISSUER,RESOURCE,true).verify(),
+                "Bootstrap cannot reuse ordinary identity even if the AI login is restricted.");
+        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),
+                List.of(source("catalog"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true).verify(),
+                "Catalog verification must have its own identity.");
+    }
+
     @Test void migrationRepeatAndLiveAttestationRejectDrift()throws Exception {
         try(var c=owner(db)) {sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b7-confinement.sql")));sql(c,Files.readString(Path.of("src/main/resources/ai/confinement-catalog.sql")));}
         try(var c=source("catalog").getConnection()){sql(c,Files.readString(Path.of("src/main/resources/ai/confinement-catalog.sql")));}

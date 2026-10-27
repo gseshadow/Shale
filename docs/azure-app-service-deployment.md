@@ -647,3 +647,11 @@ session authority and previously completed deployment/security records above rem
 Rollback disables OAuth/AI and revokes credential families while retaining all additive storage, receipts,
 consumption/replay/audit/revocation history and the configured token namespace. Re-enable cannot restore
 revoked descendants. Do not drop tables or restore pre-revocation database history to make old tokens work.
+
+## Production Case composition candidate
+
+The earlier synthetic-only/current-production-refusal passages describe the pre-composition baseline.
+A separate production/readiness candidate now exists, **BLOCKED pending compilation and actual
+production-profile authoritative/client/TLS acceptance**. It does not authorize deployment.
+Use [the current staged preflight](production-mcp-deployment-preflight.md) and
+[verification limits](testing/production-mcp-case-composition.md). All packaged defaults remain OFF.

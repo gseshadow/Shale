@@ -4351,3 +4351,16 @@ Audit compatibility uses the existing integration parent/resource and PHI schema
 survives uncertain ACK/close/cleanup outcomes, every fault withholds protected output without reread,
 persisted values exclude payload/proof/request/exception/SQL metadata, and bounded same-tenant admin
 review retains intentional historical Case IDs. No audit migration, new tool or production code changes.
+
+### Production Case composition candidate after Phase 3B.7
+
+A shared production/test composition policy and an independent default-OFF
+`shale.ai.mcp.case-data-composition-enabled` SQL-readiness control are implemented as an
+**unverified candidate**, not a completed deployment gate. Readiness can attest the confined boundary
+with OAuth, transport, both handlers, SQL global and tenant capability OFF. Production transport
+cannot use the ordinary-runtime ACCESS fallback. The actual SQL proof/audit/quota/final-handoff
+boundary is unchanged. [Candidate evidence and blockers](../testing/production-mcp-case-composition.md)
+and the [staged production preflight](../production-mcp-deployment-preflight.md) govern this change.
+Phase 3B.7 local acceptance retains its original scope. Fresh production-profile authoritative,
+client/expiry/TLS and ordinary regressions must pass before this candidate closes the deployment
+blocker. Legal, SDK and security/operator/tenant-owner approvals remain OPEN. No activation.

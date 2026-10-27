@@ -13,10 +13,16 @@ public final class AiCaseDataAttestation {
     private final DataSource ai,verifier;
     private final List<DataSource> forbidden;
     private final String database,issuer,resource;
+    private final boolean productionInfrastructure;
     private final Properties definitions=new Properties();
     private final String catalog;
     public AiCaseDataAttestation(DataSource ai,DataSource verifier,List<DataSource> forbidden,String database,String issuer,String resource) {
+        this(ai,verifier,forbidden,database,issuer,resource,false);
+    }
+    /** Production callers supply ordinary auth, ordinary runtime, then OAuth bootstrap in that order. */
+    public AiCaseDataAttestation(DataSource ai,DataSource verifier,List<DataSource> forbidden,String database,String issuer,String resource,boolean productionInfrastructure) {
         this.ai=Objects.requireNonNull(ai);this.verifier=Objects.requireNonNull(verifier);this.forbidden=List.copyOf(forbidden);
+        this.productionInfrastructure=productionInfrastructure;
         this.database=Objects.requireNonNull(database);this.issuer=Objects.requireNonNull(issuer);this.resource=Objects.requireNonNull(resource);
         try(var manifest=getClass().getResourceAsStream("/ai/confinement-modules.properties");var sql=getClass().getResourceAsStream("/ai/confinement-catalog.sql")) {
             if(manifest==null||sql==null)throw new IllegalStateException();definitions.load(manifest);catalog=new String(sql.readAllBytes(),StandardCharsets.UTF_8);
@@ -27,9 +33,42 @@ public final class AiCaseDataAttestation {
         try(Connection caller=ai.getConnection();Connection review=verifier.getConnection()) {
             Identity identity=identity(caller);
             if(!database.equals(identity.database())||identity.userId()==1||identity.sysadmin()!=0)throw refused();
-            if(!database.equals(identity(review).database()))throw refused();
+            Identity catalogIdentity=identity(review);
+            if(!database.equals(catalogIdentity.database())||Arrays.equals(identity.sid(),catalogIdentity.sid()))throw refused();
+            var otherIdentities=new ArrayList<Identity>();
             for(DataSource source:forbidden)try(Connection other=source.getConnection()) {
-                if(Arrays.equals(identity.sid(),identity(other).sid()))throw refused();
+                Identity otherIdentity=identity(other);
+                if(Arrays.equals(identity.sid(),otherIdentity.sid()))throw refused();
+                if(productionInfrastructure&&Arrays.equals(catalogIdentity.sid(),otherIdentity.sid()))throw refused();
+                otherIdentities.add(otherIdentity);
+            }
+            if(productionInfrastructure) {
+                if(otherIdentities.size()!=3)throw refused();
+                for(int n=0;n<2;n++)if(Arrays.equals(otherIdentities.get(2).sid(),otherIdentities.get(n).sid()))throw refused();
+                if(catalogIdentity.userId()==1||catalogIdentity.sysadmin()!=0)throw refused();
+                var catalogTokens=new HashSet<String>();
+                try(var s=statement(review);var r=s.executeQuery("SELECT name,type FROM sys.user_token")) {
+                    while(r.next()) {
+                        String name=r.getString(1);catalogTokens.add(name);
+                        if(name.equals(catalogIdentity.user())&&!r.getString(2).equals("SQL USER"))throw refused();
+                    }
+                }
+                if(!catalogTokens.equals(Set.of(catalogIdentity.user(),"public","AiCaseDataCatalogVerifier")))throw refused();
+                try(var s=statement(review);var r=s.executeQuery("SELECT name FROM sys.login_token")) {
+                    while(r.next())if(!Set.of(catalogIdentity.login(),"public").contains(r.getString(1)))throw refused();
+                }
+                try(var p=review.prepareStatement("SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND state IN('G','W') AND NOT(class=0 AND permission_name='CONNECT' AND state='G')")) {
+                    p.setQueryTimeout(3);p.setInt(1,catalogIdentity.userId());
+                    try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
+                }
+                try(var p=review.prepareStatement("SELECT COUNT(*) FROM sys.server_permissions p JOIN sys.server_principals s ON s.principal_id=p.grantee_principal_id WHERE s.sid=? AND p.state IN('G','W') AND NOT(p.class=100 AND p.state='G' AND p.permission_name IN('CONNECT SQL','VIEW ANY DATABASE','VIEW ANY DEFINITION'))")) {
+                    p.setQueryTimeout(3);p.setBytes(1,catalogIdentity.sid());
+                    try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
+                }
+                try(var p=review.prepareStatement("SELECT (SELECT COUNT(*) FROM sys.schemas WHERE principal_id=?)+(SELECT COUNT(*) FROM sys.objects WHERE principal_id=?)+(SELECT COUNT(*) FROM sys.database_principals WHERE owning_principal_id=?)")) {
+                    p.setQueryTimeout(3);for(int n=1;n<=3;n++)p.setInt(n,catalogIdentity.userId());
+                    try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
+                }
             }
             stage="TOKENS";
             var tokens=new ArrayList<Integer>();var names=new HashSet<String>();
