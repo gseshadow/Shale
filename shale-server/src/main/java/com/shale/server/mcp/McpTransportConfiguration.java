@@ -33,6 +33,15 @@ import java.util.Map;
 @Import({McpSearchConfiguration.class,McpOverviewConfiguration.class})
 @EnableConfigurationProperties({McpTransportProperties.class,McpOAuthProperties.class})
 public class McpTransportConfiguration {
+    @Bean
+    McpCaseCompositionPolicy mcpCaseCompositionPolicy(Environment environment, McpOAuthProperties identity) {
+        return new McpCaseCompositionPolicy(environment, identity);
+    }
+
+    @Bean(initMethod="report")
+    McpCaseReadiness mcpCaseReadiness(McpCaseCompositionPolicy policy, ObjectProvider<McpAiCaseData> boundary) {
+        return new McpCaseReadiness(policy, boundary);
+    }
     static JacksonMcpJsonMapper mapper() {
         return mapper(8,8192);
     }
@@ -57,7 +66,8 @@ public class McpTransportConfiguration {
     }
     @Bean @Order(0)
     SecurityFilterChain mcpTransportChain(HttpSecurity http, McpTransportProperties transport, McpOAuthProperties identity,
-            Environment env, ObjectProvider<AiAccessTokenValidator> validators, ObjectProvider<DeadlineAccess> bounded, ObjectProvider<McpAiCaseData> confined) throws Exception {
+            Environment env, ObjectProvider<AiAccessTokenValidator> validators, ObjectProvider<DeadlineAccess> bounded, ObjectProvider<McpAiCaseData> confined, McpCaseCompositionPolicy policy) throws Exception {
+        policy.requireTransport();
         transport.validate(identity);
         http.securityMatcher(request -> {
             String path=request.getRequestURI().substring(request.getContextPath().length());
@@ -70,20 +80,26 @@ public class McpTransportConfiguration {
                 .sessionManagement(c->c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(c->c.anyRequest().permitAll());
         http.addFilterBefore(new McpGate(transport,identity,env.getProperty("shale.ai.enabled",Boolean.class,false),
-                (token,deadline)->{var protectedData=confined.getIfAvailable();if(protectedData!=null)return protectedData.authenticate(token,deadline);var fixture=validators.getIfAvailable();return fixture!=null?fixture.validate(token):bounded.getObject().validate(token,deadline);},System::nanoTime),SecurityContextHolderFilter.class);
+                (token,deadline)->{
+                    var protectedData=confined.getIfAvailable();
+                    if(protectedData!=null)return protectedData.authenticate(token,deadline);
+                    if(policy.production())throw new SecurityException("Confined ACCESS required.");
+                    var fixture=validators.getIfAvailable();
+                    return fixture!=null?fixture.validate(token):bounded.getObject().validate(token,deadline);
+                },System::nanoTime),SecurityContextHolderFilter.class);
         return http.build();
     }
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${shale.ai.enabled:false}' == 'true' && '${shale.ai.mcp.enabled:false}' == 'true' && ('${shale.ai.mcp.search-cases-enabled:false}' == 'true' || '${shale.ai.mcp.get-case-overview-enabled:false}' == 'true')")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${shale.ai.mcp.case-data-composition-enabled:false}' == 'true' || ('${shale.ai.enabled:false}' == 'true' && '${shale.ai.mcp.enabled:false}' == 'true' && ('${shale.ai.mcp.search-cases-enabled:false}' == 'true' || '${shale.ai.mcp.get-case-overview-enabled:false}' == 'true'))")
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(McpAiCaseData.class)
-    McpAiCaseData mcpAiCaseData(Environment env,McpOAuthProperties identity,DataSources sources) {
-        if(!env.acceptsProfiles(org.springframework.core.env.Profiles.of("test")) || identity.identity()!=McpOAuthProperties.Identity.TEST || env.acceptsProfiles(org.springframework.core.env.Profiles.of("prod","azure")))
-            throw new IllegalStateException("Case handlers require isolated test configuration.");
+    McpAiCaseData mcpAiCaseData(Environment env,McpOAuthProperties identity,DataSources sources,McpCaseCompositionPolicy policy) {
+        policy.requireBoundary();
         return new McpAiCaseData(env,identity,sources);
     }
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({AiAccessTokenValidator.class,DeadlineAccess.class})
     @ConditionalOnProperty(name={"shale.ai.mcp.enabled","shale.ai.enabled"},havingValue="true")
+    @Profile("!azure & !prod")
     DeadlineAccess mcpAccessAuthenticator(McpOAuthProperties identity, Environment env, ObjectProvider<DataSources> sources) {
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();
         source.setURL(env.getRequiredProperty("shale.ai.oauth.bootstrap.jdbc-url"));

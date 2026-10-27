@@ -79,12 +79,12 @@ class McpOverviewTest {
         assertEquals(result.path("structuredContent"),McpTransportConfiguration.mapper().getJsonMapper().readTree(result.path("content").get(0).path("text").asText()));
         verify(service).overview(any(IntegrationInvocation.class),eq(100L),any());verifyNoMoreInteractions(service);
     }
-    @Test void productionAndAzureCannotActivateOverviewEvenWithTestProfile() {
+    @Test void productionAndAzureCannotActivateOverviewWithMixedTestProfileOrMissingComposition() {
         for(String profile:List.of("prod","azure","local")) {
             var env=new org.springframework.mock.env.MockEnvironment();env.setActiveProfiles("test",profile);
             if(profile.equals("local"))env.setActiveProfiles("local");
-            assertThrows(IllegalStateException.class,()->new McpOverviewConfiguration().mcpOverviewHandler(env,
-                    new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false),null));
+            var identity=new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false);
+            assertThrows(IllegalStateException.class,()->new McpOverviewConfiguration().mcpOverviewHandler(new McpCaseCompositionPolicy(env,identity),null));
         }
     }
     @Test void errorsAreClosedAndUnavailableCategoriesHaveOneShape()throws Exception {

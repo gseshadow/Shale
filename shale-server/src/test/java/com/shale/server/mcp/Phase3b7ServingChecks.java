@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * No insecure TLS, header-only TLS claim, live ingress, diagnostic MCP tool or production hook. */
 public final class Phase3b7ServingChecks {
     private static final Path ROOT=Path.of("..").toAbsolutePath().normalize(),OUT=ROOT.resolve("work/phase3b7");
+    private static final String HOST=Boolean.getBoolean("shale.acceptance.production")?"shale.example":"shale.test";
     private static final tools.jackson.databind.ObjectMapper JSON=new tools.jackson.databind.ObjectMapper();
     public static void run(String backend,String performanceToken,String conformanceToken,Path temp,Phase3b7FaultSource.Owner owner)throws Exception {
         String event=beginSqlMetrics(owner);
@@ -133,13 +134,13 @@ public final class Phase3b7ServingChecks {
         Files.writeString(OUT.resolve("finished-conformance-active-execution.json"),JSON.writeValueAsString(Map.of("suite","@modelcontextprotocol/conformance 0.2.0-alpha.12","selection","active","specVersion","2026-07-28","exit",process.exitValue(),"diagnosticToolsAdded",false,"command",command))+"\n");
     }
     private static int port()throws IOException {try(var socket=new ServerSocket(0,1,InetAddress.getLoopbackAddress())){return socket.getLocalPort();}}
-    private static void tls(String backend,String token,Path temp)throws Exception {
+    public static void tls(String backend,String token,Path temp)throws Exception {
         Path binary=OUT.resolve("caddy");assertTrue(Files.isExecutable(binary),"Task-owned Caddy binary required for real proxy acceptance");
         Path key=temp.resolve("proxy.key"),cert=temp.resolve("proxy.crt"),config=temp.resolve("Caddyfile");
-        var openssl=new ProcessBuilder("openssl","req","-x509","-newkey","rsa:2048","-nodes","-keyout",key.toString(),"-out",cert.toString(),"-days","1","-subj","/CN=shale.test","-addext","subjectAltName=DNS:shale.test,IP:127.0.0.1").redirectErrorStream(true).redirectOutput(temp.resolve("certificate.log").toFile()).start();
+        var openssl=new ProcessBuilder("openssl","req","-x509","-newkey","rsa:2048","-nodes","-keyout",key.toString(),"-out",cert.toString(),"-days","1","-subj","/CN="+HOST,"-addext","subjectAltName=DNS:"+HOST+",IP:127.0.0.1").redirectErrorStream(true).redirectOutput(temp.resolve("certificate.log").toFile()).start();
         assertTrue(openssl.waitFor(15,TimeUnit.SECONDS));assertEquals(0,openssl.exitValue());
         int tls=port(),http=port();assertNotEquals(tls,http);
-        Files.writeString(config,"{\n admin off\n auto_https off\n persist_config off\n}\nhttps://:"+tls+" {\n bind 127.0.0.1\n tls "+cert+" "+key+"\n reverse_proxy "+backend.substring(0,backend.lastIndexOf('/'))+"\n}\nhttp://:"+http+" {\n bind 127.0.0.1\n redir https://shale.test{uri} 308\n}\n");
+        Files.writeString(config,"{\n admin off\n auto_https off\n persist_config off\n}\nhttps://:"+tls+" {\n bind 127.0.0.1\n tls "+cert+" "+key+"\n reverse_proxy "+backend.substring(0,backend.lastIndexOf('/'))+"\n}\nhttp://:"+http+" {\n bind 127.0.0.1\n redir https://"+HOST+"{uri} 308\n}\n");
         var builder=new ProcessBuilder(binary.toString(),"run","--adapter","caddyfile","--config",config.toString()).redirectErrorStream(true).redirectOutput(temp.resolve("proxy.log").toFile());
         builder.environment().put("XDG_DATA_HOME",temp.resolve("data").toString());builder.environment().put("XDG_CONFIG_HOME",temp.resolve("config").toString());
         var process=builder.start();
@@ -150,23 +151,53 @@ public final class Phase3b7ServingChecks {
             var store=KeyStore.getInstance(KeyStore.getDefaultType());store.load(null,null);try(var in=Files.newInputStream(cert)){store.setCertificateEntry("local",CertificateFactory.getInstance("X.509").generateCertificate(in));}
             var trust=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());trust.init(store);var ssl=SSLContext.getInstance("TLS");ssl.init(null,trust.getTrustManagers(),null);
             var results=new LinkedHashMap<String,Integer>();
-            for(var item:List.of(Map.entry("canonical-origin",Map.of("Host","shale.test")),Map.entry("hostile-host",Map.of("Host","evil.invalid")),Map.entry("forwarded",Map.of("Host","shale.test","Forwarded","host=evil.invalid;proto=http")),Map.entry("x-forwarded",Map.of("Host","shale.test","X-Forwarded-Host","evil.invalid","X-Forwarded-Proto","http","X-Forwarded-For","203.0.113.9")))) {
-                String response=request(ssl,tls,item.getValue(),null);assertTrue(response.startsWith("HTTP/1.1 401"),item.getKey());assertTrue(response.contains("https://shale.test/.well-known/oauth-protected-resource/mcp"));assertFalse(response.contains("https://evil.invalid"));results.put(item.getKey(),401);
+            try(var wrong=(SSLSocket)ssl.getSocketFactory().createSocket(new Socket("127.0.0.1",tls),"wrong.example",tls,true)) {
+                wrong.setSoTimeout(5000);var parameters=wrong.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");wrong.setSSLParameters(parameters);
+                assertThrows(javax.net.ssl.SSLHandshakeException.class,wrong::startHandshake);results.put("wrong-hostname-refused",0);
             }
-            String allowed=request(ssl,tls,Map.of("Host","shale.test","Origin","https://shale.test"),token);assertTrue(allowed.startsWith("HTTP/1.1 200"));results.put("exact-origin",200);
+            try(var untrusted=(SSLSocket)SSLContext.getDefault().getSocketFactory().createSocket(new Socket("127.0.0.1",tls),HOST,tls,true)) {
+                untrusted.setSoTimeout(5000);var parameters=untrusted.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");untrusted.setSSLParameters(parameters);
+                assertThrows(javax.net.ssl.SSLHandshakeException.class,untrusted::startHandshake);results.put("untrusted-certificate-refused",0);
+            }
+            for(var item:List.of(Map.entry("canonical-origin",Map.of("Host",HOST)),Map.entry("hostile-host",Map.of("Host","evil.invalid")),Map.entry("forwarded",Map.of("Host",HOST,"Forwarded","host=evil.invalid;proto=http")),Map.entry("x-forwarded",Map.of("Host",HOST,"X-Forwarded-Host","evil.invalid","X-Forwarded-Proto","http","X-Forwarded-For","203.0.113.9")))) {
+                String response=request(ssl,tls,item.getValue(),null);assertTrue(response.startsWith("HTTP/1.1 401"),item.getKey());assertTrue(response.contains("https://"+HOST+"/.well-known/oauth-protected-resource/mcp"));assertFalse(response.contains("https://evil.invalid"));results.put(item.getKey(),401);
+            }
+            String allowed=request(ssl,tls,Map.of("Host",HOST,"Origin","https://"+HOST),token);assertTrue(allowed.startsWith("HTTP/1.1 200"));results.put("exact-origin",200);
             var overview=params();overview.put("name","get_case_overview");overview.put("arguments",Map.of("caseId",100));
-            String protectedResponse=request(ssl,tls,Map.of("Host","shale.test","Origin","https://shale.test"),token,"tools/call",overview);
+            String protectedResponse=request(ssl,tls,Map.of("Host",HOST,"Origin","https://"+HOST),token,"tools/call",overview);
             assertTrue(protectedResponse.startsWith("HTTP/1.1 200"));var protectedResult=JSON.readTree(protectedResponse.substring(protectedResponse.indexOf("\r\n\r\n")+4)).path("result");assertFalse(protectedResult.path("isError").asBoolean());assertEquals(100,protectedResult.path("structuredContent").path("case").path("caseId").asInt());results.put("protected-overview-through-tls",200);
-            String hostile=request(ssl,tls,Map.of("Host","shale.test","Origin","https://evil.invalid"),token);assertTrue(hostile.startsWith("HTTP/1.1 403"));results.put("hostile-origin",403);
-            try(var socket=new Socket("127.0.0.1",http)){socket.setSoTimeout(5000);socket.getOutputStream().write("GET /mcp HTTP/1.1\r\nHost: evil.invalid\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));String response=new String(socket.getInputStream().readAllBytes(),StandardCharsets.UTF_8);assertTrue(response.startsWith("HTTP/1.1 308"));assertTrue(response.contains("https://shale.test/mcp"));results.put("http-enforcement",308);}
+            String missing=request(ssl,tls,Map.of("Host",HOST),token);assertTrue(missing.startsWith("HTTP/1.1 200"));results.put("missing-origin-nonbrowser",200);
+            for(String origin:List.of("https://evil.invalid","https://"+HOST+"/","https://"+HOST+".evil.invalid","http://"+HOST,"null")) {
+                String hostile=request(ssl,tls,Map.of("Host",HOST,"Origin",origin),token);assertTrue(hostile.startsWith("HTTP/1.1 403"),"Origin must match exactly");results.put("denied-origin-"+results.size(),403);
+            }
+            for(String path:Boolean.getBoolean("shale.acceptance.production")?List.of(com.shale.server.oauth.OAuthMetadataContract.PROTECTED_RESOURCE_PATH,com.shale.server.oauth.OAuthMetadataContract.AUTHORIZATION_SERVER_PATH):List.of(com.shale.server.oauth.OAuthMetadataContract.PROTECTED_RESOURCE_PATH)) {
+                String metadata=get(ssl,tls,path);assertTrue(metadata.startsWith("HTTP/1.1 200"),path+" "+metadata.lines().findFirst().orElse("missing status"));
+                var claims=JSON.readTree(metadata.substring(metadata.indexOf("\r\n\r\n")+4));
+                if(path.contains("protected-resource")){assertEquals("https://"+HOST+"/mcp",claims.path("resource").asText());assertEquals("https://"+HOST+"/oauth/mcp",claims.path("authorization_servers").get(0).asText());}
+                else assertEquals("https://"+HOST+"/oauth/mcp",claims.path("issuer").asText());
+                assertFalse(metadata.contains("evil.invalid"));results.put(path,200);
+            }
+            try(var socket=new Socket("127.0.0.1",http)){socket.setSoTimeout(5000);socket.getOutputStream().write("GET /mcp HTTP/1.1\r\nHost: evil.invalid\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));String response=new String(socket.getInputStream().readAllBytes(),StandardCharsets.UTF_8);assertTrue(response.startsWith("HTTP/1.1 308"));assertTrue(response.contains("https://"+HOST+"/mcp"));results.put("http-enforcement",308);}
+            for(String path:List.of("/mcp","/oauth/mcp/token","/oauth/mcp/authorize"))try(var socket=new Socket("127.0.0.1",http)) {
+                socket.setSoTimeout(5000);
+                socket.getOutputStream().write(("POST "+path+" HTTP/1.1\r\nHost: evil.invalid\r\nAuthorization: Bearer "+token+"\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}").getBytes(StandardCharsets.US_ASCII));
+                String response=new String(socket.getInputStream().readAllBytes(),StandardCharsets.UTF_8);assertTrue(response.startsWith("HTTP/1.1 308"));assertTrue(response.contains("https://"+HOST+path));assertFalse(response.contains("access_token"));assertFalse(response.contains("structuredContent"));results.put("http-credentials-"+path,308);
+            }
             Files.writeString(OUT.resolve("tls-proxy.json"),JSON.writeValueAsString(Map.of("proxy","Caddy 2.11.7","scope","owned isolated real TLS reverse proxy; not deployed ingress","certificateValidated",true,"hostnameValidated",true,"cases",results))+"\n");
         } finally {process.destroy();if(!process.waitFor(5,TimeUnit.SECONDS)){process.destroyForcibly();process.waitFor();}Files.deleteIfExists(key);}
+    }
+    private static String get(SSLContext ssl,int port,String path)throws Exception {
+        try(var socket=(SSLSocket)ssl.getSocketFactory().createSocket(new Socket("127.0.0.1",port),HOST,port,true)) {
+            socket.setSoTimeout(10000);var parameters=socket.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");socket.setSSLParameters(parameters);socket.startHandshake();
+            socket.getOutputStream().write(("GET "+path+" HTTP/1.1\r\nHost: evil.invalid\r\nForwarded: host=evil.invalid;proto=http\r\nX-Forwarded-Host: evil.invalid\r\nX-Forwarded-Proto: http\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            return new String(socket.getInputStream().readAllBytes(),StandardCharsets.UTF_8);
+        }
     }
     private static String request(SSLContext ssl,int port,Map<String,String> headers,String token)throws Exception {
         return request(ssl,port,headers,token,"server/discover",params());
     }
     private static String request(SSLContext ssl,int port,Map<String,String> headers,String token,String method,Map<String,Object> params)throws Exception {
-        try(var socket=(SSLSocket)ssl.getSocketFactory().createSocket("127.0.0.1",port)) {
+        try(var socket=(SSLSocket)ssl.getSocketFactory().createSocket(new Socket("127.0.0.1",port),HOST,port,true)) {
             socket.setSoTimeout(10000);var parameters=socket.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");socket.setSSLParameters(parameters);socket.startHandshake();
             String body=body(method,params);var request=new StringBuilder("POST /mcp HTTP/1.1\r\nConnection: close\r\nContent-Type: application/json\r\nAccept: application/json\r\nMCP-Protocol-Version: 2026-07-28\r\nMcp-Method: "+method+"\r\n");
             if(params.containsKey("name"))request.append("Mcp-Name: ").append(params.get("name")).append("\r\n");

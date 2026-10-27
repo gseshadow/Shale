@@ -43,6 +43,14 @@ class Phase3b7AcceptanceLocalSqlServerTest {
     void finishedFrozenConformance(@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
         finishedChecks("frozen",temp,true);
     }
+    @Test @Timeout(180)
+    void productionTlsProxy(@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
+        Assumptions.assumeTrue(OAuthAuthorizationFlowTest.PRODUCTION);finishedChecks("tls",temp,true);
+    }
+    @Test @Timeout(180)
+    void productionCatalogPublicGrantDeniesServing(@org.junit.jupiter.api.io.TempDir Path temp)throws Exception {
+        Assumptions.assumeTrue(OAuthAuthorizationFlowTest.PRODUCTION);finishedChecks("catalog-public",temp,true);
+    }
     private void finishedChecks(String kind,Path temp,boolean protocol)throws Exception {
         Assumptions.assumeTrue("LOCAL_DISPOSABLE_AI".equals(System.getenv("SHALE_AI_SQL_OPT_IN"))&&System.getenv("SHALE_CASE_VERIFY_SCHEMA")!=null);
         var h=new OAuthAuthorizationFlowTest();String ai=null,catalog=null;
@@ -61,7 +69,11 @@ class Phase3b7AcceptanceLocalSqlServerTest {
             McpConfinedClientFixture.withServer(source(h,ai,aiSecret), source(h,catalog,catalogSecret),
                     List.of(source(h,h.login,h.secret), source(h,h.bootstrapLogin,h.bootstrapSecret),
                             source(h,"sa",h.password)), h.db, temp, faults::overPool, url -> {
-                if (protocol && kind.equals("boundaries")) {
+                if (protocol && kind.equals("catalog-public")) {
+                    com.shale.server.mcp.McpCatalogVerifierServingChecks.run(url,controls.prepare("catalog-public","prepare"),()->h.owner(h.db));
+                } else if (protocol && kind.equals("tls")) {
+                    com.shale.server.mcp.Phase3b7ServingChecks.tls(url,controls.prepare("tls","prepare"),temp);
+                } else if (protocol && kind.equals("boundaries")) {
                     com.shale.server.mcp.Phase3b7BoundaryServingChecks.run(url,
                             controls.prepare("boundary","prepare"), () -> h.owner(h.db), () -> {
                         try { return OAuthAuthorizationFlowTest.runtime.openConnection(new ServerPrincipal(72,7,null)); }

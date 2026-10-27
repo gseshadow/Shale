@@ -63,6 +63,31 @@ class AiCaseDataLocalSqlServerTest {
     }
     @AfterAll void removeIdentities()throws Exception {if(prefix!=null)try(var c=owner("master")){for(String role:secrets.keySet())sql(c,"DROP LOGIN ["+prefix+"_"+role+"]");}}
 
+    @Test void productionInfrastructureRequiresSeparateCatalogAndBootstrapSids() {
+        assertDoesNotThrow(()->new AiCaseDataAttestation(source("ai"),source("catalog"),
+                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true).verify());
+        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),
+                List.of(source("runtime"),source("runtime"),source("runtime")),db,ISSUER,RESOURCE,true).verify(),
+                "Bootstrap cannot reuse ordinary identity even if the AI login is restricted.");
+        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),
+                List.of(source("catalog"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true).verify(),
+                "Catalog verification must have its own identity.");
+    }
+
+    @Test void productionVerifierRejectsCaseAuthorityInheritedFromPublic()throws Exception {
+        var production=new AiCaseDataAttestation(source("ai"),source("catalog"),
+                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true);
+        production.verify();
+        try(var c=owner(db)){sql(c,"GRANT SELECT ON dbo.Cases TO public");}
+        try {
+            // The AI role's DENY still protects AI. The separate verifier inherits this table grant.
+            try(var c=connection("ai",7,72)){assertEquals(229,assertThrows(SQLException.class,()->sql(c,"SELECT Name FROM dbo.Cases")).getErrorCode());}
+            try(var c=connection("catalog",7,72)){assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.Cases WHERE Id=100"));}
+            assertThrows(IllegalStateException.class,production::verify,"Exact verifier membership/own grants cannot conceal inherited application authority");
+        } finally {try(var c=owner(db)){sql(c,"REVOKE SELECT ON dbo.Cases FROM public");}}
+        production.verify();
+    }
+
     @Test void migrationRepeatAndLiveAttestationRejectDrift()throws Exception {
         try(var c=owner(db)) {sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b7-confinement.sql")));sql(c,Files.readString(Path.of("src/main/resources/ai/confinement-catalog.sql")));}
         try(var c=source("catalog").getConnection()){sql(c,Files.readString(Path.of("src/main/resources/ai/confinement-catalog.sql")));}

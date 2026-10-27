@@ -58,8 +58,8 @@ final class AuthoritativeCaseMcpFixture {
         h.client=controls.register("Synthetic authoritative client",false,Set.of(CASES_SEARCH,CASES_OVERVIEW_READ),1,List.of(URI.create(OAuthAuthorizationFlowTest.REDIRECT))).clientId();
         OAuthAuthorizationFlowTest.tokens=new ShaleAuthTokenService("synthetic-oauth-flow-secret-at-least-32-bytes",3600,Clock.systemUTC());
         OAuthAuthorizationFlowTest.sessions=new ShaleOAuthHumanTest.FixtureSessions();actor(h,72,7);
-        h.context=new AnnotationConfigWebApplicationContext();h.context.setServletContext(new MockServletContext());h.context.getEnvironment().setActiveProfiles("test");
-        h.context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url",h.url(h.db),"shale.ai.oauth.bootstrap.username",h.bootstrapLogin,"shale.ai.oauth.bootstrap.password",h.bootstrapSecret)));
+        h.context=new AnnotationConfigWebApplicationContext();h.context.setServletContext(new MockServletContext());h.context.getEnvironment().setActiveProfiles(OAuthAuthorizationFlowTest.PRODUCTION?"azure":"test");
+        h.context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin",OAuthAuthorizationFlowTest.ORIGIN,"shale.ai.oauth.identity",OAuthAuthorizationFlowTest.PRODUCTION?"PRODUCTION":"TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url",h.url(h.db),"shale.ai.oauth.bootstrap.username",h.bootstrapLogin,"shale.ai.oauth.bootstrap.password",h.bootstrapSecret)));
         h.context.register(McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class,OAuthAuthorizationFlowTest.Fixtures.class);h.context.refresh();
     }
 

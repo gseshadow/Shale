@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * ordinary production WEB/DESKTOP authority is separately covered by existing auth regressions. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OAuthAuthorizationFlowTest {
-    static final String ISSUER="https://shale.test/oauth/mcp",RESOURCE="https://shale.test/mcp",REDIRECT="https://client.test/callback",VERIFIER="v".repeat(43);
+    static final boolean PRODUCTION=Boolean.getBoolean("shale.acceptance.production");
+    static final String ORIGIN=PRODUCTION?"https://shale.example":"https://shale.test";
+    static final String ISSUER=ORIGIN+"/oauth/mcp",RESOURCE=ORIGIN+"/mcp",REDIRECT="https://client.test/callback",VERIFIER="v".repeat(43);
     static ShaleAuthTokenService tokens;
     static ShaleOAuthHumanTest.FixtureSessions sessions;
     static RuntimeConnectionProvider runtime;
@@ -31,7 +33,7 @@ class OAuthAuthorizationFlowTest {
     String port,password,db,login,secret,bootstrapLogin,bootstrapSecret,webToken,client,otherClient;
     UUID sid;
     Connection owner(String database)throws Exception {return DriverManager.getConnection(url(database),"sa",password);}
-    String url(String database){return "jdbc:sqlserver://127.0.0.1:"+port+";databaseName="+database+";encrypt=true;trustServerCertificate=true;loginTimeout=5;socketTimeout=10000";}
+    String url(String database){return "jdbc:sqlserver://"+(PRODUCTION?"localhost":"127.0.0.1")+":"+port+";databaseName="+database+";encrypt=true;trustServerCertificate="+(!PRODUCTION)+";loginTimeout=5;socketTimeout=10000";}
     static void sql(Connection c,String text)throws SQLException {try(var s=c.createStatement()){s.setQueryTimeout(10);s.execute(text);}}
     @BeforeAll void setup()throws Exception {
         Assumptions.assumeTrue("LOCAL_DISPOSABLE_AI".equals(System.getenv("SHALE_AI_SQL_OPT_IN")),"Disposable loopback SQL opt-in required; skip is not evidence");
@@ -66,8 +68,8 @@ class OAuthAuthorizationFlowTest {
         var principal=new ServerPrincipal(72,7,null);var prepared=tokens.prepare(principal);sid=UUID.randomUUID();webToken=tokens.issueBound(prepared,sid);
         sessions=new ShaleOAuthHumanTest.FixtureSessions();sessions.current=new UserSessionView(1,sid,ClientType.WEB,null,prepared.tokenId(),Instant.now(),Instant.now().plusSeconds(3600),null,null,null);
         try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,72,'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
-        context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url",url(db),"shale.ai.oauth.bootstrap.username",bootstrapLogin,"shale.ai.oauth.bootstrap.password",bootstrapSecret)));
+        context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles(PRODUCTION?"azure":"test");
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin",ORIGIN,"shale.ai.oauth.identity",PRODUCTION?"PRODUCTION":"TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url",url(db),"shale.ai.oauth.bootstrap.username",bootstrapLogin,"shale.ai.oauth.bootstrap.password",bootstrapSecret)));
         context.register(McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class,Fixtures.class);context.refresh();
     }
     @Configuration static class Fixtures {

@@ -29,29 +29,59 @@ public final class McpConfinedClientFixture {
         withServer(ai,catalog,forbidden,database,temp,java.util.function.Function.identity(),check);
     }
     public static void withServer(DataSource ai,DataSource catalog,List<DataSource> forbidden,String database,Path temp,java.util.function.Function<DataSource,DataSource> decorate,ServingCheck check)throws Exception {
+        boolean production=Boolean.getBoolean("shale.acceptance.production");
+        String origin=production?"https://shale.example":"https://shale.test";
         var tomcat=new org.apache.catalina.startup.Tomcat();tomcat.setBaseDir(temp.toString());tomcat.setPort(0);tomcat.getConnector().setProperty("address","127.0.0.1");
         var tc=tomcat.addContext("",temp.toString());
         var config=new com.zaxxer.hikari.HikariConfig();config.setDataSource(ai);config.setMinimumIdle(0);config.setMaximumPoolSize(5);config.setConnectionTimeout(2000);config.setInitializationFailTimeout(-1);
         try(var pool=new com.zaxxer.hikari.HikariDataSource(config);var context=new org.springframework.web.context.support.GenericWebApplicationContext()) {
-            context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles("test");
+            context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles(production?"azure":"test");
             context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("confined",Map.of(
                     "shale.ai.mcp.enabled",true,"shale.ai.enabled",true,"shale.ai.mcp.search-cases-enabled",true,"shale.ai.mcp.get-case-overview-enabled",true,
-                    "shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST",
-                    "shale.ai.oauth.bootstrap.jdbc-url","jdbc:sqlserver://127.0.0.1:1;databaseName=unused","shale.ai.oauth.bootstrap.username","unused","shale.ai.oauth.bootstrap.password","unused","shale.ai.mcp.allowed-origins",Set.of("https://shale.test"))));
-            var identity=new McpOAuthProperties("https://shale.test",McpOAuthProperties.Identity.TEST,false);
+                    "shale.ai.oauth.public-origin",origin,"shale.ai.oauth.identity",production?"PRODUCTION":"TEST",
+                    "shale.ai.oauth.bootstrap.jdbc-url","jdbc:sqlserver://127.0.0.1:1;databaseName=unused","shale.ai.oauth.bootstrap.username","unused","shale.ai.oauth.bootstrap.password","unused","shale.ai.mcp.allowed-origins",Set.of(origin))));
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("production-gate",Map.of("shale.ai.mcp.case-data-composition-enabled",production,"shale.ai.oauth.composition-enabled",production)));
+            var identity=new McpOAuthProperties(origin,production?McpOAuthProperties.Identity.PRODUCTION:McpOAuthProperties.Identity.TEST,false);
             // Exact restricted AI identity and live catalog checks; no attestation bypass.
-            DataSource serving=decorate.apply(pool);
-            context.registerBean(McpAiCaseData.class,()->new McpAiCaseData(serving,catalog,forbidden,database,identity));
+            DataSource decorated=decorate.apply(pool);
+            var available=new java.util.concurrent.atomic.AtomicBoolean(true);
+            DataSource serving=(DataSource)java.lang.reflect.Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class<?>[]{DataSource.class},(proxy,method,args)->{
+                if(method.getName().equals("getConnection")&&!available.get())throw new java.sql.SQLException("Synthetic confined boundary unavailable");
+                try{return method.invoke(decorated,args);}catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
+            });
+            var fallbackCalls=new java.util.concurrent.atomic.AtomicInteger();
+            if(production)context.registerBean("forbiddenLegacyFallback",McpTransportConfiguration.DeadlineAccess.class,()->(token,deadline)->{fallbackCalls.incrementAndGet();throw new AssertionError("Production must never invoke legacy authority");});
+            context.registerBean(McpAiCaseData.class,()->new McpAiCaseData(serving,catalog,production?List.of(forbidden.get(0),forbidden.get(0),forbidden.get(1)):forbidden,database,identity));
             new org.springframework.context.annotation.AnnotatedBeanDefinitionReader(context).register(com.shale.server.oauth.McpOAuthSecurityConfiguration.class,McpTransportConfiguration.class);
             context.refresh();
+            assertEquals(List.of(production?"azure":"test"),List.of(context.getEnvironment().getActiveProfiles()));
+            if(production)assertFalse(context.containsBean("mcpAccessAuthenticator"));
+            assertEquals("ready",context.getBean(McpCaseReadiness.class).state());
+            assertNotNull(context.getBean(McpSearchHandler.class));
+            assertNotNull(context.getBean(McpOverviewHandler.class));
             var servlet=(HttpServletMcpTransport)context.getBean("mcpServlet",org.springframework.boot.web.servlet.ServletRegistrationBean.class).getServlet();
             org.apache.catalina.startup.Tomcat.addServlet(tc,"mcp",servlet).setAsyncSupported(true);tc.addServletMappingDecoded("/mcp","mcp");
+            org.apache.catalina.startup.Tomcat.addServlet(tc,"closedMetadataTerminal",new jakarta.servlet.http.HttpServlet(){
+                @Override protected void service(jakarta.servlet.http.HttpServletRequest request,jakarta.servlet.http.HttpServletResponse response)throws java.io.IOException {response.sendError(404);}
+            });
+            tc.addServletMappingDecoded(com.shale.server.oauth.OAuthMetadataContract.PROTECTED_RESOURCE_PATH,"closedMetadataTerminal");
+            tc.addServletMappingDecoded(com.shale.server.oauth.OAuthMetadataContract.AUTHORIZATION_SERVER_PATH,"closedMetadataTerminal");
             var filter=new FilterDef();filter.setFilterName("security");filter.setAsyncSupported("true");filter.setFilter(context.getBean(FilterChainProxy.class));tc.addFilterDef(filter);
-            var mapping=new FilterMap();mapping.setFilterName("security");mapping.addURLPattern("/mcp");mapping.setDispatcher("REQUEST");mapping.setDispatcher("ASYNC");tc.addFilterMap(mapping);
+            var mapping=new FilterMap();mapping.setFilterName("security");mapping.addURLPattern("/mcp");mapping.addURLPattern(com.shale.server.oauth.OAuthMetadataContract.PROTECTED_RESOURCE_PATH);mapping.addURLPattern(com.shale.server.oauth.OAuthMetadataContract.AUTHORIZATION_SERVER_PATH);mapping.setDispatcher("REQUEST");mapping.setDispatcher("ASYNC");tc.addFilterMap(mapping);
             var body=new FilterDef();body.setFilterName("body");body.setAsyncSupported("true");body.setFilter(new McpBodyFilter());tc.addFilterDef(body);
             var bodyMapping=new FilterMap();bodyMapping.setFilterName("body");bodyMapping.addURLPattern("/mcp");bodyMapping.setDispatcher("REQUEST");bodyMapping.setDispatcher("ASYNC");tc.addFilterMapBefore(bodyMapping);
             tomcat.start();String url="http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/mcp";
             check.run(url);
+            if(production) {
+                available.set(false);
+                assertEquals("not-ready",context.getBean(McpCaseReadiness.class).state());
+                try(var client=java.net.http.HttpClient.newHttpClient()) {
+                    var request=java.net.http.HttpRequest.newBuilder(java.net.URI.create(url)).header("Authorization","Bearer "+"a".repeat(43)).header("Content-Type","application/json").header("Accept","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString("{}")).build();
+                    var response=client.send(request,java.net.http.HttpResponse.BodyHandlers.ofString());
+                    assertEquals(401,response.statusCode());assertFalse(response.body().contains("Direct overview"));assertFalse(response.body().contains("MCP literal"));
+                }
+                assertEquals(0,fallbackCalls.get(),"Unavailable confinement must not consult ordinary ACCESS authority");
+            }
         } finally {try{tomcat.stop();}finally{tomcat.destroy();}}
     }
 }

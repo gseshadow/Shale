@@ -4351,3 +4351,23 @@ Audit compatibility uses the existing integration parent/resource and PHI schema
 survives uncertain ACK/close/cleanup outcomes, every fault withholds protected output without reread,
 persisted values exclude payload/proof/request/exception/SQL metadata, and bounded same-tenant admin
 review retains intentional historical Case IDs. No audit migration, new tool or production code changes.
+
+### Production Case composition candidate after Phase 3B.7
+
+A shared production/test composition policy and an independent default-OFF
+`shale.ai.mcp.case-data-composition-enabled` SQL-readiness control passed mandatory local
+production-profile acceptance on October 27, 2026. Classification is **READY FOR GOVERNED DEPLOYMENT**;
+actual deployment and remaining Category B approvals are separate. Readiness can attest the confined boundary
+with OAuth, transport, both handlers, SQL global and tenant capability OFF. Production transport
+cannot use the ordinary-runtime ACCESS fallback. The actual SQL proof/audit/quota/final-handoff
+boundary is unchanged. [Candidate evidence and blockers](../testing/production-mcp-case-composition.md)
+and the [staged production preflight](../production-mcp-deployment-preflight.md) govern this change.
+Phase 3B.7 local acceptance retains its original scope. Fresh production-profile authoritative,
+client/expiry/TLS, ordinary and affected/critical regressions passed. A live adversarial test exposed
+inherited public Case SELECT on the catalog verifier despite exact own grants/role membership.
+Production attestation now rejects public application/data/EXECUTE/schema/database authority and
+grant options outside its metadata allowlist, preserving engine system metadata/context facilities.
+The fixed Boot and valid-ACCESS serving regressions remove readiness/deny disclosure under that
+fault and require fresh attestation after restoration. No SQL migration or audit schema changed.
+Legal, SDK 2.2.0-M1, actual Azure/deployed parity and security/operator/tenant-owner approvals remain
+OPEN. No activation.

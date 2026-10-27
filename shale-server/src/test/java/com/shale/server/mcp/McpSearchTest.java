@@ -65,11 +65,12 @@ class McpSearchTest {
         assertEquals(result.path("structuredContent"),McpTransportConfiguration.mapper().getJsonMapper().readTree(result.path("content").get(0).path("text").asText()));
         verify(service).search(any(IntegrationInvocation.class),eq("  literal  "),eq(0),any());verifyNoMoreInteractions(service);
     }
-    @Test void productionAndAzureCannotActivateTheHandler() {
+    @Test void productionAndAzureCannotActivateTheHandlerWithoutProductionComposition() {
         var config=new McpSearchConfiguration();
         for(String profile:List.of("prod","azure","local")) {
             var env=new org.springframework.mock.env.MockEnvironment();env.setActiveProfiles(profile);
-            assertThrows(IllegalStateException.class,()->config.mcpSearchHandler(env,new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false),null));
+            var identity=new com.shale.server.oauth.McpOAuthProperties("https://shale.test",com.shale.server.oauth.McpOAuthProperties.Identity.TEST,false);
+            assertThrows(IllegalStateException.class,()->config.mcpSearchHandler(new McpCaseCompositionPolicy(env,identity),null));
         }
     }
     @Test void duplicateTextEscapingCanExceedFullEnvelopeWhileStructuredContentFits()throws Exception {

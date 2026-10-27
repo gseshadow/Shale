@@ -679,3 +679,13 @@ Protected audit review intentionally adds no Case PHI success or entity-action e
 bounded history identifiers/outcomes, reads no Case projection and changes no administrative state.
 A separate audit-review access vocabulary, if required later, must be reviewed rather than misusing the
 current Case tools, PHI value fields or administrative instance-read enum.
+
+## Production composition candidate and readiness
+
+No migration changes accompany the [production composition candidate](../../testing/production-mcp-case-composition.md).
+Its independent default-OFF `shale.ai.mcp.case-data-composition-enabled` control can instantiate
+and attest the same restricted SQL boundary while OAuth/MCP/handlers/capabilities remain OFF.
+Mandatory local production-profile acceptance passed, including the inherited-public-authority
+regression for the catalog verifier. No migration changed. Exact membership/own grants alone are
+insufficient: unexpected public application authority must also remove readiness. Credentials and
+this setting do not grant deployment or pilot authorization; platform/legal/SDK/pilot gates remain OPEN. Follow the [staged preflight](../../production-mcp-deployment-preflight.md).
