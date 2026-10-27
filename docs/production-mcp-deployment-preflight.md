@@ -1,8 +1,10 @@
 # Production MCP deployment preflight
 
-This is a future governed sequence, not execution authorization. The production composition is an
-[unverified candidate](testing/production-mcp-case-composition.md); required production-like acceptance
-has not executed. Do not activate or claim READY FOR GOVERNED DEPLOYMENT until that blocker closes.
+This is a future governed sequence, not execution authorization. The production composition's
+[mandatory local acceptance passed](testing/production-mcp-case-composition.md), including the
+verification-discovered inherited-verifier-authority fix. Classification is **READY FOR GOVERNED
+DEPLOYMENT**, subject to the remaining operator/platform/legal/SDK/pilot gates below. No deployment,
+production SQL, principal provisioning or activation is authorized by that local result.
 
 ## Configuration and safe deployment state
 
@@ -40,7 +42,11 @@ Readiness uses read-only SQL catalog/reference/identity queries, not Case data o
 **READ ONLY — SAFE PREFLIGHT.** Establish actual engine/edition, database/login/user, NULL application
 context, migration/source/catalog receipts, roles and effective permissions; inventory Cases, Users,
 auditLog and Statuses predicates, owners/triggers/constraints and enabled capability/tenant counts.
-No credential/hash/PHI rows may be exported. Missing visibility means UNKNOWN, never an empty pass.
+No credential/hash/PHI rows may be exported. Missing visibility means UNKNOWN, never an empty pass. Include inherited
+`public` grants when reviewing the catalog verifier: exact role membership and its own direct grants
+do not exclude public Case/application authority. Production attestation rejects unexpected public
+application grants and grant options. Inventory existing grants read-only; do not inject the local
+adversarial fault or automatically revoke permissions in production.
 Verify existing Stage A/B, remembered/session security and legacy retirement before proposing changes.
 Preserve the October 20 operator-reported retirement; do not replay it. Stage A's historical preflight
 predates the three FILTERs and refuses their presence; reconcile uncertain state instead of weakening it.

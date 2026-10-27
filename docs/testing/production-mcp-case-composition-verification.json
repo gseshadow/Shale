@@ -1,13 +1,16 @@
 {
+  "schemaVersion": 2,
   "date": "2026-10-27",
-  "timezone": "America/Denver",
-  "classification": "BLOCKED",
-  "pullRequest": 1924,
+  "reportTimezone": "America/Denver",
+  "executionLogTimezone": "UTC",
+  "classification": "READY FOR GOVERNED DEPLOYMENT",
+  "deploymentOrActivationAuthorized": false,
+  "pullRequest": "https://github.com/gseshadow/Shale/pull/1924",
   "branch": "codex/production-mcp-case-composition",
   "mergedBaseline": "b990a09212b9e5872858005e9385d4a2b0539c9f",
-  "publishedHeadAtStart": "e396af4026efd135c8201a3cf0648a2a993163c8",
-  "matchedInitialTree": "d8b0d83d1abbccbe04abbfb53aa42fd1f1449762",
-  "localVerifiedCodeCommit": "f8ab23722433d1676478ff0a574b98170a2dacf7",
+  "publishedHeadAtAttachmentResume": "3adcd603db047bf1c2509a942672a06d506033de",
+  "matchedInitialTree": "3bdd451b915ab10412c0914a24f4dc5094979511",
+  "verifiedCodeCommit": "7225815414b82a12b3a79345efd4e1c1d09001f8",
   "verifiedSourceFiles": [
     {
       "path": "build/test-selection/critical-tests.txt",
@@ -19,11 +22,11 @@
     },
     {
       "path": "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
-      "sha256": "aa3da2eab740f6def06ea47bf197c97b05518d3893650012aab6607f5652e924"
+      "sha256": "d3da82933c0f2aefdd916361bdb26d5fb551b1e8be6153d7b05c16be15c7a50f"
     },
     {
       "path": "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java",
-      "sha256": "85eccef9e3138d85954286c4b38588e2947a05659fe3ec88987f794c0dd01b52"
+      "sha256": "1aff07c300b89866939c6ff9291699d113e7499834f8311c26fb29b23c59a52e"
     },
     {
       "path": "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
@@ -50,8 +53,20 @@
       "sha256": "0959d19c8650758820d81547ef1c6607f7bbd8a3a2d72f501e6dbb5b8ea13406"
     },
     {
+      "path": "shale-server/src/main/resources/application.properties",
+      "sha256": "076c14f4710e91b3b7fef18fd124036d2197f8de72992a3796420cff97e8bfe9"
+    },
+    {
       "path": "shale-server/src/test/java/com/shale/server/mcp/McpCaseCompositionTest.java",
-      "sha256": "63db8eaefa6c024494d1b78dc816db76136f1de0816281633473c4980ac7e8b7"
+      "sha256": "60df7e2bb346ce4ec4957c7d62c6539f92c718052a409a29c8b0412b9a209bdf"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpCatalogVerifierServingChecks.java",
+      "sha256": "26589cd7824a768a14110601961d16ec1b18e7cb345f41fec69144ab8d24d00d"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/McpConfinedClientFixture.java",
+      "sha256": "1196b701bb5cfa86df436c1974bf0d2a6d4103f64647fed36236f7b6803374d6"
     },
     {
       "path": "shale-server/src/test/java/com/shale/server/mcp/McpOverviewTest.java",
@@ -64,51 +79,156 @@
     {
       "path": "shale-server/src/test/java/com/shale/server/mcp/McpSearchTest.java",
       "sha256": "e2ead16e15570245ec981ad0bd61afdd9bbf63c16d0eb10e00845fd4c9a9af6f"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/mcp/Phase3b7ServingChecks.java",
+      "sha256": "81a07ecdae091ad41c772cb54c0a7f79b2335d0c78efbb7fba9dee2439fd6120"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/AuthoritativeCaseMcpFixture.java",
+      "sha256": "b5088dd492e5b0042da613791e798e9991cf9cb950bebd33aa4a955a0a9ae2b5"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/McpProductionReadinessLocalSqlServerTest.java",
+      "sha256": "6fcbafc26dcfa53a7d95d9ff301065768d15b2766a8adf76a16fbaa8cf39fd2e"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/OAuthAuthorizationFlowTest.java",
+      "sha256": "ec2fd28167de3291de22eebb4a630473530a30eb6783824e91ffb3abc87225bc"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/Phase3b7AcceptanceLocalSqlServerTest.java",
+      "sha256": "f72b35a718d998e7158a7aaf20d5f999e68f9236ba69ce5445b96884b12bbeda"
+    },
+    {
+      "path": "shale-server/src/test/java/com/shale/server/oauth/ProductionOrdinarySmoke.java",
+      "sha256": "170262c724b0d0276dc1c94011887726f5e2a7f425694baee725fb1918610508"
     }
   ],
-  "authoritativeSource": {
-    "file": "shale-schema-source.sql",
-    "status": "ABSENT",
-    "actualSha256": null,
-    "expectedSha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
-    "expectedDerivedSha256": "40a665caefb3203a6c364d0caac3fadcc1a58d24a66a994f48e058b73ae6f243",
-    "expectedCandidateSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f",
-    "derivedOrExecuted": false,
-    "substitutedOrReconstructed": false,
-    "searchScope": "Mounted attachment/shared/library areas and workspace/tmp filename search; only prior pasted text request mounted."
-  },
   "runtime": {
     "maven": "3.9.11",
     "java": "21.0.12.1",
-    "springBoot": "4.1.1"
+    "springBoot": "4.1.1",
+    "javaMcpSdk": "2.2.0-M1",
+    "sqlImage": "mcr.microsoft.com/mssql/server@sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718"
   },
-  "dependencyRecovery": {
-    "firstCommand": [
-      "mvn",
-      "-B",
-      "-pl",
-      "shale-server",
-      "-am",
-      "test"
-    ],
-    "firstOutcome": "Dependency resolution failed: proxy socket denied, Operation not permitted.",
-    "concreteFix": "Command network permission enabled; configured proxy retained; socket reachability independently confirmed.",
-    "retryCommand": [
-      "mvn",
-      "-U",
-      "-B",
-      "-pl",
-      "shale-server",
-      "-am",
-      "test"
-    ],
-    "retryOutcome": "Dependencies resolved; real test compilation exposed MockEnvironment.setProperty void dereference at McpCaseCompositionTest.java:41.",
-    "fix": "Split chained setter calls; no production code change.",
-    "furtherDependencyRetries": 0
+  "authoritativeSchema": {
+    "sourceSha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+    "sourceBytes": 728862,
+    "inventory": {
+      "CREATE SCHEMA": 3,
+      "CREATE FUNCTION": 1,
+      "CREATE   FUNCTION": 4,
+      "CREATE TABLE": 96,
+      "CREATE SECURITY": 1,
+      "CREATE NONCLUSTERED": 104,
+      "CREATE UNIQUE": 104,
+      "ALTER TABLE": 1142
+    },
+    "derivedSha256": "40a665caefb3203a6c364d0caac3fadcc1a58d24a66a994f48e058b73ae6f243",
+    "candidateSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f",
+    "originalUnchangedAndUncommitted": true,
+    "hashVerifiedBeforeDecode": true,
+    "derivedHashesVerifiedBeforeSql": true,
+    "substitutedOrReconstructed": false
   },
-  "checks": [
+  "productionAcceptance": {
+    "name": "postfix-authoritative-acceptance",
+    "buildSuccess": true,
+    "compilationFailure": false,
+    "classes": [
+      {
+        "class": "com.shale.data.security.ai.AiCaseDataLocalSqlServerTest",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "com.shale.server.oauth.AuthoritativeCaseMcpLocalSqlServerTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "invocation": {
+      "command": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dtest=AiCaseDataLocalSqlServerTest,McpProductionReadinessLocalSqlServerTest,OAuthAuthorizationFlowTest#maintainedAuthorizationConsentAndCodeFlowPreservesStateAndIssuerAndNeverIssuesTokens+maintainedPublicTokenEndpointIssuesOnlyBoundedOpaqueCredentials+enabledTokenNamespaceRejectsEveryOtherGrantOrdinaryAuthAndMisleadingMetadata+maintainedConfidentialEndpointRequiresPinnedJwtAndPkceAndRejectsReplayAcrossCodes+approvalRejectsCrossClientAndAllBindingSubstitutionsAndAllowsBothExplicitScopes+noSessionOrSpringCookieOrDesktopCredentialCanAuthorize+hostileAuthorizationAndConsentParametersAreRejectedWithoutRedirect+maintainedPublicRefreshRotatesAndLostResponseRetryRevokesReplacement+publicRevocationIsEmpty200ForBothKindsUnknownMalformedForeignAndRepeated+revocationRejectsSecretsCallerAuthorityAndOrdinarySessionAuthentication+confidentialRevocationRequiresEndpointAudienceAndFreshSharedJtiEvenForUnknown+revocationAuditFailureWithholdsSuccessAndRollsBackFamily,AuthoritativeCaseMcpLocalSqlServerTest,Phase3b7AcceptanceLocalSqlServerTest#identicalFinishedCorpus+productionTlsProxy+productionCatalogPublicGrantDeniesServing",
+        "-Dshale.acceptance.production=true",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "productionProfile": true,
+      "sqlPort": "14340",
+      "schemaSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f"
+    }
+  },
+  "isolatedTestProfileAcceptance": {
+    "name": "postfix-test-profile",
+    "buildSuccess": true,
+    "compilationFailure": false,
+    "classes": [
+      {
+        "class": "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "com.shale.server.oauth.AuthoritativeCaseMcpLocalSqlServerTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "invocation": {
+      "command": [
+        "mvn",
+        "-B",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dtest=OAuthAuthorizationFlowTest,AuthoritativeCaseMcpLocalSqlServerTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "productionProfile": false,
+      "sqlPort": "14339",
+      "schemaSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f"
+    }
+  },
+  "postFixRegressionGroups": [
     {
-      "name": "production-focused",
+      "name": "attachment-focused",
       "command": [
         "mvn",
         "-B",
@@ -120,31 +240,32 @@
         "test"
       ],
       "exit": 0,
+      "durationSeconds": 20.197,
       "counts": {
-        "tests": 28,
+        "tests": 29,
         "failures": 0,
         "errors": 0,
         "skipped": 0,
-        "passed": 28
+        "passed": 29
       },
       "classes": [
         {
-          "class": "com.shale.server.oauth.OAuthConfigurationTest",
-          "tests": 4,
-          "failures": 0,
-          "errors": 0,
-          "skipped": 0
-        },
-        {
-          "class": "com.shale.server.mcp.McpCaseCompositionTest",
-          "tests": 8,
-          "failures": 0,
-          "errors": 0,
-          "skipped": 0
-        },
-        {
           "class": "com.shale.server.mcp.McpSearchTest",
           "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.mcp.McpFilterIsolationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.OAuthConfigurationTest",
+          "tests": 4,
           "failures": 0,
           "errors": 0,
           "skipped": 0
@@ -164,14 +285,14 @@
           "skipped": 0
         },
         {
-          "class": "com.shale.server.mcp.McpFilterIsolationTest",
-          "tests": 3,
+          "class": "com.shale.server.mcp.McpCaseCompositionTest",
+          "tests": 9,
           "failures": 0,
           "errors": 0,
           "skipped": 0
         }
       ],
-      "zeroExecutionClasses": []
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence"
     },
     {
       "name": "final-focused",
@@ -186,7 +307,7 @@
         "test"
       ],
       "exit": 0,
-      "durationSeconds": 19.649,
+      "durationSeconds": 17.524,
       "counts": {
         "tests": 90,
         "failures": 0,
@@ -280,10 +401,7 @@
           "skipped": 0
         }
       ],
-      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
-      "zeroExecutionClasses": [
-        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
-      ]
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence"
     },
     {
       "name": "final-ordinary",
@@ -298,7 +416,7 @@
         "test"
       ],
       "exit": 0,
-      "durationSeconds": 16.13,
+      "durationSeconds": 16.878,
       "counts": {
         "tests": 55,
         "failures": 0,
@@ -371,10 +489,7 @@
           "skipped": 0
         }
       ],
-      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
-      "zeroExecutionClasses": [
-        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
-      ]
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence"
     },
     {
       "name": "final-desktop-and-http",
@@ -389,7 +504,7 @@
         "test"
       ],
       "exit": 0,
-      "durationSeconds": 25.244,
+      "durationSeconds": 25.485,
       "counts": {
         "tests": 58,
         "failures": 0,
@@ -469,10 +584,7 @@
           "skipped": 0
         }
       ],
-      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
-      "zeroExecutionClasses": [
-        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
-      ]
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence"
     },
     {
       "name": "oauth-policy",
@@ -487,7 +599,7 @@
         "test"
       ],
       "exit": 0,
-      "durationSeconds": 14.924,
+      "durationSeconds": 15.834,
       "counts": {
         "tests": 20,
         "failures": 0,
@@ -546,8 +658,7 @@
           "skipped": 0
         }
       ],
-      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
-      "zeroExecutionClasses": []
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence"
     },
     {
       "name": "affected",
@@ -557,18 +668,18 @@
         "-pl",
         "shale-core,shale-data,shale-server",
         "-am",
-        "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.McpCaseCompositionTest,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpProductionOffBootTest,com.shale.server.mcp.McpSearchTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+        "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.McpCaseCompositionTest,com.shale.server.mcp.McpCatalogVerifierServingChecks,com.shale.server.mcp.McpConfinedClientFixture,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpProductionOffBootTest,com.shale.server.mcp.McpSearchTest,com.shale.server.mcp.Phase3b7ServingChecks,com.shale.server.oauth.AuthoritativeCaseMcpFixture,com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ProductionOrdinarySmoke,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
         "-Dsurefire.failIfNoSpecifiedTests=false",
         "test"
       ],
       "exit": 0,
-      "durationSeconds": 24.65,
+      "durationSeconds": 26.841,
       "counts": {
-        "tests": 184,
+        "tests": 194,
         "failures": 0,
         "errors": 0,
-        "skipped": 0,
-        "passed": 184
+        "skipped": 9,
+        "passed": 185
       },
       "classes": [
         {
@@ -846,7 +957,7 @@
         },
         {
           "class": "com.shale.server.mcp.McpCaseCompositionTest",
-          "tests": 8,
+          "tests": 9,
           "failures": 0,
           "errors": 0,
           "skipped": 0
@@ -857,14 +968,23 @@
           "failures": 0,
           "errors": 0,
           "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 8
+        },
+        {
+          "class": "com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1
         }
       ],
-      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
-      "zeroExecutionClasses": [
-        "com.shale.data.security.ai.AiSecurityLocalSqlServerTest",
-        "com.shale.data.security.ai.AiCaseDataLocalSqlServerTest",
-        "com.shale.server.oauth.OAuthAuthorizationFlowTest"
-      ]
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence"
     },
     {
       "name": "critical",
@@ -874,13 +994,13 @@
         "test"
       ],
       "exit": 0,
-      "durationSeconds": 33.108,
+      "durationSeconds": 33.779,
       "counts": {
-        "tests": 225,
+        "tests": 226,
         "failures": 0,
         "errors": 0,
         "skipped": 0,
-        "passed": 225
+        "passed": 226
       },
       "classes": [
         {
@@ -1228,7 +1348,7 @@
         },
         {
           "class": "com.shale.server.mcp.McpCaseCompositionTest",
-          "tests": 8,
+          "tests": 9,
           "failures": 0,
           "errors": 0,
           "skipped": 0
@@ -1241,10 +1361,723 @@
           "skipped": 0
         }
       ],
-      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence",
-      "zeroExecutionClasses": []
+      "authoritativeOptIns": "not enabled; no authoritative acceptance evidence"
     }
   ],
+  "officialClientMatrices": {
+    "ts": {
+      "complete": true,
+      "group": "all",
+      "client": "@modelcontextprotocol/client",
+      "version": "2.4.0",
+      "protocol": "2026-07-28",
+      "records": [
+        {
+          "id": "auth-valid",
+          "status": "PASS",
+          "elapsedMillis": 1371.6682069999997
+        },
+        {
+          "id": "auth-expired",
+          "status": "PASS",
+          "elapsedMillis": 1188.08959
+        },
+        {
+          "id": "auth-revoked",
+          "status": "PASS",
+          "elapsedMillis": 1239.1500160000005
+        },
+        {
+          "id": "auth-random",
+          "status": "PASS",
+          "elapsedMillis": 1173.4766819999995
+        },
+        {
+          "id": "auth-refresh",
+          "status": "PASS",
+          "elapsedMillis": 1190.6286440000003
+        },
+        {
+          "id": "auth-code",
+          "status": "PASS",
+          "elapsedMillis": 1333.6357480000006
+        },
+        {
+          "id": "auth-web",
+          "status": "PASS",
+          "elapsedMillis": 3.4816110000010667
+        },
+        {
+          "id": "auth-duplicate",
+          "status": "PASS",
+          "elapsedMillis": 2.719751999999062
+        },
+        {
+          "id": "auth-malformed",
+          "status": "PASS",
+          "elapsedMillis": 4.3674860000010085
+        },
+        {
+          "id": "auth-oversized",
+          "status": "PASS",
+          "elapsedMillis": 2.3565340000004653
+        },
+        {
+          "id": "auth-wrong-resource",
+          "status": "PASS",
+          "elapsedMillis": 1245.4702309999993
+        },
+        {
+          "id": "auth-wrong-issuer",
+          "status": "PASS",
+          "elapsedMillis": 1070.1339480000006
+        },
+        {
+          "id": "auth-wrong-client",
+          "status": "PASS",
+          "elapsedMillis": 1210.886966
+        },
+        {
+          "id": "catalog-search",
+          "status": "PASS",
+          "elapsedMillis": 2292.6300260000007
+        },
+        {
+          "id": "catalog-overview",
+          "status": "PASS",
+          "elapsedMillis": 2426.809652
+        },
+        {
+          "id": "catalog-both",
+          "status": "PASS",
+          "elapsedMillis": 2365.3283880000017
+        },
+        {
+          "id": "catalog-neither",
+          "status": "PASS",
+          "elapsedMillis": 1192.7781400000022
+        },
+        {
+          "id": "catalog-live-reduction",
+          "status": "PASS",
+          "elapsedMillis": 4913.956009000001
+        },
+        {
+          "id": "search-valid",
+          "status": "PASS",
+          "elapsedMillis": 2491.736128999997
+        },
+        {
+          "id": "search-zero",
+          "status": "PASS",
+          "elapsedMillis": 2251.532828999996
+        },
+        {
+          "id": "search-page0",
+          "status": "PASS",
+          "elapsedMillis": 2321.338002999997
+        },
+        {
+          "id": "search-page9",
+          "status": "PASS",
+          "elapsedMillis": 2129.154079
+        },
+        {
+          "id": "search-blank",
+          "status": "PASS",
+          "elapsedMillis": 2235.5226120000007
+        },
+        {
+          "id": "search-short",
+          "status": "PASS",
+          "elapsedMillis": 2147.2403489999997
+        },
+        {
+          "id": "search-wildcard-only",
+          "status": "PASS",
+          "elapsedMillis": 2145.6398180000033
+        },
+        {
+          "id": "search-literal-wildcards",
+          "status": "PASS",
+          "elapsedMillis": 2099.9478029999955
+        },
+        {
+          "id": "search-oversized-query",
+          "status": "PASS",
+          "elapsedMillis": 2224.335113000001
+        },
+        {
+          "id": "search-bad-page",
+          "status": "PASS",
+          "elapsedMillis": 2152.235652999996
+        },
+        {
+          "id": "search-additional-property",
+          "status": "PASS",
+          "elapsedMillis": 2341.492901999998
+        },
+        {
+          "id": "search-unicode",
+          "status": "PASS",
+          "elapsedMillis": 2360.4287140000015
+        },
+        {
+          "id": "search-overlength-source",
+          "status": "PASS",
+          "elapsedMillis": 2215.2111710000027
+        },
+        {
+          "id": "overview-same-tenant",
+          "status": "PASS",
+          "elapsedMillis": 2357.6118399999978
+        },
+        {
+          "id": "overview-unassigned",
+          "status": "PASS",
+          "elapsedMillis": 2330.7996349999958
+        },
+        {
+          "id": "overview-missing",
+          "status": "PASS",
+          "elapsedMillis": 2391.3223759999964
+        },
+        {
+          "id": "overview-foreign",
+          "status": "PASS",
+          "elapsedMillis": 2327.046497999996
+        },
+        {
+          "id": "overview-deleted",
+          "status": "PASS",
+          "elapsedMillis": 2215.456244000001
+        },
+        {
+          "id": "overview-zero",
+          "status": "PASS",
+          "elapsedMillis": 2325.898067000002
+        },
+        {
+          "id": "overview-negative",
+          "status": "PASS",
+          "elapsedMillis": 2167.33793899999
+        },
+        {
+          "id": "overview-string",
+          "status": "PASS",
+          "elapsedMillis": 2572.648052000004
+        },
+        {
+          "id": "overview-too-large",
+          "status": "PASS",
+          "elapsedMillis": 2836.555963999999
+        },
+        {
+          "id": "overview-null",
+          "status": "PASS",
+          "elapsedMillis": 3252.8496900000027
+        },
+        {
+          "id": "overview-additional-property",
+          "status": "PASS",
+          "elapsedMillis": 2822.556215999997
+        },
+        {
+          "id": "live-tenant-off",
+          "status": "PASS",
+          "elapsedMillis": 1908.6031889999867
+        },
+        {
+          "id": "live-integration-revoke",
+          "status": "PASS",
+          "elapsedMillis": 1375.8096150000056
+        },
+        {
+          "id": "live-grant-revoke",
+          "status": "PASS",
+          "elapsedMillis": 1284.1778150000027
+        },
+        {
+          "id": "live-session-revoke",
+          "status": "PASS",
+          "elapsedMillis": 1328.7479319999984
+        },
+        {
+          "id": "live-user-disable",
+          "status": "PASS",
+          "elapsedMillis": 1231.3149720000074
+        },
+        {
+          "id": "live-credential-expiry",
+          "status": "PASS",
+          "elapsedMillis": 1253.4257110000035
+        },
+        {
+          "id": "live-credential-revoke",
+          "status": "PASS",
+          "elapsedMillis": 1288.9204129999998
+        },
+        {
+          "id": "fault-parent",
+          "status": "PASS",
+          "elapsedMillis": 2432.6381739999924
+        },
+        {
+          "id": "fault-child",
+          "status": "PASS",
+          "elapsedMillis": 2332.127348000009
+        },
+        {
+          "id": "fault-phi",
+          "status": "PASS",
+          "elapsedMillis": 2124.494206999996
+        },
+        {
+          "id": "fault-quota",
+          "status": "PASS",
+          "elapsedMillis": 2195.498716000002
+        },
+        {
+          "id": "fault-commit",
+          "status": "PASS",
+          "elapsedMillis": 2487.096765999988
+        },
+        {
+          "id": "fault-lost-ack",
+          "status": "PASS",
+          "elapsedMillis": 2614.946075
+        },
+        {
+          "id": "fault-close",
+          "status": "PASS",
+          "elapsedMillis": 2098.3289349999977
+        },
+        {
+          "id": "fault-failure-audit",
+          "status": "PASS",
+          "elapsedMillis": 2090.2949720000033
+        },
+        {
+          "id": "fault-cancel-before",
+          "status": "PASS",
+          "elapsedMillis": 2182.3033510000096
+        },
+        {
+          "id": "fault-cancel-during",
+          "status": "PASS",
+          "elapsedMillis": 2537.5425109999924
+        },
+        {
+          "id": "fault-timeout",
+          "status": "PASS",
+          "elapsedMillis": 7487.511943999998
+        },
+        {
+          "id": "fault-rejected-task",
+          "status": "PASS",
+          "elapsedMillis": 2403.790800000017
+        },
+        {
+          "id": "fault-cleanup",
+          "status": "PASS",
+          "elapsedMillis": 2316.5016609999875
+        },
+        {
+          "id": "fault-interruption",
+          "status": "PASS",
+          "elapsedMillis": 2238.3777150000096
+        },
+        {
+          "id": "reuse-after-failures",
+          "status": "PASS",
+          "elapsedMillis": 2329.6720600000117
+        },
+        {
+          "id": "privacy-assertion-metadata",
+          "status": "PASS",
+          "elapsedMillis": 2371.714998999989
+        },
+        {
+          "id": "privacy-bearer-query",
+          "status": "PASS",
+          "elapsedMillis": 2264.519018000021
+        }
+      ]
+    },
+    "python": {
+      "complete": true,
+      "group": "all",
+      "client": "mcp",
+      "version": "2.3.0",
+      "protocol": "2026-07-28",
+      "records": [
+        {
+          "id": "auth-valid",
+          "status": "PASS",
+          "elapsedMillis": 1289.8979950005014
+        },
+        {
+          "id": "auth-expired",
+          "status": "PASS",
+          "elapsedMillis": 1127.1590440010186
+        },
+        {
+          "id": "auth-revoked",
+          "status": "PASS",
+          "elapsedMillis": 1105.794438997691
+        },
+        {
+          "id": "auth-random",
+          "status": "PASS",
+          "elapsedMillis": 1076.9660119985929
+        },
+        {
+          "id": "auth-refresh",
+          "status": "PASS",
+          "elapsedMillis": 1096.0290000002715
+        },
+        {
+          "id": "auth-code",
+          "status": "PASS",
+          "elapsedMillis": 1268.675205999898
+        },
+        {
+          "id": "auth-web",
+          "status": "PASS",
+          "elapsedMillis": 5.176718001166591
+        },
+        {
+          "id": "auth-duplicate",
+          "status": "PASS",
+          "elapsedMillis": 3.995046001364244
+        },
+        {
+          "id": "auth-malformed",
+          "status": "PASS",
+          "elapsedMillis": 4.751166001369711
+        },
+        {
+          "id": "auth-oversized",
+          "status": "PASS",
+          "elapsedMillis": 3.8809889992990065
+        },
+        {
+          "id": "auth-wrong-resource",
+          "status": "PASS",
+          "elapsedMillis": 1212.3662539997895
+        },
+        {
+          "id": "auth-wrong-issuer",
+          "status": "PASS",
+          "elapsedMillis": 1144.9044740002137
+        },
+        {
+          "id": "auth-wrong-client",
+          "status": "PASS",
+          "elapsedMillis": 1171.9454100020812
+        },
+        {
+          "id": "catalog-search",
+          "status": "PASS",
+          "elapsedMillis": 2282.579421000264
+        },
+        {
+          "id": "catalog-overview",
+          "status": "PASS",
+          "elapsedMillis": 2365.7794419996208
+        },
+        {
+          "id": "catalog-both",
+          "status": "PASS",
+          "elapsedMillis": 2313.7741120008286
+        },
+        {
+          "id": "catalog-neither",
+          "status": "PASS",
+          "elapsedMillis": 1195.503506998648
+        },
+        {
+          "id": "catalog-live-reduction",
+          "status": "PASS",
+          "elapsedMillis": 4896.661976999894
+        },
+        {
+          "id": "search-valid",
+          "status": "PASS",
+          "elapsedMillis": 3682.26853500164
+        },
+        {
+          "id": "search-zero",
+          "status": "PASS",
+          "elapsedMillis": 3219.5863330016437
+        },
+        {
+          "id": "search-page0",
+          "status": "PASS",
+          "elapsedMillis": 3477.373917001387
+        },
+        {
+          "id": "search-page9",
+          "status": "PASS",
+          "elapsedMillis": 3405.7627340007457
+        },
+        {
+          "id": "search-blank",
+          "status": "PASS",
+          "elapsedMillis": 2161.1562720026996
+        },
+        {
+          "id": "search-short",
+          "status": "PASS",
+          "elapsedMillis": 2122.79189200126
+        },
+        {
+          "id": "search-wildcard-only",
+          "status": "PASS",
+          "elapsedMillis": 2210.871032999421
+        },
+        {
+          "id": "search-literal-wildcards",
+          "status": "PASS",
+          "elapsedMillis": 3165.544580999267
+        },
+        {
+          "id": "search-oversized-query",
+          "status": "PASS",
+          "elapsedMillis": 2158.260717998928
+        },
+        {
+          "id": "search-bad-page",
+          "status": "PASS",
+          "elapsedMillis": 2159.746945999359
+        },
+        {
+          "id": "search-additional-property",
+          "status": "PASS",
+          "elapsedMillis": 2167.3594220010273
+        },
+        {
+          "id": "search-unicode",
+          "status": "PASS",
+          "elapsedMillis": 3151.0955240009935
+        },
+        {
+          "id": "search-overlength-source",
+          "status": "PASS",
+          "elapsedMillis": 2082.1828180014563
+        },
+        {
+          "id": "overview-same-tenant",
+          "status": "PASS",
+          "elapsedMillis": 3352.2317269998894
+        },
+        {
+          "id": "overview-unassigned",
+          "status": "PASS",
+          "elapsedMillis": 3389.002836000145
+        },
+        {
+          "id": "overview-missing",
+          "status": "PASS",
+          "elapsedMillis": 2275.050050000573
+        },
+        {
+          "id": "overview-foreign",
+          "status": "PASS",
+          "elapsedMillis": 2243.533810000372
+        },
+        {
+          "id": "overview-deleted",
+          "status": "PASS",
+          "elapsedMillis": 2194.8720149994188
+        },
+        {
+          "id": "overview-zero",
+          "status": "PASS",
+          "elapsedMillis": 2085.837642000115
+        },
+        {
+          "id": "overview-negative",
+          "status": "PASS",
+          "elapsedMillis": 2261.2555810010235
+        },
+        {
+          "id": "overview-string",
+          "status": "PASS",
+          "elapsedMillis": 2107.2248939999554
+        },
+        {
+          "id": "overview-too-large",
+          "status": "PASS",
+          "elapsedMillis": 2331.290338999679
+        },
+        {
+          "id": "overview-null",
+          "status": "PASS",
+          "elapsedMillis": 2189.6761229982076
+        },
+        {
+          "id": "overview-additional-property",
+          "status": "PASS",
+          "elapsedMillis": 2389.8172119988885
+        },
+        {
+          "id": "live-tenant-off",
+          "status": "PASS",
+          "elapsedMillis": 1053.5724010005652
+        },
+        {
+          "id": "live-integration-revoke",
+          "status": "PASS",
+          "elapsedMillis": 1066.0963240006822
+        },
+        {
+          "id": "live-grant-revoke",
+          "status": "PASS",
+          "elapsedMillis": 1117.9948200006038
+        },
+        {
+          "id": "live-session-revoke",
+          "status": "PASS",
+          "elapsedMillis": 1059.0361210015544
+        },
+        {
+          "id": "live-user-disable",
+          "status": "PASS",
+          "elapsedMillis": 1261.3927019992843
+        },
+        {
+          "id": "live-credential-expiry",
+          "status": "PASS",
+          "elapsedMillis": 1179.9268890026724
+        },
+        {
+          "id": "live-credential-revoke",
+          "status": "PASS",
+          "elapsedMillis": 1025.8123860003252
+        },
+        {
+          "id": "fault-parent",
+          "status": "PASS",
+          "elapsedMillis": 2214.1822689991386
+        },
+        {
+          "id": "fault-child",
+          "status": "PASS",
+          "elapsedMillis": 2150.1081030000933
+        },
+        {
+          "id": "fault-phi",
+          "status": "PASS",
+          "elapsedMillis": 2331.7928289980046
+        },
+        {
+          "id": "fault-quota",
+          "status": "PASS",
+          "elapsedMillis": 2144.406904000789
+        },
+        {
+          "id": "fault-commit",
+          "status": "PASS",
+          "elapsedMillis": 2356.530945002305
+        },
+        {
+          "id": "fault-lost-ack",
+          "status": "PASS",
+          "elapsedMillis": 2414.459904000978
+        },
+        {
+          "id": "fault-close",
+          "status": "PASS",
+          "elapsedMillis": 2222.825543001818
+        },
+        {
+          "id": "fault-failure-audit",
+          "status": "PASS",
+          "elapsedMillis": 2164.5999280008255
+        },
+        {
+          "id": "fault-cancel-before",
+          "status": "PASS",
+          "elapsedMillis": 2256.700288999127
+        },
+        {
+          "id": "fault-cancel-during",
+          "status": "PASS",
+          "elapsedMillis": 2432.2806959971786
+        },
+        {
+          "id": "fault-timeout",
+          "status": "PASS",
+          "elapsedMillis": 7553.9852250003605
+        },
+        {
+          "id": "fault-rejected-task",
+          "status": "PASS",
+          "elapsedMillis": 2315.1147429998673
+        },
+        {
+          "id": "fault-cleanup",
+          "status": "PASS",
+          "elapsedMillis": 2419.7074759977113
+        },
+        {
+          "id": "fault-interruption",
+          "status": "PASS",
+          "elapsedMillis": 2128.4403120007482
+        },
+        {
+          "id": "reuse-after-failures",
+          "status": "PASS",
+          "elapsedMillis": 3729.3927089995123
+        },
+        {
+          "id": "privacy-assertion-metadata",
+          "status": "PASS",
+          "elapsedMillis": 4122.341434998816
+        },
+        {
+          "id": "privacy-bearer-query",
+          "status": "PASS",
+          "elapsedMillis": 4002.7963219981757
+        }
+      ]
+    }
+  },
+  "productionTlsProxy": {
+    "cases": {
+      "wrong-hostname-refused": 0,
+      "untrusted-certificate-refused": 0,
+      "canonical-origin": 401,
+      "hostile-host": 401,
+      "forwarded": 401,
+      "x-forwarded": 401,
+      "exact-origin": 200,
+      "protected-overview-through-tls": 200,
+      "missing-origin-nonbrowser": 200,
+      "denied-origin-9": 403,
+      "denied-origin-10": 403,
+      "denied-origin-11": 403,
+      "denied-origin-12": 403,
+      "denied-origin-13": 403,
+      "/.well-known/oauth-protected-resource/mcp": 200,
+      "/.well-known/oauth-authorization-server/oauth/mcp": 200,
+      "http-enforcement": 308,
+      "http-credentials-/mcp": 308,
+      "http-credentials-/oauth/mcp/token": 308,
+      "http-credentials-/oauth/mcp/authorize": 308
+    },
+    "proxy": "Caddy 2.11.7",
+    "scope": "owned isolated real TLS reverse proxy; not deployed ingress",
+    "hostnameValidated": true,
+    "certificateValidated": true
+  },
+  "ordinaryProductionBootHttp": {
+    "readinessHttpChecks": 23,
+    "realBoot": true,
+    "realSql": true,
+    "offHttpChecks": 23
+  },
   "selectorPython": {
     "command": [
       "python3",
@@ -1257,42 +2090,1075 @@
       "test_*.py"
     ],
     "passed": 27,
-    "failures": 0
+    "failures": 0,
+    "errors": 0
   },
-  "productionOffBoot": {
-    "status": "PASS",
-    "tests": 2,
-    "profiles": [
-      "azure",
-      "prod"
+  "selectorPlan": {
+    "changed_paths": [
+      "build/test-selection/critical-tests.txt",
+      "build/test-selection/test-areas.json",
+      "docs/architecture/ai-integration-and-mcp.md",
+      "docs/azure-app-service-deployment.md",
+      "docs/production-mcp-deployment-preflight.md",
+      "docs/sql/ai-integration/README.md",
+      "docs/testing/production-mcp-case-composition-verification.json",
+      "docs/testing/production-mcp-case-composition.md",
+      "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+      "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java",
+      "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+      "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+      "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+      "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+      "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+      "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+      "shale-server/src/main/resources/application.properties",
+      "shale-server/src/test/java/com/shale/server/mcp/McpCaseCompositionTest.java",
+      "shale-server/src/test/java/com/shale/server/mcp/McpCatalogVerifierServingChecks.java",
+      "shale-server/src/test/java/com/shale/server/mcp/McpConfinedClientFixture.java",
+      "shale-server/src/test/java/com/shale/server/mcp/McpOverviewTest.java",
+      "shale-server/src/test/java/com/shale/server/mcp/McpProductionOffBootTest.java",
+      "shale-server/src/test/java/com/shale/server/mcp/McpSearchTest.java",
+      "shale-server/src/test/java/com/shale/server/mcp/Phase3b7ServingChecks.java",
+      "shale-server/src/test/java/com/shale/server/oauth/AuthoritativeCaseMcpFixture.java",
+      "shale-server/src/test/java/com/shale/server/oauth/McpProductionReadinessLocalSqlServerTest.java",
+      "shale-server/src/test/java/com/shale/server/oauth/OAuthAuthorizationFlowTest.java",
+      "shale-server/src/test/java/com/shale/server/oauth/Phase3b7AcceptanceLocalSqlServerTest.java",
+      "shale-server/src/test/java/com/shale/server/oauth/ProductionOrdinarySmoke.java"
     ],
-    "identity": "PRODUCTION",
-    "scope": "Full ShaleServerApplication Boot 4.1.1 embedded HTTP startup with real ordinary beans, DB-free health/auth-denial routes; no AI pool/boundary/handlers/servlet/bootstrap bean; ordinary pools target closed loopback port.",
-    "successfulDatabaseBackedOrdinaryFlows": "NOT RUN"
+    "selected_areas": [
+      "cases",
+      "security-data",
+      "server"
+    ],
+    "selected_modules": [
+      "shale-core",
+      "shale-data",
+      "shale-server"
+    ],
+    "test_patterns": [
+      "com.shale.core.security.ai.AiScopeTest",
+      "com.shale.data.auth.AuthCredentialLookupTest",
+      "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+      "com.shale.data.auth.PreTenantAuthenticationModuleContractTest",
+      "com.shale.data.config.DataSourcesAiCaseDataTest",
+      "com.shale.data.dao.CaseAggregateTransactionTest",
+      "com.shale.data.dao.CaseLifecycleAuditContractTest",
+      "com.shale.data.dao.ContactAggregateMutationContractTest",
+      "com.shale.data.dao.ContactMutationContractTest",
+      "com.shale.data.dao.EntityActionAuditEventTest",
+      "com.shale.data.dao.EntityActionAuditMigrationContractTest",
+      "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest",
+      "com.shale.data.runtime.RuntimeSessionServiceTimingTest",
+      "com.shale.data.security.ai.AiAccessContractTest",
+      "com.shale.data.security.ai.AiCaseDataAccessTest",
+      "com.shale.data.security.ai.AiCaseDataLocalSqlServerTest",
+      "com.shale.data.security.ai.AiCaseDataMigrationContractTest",
+      "com.shale.data.security.ai.AiOAuthCredentialContractTest",
+      "com.shale.data.security.ai.AiOAuthExchangeContractTest",
+      "com.shale.data.security.ai.AiOAuthRevocationContractTest",
+      "com.shale.data.security.ai.AiSecurityContractTest",
+      "com.shale.data.security.ai.AiSecurityLocalSqlServerTest",
+      "com.shale.data.security.ai.IntegrationAccessContractTest",
+      "com.shale.data.security.ai.IntegrationCaseReadTest",
+      "com.shale.data.security.ai.ProofDigestTest",
+      "com.shale.server.controller.AuthControllerTest",
+      "com.shale.server.mcp.McpCaseCompositionTest",
+      "com.shale.server.mcp.McpCatalogVerifierServingChecks",
+      "com.shale.server.mcp.McpConfinedClientFixture",
+      "com.shale.server.mcp.McpOverviewTest",
+      "com.shale.server.mcp.McpProductionOffBootTest",
+      "com.shale.server.mcp.McpSearchTest",
+      "com.shale.server.mcp.Phase3b7ServingChecks",
+      "com.shale.server.oauth.AuthoritativeCaseMcpFixture",
+      "com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest",
+      "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+      "com.shale.server.oauth.OAuthClientMappingTest",
+      "com.shale.server.oauth.OAuthCodeExchangePolicyTest",
+      "com.shale.server.oauth.OAuthConfigurationTest",
+      "com.shale.server.oauth.OAuthFilterIsolationTest",
+      "com.shale.server.oauth.OAuthMetadataTest",
+      "com.shale.server.oauth.OAuthRevocationPolicyTest",
+      "com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest",
+      "com.shale.server.oauth.PinnedClientAssertionTest",
+      "com.shale.server.oauth.ProductionOrdinarySmoke",
+      "com.shale.server.oauth.ShaleOAuthHumanTest",
+      "com.shale.server.runtime.RequestScopedDbSessionProviderTest",
+      "com.shale.server.runtime.ServerSessionSkeletonTest"
+    ],
+    "ownership_class_count": 235,
+    "ownership_advisory_command": "python build/test-selection/select_tests.py --area cases --area security-data --area server --run",
+    "test_reasons": {
+      "com.shale.core.security.ai.AiScopeTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.auth.AuthCredentialLookupTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke"
+        ]
+      },
+      "com.shale.data.auth.AuthUserLifecycleSecurityTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.auth.PreTenantAuthenticationModuleContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke"
+        ]
+      },
+      "com.shale.data.config.DataSourcesAiCaseDataTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.dao.CaseAggregateTransactionTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.dao.CaseLifecycleAuditContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.dao.ContactAggregateMutationContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.dao.ContactMutationContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.dao.EntityActionAuditEventTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.dao.EntityActionAuditMigrationContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.dao.RequestLookupRlsPhase2MigrationTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.runtime.RuntimeSessionServiceTimingTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke"
+        ]
+      },
+      "com.shale.data.security.ai.AiAccessContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.AiCaseDataAccessTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.AiCaseDataLocalSqlServerTest": {
+        "changed_paths": [
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.data.security.ai.AiCaseDataMigrationContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.AiOAuthCredentialContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.AiOAuthExchangeContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.AiOAuthRevocationContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.AiSecurityContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.AiSecurityLocalSqlServerTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke"
+        ]
+      },
+      "com.shale.data.security.ai.IntegrationAccessContractTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.IntegrationCaseReadTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.data.security.ai.ProofDigestTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.controller.AuthControllerTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.mcp.McpCaseCompositionTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties",
+          "shale-server/src/test/java/com/shale/server/mcp/McpCaseCompositionTest.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test",
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical",
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.mcp.McpCatalogVerifierServingChecks": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/mcp/McpCatalogVerifierServingChecks.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.mcp.McpConfinedClientFixture": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/mcp/McpConfinedClientFixture.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.mcp.McpOverviewTest": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/mcp/McpOverviewTest.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.mcp.McpProductionOffBootTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties",
+          "shale-server/src/test/java/com/shale/server/mcp/McpProductionOffBootTest.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test",
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical",
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.mcp.McpSearchTest": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/mcp/McpSearchTest.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.mcp.Phase3b7ServingChecks": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/mcp/Phase3b7ServingChecks.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.oauth.AuthoritativeCaseMcpFixture": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/oauth/AuthoritativeCaseMcpFixture.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/oauth/McpProductionReadinessLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.oauth.OAuthAuthorizationFlowTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties",
+          "shale-server/src/test/java/com/shale/server/oauth/OAuthAuthorizationFlowTest.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test",
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.oauth.OAuthClientMappingTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.oauth.OAuthCodeExchangePolicyTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.oauth.OAuthConfigurationTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.oauth.OAuthFilterIsolationTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.oauth.OAuthMetadataTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.oauth.OAuthRevocationPolicyTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/oauth/Phase3b7AcceptanceLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.oauth.PinnedClientAssertionTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.oauth.ProductionOrdinarySmoke": {
+        "changed_paths": [
+          "shale-server/src/test/java/com/shale/server/oauth/ProductionOrdinarySmoke.java"
+        ],
+        "mapping_rules": [
+          "directly-modified-test"
+        ],
+        "classifications": [
+          "directly_modified"
+        ]
+      },
+      "com.shale.server.oauth.ShaleOAuthHumanTest": {
+        "changed_paths": [
+          "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java",
+          "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java",
+          "shale-server/src/main/resources/application.properties"
+        ],
+        "mapping_rules": [
+          "area:server"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.runtime.RequestScopedDbSessionProviderTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      },
+      "com.shale.server.runtime.ServerSessionSkeletonTest": {
+        "changed_paths": [
+          "docs/sql/ai-integration/README.md",
+          "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+          "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java"
+        ],
+        "mapping_rules": [
+          "area:security-data"
+        ],
+        "classifications": [
+          "blocking_smoke",
+          "critical"
+        ]
+      }
+    },
+    "modified_test_classes": [
+      "com.shale.data.security.ai.AiCaseDataLocalSqlServerTest",
+      "com.shale.server.mcp.McpCaseCompositionTest",
+      "com.shale.server.mcp.McpCatalogVerifierServingChecks",
+      "com.shale.server.mcp.McpConfinedClientFixture",
+      "com.shale.server.mcp.McpOverviewTest",
+      "com.shale.server.mcp.McpProductionOffBootTest",
+      "com.shale.server.mcp.McpSearchTest",
+      "com.shale.server.mcp.Phase3b7ServingChecks",
+      "com.shale.server.oauth.AuthoritativeCaseMcpFixture",
+      "com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest",
+      "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+      "com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest",
+      "com.shale.server.oauth.ProductionOrdinarySmoke"
+    ],
+    "python_commands": [],
+    "python_command_args": [],
+    "critical_command": "mvn test",
+    "critical_maven_args": [
+      "test"
+    ],
+    "selected_command": "mvn -pl shale-core,shale-data,shale-server -am -Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.McpCaseCompositionTest,com.shale.server.mcp.McpCatalogVerifierServingChecks,com.shale.server.mcp.McpConfinedClientFixture,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpProductionOffBootTest,com.shale.server.mcp.McpSearchTest,com.shale.server.mcp.Phase3b7ServingChecks,com.shale.server.oauth.AuthoritativeCaseMcpFixture,com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ProductionOrdinarySmoke,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest -Dsurefire.failIfNoSpecifiedTests=false test",
+    "selected_maven_args": [
+      "-pl",
+      "shale-core,shale-data,shale-server",
+      "-am",
+      "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.McpCaseCompositionTest,com.shale.server.mcp.McpCatalogVerifierServingChecks,com.shale.server.mcp.McpConfinedClientFixture,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpProductionOffBootTest,com.shale.server.mcp.McpSearchTest,com.shale.server.mcp.Phase3b7ServingChecks,com.shale.server.oauth.AuthoritativeCaseMcpFixture,com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ProductionOrdinarySmoke,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+      "-Dsurefire.failIfNoSpecifiedTests=false",
+      "test"
+    ],
+    "selected_maven_batches": [
+      [
+        "-pl",
+        "shale-core,shale-data,shale-server",
+        "-am",
+        "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.McpCaseCompositionTest,com.shale.server.mcp.McpCatalogVerifierServingChecks,com.shale.server.mcp.McpConfinedClientFixture,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpProductionOffBootTest,com.shale.server.mcp.McpSearchTest,com.shale.server.mcp.Phase3b7ServingChecks,com.shale.server.oauth.AuthoritativeCaseMcpFixture,com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ProductionOrdinarySmoke,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ]
+    ],
+    "maximum_command_length": 2501,
+    "windows_safe_command_length": 7000,
+    "ownership_advisory_threshold": 50,
+    "selection_error": "",
+    "informational_command": "mvn -Pall-tests test",
+    "informational_maven_args": [
+      "-Pall-tests",
+      "test"
+    ],
+    "commands": [
+      "mvn -pl shale-core,shale-data,shale-server -am -Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.config.DataSourcesAiCaseDataTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.runtime.RuntimeSessionServiceTimingTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.controller.AuthControllerTest,com.shale.server.mcp.McpCaseCompositionTest,com.shale.server.mcp.McpCatalogVerifierServingChecks,com.shale.server.mcp.McpConfinedClientFixture,com.shale.server.mcp.McpOverviewTest,com.shale.server.mcp.McpProductionOffBootTest,com.shale.server.mcp.McpSearchTest,com.shale.server.mcp.Phase3b7ServingChecks,com.shale.server.oauth.AuthoritativeCaseMcpFixture,com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest,com.shale.server.oauth.OAuthAuthorizationFlowTest,com.shale.server.oauth.OAuthClientMappingTest,com.shale.server.oauth.OAuthCodeExchangePolicyTest,com.shale.server.oauth.OAuthConfigurationTest,com.shale.server.oauth.OAuthFilterIsolationTest,com.shale.server.oauth.OAuthMetadataTest,com.shale.server.oauth.OAuthRevocationPolicyTest,com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest,com.shale.server.oauth.PinnedClientAssertionTest,com.shale.server.oauth.ProductionOrdinarySmoke,com.shale.server.oauth.ShaleOAuthHumanTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest -Dsurefire.failIfNoSpecifiedTests=false test",
+      "mvn test"
+    ],
+    "full_suite": true,
+    "escalation_reasons": [
+      "build/test-selection/critical-tests.txt: parent build, module graph, selector, workflow, or Codex test infrastructure",
+      "build/test-selection/test-areas.json: parent build, module graph, selector, workflow, or Codex test infrastructure"
+    ],
+    "reasons": {
+      "cases": [
+        "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java: Case view, Case domain, intake, persistence, or Case FXML changed.",
+        "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java: Case view, Case domain, intake, persistence, or Case FXML changed.",
+        "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java: Case view, Case domain, intake, persistence, or Case FXML changed.",
+        "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java: Case view, Case domain, intake, persistence, or Case FXML changed.",
+        "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java: Case view, Case domain, intake, persistence, or Case FXML changed.",
+        "shale-server/src/test/java/com/shale/server/mcp/McpCaseCompositionTest.java: Case view, Case domain, intake, persistence, or Case FXML changed.",
+        "shale-server/src/test/java/com/shale/server/oauth/AuthoritativeCaseMcpFixture.java: Case view, Case domain, intake, persistence, or Case FXML changed."
+      ],
+      "security-data": [
+        "docs/sql/ai-integration/README.md: Security, RLS, tenant session, or audit infrastructure changed; critical and affected data/security contracts are blocking.",
+        "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java: Security, RLS, tenant session, or audit infrastructure changed; critical and affected data/security contracts are blocking.",
+        "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java: Security, RLS, tenant session, or audit infrastructure changed; critical and affected data/security contracts are blocking."
+      ],
+      "server": [
+        "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java: Server, API, authentication endpoint, or web consumer changed.",
+        "shale-server/src/main/java/com/shale/server/mcp/McpCaseCompositionPolicy.java: Server, API, authentication endpoint, or web consumer changed.",
+        "shale-server/src/main/java/com/shale/server/mcp/McpCaseReadiness.java: Server, API, authentication endpoint, or web consumer changed.",
+        "shale-server/src/main/java/com/shale/server/mcp/McpOverviewConfiguration.java: Server, API, authentication endpoint, or web consumer changed.",
+        "shale-server/src/main/java/com/shale/server/mcp/McpSearchConfiguration.java: Server, API, authentication endpoint, or web consumer changed.",
+        "shale-server/src/main/java/com/shale/server/mcp/McpTransportConfiguration.java: Server, API, authentication endpoint, or web consumer changed.",
+        "shale-server/src/main/resources/application.properties: Server, API, authentication endpoint, or web consumer changed."
+      ]
+    },
+    "skipped_areas": {
+      "build-scripts": "No changed path mapped to this area.",
+      "calendar": "No changed path mapped to this area.",
+      "contacts": "No changed path mapped to this area.",
+      "notifications": "No changed path mapped to this area.",
+      "organizations": "No changed path mapped to this area.",
+      "reports": "No changed path mapped to this area.",
+      "settings-team": "No changed path mapped to this area.",
+      "tasks": "No changed path mapped to this area.",
+      "ui-behavior": "No changed path mapped to this area.",
+      "ui-fxml-structure": "No changed path mapped to this area.",
+      "ui-presentation": "No changed path mapped to this area.",
+      "ui-visual-advisory": "No changed path mapped to this area.",
+      "updater": "No changed path mapped to this area."
+    },
+    "selector_tests_required": true
   },
-  "readinessUnitAndWiring": {
-    "status": "PASS",
-    "scope": "Fresh mocked attestation states, exact three log messages, no error details, no bearer authentication or reader call; not authoritative SQL."
-  },
-  "blockedChecks": [
-    "Authoritative production-profile readiness-only Boot with SQL global/tenant OFF",
-    "Production-profile PRODUCTION-identity positive confined serving",
-    "Actual restricted AI and catalog-verifier tokens, SIDs and effective authority",
-    "#1922 actual SQL read/context/PHI/legacy/control/escalation attacks",
-    "Deterministic post-lock DB-UTC final-handoff expiry through both clients",
-    "Full TypeScript/Python production-like matrix (0 executed for each)",
-    "Real certificate/hostname-validated TLS/proxy production-like acceptance",
-    "Production-like durable OAuth SQL issuance, replay, refresh/reuse and revocation",
-    "Successful production-like ordinary database flows and after-readiness smoke"
+  "resolvedFailedAttempts": [
+    {
+      "name": "production-readiness",
+      "buildSuccess": false,
+      "compilationFailure": false,
+      "classes": [
+        {
+          "class": "com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 1,
+          "skipped": 0
+        }
+      ],
+      "resolution": "Fixture SQL hostname required DNS SAN localhost; fixed without weakening certificate validation."
+    },
+    {
+      "name": "production-ordinary-readiness",
+      "buildSuccess": false,
+      "compilationFailure": true,
+      "classes": [],
+      "resolution": "New test referenced unavailable Spring JDBC helper; replaced with a JDK DataSource proxy, no dependency added."
+    },
+    {
+      "name": "production-oauth-final-serving",
+      "buildSuccess": false,
+      "compilationFailure": false,
+      "classes": [
+        {
+          "class": "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.AuthoritativeCaseMcpLocalSqlServerTest",
+          "tests": 2,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest",
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "resolution": "New denial probe omitted Accept and got 406; metadata path lacked fixture servlet mapping. Test harness preconditions corrected."
+    },
+    {
+      "name": "production-public-grant-repro",
+      "buildSuccess": false,
+      "compilationFailure": false,
+      "classes": [
+        {
+          "class": "com.shale.server.oauth.McpProductionReadinessLocalSqlServerTest",
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "invocation": {
+        "command": [
+          "mvn",
+          "-B",
+          "-pl",
+          "shale-server",
+          "-am",
+          "-Dtest=McpProductionReadinessLocalSqlServerTest",
+          "-Dshale.acceptance.production=true",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "productionProfile": true,
+        "sqlPort": "14340",
+        "schemaSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f"
+      },
+      "resolution": "Real defect: inherited public Case SELECT gave verifier visibility but readiness returned ready. Production attestation fixed."
+    },
+    {
+      "name": "production-fixed-serving-gate",
+      "buildSuccess": false,
+      "compilationFailure": false,
+      "classes": [
+        {
+          "class": "com.shale.server.oauth.Phase3b7AcceptanceLocalSqlServerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 1,
+          "skipped": 0
+        }
+      ],
+      "invocation": {
+        "command": [
+          "mvn",
+          "-B",
+          "-pl",
+          "shale-server",
+          "-am",
+          "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#productionCatalogPublicGrantDeniesServing",
+          "-Dshale.acceptance.production=true",
+          "-Dsurefire.failIfNoSpecifiedTests=false",
+          "test"
+        ],
+        "productionProfile": true,
+        "sqlPort": "14340",
+        "schemaSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f"
+      },
+      "resolution": "First strict public-grant guard refused built-in negative-ID system compatibility metadata. Narrow system SELECT handling added; application authority remains refused."
+    }
   ],
-  "ci": "Not used; repository rules explicitly prohibit automated tests in GitHub Actions; only workflow is static-web deployment.",
-  "sqlChanged": false,
-  "productionCodeChangedDuringResume": false,
-  "noProductionOrAzureSql": true,
-  "noAzureConfigurationChange": true,
-  "noJarDeployed": true,
-  "noRealTenantOrIntegrationEnabled": true,
-  "noProductionCredentialsIssued": true,
-  "packagedActivationDefaults": "OFF",
-  "interpretation": "Group counts overlap. Zero-execution opt-in classes provide no passing evidence. No isolated javac result is used as Maven/Boot acceptance."
+  "authorityFix": {
+    "productionCodeFile": "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+    "cause": "Inherited public application read authority was not excluded by exact verifier token and own-grant checks.",
+    "fix": "Reject public application/data/EXECUTE/schema/database grants and grant options outside metadata allowlist; retain engine system metadata/context facilities.",
+    "regression": "Actual verifier Case visibility under injected public SELECT removes readiness and denies valid ACCESS serving; removing fault requires fresh successful attestation."
+  },
+  "sqlMigrationChanged": false,
+  "historicalSqlModulesChanged": false,
+  "runtimeAttestationQueryChanged": true,
+  "migrationOrder": [
+    "phase3b1.sql",
+    "phase3b2b.sql",
+    "phase3b2c1.sql",
+    "phase3b2c2.sql",
+    "revocation.sql",
+    "phase3b2d.sql",
+    "phase3b3.sql",
+    "phase3b7-confinement.sql"
+  ],
+  "packagedActivationDefaults": {
+    "shale.ai.oauth.composition-enabled": "false",
+    "shale.ai.oauth.authorization-enabled": "false",
+    "shale.ai.oauth.exchange-enabled": "false",
+    "shale.ai.mcp.enabled": "false",
+    "shale.ai.mcp.search-cases-enabled": "false",
+    "shale.ai.enabled": "false",
+    "shale.ai.mcp.get-case-overview-enabled": "false",
+    "shale.ai.mcp.case-data-composition-enabled": "false"
+  },
+  "scopeLimits": [
+    "Counts overlap; do not add as unique tests.",
+    "Disabled opt-ins/zero-test suites are not passing acceptance.",
+    "Production-profile serving uses actual confined SQL sources, Spring and embedded Tomcat; full Boot readiness tests the property-based production pool factory.",
+    "Client corpus uses private loopback serving; a separate real TLS/proxy suite exercises protected Overview and metadata.",
+    "Ordinary WEB/DESKTOP evidence is protocol/service regression, not interactive GUI acceptance.",
+    "Local Developer SQL and local Caddy do not establish deployed Azure platform/ingress/JAR parity."
+  ],
+  "openGates": [
+    "tenant/legal retention sign-off",
+    "SDK 2.2.0-M1 production approval",
+    "security/operator/tenant-owner pilot authorization",
+    "actual Azure SQL edition/catalog/auth Stage A/B/RLS/principal/JAR/caller parity",
+    "deployed TLS/proxy, monitoring/capacity/restart/failover and Category B/R4/live acceptance"
+  ],
+  "sideEffects": {
+    "noProductionOrAzureSql": true,
+    "noAzureConfigurationChange": true,
+    "noJarDeployed": true,
+    "noRealTenantOrIntegrationEnabled": true,
+    "noProductionCredentialsIssued": true,
+    "noProductionDnsProxyCertificateChange": true,
+    "noInstallerOrVersionPublished": true
+  },
+  "cleanup": "Removed both task-owned disposable SQL containers after verifying exact task labels; all fixture/proxy lifetimes closed. Original schema and private scratch inputs remain unchanged/uncommitted.",
+  "finalStaticChecks": {
+    "sourceHashesMatch": true,
+    "historicalMigrationsByteIdentical": 8,
+    "phase3b2aExists": false,
+    "packagedOffDefaults": 8,
+    "relativeDocumentationLinksResolve": true,
+    "gitDiffCheck": true,
+    "selectorMatchesExecutedAffectedBatch": true
+  }
 }

@@ -685,5 +685,7 @@ current Case tools, PHI value fields or administrative instance-read enum.
 No migration changes accompany the [production composition candidate](../../testing/production-mcp-case-composition.md).
 Its independent default-OFF `shale.ai.mcp.case-data-composition-enabled` control can instantiate
 and attest the same restricted SQL boundary while OAuth/MCP/handlers/capabilities remain OFF.
-The candidate is UNVERIFIED/BLOCKED pending the documented executions; credentials and this setting
-do not grant deployment or pilot authorization. Follow the [staged preflight](../../production-mcp-deployment-preflight.md).
+Mandatory local production-profile acceptance passed, including the inherited-public-authority
+regression for the catalog verifier. No migration changed. Exact membership/own grants alone are
+insufficient: unexpected public application authority must also remove readiness. Credentials and
+this setting do not grant deployment or pilot authorization; platform/legal/SDK/pilot gates remain OPEN. Follow the [staged preflight](../../production-mcp-deployment-preflight.md).

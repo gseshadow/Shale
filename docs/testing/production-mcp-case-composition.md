@@ -1,91 +1,168 @@
-# Production MCP Case composition candidate
+# Production MCP Case composition verification
 
-Base: `b990a09212b9e5872858005e9385d4a2b0539c9f`, merged #1922/#1923.
-Status: **BLOCKED — Maven/Boot and production OFF startup verified; authoritative production-profile acceptance remains unexecuted.**
+PR: [#1924](https://github.com/gseshadow/Shale/pull/1924), branch
+`codex/production-mcp-case-composition`.
 
+Status: **READY FOR GOVERNED DEPLOYMENT — mandatory local acceptance passed.**
+Deployment, activation and remaining Category B approvals are not authorized by this result.
 
-## Resumed verification 2026-10-27
+## Baseline and immutable schema
 
-PR #1924 was resumed in place at published `e396af4026efd135c8201a3cf0648a2a993163c8`.
-The initial local tree matched published tree `d8b0d83d1abbccbe04abbfb53aa42fd1f1449762`
-exactly before edits. Current origin/codex/latest is the baseline above. The original checkout is
-preserved. Full Git history was fetched after command network access was corrected.
+Resumption started from published `e396af4026efd135c8201a3cf0648a2a993163c8`; the preceding verification
+update published `3adcd603db047bf1c2509a942672a06d506033de`. At attachment resumption, the local
+branch matched that published commit/tree (`3bdd451b915ab10412c0914a24f4dc5094979511`) before edits.
+Fresh fetch confirmed merged base `b990a09212b9e5872858005e9385d4a2b0539c9f` and unchanged PR head.
+The original checkout and unrelated work are preserved. No second PR was created.
 
-**Hard gate: the authoritative `shale-schema-source.sql` attachment is ABSENT.** Mounted inputs
-contain only the prior pasted request. Expected original SHA-256 is
-`4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`.
-No source was copied, decoded, derived, reconstructed, substituted or executed. Authoritative SQL,
-client and TLS acceptance stopped at this gate. The expected derived/candidate hashes remain those
-in #1922/#1923; neither was reproduced in this run. Reattach the original and hash its immutable
-bytes before any preparation. No earlier test-profile result closes this production-profile gate.
+The previously missing attachment was supplied on October 27, 2026. Its **original bytes were hashed
+before decoding or derivation**, matched exactly, and remain unchanged, private and uncommitted.
+The existing reviewed `build/sql-confinement/prepare-authoritative-fixture.py` reproduced both
+reviewed receipts before any SQL execution:
 
-### Actual Maven and Boot results
+| Artifact | Bytes / SHA-256 |
+| --- | --- |
+| `shale-schema-source.sql` | 728,862 bytes; `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda` |
+| Reviewed derived schema | `40a665caefb3203a6c364d0caac3fadcc1a58d24a66a994f48e058b73ae6f243` |
+| Reviewed three-FILTER candidate | `4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f` |
 
-The first `mvn -B -pl shale-server -am test` failed because the command sandbox denied the configured
-proxy socket. A network-permitted connectivity check succeeded. The one dependency-resolution retry,
-`mvn -U -B -pl shale-server -am test`, resolved dependencies and reached the real compiler. It exposed
-`McpCaseCompositionTest.java:41: void cannot be dereferenced`: the Spring 7 MockEnvironment setter
-cannot be chained. Splitting those calls fixed compilation without changing production behavior.
-No dependency version, migration or confinement implementation was redesigned.
+Both task-owned SQL containers were removed after exact-label ownership checks at completion.
+The original attachment and private scratch inputs remain uncommitted.
 
-Actual Maven 3.9.11 / JDK 21.0.12.1 / Spring Boot 4.1.1 compilation and the following checks passed:
+No schema reconstruction or substitute Case model was used. The candidate contains 96 tables,
+five functions, three schemas, 208 indexes and 1,142 ALTER TABLE batches. Authoritative tests use
+nonce-owned databases/logins on task-owned SQL Server Developer containers pinned to
+`mcr.microsoft.com/mssql/server@sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`.
+Only synthetic data was seeded. Production-mode fixture connections require encrypted JDBC with
+certificate validation and a trusted task-owned certificate for `localhost`; the production Case
+pool also uses the normal protected datasource constructors. No production datasource was contacted.
 
-| Executed group | Passed | Failures/errors | Reported skips |
+## Verification-discovered defect and fix
+
+The first actual Maven build exposed a test compilation error: Spring 7's `MockEnvironment.setProperty`
+returns void and cannot be chained. That test was corrected. Maven 3.9.11, JDK 21.0.12.1 and Boot 4.1.1
+then compiled the candidate and ran actual tests; isolated javac is not used as acceptance evidence.
+The original network failure was a command socket permission issue; the concrete permission fix
+resolved dependency acquisition. Repository policy disables GitHub Actions testing, which was not used.
+
+A later live adversarial test found a production attestation defect: `GRANT SELECT ON dbo.Cases TO public`
+gave the catalog verifier real Case visibility while readiness still returned `ready`. The AI principal's
+own role DENY continued to reject its direct Case read, so inspecting only the AI token was insufficient.
+The failing assertion was **expected `not-ready`, actual `ready`**.
+
+`AiCaseDataAttestation` now inspects the verifier's inherited public grants in production mode. It rejects
+application reads/EXECUTEs, schema/database authority and grant options outside the metadata allowlist.
+Engine-owned system metadata/context facilities remain allowed; hidden negative-ID compatibility
+catalog views are recognized only as system SELECTs. Unknown application grants fail closed. The exact
+verifier token, its own direct grants, server grants and ownership checks remain in force. No SQL
+migration, grant installation, receipt, historical module, role definition or dependency changed.
+
+The fixed full Boot test proves actual excess verifier visibility during the injected fault, fresh
+`not-ready`, and fresh `ready` after removal. A separate real serving test proves a valid ACCESS gets
+401 while that drift exists, no protected output, then successful discovery after restoration.
+The legacy-authority sentinel remains uncalled when the confined boundary is unavailable.
+
+## Executed evidence
+
+Exact argv, source hashes, per-class counts, schema receipts, client vector results and resolved failed
+attempts are recorded in [the verification JSON](production-mcp-case-composition-verification.json).
+Counts overlap; they must not be added as unique coverage. A class with zero tests under a disabled SQL
+opt-in is **NOT RUN**, even if Surefire reports zero skips.
+
+The final source is code commit `7225815414b82a12b3a79345efd4e1c1d09001f8`. All counts below
+were executed after the inherited-permission fix; pre-fix passes are not used to close its acceptance.
+
+| Executed group | Passed | Failures/errors | Skipped |
 | --- | ---: | --- | ---: |
-| Composition/policy/readiness/logging, actual production OFF Boot, handler/filter/OAuth configuration | 28 | 0/0 | 0 |
-| Existing Case security/transport/disclosure contracts | 90 | 0/0 | 0 |
-| Ordinary JDBC-binding/auth/Case REST/session regressions | 55 | 0/0 | 0 |
+| Authoritative SQL confinement/parity/attacks, including inherited verifier grant regression | 27 | 0/0 | 0 |
+| Production-profile readiness/ordinary Boot, OAuth lifecycle, both expiry clients, TLS and full client corpus wrappers | 19 | 0/0 | 0 |
+| Isolated TEST-profile OAuth/legacy-refusal and both confined clients | 19 | 0/0 | 0 |
+| Actual Spring composition matrix, production OFF Boot and focused configuration | 29 | 0/0 | 0 |
+| Case security/transport/disclosure contracts | 90 | 0/0 | 0 |
+| Ordinary JDBC/auth/Case REST/session regressions | 55 | 0/0 | 0 |
 | Desktop/HTTP/session regressions | 58 | 0/0 | 0 |
-| OAuth profile/assertion/metadata policy regressions | 20 | 0/0 | 0 |
-| Selector affected cases/security-data/server suite | 184 | 0/0 | 0 |
-| Critical reactor, once after verification fixes, all seven modules | 225 | 0/0 | 0 |
+| OAuth policy/assertion/metadata regressions | 20 | 0/0 | 0 |
+| Affected cases/security-data/server suite | 185 | 0/0 | 9 |
+| Critical reactor, once after final source fix, all seven modules | 226 | 0/0 | 0 |
 | Selector Python | 27 | 0/0 | 0 |
 
-Counts overlap and are not additive unique coverage. Opt-in `AiSecurityLocalSqlServerTest`,
-`AiCaseDataLocalSqlServerTest` and `OAuthAuthorizationFlowTest` reported zero executed tests where
-selected; they are explicitly **NOT RUN**, even though Surefire reports zero skips for those empty
-class suites. No SQL opt-in was supplied. Zero execution is never passing authoritative/OAuth SQL proof.
-Exact argv, per-class counts and verified source hashes are in the
-[resumed verification JSON](production-mcp-case-composition-verification.json).
-No isolated javac result is used to claim Maven/Boot completion. GitHub Actions testing remains disabled
-by repository policy; its only workflow deploys static web assets and was not used as a build fallback.
+The 46-test authoritative reactor contains the first two rows. Its 19 production cases include
+12 durable OAuth cases, one full Boot readiness/ordinary case, two official-client expiry cases,
+and four finished-serving cases (two client matrices, TLS, inherited-authority denial).
+TypeScript and Python each passed **66/66 vectors**. TLS/proxy passed **20/20 checks**; the 0 status
+entries in its receipt mean refused TLS handshakes, not HTTP success. Ordinary full Boot/SQL smoke
+passed **23/23 HTTP checks with AI OFF and 23/23 after readiness alone**.
 
-### Production OFF and readiness scope
+The affected suite's nine skips are eight opt-in Phase3B.7 cases plus one production readiness case;
+its normal selector invocation deliberately supplies no SQL opt-in. No skip or zero-test SQL suite is
+counted as passing SQL evidence. Mandatory production cases were explicitly executed in the separate
+zero-skip authoritative run. Unselected historical frozen/modern conformance/performance cases are
+not represented as fresh evidence; existing Phase3B.7 closeout retains its original scope.
 
-New `McpProductionOffBootTest` starts the actual `ShaleServerApplication` and embedded HTTP server
-under **azure and prod**, PRODUCTION identity, all eight AI/OAuth/readiness/handler switches false,
-and no AI/verifier/bootstrap configuration. The two cases pass with real ordinary bearer/session/
-remembered-store beans, DB-free health 200, ordinary protected-route 401, and MCP/OAuth routes 404.
-There is no McpAiCaseData, AI pool, Case handler, MCP servlet, OAuth bootstrap or legacy MCP
-access-authenticator bean. Ordinary pools use isolated closed-loopback destinations; no successful
-SQL-backed ordinary workflow is claimed by this startup check.
+## What the production proofs exercise
 
-The actual Spring composition tests pass their shared-policy control matrix, isolated test mode,
-production missing-setting and ambiguity cases, readiness-only mocked wiring and handler refusal on
-attestation failure. New readiness log coverage emits exactly the three closed state strings and
-no Throwable/diagnostic payload, never authenticates a bearer or invokes a Case reader, and confirms
-fresh failure replaces prior success. This is **unit/wiring evidence**, not live SQL readiness.
+- Full `ShaleServerApplication` Boot startup under both `azure` and `prod`, PRODUCTION identity,
+  all eight controls OFF and no AI settings: ordinary real beans and routes remain available;
+  no AI pool/boundary, handler, MCP servlet, OAuth issuance/bootstrap or legacy authenticator.
+- Actual Spring registration for all 32 control masks under each production profile, plus isolated
+  `test`/TEST composition. Production transport, search and Overview use the same policy. Mixed
+  profiles, invalid/noncanonical/HTTP identities and incomplete dedicated settings fail their guards.
+- Full Boot readiness under `azure`/PRODUCTION with only Case composition enabled; SQL global and
+  tenant capability OFF; normal independent AI, verifier and bootstrap datasources; immutable
+  database/issuer/resource/timezone binding; live SID/token/authority attestation. MCP, handlers and
+  OAuth issuance remain absent. Readiness is fresh, closed and data-free.
+- Actual restricted AI login denials: Cases/control/credential SELECT, forged tenant/user context,
+  direct PHI INSERT, all 42 legacy EXECUTEs, impersonation, DDL, policy/role changes and an actual
+  cross-database read against a separate owned marker database. A successful statement followed by
+  rollback is never counted as denial.
+- Verifier token exactly own SQL user + public + `AiCaseDataCatalogVerifier`; approved metadata-only
+  server permissions; SID different from AI/auth/runtime/bootstrap; no ordinary Case/PHI/credential/
+  control read or application EXECUTE. Wrong database/binding, reused SIDs, excess direct grants and
+  inherited public Case grants remove readiness. Ordinary auth/runtime may share a SID; bootstrap
+  and verifier may not reuse that SID or each other's SID.
+- Real production-profile confined serving, both unchanged tools, no `mcpAccessAuthenticator` under
+  production profiles. Deliberate boundary unavailability returns `not-ready`/401 with no disclosure
+  or call to the injected legacy fallback sentinel.
+- Both official clients: catalog and exact two-tool contract; search success/zero/paging/literal/
+  Unicode/invalid input; same-tenant/unassigned/foreign/missing/deleted Overview; expired/revoked/
+  reduced/live authority; all maintained audit/commit/close/cancellation/timeout/privacy vectors.
+  Client versions are TypeScript `@modelcontextprotocol/client` 2.4.0 and Python `mcp` 2.3.0.
+- Both official clients' final-handoff race uses the existing deterministic SQL lock drill, crosses
+  DB-UTC expiry while blocked, samples DB UTC after required locks and denies protected output.
+- Real task-owned Caddy 2.11.7 TLS proxy: trusted certificate and canonical hostname; wrong hostname
+  and untrusted certificate rejected; canonical issuer/resource metadata despite hostile Host,
+  Forwarded and X-Forwarded headers; exact Origin and near-match denials; permitted nonbrowser
+  missing Origin; protected Overview; HTTP redirects even for credential-bearing MCP/OAuth requests.
+  This proves local proxy behavior, not deployed Azure ingress parity.
+- Twelve production-identity durable OAuth tests: S256 authorization code, public client none,
+  confidential pinned RS256 private_key_jwt, exact redirect/issuer/resource, single-use code/JTI,
+  refresh rotation/reuse family revocation, revocation and unsupported-grant/ordinary-bearer refusal.
+- Real Boot/SQL ordinary smoke with all AI OFF, then readiness alone: 23 HTTP checks in each state
+  for WEB login/identity/refresh/logout, remembered DESKTOP rotation/replay/logout, Case REST search/
+  Overview and closed foreign/missing/deleted results. Existing ordinary/client/session regressions
+  run separately. These are protocol/service regressions, not an interactive browser/JavaFX GUI run.
 
-### Remaining mandatory acceptance
+## Reproduction and scope
 
-The authoritative attachment gate leaves all of these **NOT RUN**:
+Use the original hash-gated attachment and the reviewed preparer; point `SHALE_CASE_VERIFY_SCHEMA`
+and `SHALE_CASE_VERIFY_SCHEMA_SHA256` at the verified candidate above. Set the explicit
+`SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI`, task-owned loopback SQL port and synthetic owner password
+through a private environment/secure prompt. Never substitute a production URL/login. Install the
+repository's Node dependencies and `mcp==2.3.0` in the task-owned `work/mcp-clients` venv; place the
+reviewed Caddy executable at `work/phase3b7/caddy`.
 
-- Real readiness-only production Boot, restricted AI/verifier/bootstrap identities, immutable
-  deployment binding and SQL global/tenant capability OFF.
-- Production-profile/PRODUCTION-identity positive Case serving and actual absence of fallback under
-  confined SQL failure; completed production-specific serving harness evidence.
-- Actual restricted AI and verifier SID/token/effective-permission proofs, all #1922 direct attacks,
-  ownership/escalation/cross-database denials and catalog drift injection.
-- Post-lock DB-UTC final-handoff expiry through both official clients.
-- Full TypeScript/Python production-like corpus: **0 executed for each client** in this resume.
-- Real verified TLS/proxy/Host/Forwarded/Origin and canonical metadata/protected Overview.
-- Production-like durable OAuth SQL lifecycle/replay/rotation/revocation, and successful ordinary
-  database-backed flows plus the after-live-readiness ordinary smoke.
+Production acceptance additionally requires a locally trusted SQL TLS certificate with DNS SAN
+`localhost` (and the existing ordinary-pool certificate name `*.database.windows.net`), its root in the test JVM's truststore, and `-Dshale.acceptance.production=true` on the
+recorded Maven commands. That switch changes only opt-in test fixtures to profile `azure`, identity
+PRODUCTION and canonical `https://shale.example`; it is not an application activation setting.
+Production-mode fixture JDBC uses `trustServerCertificate=false`. The original TEST-mode SQL fixtures
+retain their explicitly local setup behavior and are not used as production TLS proof. Ephemeral proxy
+certificates are trusted explicitly by the test trust manager with hostname checks enabled; negative
+trust and hostname checks must fail. There is no TLS trust-all client or forwarding-header authority.
 
-No SQL file or migration changed; no production source changed during this resume. This is still
-**BLOCKED**, not READY or a completed production acceptance. Legal/SDK/operator/tenant-owner and the
-remaining Category B live/deployment gates stay OPEN. No production/Azure SQL, Azure changes,
-JAR deployment, real enablement or production credentials. Packaged defaults remain OFF.
+The shared 66-vector client corpus runs on the private loopback serving listener; the separate real
+TLS/proxy suite proves canonical TLS serving with a protected Overview. The production readiness Boot
+proof uses the actual property-based pool factory, while the serving fixture supplies real confined
+SQL sources to the same boundary and transport. No mocked SQL attestation is counted as live proof.
 
 ## Original blocker and changed boundary
 
@@ -157,58 +234,21 @@ Pre-edit searches covered all callers of `mcpAiCaseData`, `mcpSearchHandler`, `m
 | Missing datasource settings and no pool allocation | New missing-property matrix; existing `DataSourcesAiCaseDataTest` |
 | Actual SID separation and drift | New disposable `AiCaseDataLocalSqlServerTest` method; existing authoritative denial/parity/expiry tests |
 | OAuth and ordinary callers | `OAuthConfigurationTest`, `OAuthAuthorizationFlowTest`, existing WEB/DESKTOP/session suites |
-| Serving bounds, final handoff, clients, TLS | Existing #1922/#1923 serving/client/TLS suites; fresh production-profile proof still required |
+| Serving bounds, final handoff, clients, TLS | Existing #1922/#1923 serving/client/TLS suites; production-profile proofs described above |
 
-The mocked production context test proves wiring only. It does not prove SQL confinement, actual
-production-like credentials/TLS, client interoperability or authoritative acceptance.
+Mocked wiring remains supplemental; the real SQL/Boot/serving proofs above supply live evidence.
 
-## Historical initial candidate execution limits
+## Audit compatibility and gates remaining OPEN
 
-The exact signed base commit/tree and source blobs were recovered through the GitHub connector
-because the executor's shell proxy was unavailable. All source and binary blobs were verified against their original Git object IDs.
-The original checkout is preserved.
+Readiness/attestation reads only identity/catalog/reference state and adds no PHI/entity audit event.
+Existing Overview PHI, integration parent/resource audit, quota and final-handoff behavior is unchanged;
+no audit schema or migration is added. Fault-injected synthetic Case visibility is counted, never exported.
 
-The focused Maven command fails before compilation because the required
-`spring-boot-dependencies:4.1.1` POM is absent and outbound Maven access is denied.
-Offline compilation fails for the same absent dependency. Docker socket access is denied and
-the private hash-gated authoritative schema is not mounted. No SQL/client/expiry/TLS production-like
-run can be claimed. Existing #1923 results retain their original test-profile/local scope only.
+Tenant/legal retention sign-off, **SDK 2.2.0-M1 production approval**, and security/operator/tenant-owner
+pilot authorization remain OPEN. Actual Azure SQL/platform/catalog/Stage A/B/owner/collation/JAR/caller
+parity, deployed TLS/proxy, monitoring/capacity/restart/failover and remaining Category B/R4/live gates
+remain OPEN. Local acceptance does not approve deployment, activation or production principal provisioning.
 
-**Required before this candidate is accepted:** resolve the local dependency/runtime/fixture setup,
-compile and run the added policy/context/readiness tests; then execute actual production-profile,
-PRODUCTION-identity authoritative composition, all #1922 attacks, final-gate expiry, both clients
-(including missing/deleted/revoked/expired/scope-reduction cases), local verified TLS/proxy and
-ordinary regressions; run the affected suites and critical reactor once. Skips are not passes.
-The production-specific serving/TLS harness work is not represented as finished by mocked wiring.
-
-Available checks: selector Python **27 PASS** after the test inventory update; isolated compilation
-and execution of the actual policy/properties against cached Spring 6 APIs **131 assertions PASS**;
-JDK 21 isolated compilation of `AiCaseDataAttestation`/`AiSql`/`UtcJdbcTimestamp` PASS. These are
-supplemental checks, not a Boot 4 build or SQL proof. Focused, affected and critical Maven attempts
-all stop at dependency resolution before any Java test runs; their passing-test count is zero.
-The selector chooses cases/security-data/server and includes the new composition test in both
-affected and critical inventories. Diff/defaults/SQL-history/relative-link static checks PASS.
-
-Commands executed:
-
-```
-mvn -o -B -pl shale-server -am -DskipTests compile
-mvn -B -pl shale-server -am -Dtest=McpCaseCompositionTest,McpSearchTest,McpOverviewTest,McpFilterIsolationTest,OAuthConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test
-python3 build/test-selection/select_tests.py --base b990a09212b9e5872858005e9385d4a2b0539c9f --head HEAD --format json --output /workspace/work/production-selection.json
-# The emitted selected_maven_batches argv was attempted with mvn -o -B; dependency failure.
-mvn -o -B test
-python3 -m unittest discover -s build/test-selection -p 'test_*.py'
-git diff b990a09212b9e5872858005e9385d4a2b0539c9f HEAD --check
-```
-
-## Audit compatibility and remaining gates
-
-Read-only readiness/attestation has no Case read or application mutation and adds no PHI/entity
-audit event. Existing Overview PHI and integration parent/resource audit behavior is unchanged.
-No audit schema or migration is added. Runtime permission and actual principal review remain required.
-
-Tenant/legal retention sign-off, SDK 2.2.0-M1 production approval, security/operator/tenant-owner
-pilot authorization, actual Azure SQL platform compatibility, deployed catalog/Stage A/B/owner/
-collation/JAR/caller parity, public ingress, monitoring/capacity/restart/failover and R4/live gates
-remain OPEN. No production/Azure SQL, Azure change, deployment, credential issuance, real tenant/
-integration enablement or installer/version publication is performed. Packaged defaults remain OFF.
+No production/Azure SQL, Azure configuration change, JAR deployment, production credential issuance,
+real tenant/integration enablement, production DNS/proxy/certificate change or installer/version publication was
+performed. All packaged AI/OAuth/MCP/readiness/handler activation defaults remain OFF.
