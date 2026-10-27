@@ -37,6 +37,31 @@ class McpCaseCompositionTest {
         }
     }
 
+    @Test void productionControlMatrixUsesActualSpringHandlerRegistration() {
+        for(String profile:List.of("azure","prod"))for(int mask=0;mask<32;mask++) {
+            var properties=new HashMap<String,Object>();
+            String[] flags={GLOBAL,TRANSPORT,McpCaseCompositionPolicy.COMPOSITION,SEARCH,OVERVIEW};
+            for(int bit=0;bit<flags.length;bit++)properties.put(flags[bit],(mask&(1<<bit))!=0);
+            properties.put("shale.ai.oauth.public-origin","https://shale.example");
+            boolean transport=(mask&2)!=0,common=(mask&7)==7;
+            if(transport&&!common) {
+                assertThrows(RuntimeException.class,()->context(profile,properties,mock(McpAiCaseData.class)),"Incomplete production transport must refuse Spring composition");
+            } else try(var context=context(profile,properties,mock(McpAiCaseData.class))) {
+                assertEquals(common&&(mask&8)!=0, !context.getBeansOfType(McpSearchHandler.class).isEmpty());
+                assertEquals(common&&(mask&16)!=0, !context.getBeansOfType(McpOverviewHandler.class).isEmpty());
+                assertEquals(transport,context.containsBean("mcpServlet"));
+                assertFalse(context.containsBean("mcpAccessAuthenticator"));
+            }
+        }
+        try(var context=context("test",Map.of(GLOBAL,true,TRANSPORT,true,SEARCH,true,OVERVIEW,true,
+                "shale.ai.oauth.public-origin","https://shale.test","shale.ai.oauth.identity","TEST",
+                "shale.ai.oauth.bootstrap.jdbc-url","jdbc:sqlserver://127.0.0.1:1;databaseName=unused",
+                "shale.ai.oauth.bootstrap.username","unused","shale.ai.oauth.bootstrap.password","unused"),mock(McpAiCaseData.class))) {
+            assertEquals(1,context.getBeansOfType(McpSearchHandler.class).size());
+            assertEquals(1,context.getBeansOfType(McpOverviewHandler.class).size());
+        }
+    }
+
     @Test void isolatedTestCompositionIsPreservedAndAmbiguousProfilesAreRejected() {
         var env=environment("test");
         env.setProperty(GLOBAL,"true");env.setProperty(TRANSPORT,"true");env.setProperty(SEARCH,"true");

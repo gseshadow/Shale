@@ -57,6 +57,23 @@ public final class AiCaseDataAttestation {
                 try(var s=statement(review);var r=s.executeQuery("SELECT name FROM sys.login_token")) {
                     while(r.next())if(!Set.of(catalogIdentity.login(),"public").contains(r.getString(1)))throw refused();
                 }
+                // Exact verifier role/own grants do not exclude authority inherited through public.
+                // Keep ordinary system metadata/context facilities, but refuse application reads,
+                // EXECUTEs, schema/database authority and every public grant option. Negative
+                // system IDs include engine compatibility catalog views absent from sys.all_objects.
+                try(var s=statement(review);var r=s.executeQuery("""
+                        SELECT COUNT(*) FROM sys.database_permissions p
+                        LEFT JOIN sys.all_objects o ON p.class=1 AND o.object_id=p.major_id
+                        WHERE p.grantee_principal_id=DATABASE_PRINCIPAL_ID('public') AND p.state IN('G','W')
+                          AND (p.state='W' OR NOT(
+                            p.class=0 AND p.permission_name IN('CONNECT','VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION')
+                            OR p.class=1 AND p.permission_name IN('SELECT','EXECUTE','VIEW DEFINITION')
+                              AND OBJECT_SCHEMA_NAME(p.major_id) IN('sys','INFORMATION_SCHEMA')
+                              AND (COALESCE(o.is_ms_shipped,0)=1 OR p.major_id<0 AND p.permission_name='SELECT')
+                            OR p.class IN(1,3) AND p.permission_name='VIEW DEFINITION'))
+                        """)) {
+                    if(!r.next()||r.getInt(1)!=0)throw refused();
+                }
                 try(var p=review.prepareStatement("SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND state IN('G','W') AND NOT(class=0 AND permission_name='CONNECT' AND state='G')")) {
                     p.setQueryTimeout(3);p.setInt(1,catalogIdentity.userId());
                     try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
