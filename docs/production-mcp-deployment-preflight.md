@@ -1,10 +1,11 @@
 # Production MCP deployment preflight
 
 This is a future governed sequence, not execution authorization. The production composition's
-[mandatory local acceptance passed](testing/production-mcp-case-composition.md), including the
-verification-discovered inherited-verifier-authority fix. Classification is **READY FOR GOVERNED
-DEPLOYMENT**, subject to the remaining operator/platform/legal/SDK/pilot gates below. No deployment,
-production SQL, principal provisioning or activation is authorized by that local result.
+[prior SQL Server local acceptance passed](testing/production-mcp-case-composition.md), including the
+inherited-verifier-authority fix. The [Azure SQL Database successor](testing/azure-sql-case-attestation.md)
+is currently **BLOCKED pending actual SQL/Azure acceptance**. Do not apply the prior platform-limited
+READY classification to this unverified successor. No deployment, production SQL, principal
+provisioning or activation is authorized by either local result.
 
 ## Configuration and safe deployment state
 
@@ -39,6 +40,36 @@ Readiness uses read-only SQL catalog/reference/identity queries, not Case data o
 
 ## Stage 0 Read only inventory
 
+The [Azure attestation contract](architecture/azure-sql-case-attestation.md) replaces the invalid
+SQL Server/MI-only platform assumption. Its current acceptance is **BLOCKED pending live evidence**;
+Azure SQL Database is not intrinsically a blocker. Unknown/unsupported engines always STOP.
+
+Run the bounded read-only platform dispatcher using an already authorized operator connection:
+
+```bash
+sqlcmd -S "$SQL_SERVER" -d "$SQL_DATABASE" -U "$SQL_INVENTORY_USER" -N -b -l 5 -t 15 -i docs/sql/ai-integration/stage0-platform-verify.sql
+```
+
+Supply the password through the approved secure prompt/secret mechanism, never a command argument.
+Certificate validation stays enabled (no `-C`). This command is an operator recheck instruction;
+it was not run on production by this change.
+
+| Positive engine detection | Required verifier |
+| --- | --- |
+| EngineEdition 5 | `azure-sql-stage0-verify.sql`, dispatched automatically; no server permission/principal/endpoint/login-token query |
+| EngineEdition 8 | Managed Instance server catalog verifier branch |
+| EngineEdition 2, 3, 4 | Supported SQL Server server catalog verifier branch |
+| NULL / any other edition | STOP |
+
+The Azure script requires existing CONTROL DATABASE operator visibility **only for this read-only
+inventory**, including scoped credentials. Never grant it to the application/verifier. It returns
+one bounded count/status row; zero external sources/tables/scoped credentials/synonyms/cross-database
+dependencies/unsafe ownership routes/unexpected public grants is required. Missing visibility stops.
+Names, credential identities/locations, PHI and secrets are never output. A platform-compatible
+result is not migration, identity, catalog, readiness or disclosure acceptance. The existing general
+inventory below and all later independently authorized stages remain required.
+
+
 **READ ONLY — SAFE PREFLIGHT.** Establish actual engine/edition, database/login/user, NULL application
 context, migration/source/catalog receipts, roles and effective permissions; inventory Cases, Users,
 auditLog and Statuses predicates, owners/triggers/constraints and enabled capability/tenant counts.
@@ -65,12 +96,17 @@ Its early return means separate state and actual-login permission checks remain 
 ## Stage 2 Restricted identities and immutable binding
 
 **DO NOT RUN — FUTURE SQL CHANGE.** After SQL verification, separately provision SQL-authenticated AI
-and catalog identities. AI membership is own SQL user/public/AiCaseDataRuntime only, with the six exact
+and catalog identities. On EngineEdition 5 use dedicated database-contained users (type S,
+authentication_type 2), independent secrets and explicit target database; no server login/master
+user or server role. Login-mapped and external/group AI/verifier identities fail closed. AI membership is own SQL user/public/AiCaseDataRuntime only, with the six exact
 role EXECUTEs and no direct data/PHI/legacy EXECUTE/impersonation/DDL/grant authority. Catalog membership
 is own SQL user/public/AiCaseDataCatalogVerifier, with the existing definition/dependency/four reference
-table permissions and separately governed server VIEW ANY DEFINITION/VIEW ANY DATABASE. No broad roles.
-The actual Azure SQL edition must support the exact current server/catalog attestation model; otherwise
-stop for architectural review. Do not invent alternate broad grants.
+table permissions. SQL Server/MI additionally need separately governed server VIEW ANY
+DEFINITION/VIEW ANY DATABASE. Azure SQL Database uses the reviewed contained-principal and
+database-scoped contract; no server metadata grant or broader role compensates for missing catalogs.
+Confirm independent secret consumers and the Stage 0 scoped-credential inventory. After provisioning,
+run the explicit live read-only Azure attestation gate documented in the acceptance record. A local
+SQL Server run cannot close it.
 Provision exactly one AiCaseDataDeployment row with Id 1, case-read-v1, canonical issuer/resource and
 the actual existing JVM/SQL time-zone mapping. It is immutable; do not guess UTC or update a binding.
 Verify the real AI login's tokens, column permissions, six EXECUTEs, 42 denials, no ownership, cross-DB

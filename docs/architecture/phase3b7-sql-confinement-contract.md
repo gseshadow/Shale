@@ -7,6 +7,11 @@ SQL confinement and expiry serving are FIXED at that recorded local scope; broad
 
 **Historical design-review classification: `3B.7 FAILED / Phase 3B IN PROGRESS`.** No migration, runtime change, production SQL, deployment, or real tenant/integration enablement is authorized here. Implementation and adversarial evidence are prerequisites to FIXED. Every name introduced below is proposed, not an installed database object.
 
+Azure SQL Database successor contract: [platform/principal mapping](azure-sql-case-attestation.md).
+The original server-login checks below remain the SQL Server/MI branch; Azure requires the explicit
+contained-principal equivalent and its separate live acceptance gate. No original local receipt
+establishes Azure platform acceptance.
+
 ## Decisions and scope
 
 Adopt a dedicated `AiCaseDataRuntime` database role and independently credentialed AI datasource. Use the application-computed existing SHA-256 ACCESS digest as a bearer-equivalent secret, validated inside every protected procedure. SQL owns AI Case reads, quota admission, and transactional audits. Retain ordinary Java Case queries under **Strategy B**, with mandatory executable parity coverage. A fresh proof-validating, data-free post-commit handoff check remains mandatory.
