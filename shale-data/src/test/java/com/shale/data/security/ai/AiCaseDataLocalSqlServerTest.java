@@ -61,7 +61,16 @@ class AiCaseDataLocalSqlServerTest {
             sql(c,"DROP DATABASE ["+db+"]");db=null;
         }
     }
-    @AfterAll void removeIdentities()throws Exception {if(prefix!=null)try(var c=owner("master")){for(String role:secrets.keySet())sql(c,"DROP LOGIN ["+prefix+"_"+role+"]");}}
+    @AfterAll void removeIdentities()throws Exception {if(prefix!=null)try(var c=owner("master")){for(String role:secrets.keySet()) {
+        // PolyBase can retain a metadata connection in master after its source is dropped.
+        // Drain only this fixture's exact nonce login, including those pooled sessions.
+        var sessions=new ArrayList<Integer>();
+        try(var p=c.prepareStatement("SELECT session_id FROM sys.dm_exec_sessions WHERE original_login_name=? AND is_user_process=1 AND session_id<>@@SPID")) {
+            p.setString(1,prefix+"_"+role);try(var r=p.executeQuery()){while(r.next())sessions.add(r.getInt(1));}
+        }
+        for(int session:sessions)sql(c,"KILL "+session);
+        sql(c,"DROP LOGIN ["+prefix+"_"+role+"]");
+    }}}
 
     @Test void productionInfrastructureRequiresSeparateCatalogAndBootstrapSids() {
         assertDoesNotThrow(()->new AiCaseDataAttestation(source("ai"),source("catalog"),
@@ -133,6 +142,48 @@ class AiCaseDataLocalSqlServerTest {
         try(var c=owner(db)){sql(c,"CREATE SYNONYM dbo.AttestationSynonym FOR [UnrelatedDatabase].dbo.AttestationProbe");}
         try{try(var c=source("catalog").getConnection()){assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.azureIsolation(c));}}
         finally{try(var c=owner(db)){sql(c,"DROP SYNONYM dbo.AttestationSynonym");}}
+        try(var c=source("catalog").getConnection()){AiCaseDataAttestation.azureIsolation(c);}
+    }
+
+    @Test void azureStructuralInventoryRejectsExplicitDatabaseDependency()throws Exception {
+        // Actual shared SQL catalogs, not a claim about Azure contained identities or visibility.
+        String marker=db+"_route";
+        try(var c=owner("master")){sql(c,"CREATE DATABASE ["+marker+"]");}
+        try {
+            try(var c=owner(marker)){sql(c,"CREATE TABLE dbo.AttestationMarker(Id int)");}
+            try(var c=owner(db)) {
+                sql(c,"CREATE VIEW dbo.AttestationCrossDatabase AS SELECT Id FROM ["+marker+"].dbo.AttestationMarker");
+                assertEquals(1,count(c,"SELECT COUNT(*) FROM sys.sql_expression_dependencies WHERE referencing_id=OBJECT_ID('dbo.AttestationCrossDatabase') AND referenced_database_name='"+marker+"'"));
+            }
+            try(var c=source("catalog").getConnection()){assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.azureIsolation(c));}
+        } finally {
+            try(var c=owner(db)){sql(c,"DROP VIEW IF EXISTS dbo.AttestationCrossDatabase");}
+            try(var c=owner("master")){sql(c,"DROP DATABASE ["+marker+"]");}
+        }
+        try(var c=source("catalog").getConnection()){AiCaseDataAttestation.azureIsolation(c);}
+    }
+
+    @Test void azureStructuralInventoryRejectsRealExternalTable()throws Exception {
+        try(var c=owner(db)) {
+            assertEquals(1,count(c,"SELECT CONVERT(int,SERVERPROPERTY('IsPolyBaseInstalled'))"),"Mandatory external-table fault requires the owned local PolyBase fixture");
+            sql(c,"CREATE TABLE dbo.AttestationMarker(Id int)");
+            sql(c,"GRANT SELECT ON dbo.AttestationMarker TO ["+prefix+"_runtime]");
+            sql(c,"CREATE MASTER KEY ENCRYPTION BY PASSWORD='"+UUID.randomUUID()+"aB9!'");
+            sql(c,"CREATE DATABASE SCOPED CREDENTIAL AttestationCredential WITH IDENTITY='"+prefix+"_runtime',SECRET='"+secrets.get("runtime")+"'");
+            // Local-only certificate trust override for SQLPAL's nested ODBC connector.
+            // This rejected route is not the validated production JDBC or serving TLS proof.
+            sql(c,"CREATE EXTERNAL DATA SOURCE AttestationExternal WITH(LOCATION='sqlserver://localhost:1433',CONNECTION_OPTIONS='Encrypt=Yes;TrustServerCertificate=Yes',CREDENTIAL=AttestationCredential)");
+            sql(c,"CREATE EXTERNAL TABLE dbo.AttestationExternalTable(Id int) WITH(LOCATION='"+db+".dbo.AttestationMarker',DATA_SOURCE=AttestationExternal)");
+            assertEquals(1,count(c,"SELECT COUNT(*) FROM sys.external_tables"));
+        }
+        try {
+            try(var c=source("catalog").getConnection()) {
+                assertEquals(1,count(c,"SELECT COUNT(*) FROM sys.external_tables"),"Verifier must see the real external table");
+                assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.azureIsolation(c));
+            }
+        } finally {
+            try(var c=owner(db)){sql(c,"DROP EXTERNAL TABLE dbo.AttestationExternalTable; DROP EXTERNAL DATA SOURCE AttestationExternal; DROP DATABASE SCOPED CREDENTIAL AttestationCredential; DROP MASTER KEY; DROP TABLE dbo.AttestationMarker");}
+        }
         try(var c=source("catalog").getConnection()){AiCaseDataAttestation.azureIsolation(c);}
     }
 

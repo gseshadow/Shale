@@ -2,7 +2,7 @@
 
 **Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL locally verified at #1922 recorded scope; Phase 3A security contract COMPLETE; Phase 3B COMPLETE at pre-deployment/local acceptance scope; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); 3B.7 COMPLETE (local/adversarial acceptance, §10.32); deployment/live gates OPEN; transport and both handlers default OFF.
 
-**Last reviewed:** 2026-10-26 (post-#1922 reconciliation; artifact recovered/hash-verified; confinement and expiry FIXED at recorded local scope; remaining local acceptance OPEN; defaults OFF)
+**Last reviewed:** 2026-10-28 (Azure successor: operator-reported production Stage 0 platform PASS; authoritative local/adversarial acceptance PASS; production identity/catalog attestation OPEN; deployment and pilot NOT AUTHORIZED; defaults OFF)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of
@@ -4371,3 +4371,48 @@ The fixed Boot and valid-ACCESS serving regressions remove readiness/deny disclo
 fault and require fresh attestation after restoration. No SQL migration or audit schema changed.
 Legal, SDK 2.2.0-M1, actual Azure/deployed parity and security/operator/tenant-owner approvals remain
 OPEN. No activation.
+
+
+### Azure SQL Database successor authoritative acceptance — 2026-10-28
+
+**READY FOR PRODUCTION IDENTITY/SQL DEPLOYMENT PREPARATION.** The current successor is based on
+merged #1925 (`a8b216f6cc89897121988c675b0ea58280a80cca`). The [acceptance record](../testing/azure-sql-case-attestation.md)
+and [machine receipt](../testing/azure-sql-case-attestation-verification.json) own the exact fresh commands,
+source/derived/candidate hashes, counts and remaining gates. Earlier platform-limited results retain
+their original scope.
+
+**PRODUCTION AZURE SQL PLATFORM STAGE 0: PASS** is operator-reported actual production evidence:
+edition 5, AZURE_SQL_DATABASE, all seven finding counts zero, status
+`PLATFORM_COMPATIBLE_PENDING_IDENTITY_AND_CATALOG_ATTESTATION`. The task made no production connection.
+This closes only the platform gate; it is not identity/catalog attestation or deployment authorization.
+
+The original 728862-byte authoritative schema matches SHA-256
+`4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda` and reproduces both reviewed fixtures.
+Fresh mandatory local/adversarial acceptance passes: 31 actual SQL confinement/security/parity cases
+and 19 production-profile Boot/OAuth/client/expiry/TLS/authority cases; both clients 66/66; TLS/proxy
+20/20; 42 independently injected authority faults remove readiness and deny discovery and protected
+Overview without disclosure. The two actual lock/expiry races preserve deadlines and proof lifetime.
+Focused regressions pass 45/45, affected has 137 passes with nine separately classified opt-in skips,
+critical passes 226/226, selector Python passes 27/27 and Boot packaging passes. Mandatory local
+acceptance itself has zero failures/errors/skips. Shared local external source/table/synonym/dependency
+catalog tests do not claim native Azure identity or visibility acceptance.
+
+The fresh driver-level run exposed a #1925 ownership-query defect: one placeholder was bound four
+times and subqueries used the verifier's token instead of each AI token. The correction restores four
+AI-token ownership/grant-option parameters while retaining independent verifier-token closure.
+Schema and role ownership faults for both identities are included in the passing Boot/HTTP matrix.
+No grant, role, receipt, module, proof/expiry policy or permission check was weakened.
+
+Production identity/catalog attestation remains **OPEN**: governed contained AI identity, contained
+verifier identity, bootstrap identity, independent secrets, exact database token/SID proof, complete
+live attestation, secret-consumer separation, immutable deployment binding and an authorized disposable
+Azure SQL mutation/fault fixture remain separate gates. No such Azure fixture was configured/authorized
+for this task, so its mutations remain a deployment gate. No production identities were provisioned.
+
+Audit compatibility retains the existing PHI/integration transaction and accounting contracts;
+data-free attestation adds no new audit event/schema. **No new SQL migration is required by this change**;
+any unapplied existing production migrations and identity/binding changes require a separately reviewed,
+governed proposal. This classification authorizes no production SQL/configuration/deployment action.
+**Production deployment: NOT AUTHORIZED. Pilot: NOT AUTHORIZED.** Existing legal, SDK,
+security/operator/tenant-owner and live deployment approvals remain independent. No production SQL,
+identity, Azure App Service setting, JAR or AI/MCP/OAuth capability was changed.

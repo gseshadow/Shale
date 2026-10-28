@@ -1,149 +1,193 @@
 # Azure SQL Database attestation acceptance
 
-Date: 2026-10-27. Base: `efd8be8a350523344bf69b72bbc715f9e888589d` (`codex/latest`, #1924).
-Branch: `codex/azure-sql-attestation`.
+Date: 2026-10-28. Base: `a8b216f6cc89897121988c675b0ea58280a80cca` (merged #1925).
+Branch: `codex/authoritative-acceptance-20261028`. Tested implementation: `61ec3bf59b2ae7ed67e5adec95fd7d7644e887e7`.
+Subsequent record-only edits leave the tested runtime and test source unchanged.
 
-**BLOCKED.** Implementation and structural acceptance do not yet prove all required Azure SQL
-security properties safely. The private authoritative source attachment is absent from this
-workspace, and no Azure acceptance credentials/fixture are configured. No historical #1922/#1924
-SQL/client result is presented as a fresh pass. Do not deploy or activate this candidate.
+**READY FOR PRODUCTION IDENTITY/SQL DEPLOYMENT PREPARATION**
 
-The [reviewed design candidate](../architecture/azure-sql-case-attestation.md) enumerates every
-current database/server check, reason, Azure replacement, preserved property, residual risk and
-required evidence. This change does not contact production or change SQL objects, production
-identities, Azure configuration, deployed JARs or capabilities. **No SQL migration required.**
-
-## Test-impact review before implementation
-
-Read the repository bootstrap/rules, confinement architecture, implementation and local closeout,
-production composition evidence, preflight, SQL migration/verifier, current attestation,
-`McpAiCaseData`, `McpCaseReadiness`, datasource/config and the related database/tenancy contracts.
-Repository-wide searches covered attestation callers, constructor shapes, server catalog fragments,
-tokens, receipts, public grants, datasource properties and readiness assumptions before edits.
-
-| Changed contract | Inspected/maintained test owners |
+| Independent gate | Current result |
 | --- | --- |
-| Positive engine routing, contained model, visibility/unknown/error refusal | New `AiCaseDataAttestationTest` (JDBC doubles, explicitly not Azure semantics) |
-| Public authority, role/direct grant/ownership and external catalog defense | `AiCaseDataLocalSqlServerTest`, expanded actual SQL fault cases; authoritative input still mandatory |
-| Immutable SQL/module/catalog/source receipts | `AiCaseDataMigrationContractTest`, unchanged expectations |
-| Production `not-ready` and every protected request withholding on public drift | `McpProductionReadinessLocalSqlServerTest`, `McpCatalogVerifierServingChecks`, expanded fault matrix |
-| Per-request attestation, pool separation, proof/handlers/OAuth | Existing datasource/access/proof/composition/search/Overview/filter/OAuth tests retained |
-| Live target-database Azure semantics | New explicit `AiCaseDataAzureSqlDatabaseReadOnlyTest`; never runs without opt-in |
-| Stage 0 dispatch/no persistent mutation/no secret surfaces | New focused script contract assertion, exact Azure batch embedded in dispatcher |
-| Affected-area selection | Add focused attestation class to security-data blocking inventory; selector Python retained |
+| Production Azure SQL Stage 0 platform | PASS — operator-reported live production evidence |
+| Authoritative local/adversarial acceptance | PASS — fresh owned local SQL, both clients and real TLS |
+| Production identity/catalog attestation | OPEN |
+| Production deployment | NOT AUTHORIZED |
+| Pilot | NOT AUTHORIZED |
 
-## Evidence and limits
+This permits preparation of a reviewable governed deployment proposal, not provisioning, migration,
+deployment, configuration changes or activation. No production connection or change was made by this task.
+The [preflight](../production-mcp-deployment-preflight.md) retains separate staged authorizations.
 
-Local SQL Server cannot emulate Azure server metadata availability, contained-user authentication,
-virtual-master visibility or logical-server role semantics by changing EngineEdition in a mock.
-The focused routing test proves that unsupported server catalogs are never called in the Azure
-branch and that incomplete metadata fails; it intentionally stops at a refused catalog receipt.
-It is not a full successful attestation or actual Azure permission proof.
+## Production Stage 0 platform evidence
 
-The shared structural helper test uses the separately hash-gated SQL Server fixture to reject an
-external BLOB source and an unresolved cross-database synonym without contacting either target.
-That test is present but **NOT RUN** here. It cannot establish Azure external-table visibility.
+**PRODUCTION AZURE SQL PLATFORM STAGE 0: PASS**
 
-Required actual-login attacks remain direct Case/join/credential/control reads; mutable/read-only
-SESSION_CONTEXT poison; direct PHI INSERT; all 42 legacy/private EXECUTEs; direct/schema/database/
-column/view/function/public grants and grant option; verifier public visibility and direct grants;
-ownership; impersonation; DDL; GRANT/CONTROL; and external/cross-database routes. New disposable tests
-add nine public application permission shapes, grant option, direct escalation grants for both
-identities, external-source and synonym faults. The production readiness/serving helpers inject
-eight public faults and require fresh `not-ready`/401 with no structured data, then recovery.
-These are **unexecuted attack expectations**, not results. Existing final-handoff code is unchanged.
+The existing authorized operator reported manually running this command against actual production `Shale`:
 
-No production permission injection is authorized or needed for read-only platform acceptance.
-Azure privilege-fault tests require a separately owned disposable Azure database, synthetic data,
-independent users and the exact authoritative fixture. Never enable local owner/fault harnesses on
-production. This candidate does not claim such an Azure mutation fixture was provisioned.
-
-The fresh commands/results are recorded below and in the [verification JSON](azure-sql-case-attestation-verification.json). Counts overlap and are not additive. The tested source is `09f2593f42958c130e21cb224d7ef97a708271bc`; subsequent receipt-only edits do not change that implementation. Maven uses task-owned Maven 3.9.11/JDK 21, an
-explicit workspace-local repository/proxy settings file and the system CA truststore. TLS remains
-validated. The normal command prefix below is `mvn -B`; actual launcher/setup paths are private
-scratch, not deployment dependencies. Skips/zero-test SQL classes are never counted as acceptance.
-
-| Command / group | Fresh result |
-| --- | --- |
-| `mvn -B -pl shale-server -am -DskipTests package` | PASS; includes Boot executable JAR compilation/repackage, no deployment |
-| `mvn -B -pl shale-data -am -Dtest=AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataAccessTest,ProofDigestTest,DataSourcesAiCaseDataTest -Dsurefire.failIfNoSpecifiedTests=false test` | 16 PASS, 0 failures/errors/skips |
-| Focused server command: same data tests plus `McpCaseCompositionTest,McpSearchTest,McpOverviewTest,McpFilterIsolationTest,OAuthAuthorizationFlowTest,OAuthConfigurationTest` with `-pl shale-server -am` | 43 PASS, 0 failures/errors/skips across data/server; opt-in OAuth SQL methods produce no live proof |
-| Selector affected command | 137 PASS, 2 explicit live-gate skips, 0 failures/errors (139 run) |
-| `mvn -B test` critical reactor | 226 PASS, 0 failures/errors/skips; all seven modules SUCCESS |
-| `python3 -m unittest discover -s build/test-selection -p 'test_*.py'` | 27 PASS after final selector inventory/source changes |
-| Authoritative Case/security, expanded live inherited faults, production Boot/SQL, final-handoff expiry, TypeScript 66/66, Python 66/66, TLS/proxy, durable SQL OAuth lifecycle | **NOT RUN**; missing original private schema input; no replacement/synthetic Case schema invented |
-| Azure SQL live read-only platform gate / production Stage 0 | **NOT RUN**; no configured authorized target connections |
-
-Resolved setup/failed attempts are not passing evidence: initial shell fetch needed the permitted
-network execution path; Maven needed workspace-local cache/proxy configuration, a full JDK rather
-than the installed JRE, and the system CA store. The first static Stage 0 privacy assertion also
-incorrectly matched a comment saying no locations are emitted; the complete test was reviewed and
-changed to inspect executable SQL. The corrected test passes in the final focused/affected runs.
-
-The selector recommends informational `mvn -Pall-tests test` solely because its inventory changed.
-That optional historical suite was not run; it cannot replace the focused/affected/critical gates.
-Changed-file-to-test review and a second search confirmed server surfaces remain behind the explicit
-SQL Server/MI branch, all private identity constructor callers compile, and source/catalog/module
-receipts and final-handoff code remain unchanged. Git diff checks pass.
-
-## Exact read-only Stage 0 recheck, before provisioning
-
-From the repository root, using an **existing separately authorized operator identity** with
-CONTROL DATABASE visibility and approved secure password handling:
-
-```bash
-sqlcmd -S "$SQL_SERVER" -d "$SQL_DATABASE" -U "$SQL_INVENTORY_USER" -N -b -l 5 -t 15 -i docs/sql/ai-integration/stage0-platform-verify.sql
+```text
+sqlcmd -S tcp:shale.database.windows.net,1433 -d Shale -U brian -N -b -l 5 -t 15 -i docs/sql/ai-integration/stage0-platform-verify.sql
 ```
 
-The dispatcher executes the Azure verifier when EngineEdition=5, the reviewed server-catalog
-branch for 8/2/3/4, and STOP for everything else. The Azure standalone equivalent is the same
-command with `-i docs/sql/ai-integration/azure-sql-stage0-verify.sql`. No `-C`, PHI query, secret dump,
-DDL, provisioning or grant is included. Missing visibility must STOP rather than trigger a grant.
+Exact reported result (execution timestamp was not supplied):
 
-On Azure require EngineEdition 5, Platform AZURE_SQL_DATABASE, seven zero FindingCounts and
-`PLATFORM_COMPATIBLE_PENDING_IDENTITY_AND_CATALOG_ATTESTATION`. It returns one bounded row, followed
-by a failing SQL error for dangerous state. The existing general Stage 0 inventory/receipts and
-all independent later migration/provisioning/configuration gates still apply. This platform result
-alone does not prove any not-yet-provisioned principal or authorize readiness.
+```text
+EngineEdition = 5
+Platform = AZURE_SQL_DATABASE
+ExternalDataSourceFindingCount = 0
+ExternalTableFindingCount = 0
+ScopedCredentialFindingCount = 0
+SynonymFindingCount = 0
+CrossDatabaseDependencyFindingCount = 0
+OwnershipRouteFindingCount = 0
+PublicAuthorityFindingCount = 0
+PlatformStatus = PLATFORM_COMPATIBLE_PENDING_IDENTITY_AND_CATALOG_ATTESTATION
+```
 
-## Later live read-only Azure gate, after governed provisioning
+This is operator-reported live production Stage 0 evidence, not an agent rerun, identity/catalog
+attestation or deployment authorization. The operator reported no SQL migration, principal provisioning,
+Azure configuration change, JAR deployment or AI capability activation.
 
-No production changes are part of this task. Before future production readiness, first execute this
-gate on a disposable **actual Azure SQL Database** with the authoritative reviewed catalog and
-separately provisioned contained identities, then on the separately authorized installed deployment.
-Do not run the mutation harnesses against production.
+## Authoritative fixture and execution environment
 
-Set `SHALE_AZURE_ATTESTATION_OPT_IN=AZURE_SQL_DATABASE_READ_ONLY`,
-`SHALE_AZURE_JDBC_URL` (SQL authentication, explicit databaseName, no TLS overrides),
-`SHALE_AZURE_DATABASE`, `SHALE_AZURE_ISSUER`, `SHALE_AZURE_RESOURCE`, and independent
-`SHALE_AZURE_{AI,VERIFIER,AUTH,RUNTIME,BOOTSTRAP}_{USERNAME,PASSWORD}` through approved secret
-handling. Use the actual JVM PHI time zone, matching immutable SQL deployment binding. Run:
+The supplied private export was treated as data, hashed before decoding and left unchanged/uncommitted.
+`python3 build/sql-confinement/prepare-authoritative-fixture.py <original-source> <private-output>`
+reproduced the reviewed fixture before any SQL execution:
+
+| Artifact | Bytes / SHA-256 |
+| --- | --- |
+| Original `shale-schema-source.sql` | 728862; `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda` |
+| Derived schema | `40a665caefb3203a6c364d0caac3fadcc1a58d24a66a994f48e058b73ae6f243` |
+| Reviewed candidate | `4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f` |
+
+All 96 tables, five functions, three schemas, 208 indexes and 1142 ALTER TABLE batches retain their
+reviewed shapes. No generated substitute or receipt reissue was used.
+
+Task-owned SQL Server 2022 Developer `16.0.4305.5` used the pinned base image
+`mcr.microsoft.com/mssql/server@sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`.
+The external-table fixture added matching PolyBase `16.0.4305.5-1`, package SHA-256
+`476f61739090c07ac1aeec1ca7c3f898f63422ab54d2a075032f4b6f6e0c34fa`, to execute a real external-table
+fault. Only nonce-owned databases/logins and synthetic rows were used: ordinary confinement and
+production serving on loopback port 14333, and the isolated external-table case on port 14334.
+Both owned containers were removed after exact-label checks. Private SQL, credentials, keys and logs
+remain uncommitted. Maven 3.9.11/JDK 21 use an isolated cache and a test truststore containing the owned
+localhost SQL certificate and system roots. Production-composition JDBC validates encryption,
+certificate and hostname. The rejected external route's nested SQLPAL ODBC connector uses a local-only
+certificate trust override; that setup is not counted as TLS acceptance.
+
+## Verification-discovered defect and regression coverage
+
+Fresh authoritative execution of #1925 found **29 tests: 25 pass, 1 failure, 3 errors, 0 skips**.
+Valid identities failed at `OWNERSHIP`: the AI ownership query had one parameter but bound four,
+and its subqueries incorrectly used the verifier session's token. The corrected query uses four
+parameters to inspect schema/object/principal ownership and grant option for each actual AI token,
+through the independent verifier. Separate verifier-token checks remain intact. No check was removed.
+
+Pre-edit review covered the repository rules, database/tenancy contracts, confinement and Azure
+architecture, prior composition evidence and SQL runbook. Searches inspected all attestation callers,
+ownership/token/binding queries, live SQL tests, readiness and serving helpers before edits.
+`AiCaseDataLocalSqlServerTest`, `McpProductionReadinessLocalSqlServerTest`, and
+`Phase3b7AcceptanceLocalSqlServerTest` own the driver-level and full Boot/HTTP regressions.
+
+The shared **42-fault** matrix independently injects direct/schema/database/column/view/function/
+public grants, public EXECUTE and grant option, plus schema/role ownership, impersonation, DDL and
+GRANT/CONTROL authority for AI and verifier. Full Boot returns fresh `not-ready` for each fault and
+fresh `ready` after removal. Actual HTTP serving denies all 42 discovery and 42 protected Overview
+requests with 401 and no structured/protected output, then reattests after restoration. The inherited
+public Case SELECT regression positively proves excess verifier visibility before asserting refusal.
+
+Actual-login tests also cover direct Case/join/credential/control read denials, mutable/read-only
+SESSION_CONTEXT tenant/user poisoning, direct foreign PHI INSERT denial, **all 42 legacy EXECUTE
+denials plus private helpers**, effective grants, module/catalog drift and separate SID/token proofs.
+The Azure isolation helper is executed against real shared local catalogs containing an external
+source, external table, synonym and explicit cross-database dependency. The external table points to
+an owned local marker, never production. These tests prove local structural refusal, not native Azure
+contained authentication or catalog completeness. Unit routing/ambiguous-result tests remain supplemental.
+
+## Fresh mandatory results
+
+Exact commands and per-class counts are in the [verification JSON](azure-sql-case-attestation-verification.json).
+Counts overlap and must not be added as unique tests. All final groups have zero failures/errors.
+
+| Group | Passed | Failures/errors | Skipped |
+| --- | ---: | --- | ---: |
+| authoritative-final | 50 | 0/0 | 0 |
+| focused-final | 45 | 0/0 | 0 |
+| affected | 137 | 0/0 | 9 |
+| critical | 226 | 0/0 | 0 |
+| package-final | PASS (build) | 0/0 | 0 |
+| Selector Python | 27 | 0/0 | 0 |
+| TypeScript client vectors | 66/66 | 0/0 | 0 |
+| Python client vectors | 66/66 | 0/0 | 0 |
+| Owned validated TLS/proxy checks | 20/20 | 0/0 | 0 |
+
+The zero-skip authoritative partitions contain **31 data confinement/parity/security tests** and
+**19 production-profile cases**: full Boot readiness/ordinary smoke (1), durable SQL OAuth lifecycle
+(12), independent-client live lock/expiry drills (2), both full 66-vector clients (2), validated Caddy
+TLS/proxy (1), and authority-fault serving (1). No required vector or mandatory local case was skipped.
+The normal affected invocation supplies no SQL opt-in; its reported skips are not passing SQL evidence.
+The required cases execute separately in the zero-skip authoritative run. No native Azure test was
+substituted with a mock. Historical opt-in suites outside this fresh scope are not represented as run.
+
+Both expiry drills positively observe the exact final-gate blocker, cross the stored DB-UTC expiry
+before releasing its lock, prove a subsequent SQL UTC sample using XEvents, and deny protected output.
+Proof lifetime, SQL/Java authorization deadlines and lock drill are unchanged. Both clients also execute
+live authority reduction/revocation, bearer expiry/revocation, cancellation, commit/ACK/close/audit faults
+and privacy checks. The 12 SQL-backed OAuth tests exercise transaction/consent/code consume, PKCE,
+assertion replay, opaque access issuance, refresh rotation/reuse family revocation and explicit revocation;
+the clients supply fresh bearer/expiry/live-authority evidence through the confined production path.
+
+Caddy 2.11.7 performs real TLS and proxy serving, including rejected wrong-host/untrusted handshakes,
+canonical metadata despite hostile forwarding headers, exact Origin handling, protected Overview and
+credential-bearing HTTP redirects. Its 20 checks use actual sockets; zero-valued receipt entries mean
+refused TLS handshakes. Local proxy evidence does not certify deployed Azure ingress.
+
+Focused regressions cover attestation/data, production composition, both MCP tools, filter isolation,
+OAuth configuration and production OFF Boot. Affected cases/security-data selection, the critical
+reactor, selector Python and Boot packaging are fresh. The initial focused setup error from overlapping
+Maven reactors is retained as a resolved attempt; final reactors use isolated target directories and
+run sequentially within each worktree. Static diff checks pass. The optional historical full-suite
+profile is not a replacement for these required gates.
+
+A combined PolyBase run also encountered four socket timeouts during migration import, before the
+affected security assertions. No timeout or authorization deadline was extended. The final authoritative
+suite is partitioned into 30 ordinary data cases on the original pinned fixture, one real external-table
+case on the PolyBase fixture, and 19 production serving cases on the original fixture. Every partition
+must pass with zero skips; the failed setup attempt is retained in the JSON and is not passing evidence.
+
+## Separate remaining Azure and production gates
+
+No already-authorized disposable Azure SQL Database fixture or Azure acceptance credentials are
+configured. No Azure fixture or production identity was provisioned. The **Azure disposable mutation/fault
+suite remains a deployment gate**, including actual contained-principal and external-catalog semantics.
+The local structural tests and operator Stage 0 result do not close it.
+
+The remaining distinct gates are governed contained AI identity; governed contained verifier identity;
+bootstrap identity; independent secrets; exact database token/SID proof; complete live attestation;
+secret-consumer separation; immutable deployment binding; and the authorized disposable Azure fault
+fixture. After separately governed provisioning, run `AiCaseDataAzureSqlDatabaseReadOnlyTest` with the
+explicit `AZURE_SQL_DATABASE_READ_ONLY` opt-in and independent target settings described in the
+[Azure design contract](../architecture/azure-sql-case-attestation.md). Supply through approved secret
+handling `SHALE_AZURE_ATTESTATION_OPT_IN=AZURE_SQL_DATABASE_READ_ONLY`, `SHALE_AZURE_JDBC_URL`
+(SQL authentication, explicit `databaseName`, no TLS overrides), `SHALE_AZURE_DATABASE`,
+`SHALE_AZURE_ISSUER`, `SHALE_AZURE_RESOURCE`, and independent
+`SHALE_AZURE_{AI,VERIFIER,AUTH,RUNTIME,BOOTSTRAP}_{USERNAME,PASSWORD}`. Use the actual JVM/SQL
+time-zone mapping and immutable binding. The later read-only acceptance command is:
 
 ```bash
 mvn -B -pl shale-data -am -Dtest=AiCaseDataAzureSqlDatabaseReadOnlyTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-Require one executed test, zero skips/failures/errors. It positively detects edition 5 then performs
-the complete live production attestation, including fresh source/catalog/module/RLS/binding/identity
-checks, without protected procedure execution or application data reads. Its absence is not a pass.
-Run Stage 0 again after any governed credential/catalog change; operator credential/secret-consumer
-proof remains distinct from runtime database permission closure. Retain only bounded outcomes and
-reviewed source/head identity, never JDBC binds, credential identities or catalog dumps.
+Require one executed test,
+zero skips/failures, actual edition 5 and complete live attestation. Measure it within the unchanged
+ten-second protected request budget; do not widen authority or extend deadlines to pass.
 
-Acceptance must also measure remote attestation within the unchanged ten-second protected request
-budget. If Azure visibility, catalog receipt compatibility or timing differs, STOP and review;
-do not bypass a check, widen a role or extend proof/deadline behavior to obtain readiness.
+**No new SQL migration is required by this PR.** Future production preparation must inventory and
+review any unapplied existing migration chain, dedicated principal provisioning and immutable binding;
+the platform result establishes none of that catalog state. Existing legal, SDK, security/operator/
+tenant-owner and pilot approvals remain separate. Audit compatibility uses existing PHI/integration
+transactions unchanged; data-free attestation adds no mutation/PHI audit schema or event.
 
-## Remaining completion gates
-
-Recover original `shale-schema-source.sql` (728862 bytes,
-SHA-256 `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`) and use the existing
-`build/sql-confinement/prepare-authoritative-fixture.py` to reproduce the exact reviewed candidate.
-Then rerun all mandatory authoritative security/production/client/expiry/TLS/OAuth groups using
-owned local SQL, synthetic rows and independently validated TLS as #1924 documents. Run the
-structural external-route/public faults; reproduce applicable attacks in an owned disposable Azure
-fixture before claiming Azure authoritative security acceptance. Complete the read-only live Azure
-gate and operator evidence. None may be fabricated from source assertions or historical receipts.
-
-No production change was made. The candidate remains BLOCKED, not READY FOR AZURE SQL DATABASE
-STAGE 0 RECHECK, while mandatory local and Azure security evidence is absent.
+No production SQL, identities, Azure settings, JARs or AI/MCP/OAuth controls were changed.
+Production identity/catalog attestation remains **OPEN**. Deployment and pilot remain **NOT AUTHORIZED**.
+The [#1925 record](https://github.com/gseshadow/Shale/blob/a8b216f6cc89897121988c675b0ea58280a80cca/docs/testing/azure-sql-case-attestation.md)
+retains the historical blocked evidence; it is not presented as a fresh pass.
