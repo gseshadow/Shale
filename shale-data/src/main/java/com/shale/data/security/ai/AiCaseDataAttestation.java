@@ -140,7 +140,7 @@ public final class AiCaseDataAttestation {
                 }
             }
             stage="OWNERSHIP";
-            for(int token:tokens)try(var p=review.prepareStatement("SELECT (SELECT COUNT(*) FROM sys.schemas WHERE principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.objects WHERE principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.database_principals WHERE owning_principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id IN(SELECT principal_id FROM sys.user_token) AND state='W')+(SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND state='W')")) {
+            for(int token:tokens)try(var p=review.prepareStatement("SELECT (SELECT COUNT(*) FROM sys.schemas WHERE principal_id=?)+(SELECT COUNT(*) FROM sys.objects WHERE principal_id=?)+(SELECT COUNT(*) FROM sys.database_principals WHERE owning_principal_id=?)+(SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND state='W')")) {
                 p.setQueryTimeout(3);for(int n=1;n<=4;n++)p.setInt(n,token);
                 try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
             }

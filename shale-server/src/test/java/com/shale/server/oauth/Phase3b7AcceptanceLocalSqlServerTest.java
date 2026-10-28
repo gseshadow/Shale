@@ -66,11 +66,12 @@ class Phase3b7AcceptanceLocalSqlServerTest {
             }
             var faults=new com.shale.server.mcp.Phase3b7FaultSource(source(h,ai,aiSecret),()->h.owner(h.db));
             var controls=new Controls(h,faults);
+            String servingAi=ai,servingCatalog=catalog;
             McpConfinedClientFixture.withServer(source(h,ai,aiSecret), source(h,catalog,catalogSecret),
                     List.of(source(h,h.login,h.secret), source(h,h.bootstrapLogin,h.bootstrapSecret),
                             source(h,"sa",h.password)), h.db, temp, faults::overPool, url -> {
                 if (protocol && kind.equals("catalog-public")) {
-                    com.shale.server.mcp.McpCatalogVerifierServingChecks.run(url,controls.prepare("catalog-public","prepare"),()->h.owner(h.db));
+                    com.shale.server.mcp.McpCatalogVerifierServingChecks.run(url,controls.prepare("catalog-public","prepare"),()->h.owner(h.db),servingAi,servingCatalog);
                 } else if (protocol && kind.equals("tls")) {
                     com.shale.server.mcp.Phase3b7ServingChecks.tls(url,controls.prepare("tls","prepare"),temp);
                 } else if (protocol && kind.equals("boundaries")) {
