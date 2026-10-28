@@ -142,3 +142,68 @@ discovered 4 and skipped the private-input check (3 executed). Local server pack
 passed with tests explicitly skipped in that packaging invocation; it adds no SQL evidence.
 Mandatory SQL suites listed in the follow-up JSON remain unexecuted. No counts here
 replace the original #1927 counts, and counts across groups overlap.
+
+## Attached-input harness recovery — 2026-10-28
+
+The preceding missing-input report is historical. The task subsequently supplied the
+private candidate, derivation receipt and exact production catalog. Candidate SHA-256
+verified as `4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f`.
+Attachments remain private, outside Git. The four V2 Python checks now pass without skips.
+
+The checked-in conventions specify the image, TLS names and opt-ins, but no checked-in
+Phase 3B.7/3B.8 launcher provisions the complete SQL/TLS environment. Reconstruction used
+the recorded `mcr.microsoft.com/mssql/server@sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`,
+Developer edition, fresh task-owned container `shale-login-1928`, port mapping
+`127.0.0.1:14338:1433`, ACCEPT_EULA=Y and a generated synthetic owner password supplied
+through a private environment file. A fresh two-day RSA-2048 certificate has CN
+`*.database.windows.net`, DNS SANs `localhost` and `*.database.windows.net`, and serverAuth
+EKU. SQL `mssql.conf` points `network.tlscert`/`tlskey` to the mounted certificate/key,
+sets `tlsprotocols=1.2` and `forceencryption=1`. A task-local PKCS12 truststore imports
+that certificate; no trust override or production driver adapter is used. Bind-mounted
+configuration and key must be readable by the non-root SQL container process.
+
+Exact readiness prerequisites: JDK 21/Maven, Docker image/loopback port, healthy SQL
+owner connection, the verified candidate, that trusted TLS setup, and environment
+`SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI`, `SHALE_AI_SQL_PORT=14338`,
+`SHALE_AI_SQL_PASSWORD=<private synthetic owner password>`,
+`SHALE_CASE_VERIFY_SCHEMA=<private candidate path>` and
+`SHALE_CASE_VERIFY_SCHEMA_SHA256=<verified candidate hash>`. Command:
+
+```sh
+mvn -B -ntp -pl shale-server -am \
+  -Dtest=McpProductionReadinessLocalSqlServerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dshale.acceptance.production=true -Dshale.acceptance.confinement=V2 \
+  -Djavax.net.ssl.trustStore=<task-local-truststore> \
+  -Djavax.net.ssl.trustStorePassword=<local-truststore-password> test
+```
+
+The initial launch failed before reproduction: SQL could not read its mounted config;
+a run started before SQL initialization completed failed owner authentication. After
+correcting mount readability and verifying SQL health, the unchanged readiness test
+executed and **passed in 88.32 seconds: 1 test, 0 failures/errors/skips**. OFF smoke
+completed before the readiness-ON Boot began. Readiness-ON completed as well. The HTTP
+timeout from #1927 did not reproduce. These setup failures are not attributed as its cause.
+
+Private Java snapshots during the run show progressing readiness fault attestations
+(lines 110 and 108), followed by cleanup (line 132); no stalled login stack was obtained.
+A SQL DMV snapshot during those checks showed a running SELECT with no blocking
+session, wait or open transaction. This is sampled evidence, not exclusion of a historical
+blocking/connection/lifecycle fault. Only test HTTP lifecycle timing was added for the
+subsequent diagnostic run; no production fix is claimed. No historical SQL/TLS certificate,
+truststore or stalled-server thread/session capture was supplied to compare with #1927.
+
+Classification remains **BLOCKED**: the historical timeout's exact blocking point and
+root cause are unresolved. Successful reconstruction is not proof of a root-cause fix.
+No timeout or assertion was relaxed. Post-fix mandatory SQL regression acceptance cannot
+be claimed without a proven fix; native Azure gates remain OPEN.
+
+The diagnostic repeat passed in **85.10 seconds, 1/0 failures/0 errors/0 skips**.
+HTTP timing recorded 23 checks in each phase: OFF wrong-password/correct-password
+login took 259/120 ms; readiness-ON took 82/82 ms with expected 401/200 statuses.
+No stalled request existed on either completed run to support deeper login-seam
+instrumentation or a causal claim. Captures stay private in task-local `work/`.
+
+The recovered-tree critical reactor passed 228 tests with zero failures/errors/skips;
+local server packaging passed. Phase1R Python passed 3 checks without skips. These
+checks do not establish the unexecuted post-fix V1/V2/OAuth SQL acceptance.

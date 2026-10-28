@@ -5,17 +5,13 @@
   "historicalEvidence": "PR #1927 was merged with the ordinary production login readiness blocker unresolved; original acceptance record and JSON preserved.",
   "caseCatalogHash": "6e9182b6e9b75200a16d51dbd537ca8926b358d603220d287a9710ad6ca8063a",
   "sourceReceipt": "60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891",
-  "rootCause": "UNIDENTIFIED; reproduction blocked by absent private hash-gated schema and disposable SQL/TLS harness configuration",
+  "rootCause": "UNRESOLVED: unchanged readiness passes on reconstructed SQL/TLS harness; historical login timeout not reproduced",
   "fix": "None applied; documentation-only follow-up",
   "timeoutAndAssertionsRelaxed": false,
-  "runtimeDiagnosticsCollected": false,
+  "runtimeDiagnosticsCollected": true,
   "productionAccess": false,
   "mandatoryUnexecuted": [
-    "Production azure Boot SQL smoke: OFF then readiness ON / disclosure OFF",
-    "V2 authoritative SQL confinement/attestation",
-    "V1 SQL confinement regression",
-    "OAuthAuthorizationFlowTest SQL flow",
-    "SQL-dependent Phase1R acceptance"
+    "Post-fix complete V1/V2/OAuth SQL acceptance: no root-cause fix exists"
   ],
   "nativeAzureIdentityReadOnlyGate": "OPEN",
   "nativeAzureMutationFaultGate": "OPEN",
@@ -94,5 +90,77 @@
       "exit": 0,
       "acceptance": "PASS: local package only; no production artifact upload/deployment; tests reported separately"
     }
-  ]
+  ],
+  "attachedInputRecovery": {
+    "candidateHashVerified": true,
+    "privateInputsCommitted": false,
+    "imageDigest": "sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718",
+    "ownerConnectionHealthy": true,
+    "unmodifiedReadiness": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 88.32
+    },
+    "v2Python": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "historicalTimeoutReproduced": false,
+    "rootCause": "UNRESOLVED: the historical login timeout did not reproduce on the reconstructed documented harness",
+    "fix": "None; only test HTTP timing added",
+    "sqlSnapshot": {
+      "command": "SELECT",
+      "blockingSession": 0,
+      "waitType": null,
+      "openTransactions": 0
+    },
+    "javaSamples": "readiness fault attestation and final cleanup, not stalled authentication",
+    "noProductionChanges": true,
+    "nativeAzureGates": "OPEN",
+    "acceptanceLimit": "No proven fix; post-fix full V1/V2/OAuth SQL regression acceptance not claimed. Earlier results are historical.",
+    "timedReadiness": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 85.1,
+      "offHttpChecks": 23,
+      "readyHttpChecks": 23,
+      "offLoginMilliseconds": [
+        259,
+        120
+      ],
+      "readyLoginMilliseconds": [
+        82,
+        82
+      ]
+    },
+    "criticalReactor": {
+      "command": "mvn -B -ntp test",
+      "counts": {
+        "tests": 228,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "exit": 0
+    },
+    "phase1rPython": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "localPackage": {
+      "command": "mvn -B -ntp -pl shale-server -am -DskipTests package",
+      "exit": 0,
+      "scope": "local only; no production upload/deployment"
+    }
+  },
+  "previousRootCauseStatus": "UNIDENTIFIED; reproduction blocked by absent private hash-gated schema and disposable SQL/TLS harness configuration",
+  "runtimeDiagnosticsScope": "HTTP timings, sampled Java threads and SQL session metadata; no stalled authentication captured"
 }

@@ -44,7 +44,19 @@ final class ProductionOrdinarySmoke {
         var request=HttpRequest.newBuilder(URI.create(origin+path)).timeout(Duration.ofSeconds(10));
         if(token!=null)request.header("Authorization","Bearer "+token);
         if(body==null)request.GET();else request.header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
-        var response=client.send(request.build(),HttpResponse.BodyHandlers.ofString());assertEquals(expected,response.statusCode(),path+" status; response payload intentionally omitted");checks++;
-        return json.readTree(response.body());
+        // Test-only timing: never print bodies, identities, Authorization headers or exceptions.
+        long started=System.nanoTime();
+        System.err.printf("ORDINARY_HTTP start check=%d path=%s%n",checks+1,path);
+        try {
+            var response=client.send(request.build(),HttpResponse.BodyHandlers.ofString());
+            System.err.printf("ORDINARY_HTTP finish check=%d status=%d elapsedMs=%d%n",
+                    checks+1,response.statusCode(),(System.nanoTime()-started)/1_000_000);
+            assertEquals(expected,response.statusCode(),path+" status; response payload intentionally omitted");checks++;
+            return json.readTree(response.body());
+        } catch(Exception failure) {
+            System.err.printf("ORDINARY_HTTP failed check=%d elapsedMs=%d type=%s%n",
+                    checks+1,(System.nanoTime()-started)/1_000_000,failure.getClass().getSimpleName());
+            throw failure;
+        }
     }
 }
