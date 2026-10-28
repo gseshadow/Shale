@@ -2,7 +2,10 @@
 
 Date: 2026-10-27. Base: `efd8be8a350523344bf69b72bbc715f9e888589d` (#1924).
 This supplements the [confinement contract](phase3b7-sql-confinement-contract.md).
-Implementation candidate; **BLOCKED pending actual SQL and Azure platform acceptance**.
+Current evidence (2026-10-28): **production Stage 0 platform PASS** (operator-reported),
+**authoritative local/adversarial acceptance PASS**, **production identity/catalog attestation OPEN**.
+See the [current acceptance](../testing/azure-sql-case-attestation.md) for the preparation-only classification;
+production deployment and pilot remain **NOT AUTHORIZED**.
 Azure SQL Database itself is supported by the proposed contract, rather than classified as an
 inherent deployment blocker. This is neither deployment nor activation approval.
 
@@ -68,7 +71,7 @@ Test names below identify required evidence, not assertions that an unexecuted t
 | Public CONNECT on four non-admin TSQL endpoints via `sys.endpoints` / S,A | Allow only harmless transport baseline | Azure-managed TDS boundary, contained authentication and database CONNECT only | No admin endpoint authority acquired by principal | Logical-server transport/RBAC/firewall configuration is operator inventory; no user-managed SQL Server endpoint proof is claimed |
 | `sys.databases` enumeration + actual AI `HAS_DBACCESS(other)` / S,A | Reject cross-database access | Database-contained authentication plus reject all external sources/tables/synonyms/cross-DB expression dependencies; deny bulk/external/DDL/credential authority via permission closure | No ambient cross-DB login route and no configured in-database bridge | Cannot enumerate every other database or detect reused passwords safely from target DB; operator identity/secret gate and Stage 0 credential inventory |
 | `sys.user_token` exact own/public/AI or verifier role / D | Exclude fixed/custom/nested roles/groups | Retained; verifier enforced for Azure even outside production composition | No inherited application/bypass authority | Actual SQL attacks and read-only Azure gate; extra role/token refuses |
-| Direct database permissions, grant option, public edges / D | DENY does not neutralize every grant/column/ownership path | Retained and strengthened: any direct permission except plain CONNECT refused; public metadata DENY that could hide catalog also refused | No impersonation, schema/database DDL, grants/control/take-ownership or public application authority | Expanded actual-login/public/readiness/serving matrices; not executed without authoritative fixture |
+| Direct database permissions, grant option, public edges / D | DENY does not neutralize every grant/column/ownership path | Retained and strengthened: any direct permission except plain CONNECT refused; public metadata DENY that could hide catalog also refused | No impersonation, schema/database DDL, grants/control/take-ownership or public application authority | Fresh authoritative local actual-login/public/readiness/serving matrices pass; native Azure mutations remain OPEN |
 | Schema/object/principal ownership / D | Ownership can bypass permission DENYs | Retained for all AI tokens; expanded to all verifier tokens | Neither owns application schemas, modules or roles | Empty-schema and role ownership attacks required |
 | Every application object/column + exact six EXECUTEs / D | Reject views/functions/synonyms, column exceptions, broad application execution | Retained; Azure verifier also checks effective object rights: VIEW DEFINITION, plus SELECT only on four reviewed reference tables | No direct Case/PHI/control/credential read/write, exactly six AI public procedures, zero verifier application EXECUTEs | Module receipts retain 42 denials and private helper protection; no naming-based allowlist expansion |
 | Catalog hash, source receipt, module body/owner/execute-as/call graph / D | Prevent a narrow grant from invoking altered/broad code | Unchanged packaged SQL/manifest/source bytes and runtime checks | Reviewed SQL/RLS/security-policy definitions and dependencies | Full authoritative candidate still required; no repaired/reissued receipt |

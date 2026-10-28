@@ -3,8 +3,9 @@
 This is a future governed sequence, not execution authorization. The production composition's
 [prior SQL Server local acceptance passed](testing/production-mcp-case-composition.md), including the
 inherited-verifier-authority fix. The [Azure SQL Database successor](testing/azure-sql-case-attestation.md)
-is currently **BLOCKED pending actual SQL/Azure acceptance**. Do not apply the prior platform-limited
-READY classification to this unverified successor. No deployment, production SQL, principal
+has a separate [current acceptance record](testing/azure-sql-case-attestation.md). The operator-reported
+production Azure SQL Stage 0 platform gate is **PASS**; identity/catalog attestation remains **OPEN**.
+No deployment, production SQL, principal
 provisioning or activation is authorized by either local result.
 
 ## Configuration and safe deployment state
@@ -41,8 +42,26 @@ Readiness uses read-only SQL catalog/reference/identity queries, not Case data o
 ## Stage 0 Read only inventory
 
 The [Azure attestation contract](architecture/azure-sql-case-attestation.md) replaces the invalid
-SQL Server/MI-only platform assumption. Its current acceptance is **BLOCKED pending live evidence**;
-Azure SQL Database is not intrinsically a blocker. Unknown/unsupported engines always STOP.
+SQL Server/MI-only platform assumption. **PRODUCTION AZURE SQL PLATFORM STAGE 0: PASS**,
+based on the existing authorized operator's manually reported production result below.
+Unknown/unsupported engines always STOP. This platform gate does not close identity/catalog attestation.
+
+The operator reported executing this exact read-only command against the actual production database:
+
+```text
+sqlcmd -S tcp:shale.database.windows.net,1433 -d Shale -U brian -N -b -l 5 -t 15 -i docs/sql/ai-integration/stage0-platform-verify.sql
+```
+
+Reported output: `EngineEdition=5`, `Platform=AZURE_SQL_DATABASE`;
+`ExternalDataSourceFindingCount=0`, `ExternalTableFindingCount=0`,
+`ScopedCredentialFindingCount=0`, `SynonymFindingCount=0`,
+`CrossDatabaseDependencyFindingCount=0`, `OwnershipRouteFindingCount=0`,
+`PublicAuthorityFindingCount=0`;
+`PlatformStatus=PLATFORM_COMPATIBLE_PENDING_IDENTITY_AND_CATALOG_ATTESTATION`.
+This is operator-reported live production evidence, not a command rerun by this task.
+No migration, principal provisioning, Azure change, JAR deployment or capability activation occurred.
+**Production identity/catalog attestation: OPEN. Production deployment: NOT AUTHORIZED.
+Pilot: NOT AUTHORIZED.**
 
 Run the bounded read-only platform dispatcher using an already authorized operator connection:
 
@@ -51,8 +70,8 @@ sqlcmd -S "$SQL_SERVER" -d "$SQL_DATABASE" -U "$SQL_INVENTORY_USER" -N -b -l 5 -
 ```
 
 Supply the password through the approved secure prompt/secret mechanism, never a command argument.
-Certificate validation stays enabled (no `-C`). This command is an operator recheck instruction;
-it was not run on production by this change.
+Certificate validation stays enabled (no `-C`). This parameterized command remains the future
+operator recheck instruction; this task has made no production connection.
 
 | Positive engine detection | Required verifier |
 | --- | --- |
@@ -107,6 +126,11 @@ database-scoped contract; no server metadata grant or broader role compensates f
 Confirm independent secret consumers and the Stage 0 scoped-credential inventory. After provisioning,
 run the explicit live read-only Azure attestation gate documented in the acceptance record. A local
 SQL Server run cannot close it.
+Keep governed contained AI, contained verifier and bootstrap identities, independent secrets,
+exact live database token/SID proof, complete live attestation, secret-consumer separation,
+immutable deployment binding and an authorized disposable Azure SQL mutation/fault fixture as
+separate gates. No disposable Azure fixture is configured/authorized for this task; its mutation
+tests remain a deployment gate. Never use production for fault injection.
 Provision exactly one AiCaseDataDeployment row with Id 1, case-read-v1, canonical issuer/resource and
 the actual existing JVM/SQL time-zone mapping. It is immutable; do not guess UTC or update a binding.
 Verify the real AI login's tokens, column permissions, six EXECUTEs, 42 denials, no ownership, cross-DB
