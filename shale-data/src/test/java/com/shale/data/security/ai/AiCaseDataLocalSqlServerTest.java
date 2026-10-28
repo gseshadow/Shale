@@ -61,7 +61,16 @@ class AiCaseDataLocalSqlServerTest {
             sql(c,"DROP DATABASE ["+db+"]");db=null;
         }
     }
-    @AfterAll void removeIdentities()throws Exception {if(prefix!=null)try(var c=owner("master")){for(String role:secrets.keySet())sql(c,"DROP LOGIN ["+prefix+"_"+role+"]");}}
+    @AfterAll void removeIdentities()throws Exception {if(prefix!=null)try(var c=owner("master")){for(String role:secrets.keySet()) {
+        // PolyBase can retain a metadata connection in master after its source is dropped.
+        // Drain only this fixture's exact nonce login, including those pooled sessions.
+        var sessions=new ArrayList<Integer>();
+        try(var p=c.prepareStatement("SELECT session_id FROM sys.dm_exec_sessions WHERE original_login_name=? AND is_user_process=1 AND session_id<>@@SPID")) {
+            p.setString(1,prefix+"_"+role);try(var r=p.executeQuery()){while(r.next())sessions.add(r.getInt(1));}
+        }
+        for(int session:sessions)sql(c,"KILL "+session);
+        sql(c,"DROP LOGIN ["+prefix+"_"+role+"]");
+    }}}
 
     @Test void productionInfrastructureRequiresSeparateCatalogAndBootstrapSids() {
         assertDoesNotThrow(()->new AiCaseDataAttestation(source("ai"),source("catalog"),
@@ -138,12 +147,19 @@ class AiCaseDataLocalSqlServerTest {
 
     @Test void azureStructuralInventoryRejectsExplicitDatabaseDependency()throws Exception {
         // Actual shared SQL catalogs, not a claim about Azure contained identities or visibility.
-        try(var c=owner(db)) {
-            sql(c,"CREATE VIEW dbo.AttestationCrossDatabase AS SELECT name FROM master.sys.databases");
-            assertEquals(1,count(c,"SELECT COUNT(*) FROM sys.sql_expression_dependencies WHERE referencing_id=OBJECT_ID('dbo.AttestationCrossDatabase') AND referenced_database_name='master'"));
+        String marker=db+"_route";
+        try(var c=owner("master")){sql(c,"CREATE DATABASE ["+marker+"]");}
+        try {
+            try(var c=owner(marker)){sql(c,"CREATE TABLE dbo.AttestationMarker(Id int)");}
+            try(var c=owner(db)) {
+                sql(c,"CREATE VIEW dbo.AttestationCrossDatabase AS SELECT Id FROM ["+marker+"].dbo.AttestationMarker");
+                assertEquals(1,count(c,"SELECT COUNT(*) FROM sys.sql_expression_dependencies WHERE referencing_id=OBJECT_ID('dbo.AttestationCrossDatabase') AND referenced_database_name='"+marker+"'"));
+            }
+            try(var c=source("catalog").getConnection()){assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.azureIsolation(c));}
+        } finally {
+            try(var c=owner(db)){sql(c,"DROP VIEW IF EXISTS dbo.AttestationCrossDatabase");}
+            try(var c=owner("master")){sql(c,"DROP DATABASE ["+marker+"]");}
         }
-        try {try(var c=source("catalog").getConnection()){assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.azureIsolation(c));}}
-        finally {try(var c=owner(db)){sql(c,"DROP VIEW dbo.AttestationCrossDatabase");}}
         try(var c=source("catalog").getConnection()){AiCaseDataAttestation.azureIsolation(c);}
     }
 
