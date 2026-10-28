@@ -1,0 +1,98 @@
+{
+  "classification": "BLOCKED",
+  "date": "2026-10-28",
+  "base": "5e84669fe5f287a05d472609e29ae6ebb9b6521f",
+  "historicalEvidence": "PR #1927 was merged with the ordinary production login readiness blocker unresolved; original acceptance record and JSON preserved.",
+  "caseCatalogHash": "6e9182b6e9b75200a16d51dbd537ca8926b358d603220d287a9710ad6ca8063a",
+  "sourceReceipt": "60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891",
+  "rootCause": "UNIDENTIFIED; reproduction blocked by absent private hash-gated schema and disposable SQL/TLS harness configuration",
+  "fix": "None applied; documentation-only follow-up",
+  "timeoutAndAssertionsRelaxed": false,
+  "runtimeDiagnosticsCollected": false,
+  "productionAccess": false,
+  "mandatoryUnexecuted": [
+    "Production azure Boot SQL smoke: OFF then readiness ON / disclosure OFF",
+    "V2 authoritative SQL confinement/attestation",
+    "V1 SQL confinement regression",
+    "OAuthAuthorizationFlowTest SQL flow",
+    "SQL-dependent Phase1R acceptance"
+  ],
+  "nativeAzureIdentityReadOnlyGate": "OPEN",
+  "nativeAzureMutationFaultGate": "OPEN",
+  "results": [
+    {
+      "name": "readiness",
+      "command": "mvn -pl shale-server -am -Dtest=McpProductionReadinessLocalSqlServerTest -Dsurefire.failIfNoSpecifiedTests=false test",
+      "launcher": "/workspace/.tools/bin/mvn",
+      "exit": 0,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      "acceptance": "BLOCKED: mandatory SQL readiness skipped; not reproduced"
+    },
+    {
+      "name": "focused",
+      "command": "mvn -B -ntp -pl shale-server -am -Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,AuthServiceAdapterTest,PreTenantAuthenticationModuleContractTest,AuthControllerTest,AiCaseDataAttestationTest,AiCaseDataV2MigrationContractTest,AiCaseDataMigrationContractTest,McpCaseCompositionTest,OAuthConfigurationTest,OAuthFilterIsolationTest,OAuthMetadataTest,OAuthClientMappingTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,ShaleOAuthHumanTest -Dsurefire.failIfNoSpecifiedTests=false test",
+      "launcher": "/workspace/.tools/bin/mvn",
+      "exit": 0,
+      "counts": {
+        "tests": 63,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "acceptance": "PASS within non-SQL scope"
+    },
+    {
+      "name": "critical",
+      "command": "mvn -B -ntp test",
+      "launcher": "/workspace/.tools/bin/mvn",
+      "exit": 0,
+      "counts": {
+        "tests": 228,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "acceptance": "PASS within non-SQL scope"
+    },
+    {
+      "name": "Phase1R runner",
+      "command": "python -m unittest discover -s build/phase1r-verification -p 'test_*.py'",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit": 0
+    },
+    {
+      "name": "V2 Python",
+      "command": "python -m unittest discover -s build/sql-confinement -p test_v2.py",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "exit": 0,
+      "acceptance": "BLOCKED: private projection check skipped; only 3 executed"
+    },
+    {
+      "name": "selector Python",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s build/test-selection -p 'test_*.py'",
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit": 0
+    },
+    {
+      "name": "local server package",
+      "command": "mvn -B -ntp -pl shale-server -am -DskipTests package",
+      "launcher": "/workspace/.tools/bin/mvn",
+      "exit": 0,
+      "acceptance": "PASS: local package only; no production artifact upload/deployment; tests reported separately"
+    }
+  ]
+}

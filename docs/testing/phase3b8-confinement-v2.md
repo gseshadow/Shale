@@ -68,3 +68,77 @@ The seven production prerequisites are already installed and MUST NOT be rerun. 
 future separately governed changes. No production connection/change, identity provisioning, server
 JAR deployment, AI/MCP/OAuth activation or real integration/grant/session occurred. Do not merge or deploy
 this blocked candidate. Audit transactions and vocabulary remain unchanged.
+
+## Post-merge login investigation — 2026-10-28
+
+PR #1927 was merged as 5e84669fe5f287a05d472609e29ae6ebb9b6521f with the
+ordinary production-profile login blocker unresolved. Its original evidence above and
+verification JSON remain historical evidence; the merge did not establish production
+deployment readiness. This follow-up starts from that current `codex/latest` commit.
+
+**BLOCKED: reproduction prerequisites are absent from the new environment.**
+The owned Docker daemon is reachable but has zero containers/images. No reviewed private
+schema is attached or present in the supplied workspace input directories, and
+`SHALE_CASE_VERIFY_SCHEMA`, the disposable SQL endpoint/owner configuration and the
+local SQL TLS fixture have not been supplied. The existing harness requires the exact
+private candidate SHA-256
+`4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f`.
+Alternatively, its existing read-only derivation requires the reviewed source export
+SHA-256 `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`.
+A substitute schema cannot establish the requested authoritative acceptance.
+
+### Static findings, not root-cause evidence
+
+- `ProductionOrdinarySmoke.check()` first sends a wrong-password login expecting 401,
+  then a correct-password login expecting 200. Each HTTP request already has a ten-second
+  timeout; the HTTP client has a five-second connect timeout. The enclosing test retains
+  `@Timeout(180)`. A historical stack in the client does not locate the server stall.
+- `AuthController.login` calls `AuthServiceAdapter.authenticate`, then
+  `AuthServiceImpl.login`: auth-pool acquisition, the bounded
+  `dbo.LookupAuthenticationCredentialV1` RPC (five-second query timeout), result validation
+  and Java password verification. Only successful authentication reaches
+  `ServerAuthSessionService.issue` and response construction. No runtime timing or
+  session/lock evidence is available to identify which seam actually stalled.
+- `OAuthAuthorizationFlowTest` uses an `AnnotationConfigWebApplicationContext`,
+  fixture sessions and direct JDBC runtime connections. Its passing OAuth authorization
+  flow is not evidence that the full Boot ordinary login path succeeds.
+- `McpTransportConfiguration.mcpAiCaseData` is conditional on Case composition or
+  enabled disclosure composition. The ordinary OFF matrix has neither condition.
+  `McpAiCaseData` constructs the dedicated pool/verifier only when that bean is created;
+  `DataSources.aiCaseData()` is lazy. The existing OFF composition test checks bean
+  absence and route isolation, but cannot replace the required real SQL Boot smoke.
+- The merged V2 implementation commit `1eee0106` did not change `AuthController`,
+  `AuthServiceImpl` or the ordinary `DataSources` pool factory. Its readiness-test changes
+  choose the installer and explicit contract version. This does not prove either a
+  pre-existing fixture defect or a V2 regression. Ordinary pools enforce TLS with
+  `hostNameInCertificate=*.database.windows.net`; the documented local fixture must
+  support that name as well as `localhost`. A successful dedicated-identity localhost
+  probe alone would not prove the ordinary pool's TLS connection succeeds.
+
+### Outcome and resumption
+
+Root cause: **unidentified**. Exact fix: **none claimed or applied**. Before/after:
+#1927's reported login timeout remains unresolved; the fresh environment cannot reach
+that request without the authoritative fixture. No SQL blocking/session evidence, Java
+request-stack evidence or measured request timing was collected. Phases 1–5 are incomplete.
+Timeouts, login smoke, assertions, authentication, RLS and production behavior are unchanged.
+
+Provide the hash-gated private fixture and restore an owned disposable SQL/TLS harness
+using the existing documented contract, then collect bounded request/server/JDBC timing
+and SQL-session/thread evidence before selecting any fix. Run every mandatory local
+suite against that fixture with zero unexpected skips. Current follow-up commands/counts
+and unexecuted gates are recorded separately in
+[the follow-up verification record](phase3b8-login-timeout-followup.json).
+
+Native Azure identity/read-only acceptance and disposable Azure mutation/fault acceptance
+remain separate **OPEN** deployment gates. No production connection, migration, identity
+provisioning, JAR deployment or capability activation occurred. The seven installed
+Phase 3B production migrations must not be rerun.
+
+Follow-up verification: focused non-SQL Java checks 63/0 failures/0 errors/0 skips;
+critical reactor 228/0/0/0; Phase1R Python runner 3/0/0/0; selector Python 27/0/0/0.
+Readiness invocation discovered 1 test and skipped 1 (no runtime reproduction). V2 Python
+discovered 4 and skipped the private-input check (3 executed). Local server packaging
+passed with tests explicitly skipped in that packaging invocation; it adds no SQL evidence.
+Mandatory SQL suites listed in the follow-up JSON remain unexecuted. No counts here
+replace the original #1927 counts, and counts across groups overlap.
