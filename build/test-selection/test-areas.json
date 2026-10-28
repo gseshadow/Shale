@@ -509,6 +509,7 @@
         "build/case-read-verification/**",
         "build/auth-verification/**",
         "build/phase1r-verification/**",
+        "build/sql-confinement/**",
         "docs/sql/phase1r/**",
         "**/Phase1R*.java",
         "**/verification/CaseRead*.java",
@@ -558,6 +559,7 @@
         "com.shale.data.security.ai.ProofDigestTest",
         "com.shale.data.security.ai.AiCaseDataAccessTest",
         "com.shale.data.security.ai.AiCaseDataMigrationContractTest",
+        "com.shale.data.security.ai.AiCaseDataV2MigrationContractTest",
         "com.shale.data.security.ai.AiCaseDataAttestationTest"
       ]
     },

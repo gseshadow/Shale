@@ -13,12 +13,17 @@ final class McpAiCaseData {
     private final List<DataSource> forbidden;
     private final String database;
     private final McpOAuthProperties identity;
+    private final AiCaseDataAttestation.Contract contract;
     McpAiCaseData(Environment env,McpOAuthProperties identity,DataSources sources) {
         this(configuredData(env,sources),source(env,"shale.ai.data.verifier"),
                 List.of(sources.auth(),sources.runtime(),source(env,"shale.ai.oauth.bootstrap")),
-                env.getRequiredProperty("shale.ai.data.database"),identity);
+                env.getRequiredProperty("shale.ai.data.database"),identity,contract(env));
     }
     McpAiCaseData(DataSource data,DataSource verifier,List<DataSource> forbidden,String database,McpOAuthProperties identity) {
+        this(data,verifier,forbidden,database,identity,AiCaseDataAttestation.Contract.V1);
+    }
+    McpAiCaseData(DataSource data,DataSource verifier,List<DataSource> forbidden,String database,McpOAuthProperties identity,AiCaseDataAttestation.Contract contract) {
+        this.contract=java.util.Objects.requireNonNull(contract);
         this.data=java.util.Objects.requireNonNull(data);this.verifier=java.util.Objects.requireNonNull(verifier);
         this.forbidden=List.copyOf(forbidden);this.database=java.util.Objects.requireNonNull(database);this.identity=java.util.Objects.requireNonNull(identity);
         McpPayloadLogFilter.installSqlProtection();
@@ -27,7 +32,7 @@ final class McpAiCaseData {
     void ready(long deadline) {
         new AiCaseDataAttestation(new McpJdbcDeadline(data,deadline),new McpJdbcDeadline(verifier,deadline),
                 forbidden.stream().map(d->(DataSource)new McpJdbcDeadline(d,deadline)).toList(),database,identity.issuer(),identity.resource(),
-                identity.identity()==McpOAuthProperties.Identity.PRODUCTION).verify();
+                identity.identity()==McpOAuthProperties.Identity.PRODUCTION,contract).verify();
     }
     AiCaseDataRequest authenticate(String token,long deadline) {
         ready(deadline);
@@ -37,6 +42,7 @@ final class McpAiCaseData {
         return new AiCaseDataAccess(new McpJdbcDeadline(data,deadline),until->new McpJdbcDeadline(data,until),request);
     }
     private static DataSource configuredData(Environment env,DataSources sources) {
+        contract(env); // Reject missing/unknown version before allocating any pool.
         // Resolve every dedicated setting before allocating the independent pool.
         var config=new com.shale.data.config.Config(env::getProperty);
         config.aiCaseDataJdbcUrl();config.aiCaseDataUser();config.aiCaseDataPassword();
@@ -44,6 +50,9 @@ final class McpAiCaseData {
             for(String suffix:List.of(".jdbc-url",".username",".password"))required(env,prefix+suffix);
         required(env,"shale.ai.data.database");
         return sources.aiCaseData();
+    }
+    static AiCaseDataAttestation.Contract contract(Environment env) {
+        return AiCaseDataAttestation.Contract.valueOf(required(env,"shale.ai.data.contract-version"));
     }
     private static String required(Environment env,String key) {
         String value=env.getRequiredProperty(key);

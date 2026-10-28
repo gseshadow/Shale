@@ -16,15 +16,23 @@ public final class AiCaseDataAttestation {
     private final boolean productionInfrastructure;
     private final Properties definitions=new Properties();
     private final String catalog;
+    private final Contract contract;
+    public enum Contract { V1, V2 }
     public AiCaseDataAttestation(DataSource ai,DataSource verifier,List<DataSource> forbidden,String database,String issuer,String resource) {
         this(ai,verifier,forbidden,database,issuer,resource,false);
     }
     /** Production callers supply ordinary auth, ordinary runtime, then OAuth bootstrap in that order. */
     public AiCaseDataAttestation(DataSource ai,DataSource verifier,List<DataSource> forbidden,String database,String issuer,String resource,boolean productionInfrastructure) {
+        this(ai,verifier,forbidden,database,issuer,resource,productionInfrastructure,Contract.V1);
+    }
+    /** Explicit contract selection. No failed version may fall back to another verifier. */
+    public AiCaseDataAttestation(DataSource ai,DataSource verifier,List<DataSource> forbidden,String database,String issuer,String resource,boolean productionInfrastructure,Contract contract) {
+        this.contract=Objects.requireNonNull(contract);
         this.ai=Objects.requireNonNull(ai);this.verifier=Objects.requireNonNull(verifier);this.forbidden=List.copyOf(forbidden);
         this.productionInfrastructure=productionInfrastructure;
         this.database=Objects.requireNonNull(database);this.issuer=Objects.requireNonNull(issuer);this.resource=Objects.requireNonNull(resource);
-        try(var manifest=getClass().getResourceAsStream("/ai/confinement-modules.properties");var sql=getClass().getResourceAsStream("/ai/confinement-catalog.sql")) {
+        String prefix=contract==Contract.V2?"/ai/confinement-v2":"/ai/confinement";
+        try(var manifest=getClass().getResourceAsStream(prefix+"-modules.properties");var sql=getClass().getResourceAsStream(prefix+"-catalog.sql")) {
             if(manifest==null||sql==null)throw new IllegalStateException();definitions.load(manifest);catalog=new String(sql.readAllBytes(),StandardCharsets.UTF_8);
         } catch(Exception missing) { throw refused(); }
     }
@@ -124,7 +132,7 @@ public final class AiCaseDataAttestation {
             // Complete visibility belongs to the verifier, never to the AI data principal.
             try(var s=statement(review)) { boolean more=s.execute(catalog);while(true){if(more)try(var r=s.getResultSet()){while(r.next()){} }else if(s.getUpdateCount()==-1)break;more=s.getMoreResults(Statement.CLOSE_CURRENT_RESULT);} }
             stage="SOURCE_RECEIPT";
-            try(var p=review.prepareStatement("SELECT CONVERT(varchar(64),CONVERT(varbinary(32),value),2) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiCaseDataInvocation') AND name=N'Shale.AiCaseDataV1.Source'")) {
+            try(var p=review.prepareStatement("SELECT CONVERT(varchar(64),CONVERT(varbinary(32),value),2) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiCaseDataInvocation') AND name=N'Shale.AiCaseData"+contract+".Source'")) {
                 p.setQueryTimeout(3);try(var r=p.executeQuery()){if(!r.next()||!definitions.getProperty("Source").equalsIgnoreCase(r.getString(1))||r.next())throw refused();}
             }
             stage="MODULE_BODIES";

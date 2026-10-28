@@ -33,11 +33,22 @@ class AiCaseDataLocalSqlServerTest {
             for(String role:List.of("ai","runtime","bootstrap","catalog")) {String secret=UUID.randomUUID()+"aB9!";sql(c,"CREATE LOGIN ["+prefix+"_"+role+"] WITH PASSWORD='"+secret+"',CHECK_POLICY=OFF");secrets.put(role,secret);if(role.equals("catalog"))sql(c,"GRANT VIEW ANY DEFINITION TO ["+prefix+"_catalog]");}
         }
     }
+    AiCaseDataAttestation.Contract contract(){return AiCaseDataAttestation.Contract.V1;}
+    String confinementMigration(){return "phase3b7-confinement.sql";}
+    String confinementPrefix(){return "confinement";}
+    String confinementText()throws Exception {return Files.readString(Path.of("../docs/sql/ai-integration/"+confinementMigration()));}
+    List<String> fixtureSchema(){return schema;}
+    void afterSchema(Connection c)throws Exception {}
+    void beforeConfinement(Connection c)throws Exception {}
+    String prerequisiteText(String migration)throws Exception {return Files.readString(Path.of("../docs/sql/ai-integration/"+migration));}
     @BeforeEach void database()throws Exception {
         db=prefix+"_"+UUID.randomUUID().toString().replace("-","");try(var c=owner("master")){sql(c,"CREATE DATABASE ["+db+"]");}
         try(var c=owner(db)) {
-            for(String batch:schema)sql(c,batch);
-            for(String migration:List.of("phase3b1.sql","phase3b2b.sql","phase3b2c1.sql","phase3b2c2.sql","revocation.sql","phase3b2d.sql","phase3b3.sql","phase3b7-confinement.sql"))sql(c,Files.readString(Path.of("../docs/sql/ai-integration/"+migration)));
+            for(String batch:fixtureSchema())sql(c,batch);
+            afterSchema(c);
+            for(String migration:List.of("phase3b1.sql","phase3b2b.sql","phase3b2c1.sql","phase3b2c2.sql","revocation.sql","phase3b2d.sql","phase3b3.sql"))sql(c,prerequisiteText(migration));
+            beforeConfinement(c);
+            sql(c,confinementText());
             for(String role:secrets.keySet())sql(c,"CREATE USER ["+prefix+"_"+role+"] FOR LOGIN ["+prefix+"_"+role+"]");
             sql(c,"ALTER ROLE AiCaseDataRuntime ADD MEMBER ["+prefix+"_ai]; ALTER ROLE AiIntegrationRuntime ADD MEMBER ["+prefix+"_runtime]; ALTER ROLE AiIntegrationBootstrap ADD MEMBER ["+prefix+"_bootstrap]");
             sql(c,"ALTER ROLE AiCaseDataCatalogVerifier ADD MEMBER ["+prefix+"_catalog]");
@@ -74,18 +85,18 @@ class AiCaseDataLocalSqlServerTest {
 
     @Test void productionInfrastructureRequiresSeparateCatalogAndBootstrapSids() {
         assertDoesNotThrow(()->new AiCaseDataAttestation(source("ai"),source("catalog"),
-                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true).verify());
+                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true,contract()).verify());
         assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),
-                List.of(source("runtime"),source("runtime"),source("runtime")),db,ISSUER,RESOURCE,true).verify(),
+                List.of(source("runtime"),source("runtime"),source("runtime")),db,ISSUER,RESOURCE,true,contract()).verify(),
                 "Bootstrap cannot reuse ordinary identity even if the AI login is restricted.");
         assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),
-                List.of(source("catalog"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true).verify(),
+                List.of(source("catalog"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true,contract()).verify(),
                 "Catalog verification must have its own identity.");
     }
 
     @Test void productionVerifierRejectsCaseAuthorityInheritedFromPublic()throws Exception {
         var production=new AiCaseDataAttestation(source("ai"),source("catalog"),
-                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true);
+                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true,contract());
         production.verify();
         try(var c=owner(db)){sql(c,"GRANT SELECT ON dbo.Cases TO public");}
         try {
@@ -99,7 +110,7 @@ class AiCaseDataLocalSqlServerTest {
 
     @Test void allPublicApplicationAuthorityAndGrantOptionsRemoveAttestation()throws Exception {
         var production=new AiCaseDataAttestation(source("ai"),source("catalog"),
-                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true);
+                List.of(source("runtime"),source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,true,contract());
         try(var c=owner(db)) {
             sql(c,"CREATE VIEW dbo.AttestationView AS SELECT Id,Name FROM dbo.Cases");
             sql(c,"CREATE FUNCTION dbo.AttestationFunction() RETURNS int AS BEGIN RETURN 1 END");
@@ -188,10 +199,10 @@ class AiCaseDataLocalSqlServerTest {
     }
 
     @Test void migrationRepeatAndLiveAttestationRejectDrift()throws Exception {
-        try(var c=owner(db)) {sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b7-confinement.sql")));sql(c,Files.readString(Path.of("src/main/resources/ai/confinement-catalog.sql")));}
-        try(var c=source("catalog").getConnection()){sql(c,Files.readString(Path.of("src/main/resources/ai/confinement-catalog.sql")));}
-        try(var c=source("catalog").getConnection();var st=c.createStatement();var r=st.executeQuery("SELECT CONVERT(varchar(64),CONVERT(varbinary(32),value),2) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiCaseDataInvocation') AND name=N'Shale.AiCaseDataV1.Source'")) {
-            assertTrue(r.next(),"Catalog verifier must see the current source receipt");var expected=new Properties();try(var in=Files.newInputStream(Path.of("src/main/resources/ai/confinement-modules.properties"))){expected.load(in);}
+        try(var c=owner(db)) {sql(c,confinementText());sql(c,Files.readString(Path.of("src/main/resources/ai/"+confinementPrefix()+"-catalog.sql")));}
+        try(var c=source("catalog").getConnection()){sql(c,Files.readString(Path.of("src/main/resources/ai/"+confinementPrefix()+"-catalog.sql")));}
+        try(var c=source("catalog").getConnection();var st=c.createStatement();var r=st.executeQuery("SELECT CONVERT(varchar(64),CONVERT(varbinary(32),value),2) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiCaseDataInvocation') AND name=N'Shale.AiCaseData"+contract()+".Source'")) {
+            assertTrue(r.next(),"Catalog verifier must see the current source receipt");var expected=new Properties();try(var in=Files.newInputStream(Path.of("src/main/resources/ai/"+confinementPrefix()+"-modules.properties"))){expected.load(in);}
             assertEquals(expected.getProperty("Source").toLowerCase(Locale.ROOT),r.getString(1).toLowerCase(Locale.ROOT),"Compiled verifier and installed source receipt must match");assertFalse(r.next());
         }
         var attestation=attestation();attestation.verify();
@@ -199,8 +210,8 @@ class AiCaseDataLocalSqlServerTest {
         assertThrows(IllegalStateException.class,attestation::verify,"Column GRANT exceptions must remove readiness");
     }
     @Test void attestationRejectsIdentityRoleImpersonationOwnershipAndIndirectViewRoutes()throws Exception {
-        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),List.of(source("ai")),db,ISSUER,RESOURCE).verify(),"Same configured ordinary SID must fail");
-        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),List.of(),"wrong_database",ISSUER,RESOURCE).verify());
+        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),List.of(source("ai")),db,ISSUER,RESOURCE,false,contract()).verify(),"Same configured ordinary SID must fail");
+        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source("ai"),source("catalog"),List.of(),"wrong_database",ISSUER,RESOURCE,false,contract()).verify());
         for(String role:List.of("db_datareader","AiIntegrationRuntime","AiIntegrationBootstrap","AiCapabilityOperator")) {
             try(var c=owner(db)){sql(c,"ALTER ROLE "+role+" ADD MEMBER ["+prefix+"_ai]");}
             try{assertThrows(IllegalStateException.class,()->attestation().verify(),role);}finally{try(var c=owner(db)){sql(c,"ALTER ROLE "+role+" DROP MEMBER ["+prefix+"_ai]");}}
@@ -673,7 +684,7 @@ class AiCaseDataLocalSqlServerTest {
     private static Object invoke(Object target,java.lang.reflect.Method method,Object[] args)throws Throwable {
         try{return method.invoke(target,args);}catch(java.lang.reflect.InvocationTargetException e){throw e.getCause();}
     }
-    AiCaseDataAttestation attestation(){return new AiCaseDataAttestation(source("ai"),source("catalog"),List.of(source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE);}
+    AiCaseDataAttestation attestation(){return new AiCaseDataAttestation(source("ai"),source("catalog"),List.of(source("runtime"),source("bootstrap")),db,ISSUER,RESOURCE,false,contract());}
     AiCaseDataRequest authenticate(String token){return AiCaseDataAccess.authenticate(source("ai"),token,ISSUER,RESOURCE,System.nanoTime()+10_000_000_000L);}
     AiIntegrationSecurityService controls(int tenant,int user){return new AiIntegrationSecurityService(provider("runtime",tenant,user),true,ISSUER,RESOURCE);}
     String issue(int tenant,int user)throws Exception {

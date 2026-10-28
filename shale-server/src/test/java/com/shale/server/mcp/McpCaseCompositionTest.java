@@ -156,14 +156,18 @@ class McpCaseCompositionTest {
     }
 
     @Test void enabledReadinessRequiresEveryDedicatedSettingBeforeAllocatingAiPool() {
-        Map<String,String> complete=Map.of(
-                "shale.ai.data.jdbc-url","jdbc:sqlserver://sql.example;databaseName=shale",
-                "shale.ai.data.username","ai","shale.ai.data.password","synthetic",
-                "shale.ai.data.database","shale",
-                "shale.ai.data.verifier.jdbc-url","jdbc:sqlserver://sql.example;databaseName=shale",
-                "shale.ai.data.verifier.username","catalog","shale.ai.data.verifier.password","synthetic",
-                "shale.ai.oauth.bootstrap.jdbc-url","jdbc:sqlserver://sql.example;databaseName=shale",
-                "shale.ai.oauth.bootstrap.username","bootstrap","shale.ai.oauth.bootstrap.password","synthetic");
+        Map<String,String> complete=Map.ofEntries(
+                Map.entry("shale.ai.data.contract-version","V2"),
+                Map.entry("shale.ai.data.jdbc-url","jdbc:sqlserver://sql.example;databaseName=shale"),
+                Map.entry("shale.ai.data.username","ai"),
+                Map.entry("shale.ai.data.password","synthetic"),
+                Map.entry("shale.ai.data.database","shale"),
+                Map.entry("shale.ai.data.verifier.jdbc-url","jdbc:sqlserver://sql.example;databaseName=shale"),
+                Map.entry("shale.ai.data.verifier.username","catalog"),
+                Map.entry("shale.ai.data.verifier.password","synthetic"),
+                Map.entry("shale.ai.oauth.bootstrap.jdbc-url","jdbc:sqlserver://sql.example;databaseName=shale"),
+                Map.entry("shale.ai.oauth.bootstrap.username","bootstrap"),
+                Map.entry("shale.ai.oauth.bootstrap.password","synthetic"));
         for(String missing:complete.keySet()) {
             var env=environment("azure");complete.forEach((key,value)->{if(!key.equals(missing))env.setProperty(key,value);});
             var pools=mock(DataSources.class);
@@ -172,6 +176,18 @@ class McpCaseCompositionTest {
         }
     }
 
+    @Test void contractSelectionIsExplicitAndUnknownVersionsFailClosed() {
+        var env=environment("azure");
+        assertThrows(IllegalStateException.class,()->McpAiCaseData.contract(env));
+        for(String invalid:List.of("", "v2", "V3", "V2,V1")){
+            env.setProperty("shale.ai.data.contract-version",invalid);
+            assertThrows(RuntimeException.class,()->McpAiCaseData.contract(env));
+        }
+        for(String version:List.of("V1","V2")){
+            env.setProperty("shale.ai.data.contract-version",version);
+            assertEquals(version,McpAiCaseData.contract(env).name());
+        }
+    }
     @Test void productionTransportRequiresDedicatedCompositionAndNeverCreatesLegacyAuthenticator() {
         var env=environment("azure");env.setProperty(TRANSPORT,"true");
         assertThrows(IllegalStateException.class,()->new McpCaseCompositionPolicy(env,PRODUCTION).requireTransport());

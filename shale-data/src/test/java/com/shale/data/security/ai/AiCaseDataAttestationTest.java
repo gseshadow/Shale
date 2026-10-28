@@ -27,6 +27,16 @@ class AiCaseDataAttestationTest {
         for(String forbidden:List.of("sys.server_permissions","sys.server_principals","sys.endpoints","sys.login_token","HAS_DBACCESS","IS_SRVROLEMEMBER","'SERVER'"))
             assertFalse(observed.stream().anyMatch(q->q.contains(forbidden)),forbidden);
     }
+    @Test void v2AzureCatalogFailureDoesNotTryHistoricalReceipt() {
+        var observed=new ArrayList<String>();
+        var failure=assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(
+                source(azure("ai",10,observed)),source(azure("catalog",11,observed)),List.of(),"db","issuer","resource",false,AiCaseDataAttestation.Contract.V2).verify());
+        assertTrue(failure.getMessage().contains("CATALOG_RECEIPT"));
+        assertTrue(observed.stream().anyMatch(q->q.contains("Shale.AiCaseDataV2")));
+        assertFalse(observed.stream().anyMatch(q->q.contains("Shale.AiCaseDataV1")));
+        for(String forbidden:List.of("sys.server_permissions","sys.server_principals","sys.endpoints","sys.login_token","HAS_DBACCESS"))
+            assertFalse(observed.stream().anyMatch(q->q.contains(forbidden)),forbidden);
+    }
     @Test void azureRejectsLoginMappedAndExternalIdentitiesBeforeCatalogAcceptance() {
         for(int authentication:List.of(0,1,3,4)) {
             var observed=new ArrayList<String>();
@@ -112,7 +122,7 @@ class AiCaseDataAttestationTest {
                 Class<?> kind=prepared==null?Statement.class:PreparedStatement.class;
                 var bindings=new HashMap<Integer,Object>();
                 return Proxy.newProxyInstance(kind.getClassLoader(),new Class[]{kind},(sp,sm,sa)->{
-                    if(sm.getName().equals("execute"))throw new SQLException("catalog unavailable",null,59100);
+                    if(sm.getName().equals("execute")){query.apply((String)sa[0]);throw new SQLException("catalog unavailable",null,59100);}
                     if(sm.getName().equals("executeQuery")) {
                         List<Object[]> data;
                         try{data=query.apply(prepared==null?(String)sa[0]:prepared+" /*first="+bindings.get(1)+"*/");}catch(QueryFailure failure){throw new SQLException("catalog unavailable",null,208);}

@@ -36,3 +36,20 @@ Production-composition JDBC and the separate Caddy proxy tests still require val
 The shared catalog helper tests do not establish native Azure contained-user or catalog semantics.
 See the [current acceptance receipt](../../docs/testing/azure-sql-case-attestation.md) for exact
 engine/component hashes, commands, results and the remaining disposable Azure gate.
+
+
+## V2 successor
+
+`python3 build/sql-confinement/generate-v2.py` reads frozen V1 outputs but writes only new V2
+installer/prerequisite/standalone/package files, a new manifest, and the V2 cumulative dispatcher.
+It never regenerates historical V1. Reviewed Case module inputs are hash-only explicit variants;
+private source/candidate/production metadata must never be committed. The V2 generator encodes all
+13 unchanged confined module bodies as UTF-16LE hex so checkout line endings do not change installation.
+See [V2 design](../../docs/architecture/phase3b8-confinement-v2.md) and the V2 acceptance record.
+
+Run `python3 -m unittest discover -s build/sql-confinement -p 'test_v2.py'` for static contracts.
+The private projection case requires SHALE_CASE_VERIFY_SCHEMA and SHALE_V2_PRODUCTION_CATALOG;
+its skip without inputs is never acceptance. Actual SQL tests additionally require the existing
+LOCAL_DISPOSABLE_AI opt-in, loopback port/password and candidate SHA-256. V1 tests remain V1;
+AiCaseDataV2LocalSqlServerTest runs the same authority assertions on production-style metadata,
+and AiCaseDataV2AuthoritativeLocalSqlServerTest explicitly selects the authoritative variant.

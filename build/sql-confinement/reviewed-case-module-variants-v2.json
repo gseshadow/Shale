@@ -1,0 +1,31 @@
+{
+  "contract": "AiCaseDataV2",
+  "sourceSha256": "4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda",
+  "candidateSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f",
+  "modules": {
+    "dbo.AiCascade_Tenant": {
+      "authoritative": "013f90b908c49e35d9f7510abbde4cb3c88e9f9d988df214894ab5f5307a55b4",
+      "production": "8a5471c35ac4c51d258d4403e6ed9fba20792d025636e4eebf69e36cdd525d51"
+    },
+    "dbo.AiCascade_User": {
+      "authoritative": "8fb242847e2970c3040aa844b1c3126f276a23709cda6ecd99aaee16bbd90f0e",
+      "production": "c89d506ff1254529b31530e745c28ce5c249ed2e68f7e0b7ea77b458e3c2889c"
+    },
+    "dbo.AiCascade_Web": {
+      "authoritative": "1b5862631966933d9b5cda68b7705c035ddb5ff42953f128a5ee03c55e66f39f",
+      "production": "b2bafb8024687539b2c7b70f35b5e0175c6d5c3242de115da14f3123a40871f4"
+    },
+    "dbo.ToBitNV": {
+      "authoritative": "d203661a9f42799d7e9f60cdbdad11c2f86b14aea4a82f44f64f55c89445deeb",
+      "production": "eff52f3dc23fba3d88d8d788fe06bfb88f61e3ebcbdc5c5bc3640f083d2c2ecc"
+    },
+    "sec.fn_FilterByTenant": {
+      "authoritative": "dca29ac712cf8be8badba8d62a324857eb73931c6b98367c656c6fd094738502",
+      "production": "787ada49e37e9af1e368d6f61b1a5393de3fc4ced2bc018e8f4c22afc9c07041"
+    },
+    "sec.fn_FilterByTenantOrGlobal": {
+      "authoritative": "8a33cf8c28f999a1118d6b225e38930861f3774d55e568453716616f79fb0ac3",
+      "production": "be4978581488a070d4ad30fb6d424ffa32888face044483ba36cc461acfe944c"
+    }
+  }
+}

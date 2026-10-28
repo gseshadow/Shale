@@ -1,0 +1,358 @@
+{
+  "classification": "BLOCKED",
+  "base": "a06a05cf7a9c0b758fc7a0478c5541c9dfdb1489",
+  "implementation": "1eee0106",
+  "caseCatalogHash": "6e9182b6e9b75200a16d51dbd537ca8926b358d603220d287a9710ad6ca8063a",
+  "sourceReceipt": "60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891",
+  "productionAccess": false,
+  "nativeAzureMutationFaultGate": "OPEN; no native Azure fixture or identities provisioned",
+  "results": [
+    {
+      "name": "v2-focused-final",
+      "exit": 1,
+      "seconds": 105.2,
+      "counts": {
+        "tests": 18,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-focused-final",
+      "exit": 0,
+      "seconds": 117.62,
+      "counts": {
+        "tests": 28,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "authoritative-case-local",
+      "exit": 0,
+      "seconds": 19.64,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v1-data-1",
+      "exit": 0,
+      "seconds": 137.32,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v1-data-2",
+      "exit": 0,
+      "seconds": 86.88,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v1-data-3",
+      "exit": 0,
+      "seconds": 92.38,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v1-data-4",
+      "exit": 0,
+      "seconds": 95.62,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v1-data-5",
+      "exit": 0,
+      "seconds": 55.13,
+      "counts": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-data-1",
+      "exit": 0,
+      "seconds": 161.83,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-data-2",
+      "exit": 0,
+      "seconds": 104.59,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-data-3",
+      "exit": 0,
+      "seconds": 102.29,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-data-4",
+      "exit": 0,
+      "seconds": 104.12,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-data-5",
+      "exit": 0,
+      "seconds": 60.58,
+      "counts": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "polybase-AiCaseDataLocalSqlServerTest",
+      "exit": 1,
+      "seconds": 24.38,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 1,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-production-readiness",
+      "exit": 1,
+      "seconds": 78.16,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 1,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "polybase-AiCaseDataLocalSqlServerTest",
+      "exit": 0,
+      "seconds": 26.02,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "polybase-AiCaseDataV2LocalSqlServerTest",
+      "exit": 0,
+      "seconds": 26.44,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-serving-productionCatalogPublicGrantDeniesServing",
+      "exit": 0,
+      "seconds": 114.08,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-serving-productionTlsProxy",
+      "exit": 0,
+      "seconds": 59.01,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-serving-finishedResponseBoundaries",
+      "exit": 0,
+      "seconds": 49.45,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-client-ts",
+      "exit": 0,
+      "seconds": 200.74,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-client-python",
+      "exit": 0,
+      "seconds": 207.7,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "v2-local-receipts",
+      "exit": 0,
+      "seconds": 47.58,
+      "counts": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  ],
+  "remainingResults": [
+    {
+      "name": "affected-0",
+      "exit": 0,
+      "counts": {
+        "tests": 197,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 12
+      },
+      "seconds": 25.3
+    },
+    {
+      "name": "critical",
+      "exit": 1,
+      "counts": {
+        "tests": 129,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "seconds": 14.9
+    },
+    {
+      "name": "package",
+      "exit": 0,
+      "counts": {
+        "tests": 0,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "seconds": 13.6
+    }
+  ],
+  "criticalOnlineRetry": {
+    "status": "PASS",
+    "counts": {
+      "tests": 228,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "command": "mvn -B test"
+  },
+  "pythonCounts": {
+    "selector": 27,
+    "phase1r": 3,
+    "caseLauncher": 4,
+    "v2PrivateProjection": 4
+  },
+  "installedLocalReceipts": {
+    "authoritative-receipt": [
+      "Shale.AiCaseDataV2=35192A46D72054F6C51FA9E8248235887513FCA1DC7ACAC7FCD00EDDEC068799",
+      "Shale.AiCaseDataV2.Source=60F7B39727A95CA65AFD26BA3F8206A2700B64CA4DF512DA89DF070A9F92E891"
+    ],
+    "production-receipt": [
+      "Shale.AiCaseDataV2=DA8B39BE279B7C7B20D1A751B887C5DBA51AD8D4DE6491FAEDA32297A635B1F3",
+      "Shale.AiCaseDataV2.Source=60F7B39727A95CA65AFD26BA3F8206A2700B64CA4DF512DA89DF070A9F92E891"
+    ]
+  },
+  "changedFiles": [
+    "build/sql-confinement/README.md",
+    "build/sql-confinement/case-catalog-v2.sha256",
+    "build/sql-confinement/case-catalog-v2.sql",
+    "build/sql-confinement/generate-v2.py",
+    "build/sql-confinement/reviewed-case-module-variants-v2.json",
+    "build/sql-confinement/test_v2.py",
+    "build/test-selection/critical-tests.txt",
+    "build/test-selection/test-areas.json",
+    "docs/architecture/ai-integration-and-mcp.md",
+    "docs/architecture/phase3b8-confinement-v2.md",
+    "docs/production-mcp-deployment-preflight.md",
+    "docs/sql/ai-integration/phase3b8-confinement-prerequisite.sql",
+    "docs/sql/ai-integration/phase3b8-confinement-verify.sql",
+    "docs/sql/ai-integration/phase3b8-confinement.sql",
+    "docs/sql/ai-integration/verify.sql",
+    "shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java",
+    "shale-data/src/main/resources/ai/confinement-v2-catalog.sql",
+    "shale-data/src/main/resources/ai/confinement-v2-modules.properties",
+    "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataAttestationTest.java",
+    "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataAzureSqlDatabaseReadOnlyTest.java",
+    "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataLocalSqlServerTest.java",
+    "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataV2AuthoritativeLocalSqlServerTest.java",
+    "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataV2LocalSqlServerTest.java",
+    "shale-data/src/test/java/com/shale/data/security/ai/AiCaseDataV2MigrationContractTest.java",
+    "shale-server/src/main/java/com/shale/server/mcp/McpAiCaseData.java",
+    "shale-server/src/test/java/com/shale/server/mcp/McpCaseCompositionTest.java",
+    "shale-server/src/test/java/com/shale/server/mcp/McpConfinedClientFixture.java",
+    "shale-server/src/test/java/com/shale/server/oauth/AuthoritativeCaseMcpLocalSqlServerTest.java",
+    "shale-server/src/test/java/com/shale/server/oauth/McpProductionReadinessLocalSqlServerTest.java",
+    "shale-server/src/test/java/com/shale/server/oauth/Phase3b7AcceptanceLocalSqlServerTest.java"
+  ],
+  "requiredFailingGate": "McpProductionReadinessLocalSqlServerTest: ordinary HTTP POST /api/auth/login timed out with AI composition OFF; cause unresolved"
+}
