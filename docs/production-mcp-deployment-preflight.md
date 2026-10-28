@@ -19,6 +19,7 @@ All controls default false. Existing JDBC configuration and certificate validati
 | `shale.ai.oauth.public-origin` | Identity | Canonical HTTPS origin; issuer appends /oauth/mcp, resource appends /mcp |
 | `shale.ai.data.jdbc-url`, `.username`, `.password` | Readiness configuration | Restricted AI SQL identity; password is a secret |
 | `shale.ai.data.database` | Readiness configuration | Exact expected database |
+| `shale.ai.data.contract-version` | Attestation version | Explicit V2; no automatic fallback |
 | `shale.ai.data.verifier.jdbc-url`, `.username`, `.password` | Readiness configuration | Separate catalog verifier; password is a secret |
 | `shale.ai.oauth.bootstrap.jdbc-url`, `.username`, `.password` | Readiness/activation configuration | Separate bootstrap identity; password is a secret |
 | `shale.ai.oauth.composition-enabled` | OAuth composition | false |
@@ -103,14 +104,36 @@ predates the three FILTERs and refuses their presence; reconcile uncertain state
 
 ## Stage 1 SQL migration
 
-**DO NOT RUN — FUTURE SQL CHANGE.** After explicit SQL authorization and reviewed prerequisites, install
-only unapplied migrations: phase3b1.sql -> phase3b2b.sql -> phase3b2c1.sql -> phase3b2c2.sql ->
-revocation.sql -> phase3b2d.sql -> phase3b3.sql -> phase3b7-confinement.sql. No phase3b2a.sql exists.
-Use fresh dbo/autocommit/NULL-context sessions and stop on errors. phase3b2b is not rerunnable.
-Never rerun historical installers over a newer catalog or replace receipts. Follow the SQL README.
-Run cumulative verify.sql after all migrations. Its confinement branch equals the standalone verifier;
-completion without errors and ConfinementCatalogDriftFindingCount=0 establishes only that catalog check.
-Its early return means separate state and actual-login permission checks remain necessary.
+**DO NOT RUN — FUTURE SQL CHANGE.** The operator reports the following seven migrations already
+installed: phase3b1.sql, phase3b2b.sql, phase3b2c1.sql, phase3b2c2.sql, revocation.sql,
+phase3b2d.sql and phase3b3.sql. **Do not rerun any of them.** Phase1R and confinement remain uninstalled.
+Historical phase3b7-confinement.sql correctly refused the production representation before installation;
+it must not be retried as a repair. Physical column-ID gaps and reviewed SQL storage representation
+prevent its exact fingerprint even after Phase1R. Never rebuild tables, renumber IDs or rewrite modules
+to satisfy V1. Preserve its historical receipts, expected hash and failure evidence.
+
+The new [V2 contract](architecture/phase3b8-confinement-v2.md) requires fresh local acceptance before
+an operator receives an executable packet. The separately governed future sequence is:
+
+1. Retain the seven installed migrations; verify their current cumulative predecessor receipts.
+2. Phase1R preflight with independently reviewed destination inputs.
+3. Phase1R apply.
+4. Phase1R postcheck: three exact FILTERs, no unrelated changes, Shale.Phase1R.v1 receipt.
+5. Read-only phase3b8-confinement-prerequisite.sql; stop on any finding/error.
+6. phase3b8-confinement.sql in a fresh dbo/autocommit/NULL-context session; stop on failure.
+7. Cumulative verify.sql. V2 receipts select only V2; a failure cannot fall back to V1.
+8. Separately provision dedicated contained AI runtime, verifier and bootstrap identities.
+9. Configure dedicated App Service secrets and explicit `shale.ai.data.contract-version=V2`, all controls OFF.
+10. Build/package/deploy the reviewed server JAR under separate release authorization.
+11. Separately enable readiness-only composition and require fresh live attestation.
+12. Run no-disclosure smoke with every disclosure/OAuth/tenant capability OFF.
+13. Obtain later separate authorization for a monitored pilot.
+
+All SQLCMD invocations in the eventual operator packet require validated TLS, `-N -b -V 16`,
+interactive password, no `-C`/`-P`, and immediate exit-code checks. No script may continue after
+failed Phase1R, receipt, prerequisite, installer, source/catalog or cumulative verification.
+V2 writes Shale.AiCaseDataV2 and Shale.AiCaseDataV2.Source; V1 receipts are never interpreted as V2.
+The six existing RPC procedure names and case-read-v1 data/audit contract remain unchanged.
 
 ## Stage 2 Restricted identities and immutable binding
 

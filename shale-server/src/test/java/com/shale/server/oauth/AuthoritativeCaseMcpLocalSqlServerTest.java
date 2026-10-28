@@ -21,7 +21,7 @@ class AuthoritativeCaseMcpLocalSqlServerTest {
             try(var c=h.owner("master")){OAuthAuthorizationFlowTest.sql(c,"CREATE LOGIN ["+ai+"] WITH PASSWORD='"+aiSecret+"',CHECK_POLICY=OFF; CREATE LOGIN ["+catalog+"] WITH PASSWORD='"+catalogSecret+"',CHECK_POLICY=OFF; GRANT VIEW ANY DEFINITION TO ["+catalog+"]");}
             try(var c=h.owner(h.db)) {
                 OAuthAuthorizationFlowTest.sql(c,"DROP TRIGGER dbo.LocalPhiFault");
-                OAuthAuthorizationFlowTest.sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b7-confinement.sql")));
+                OAuthAuthorizationFlowTest.sql(c,Files.readString(Path.of("../docs/sql/ai-integration/"+("V2".equals(System.getProperty("shale.acceptance.confinement","V1"))?"phase3b8-confinement.sql":"phase3b7-confinement.sql"))));
                 OAuthAuthorizationFlowTest.sql(c,"CREATE USER ["+ai+"] FOR LOGIN ["+ai+"]; ALTER ROLE AiCaseDataRuntime ADD MEMBER ["+ai+"]; CREATE USER ["+catalog+"] FOR LOGIN ["+catalog+"]; ALTER ROLE AiCaseDataCatalogVerifier ADD MEMBER ["+catalog+"]");
                 OAuthAuthorizationFlowTest.sql(c,"INSERT dbo.AiCaseDataDeployment VALUES(1,N'"+OAuthAuthorizationFlowTest.ISSUER+"',N'"+OAuthAuthorizationFlowTest.RESOURCE+"','case-read-v1','"+java.time.ZoneId.systemDefault().getId()+"','UTC')");
             }

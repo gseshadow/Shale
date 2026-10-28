@@ -14,7 +14,7 @@ class AiCaseDataAzureSqlDatabaseReadOnlyTest {
         DataSource ai=source("AI"),verifier=source("VERIFIER");
         try(var c=ai.getConnection()) {assertEquals(AiCaseDataAttestation.Platform.AZURE_SQL_DATABASE,AiCaseDataAttestation.platform(c));}
         new AiCaseDataAttestation(ai,verifier,List.of(source("AUTH"),source("RUNTIME"),source("BOOTSTRAP")),
-                required("DATABASE"),required("ISSUER"),required("RESOURCE"),true).verify();
+                required("DATABASE"),required("ISSUER"),required("RESOURCE"),true,AiCaseDataAttestation.Contract.valueOf(required("CONTRACT_VERSION"))).verify();
     }
     private static DataSource source(String identity) {
         String url=required("JDBC_URL");

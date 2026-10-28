@@ -4416,3 +4416,21 @@ governed proposal. This classification authorizes no production SQL/configuratio
 **Production deployment: NOT AUTHORIZED. Pilot: NOT AUTHORIZED.** Existing legal, SDK,
 security/operator/tenant-owner and live deployment approvals remain independent. No production SQL,
 identity, Azure App Service setting, JAR or AI/MCP/OAuth capability was changed.
+
+
+### Confinement V2 representation successor — 2026-10-28
+
+[Design and acceptance scope](phase3b8-confinement-v2.md). V1's historical exact fingerprint remains
+unchanged. The reviewed production catalog plus only Phase1R projects D4AA4B9D029044A69BA0FE10A171DD6B5447374EC3124CBFB6EA6E743E49F0CC,
+so the historical installer is not an applicable production repair. V2 uses active logical column
+positions and finite reviewed module-definition hashes, with independent metadata/dependency checks.
+New receipts/version selection are explicit; V2 failure never falls back to V1. The six RPCs,
+proof/quota/audit/handoff rules, identity/Azure/public-authority checks and OFF defaults remain.
+
+Production already has phase3b1 through phase3b3, including all seven listed prerequisites: never
+rerun those installers. The [future sequence](../production-mcp-deployment-preflight.md#stage-1-sql-migration)
+is Phase1R preflight/apply/postcheck, V2 prerequisite, V2 installer, cumulative verification, separately
+governed contained identities, dedicated secrets with controls OFF, reviewed JAR, readiness-only,
+no-disclosure smoke, and later separately authorized pilot. No production object rewrite to match V1.
+Local V2 acceptance and native/disposable Azure gates must be reported separately. This task authorizes
+repository preparation and an unmerged PR only; no production connection/change or activation.

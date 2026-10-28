@@ -51,7 +51,7 @@ public final class McpConfinedClientFixture {
             });
             var fallbackCalls=new java.util.concurrent.atomic.AtomicInteger();
             if(production)context.registerBean("forbiddenLegacyFallback",McpTransportConfiguration.DeadlineAccess.class,()->(token,deadline)->{fallbackCalls.incrementAndGet();throw new AssertionError("Production must never invoke legacy authority");});
-            context.registerBean(McpAiCaseData.class,()->new McpAiCaseData(serving,catalog,production?List.of(forbidden.get(0),forbidden.get(0),forbidden.get(1)):forbidden,database,identity));
+            context.registerBean(McpAiCaseData.class,()->new McpAiCaseData(serving,catalog,production?List.of(forbidden.get(0),forbidden.get(0),forbidden.get(1)):forbidden,database,identity,com.shale.data.security.ai.AiCaseDataAttestation.Contract.valueOf(System.getProperty("shale.acceptance.confinement","V1"))));
             new org.springframework.context.annotation.AnnotatedBeanDefinitionReader(context).register(com.shale.server.oauth.McpOAuthSecurityConfiguration.class,McpTransportConfiguration.class);
             context.refresh();
             assertEquals(List.of(production?"azure":"test"),List.of(context.getEnvironment().getActiveProfiles()));

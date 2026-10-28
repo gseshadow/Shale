@@ -27,7 +27,7 @@ class McpProductionReadinessLocalSqlServerTest {
             ai=h.db+"_readiness_ai";catalog=h.db+"_readiness_catalog";
             try(var c=h.owner("master")){sql(c,"CREATE LOGIN ["+ai+"] WITH PASSWORD='"+aiSecret+"',CHECK_POLICY=OFF; CREATE LOGIN ["+catalog+"] WITH PASSWORD='"+catalogSecret+"',CHECK_POLICY=OFF; GRANT VIEW ANY DEFINITION TO ["+catalog+"]");}
             try(var c=h.owner(h.db)) {
-                sql(c,"DROP TRIGGER dbo.LocalPhiFault");sql(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b7-confinement.sql")));
+                sql(c,"DROP TRIGGER dbo.LocalPhiFault");sql(c,Files.readString(Path.of("../docs/sql/ai-integration/"+("V2".equals(System.getProperty("shale.acceptance.confinement","V1"))?"phase3b8-confinement.sql":"phase3b7-confinement.sql"))));
                 sql(c,"CREATE USER ["+ai+"] FOR LOGIN ["+ai+"]; ALTER ROLE AiCaseDataRuntime ADD MEMBER ["+ai+"]; CREATE USER ["+catalog+"] FOR LOGIN ["+catalog+"]; ALTER ROLE AiCaseDataCatalogVerifier ADD MEMBER ["+catalog+"]");
                 sql(c,"INSERT dbo.AiCaseDataDeployment VALUES(1,N'"+OAuthAuthorizationFlowTest.ISSUER+"',N'"+OAuthAuthorizationFlowTest.RESOURCE+"','case-read-v1','"+java.time.ZoneId.systemDefault().getId()+"','UTC')");
                 sql(c,"UPDATE dbo.AiProductCapability SET Enabled=0; UPDATE dbo.TenantAiIntegrationPolicy SET Enabled=0");
@@ -48,6 +48,7 @@ class McpProductionReadinessLocalSqlServerTest {
             // Verify the fixture certificate and hostname before composing production pools.
             try(var c=DriverManager.getConnection(url+";encrypt=true;trustServerCertificate=false",ai,aiSecret)){assertTrue(c.isValid(2));}
             var properties=new HashMap<String,Object>();
+            properties.put("shale.ai.data.contract-version",System.getProperty("shale.acceptance.confinement","V1"));
             properties.put("shale.ai.oauth.public-origin",OAuthAuthorizationFlowTest.ORIGIN);properties.put("shale.ai.oauth.identity","PRODUCTION");
             properties.put("shale.ai.mcp.case-data-composition-enabled",true);
             for(String flag:List.of("shale.ai.enabled","shale.ai.mcp.enabled","shale.ai.mcp.search-cases-enabled","shale.ai.mcp.get-case-overview-enabled","shale.ai.oauth.composition-enabled","shale.ai.oauth.authorization-enabled","shale.ai.oauth.exchange-enabled"))properties.put(flag,false);
