@@ -1,0 +1,2399 @@
+{
+  "classification": "V2 LOCAL DEPLOYMENT-PREPARATION ACCEPTANCE COMPLETE",
+  "historicalTimeoutClassification": "UNREPRODUCED HISTORICAL TRANSIENT",
+  "rootCauseEstablished": false,
+  "rootCauseFixRequired": false,
+  "productionSourceChanged": false,
+  "timeoutAndAssertionsChanged": false,
+  "historical1927EvidencePreserved": true,
+  "base": "5e84669fe5f287a05d472609e29ae6ebb9b6521f",
+  "testedSource": "10e6ac6ab913ef8056fa8d3538963264e6c9b8a1",
+  "candidateSha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f",
+  "campaign": {
+    "runs": [
+      {
+        "run": 1,
+        "junitSeconds": 97.65,
+        "processSeconds": 115.825,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1307,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 367
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 136
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 443,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 84
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 83
+            }
+          }
+        ],
+        "sqlSamples": 55,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "NONE": 21,
+          "PREEMPTIVE_OS_FLUSHFILEBUFFERS": 1,
+          "MEMORY_ALLOCATION_EXT": 1
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 4,
+        "timeout": false
+      },
+      {
+        "run": 2,
+        "junitSeconds": 94.66,
+        "processSeconds": 112.927,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1148,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 321
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 129
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 456,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 98
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 86
+            }
+          }
+        ],
+        "sqlSamples": 54,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "NONE": 24,
+          "PREEMPTIVE_OS_FLUSHFILEBUFFERS": 1,
+          "MEMORY_ALLOCATION_EXT": 1
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 2,
+        "timeout": false
+      },
+      {
+        "run": 3,
+        "junitSeconds": 93.49,
+        "processSeconds": 109.377,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1102,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 284
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 132
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 444,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 85
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 83
+            }
+          }
+        ],
+        "sqlSamples": 52,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "PREEMPTIVE_OS_FLUSHFILEBUFFERS": 1,
+          "MEMORY_ALLOCATION_EXT": 1,
+          "NONE": 26
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 3,
+        "timeout": false
+      },
+      {
+        "run": 4,
+        "junitSeconds": 93.48,
+        "processSeconds": 109.155,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1205,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 350
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 134
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 500,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 90
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 88
+            }
+          }
+        ],
+        "sqlSamples": 52,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "NONE": 27,
+          "MEMORY_ALLOCATION_EXT": 1
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 3,
+        "timeout": false
+      },
+      {
+        "run": 5,
+        "junitSeconds": 95.19,
+        "processSeconds": 108.857,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1142,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 293
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 137
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 479,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 91
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 88
+            }
+          }
+        ],
+        "sqlSamples": 52,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "NONE": 24
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 2,
+        "timeout": false
+      },
+      {
+        "run": 6,
+        "junitSeconds": 96.01,
+        "processSeconds": 109.547,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1079,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 312
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 132
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 442,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 80
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 88
+            }
+          }
+        ],
+        "sqlSamples": 53,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "NONE": 27,
+          "MEMORY_ALLOCATION_EXT": 1
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 1,
+        "timeout": false
+      },
+      {
+        "run": 7,
+        "junitSeconds": 92.08,
+        "processSeconds": 105.356,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1104,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 271
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 124
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 514,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 90
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 88
+            }
+          }
+        ],
+        "sqlSamples": 51,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "NONE": 22,
+          "WRITELOG": 1
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 4,
+        "timeout": false
+      },
+      {
+        "run": 8,
+        "junitSeconds": 99.07,
+        "processSeconds": 114.501,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1113,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 288
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 131
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 443,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 85
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 89
+            }
+          }
+        ],
+        "sqlSamples": 55,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "PREEMPTIVE_OS_FLUSHFILEBUFFERS": 2,
+          "NONE": 27
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 4,
+        "timeout": false
+      },
+      {
+        "run": 9,
+        "junitSeconds": 90.59,
+        "processSeconds": 103.671,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1099,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 289
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 132
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 453,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 97
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 93
+            }
+          }
+        ],
+        "sqlSamples": 50,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "NONE": 25
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 1,
+        "timeout": false
+      },
+      {
+        "run": 10,
+        "junitSeconds": 91.98,
+        "processSeconds": 106.42,
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "phases": [
+          {
+            "phase": "OFF",
+            "checks": 23,
+            "summedHttpMilliseconds": 1127,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 267
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 142
+            }
+          },
+          {
+            "phase": "ON",
+            "checks": 23,
+            "summedHttpMilliseconds": 504,
+            "wrongPassword": {
+              "status": 401,
+              "milliseconds": 86
+            },
+            "correctPassword": {
+              "status": 200,
+              "milliseconds": 87
+            }
+          }
+        ],
+        "sqlSamples": 51,
+        "sqlCollectionErrors": 0,
+        "sqlWaitTypes": {
+          "WRITELOG": 1,
+          "NONE": 26
+        },
+        "sqlBlockedSessionSamples": 0,
+        "sqlOpenTransactionSamples": 4,
+        "timeout": false
+      }
+    ],
+    "phaseDurationLimit": "Summed HTTP times, not full Boot/readiness phase wall time",
+    "fixtureIsolation": "Each unchanged test invocation constructs fresh UUID-named databases and logins and cleans them in finally; separate Maven/JVM per invocation",
+    "watchdog": "Java thread/performance capture armed for any HTTP request pending >=5 seconds; see private watch.log"
+  },
+  "nativeAzureIdentityReadOnlyGate": "OPEN",
+  "nativeAzureMutationFaultGate": "OPEN",
+  "acceptanceGroups": [
+    {
+      "name": "AiCaseDataLocalSqlServerTest-partition-1",
+      "selector": "AiCaseDataLocalSqlServerTest#productionInfrastructureRequiresSeparateCatalogAndBootstrapSids+productionVerifierRejectsCaseAuthorityInheritedFromPublic+allPublicApplicationAuthorityAndGrantOptionsRemoveAttestation+azureStructuralInventoryRejectsUnprivilegedExternalRoutes+azureStructuralInventoryRejectsExplicitDatabaseDependency+migrationRepeatAndLiveAttestationRejectDrift",
+      "port": "14338",
+      "version": "V1",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 131.38,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataLocalSqlServerTest#productionInfrastructureRequiresSeparateCatalogAndBootstrapSids+productionVerifierRejectsCaseAuthorityInheritedFromPublic+allPublicApplicationAuthorityAndGrantOptionsRemoveAttestation+azureStructuralInventoryRejectsUnprivilegedExternalRoutes+azureStructuralInventoryRejectsExplicitDatabaseDependency+migrationRepeatAndLiveAttestationRejectDrift",
+        "-Dshale.acceptance.confinement=V1",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataLocalSqlServerTest-partition-2",
+      "selector": "AiCaseDataLocalSqlServerTest#attestationRejectsIdentityRoleImpersonationOwnershipAndIndirectViewRoutes+actualRestrictedLoginCannotEscapeBySelectingContextOrWritingForeignPhi+validSearchOverviewAndProofBoundOneShotHandoffHaveRequiredAudits+incomingForeignContextNeverControlsProtectedReadsOrPhiOwnership+malformedProofWrongInvocationAndForeignDigestFailBeforeCaseWork+executableSearchParityCoversEveryPageProbeAndWindow",
+      "port": "14338",
+      "version": "V1",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 85.78,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataLocalSqlServerTest#attestationRejectsIdentityRoleImpersonationOwnershipAndIndirectViewRoutes+actualRestrictedLoginCannotEscapeBySelectingContextOrWritingForeignPhi+validSearchOverviewAndProofBoundOneShotHandoffHaveRequiredAudits+incomingForeignContextNeverControlsProtectedReadsOrPhiOwnership+malformedProofWrongInvocationAndForeignDigestFailBeforeCaseWork+executableSearchParityCoversEveryPageProbeAndWindow",
+        "-Dshale.acceptance.confinement=V1",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataLocalSqlServerTest-partition-3",
+      "selector": "AiCaseDataLocalSqlServerTest#executableSearchParityCoversNormalizationLiteralEscapingUnicodeAndPolicy+executableOverviewParityCoversEightFieldsNullsUnassignedClosedAndLocalTimestamps+normalizationMatchesJavaReferenceIncludingContextualSigmaAndSupplementaryText+revokedAndExpiredProofHaveOnlyHistoricalFailureOwnershipAndCannotRead+suppressedPhiAndFailedParentOrChildRollBackEverySuccessFactWithoutRefund+physicalAiPoolReuseDerivesA1A2B1A1AndEvictsReadOnlyPoison",
+      "port": "14338",
+      "version": "V1",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 85.61,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataLocalSqlServerTest#executableSearchParityCoversNormalizationLiteralEscapingUnicodeAndPolicy+executableOverviewParityCoversEightFieldsNullsUnassignedClosedAndLocalTimestamps+normalizationMatchesJavaReferenceIncludingContextualSigmaAndSupplementaryText+revokedAndExpiredProofHaveOnlyHistoricalFailureOwnershipAndCannotRead+suppressedPhiAndFailedParentOrChildRollBackEverySuccessFactWithoutRefund+physicalAiPoolReuseDerivesA1A2B1A1AndEvictsReadOnlyPoison",
+        "-Dshale.acceptance.confinement=V1",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataLocalSqlServerTest-partition-4",
+      "selector": "AiCaseDataLocalSqlServerTest#phiTimezoneConversionMatchesJavaAcrossDstBoundaries+finalHandoffWaitsAcrossDatabaseExpiryAndDeniesWithoutProtectedOutput+authoritativeSourceMaximumCannotReachOverviewByteCeilingsAndOverlengthStillFails+exactSearchStructuredBoundariesUseValidAuthoritativeSourceAndRetainCommittedHistory+exactFullResponseMeasurementCeilingsWithActualProtectedRpcAndNoReplay+authoritativeAdminReviewIsTenantBoundPagedAndRetainsHistoricalCaseIds",
+      "port": "14338",
+      "version": "V1",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 89.24,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataLocalSqlServerTest#phiTimezoneConversionMatchesJavaAcrossDstBoundaries+finalHandoffWaitsAcrossDatabaseExpiryAndDeniesWithoutProtectedOutput+authoritativeSourceMaximumCannotReachOverviewByteCeilingsAndOverlengthStillFails+exactSearchStructuredBoundariesUseValidAuthoritativeSourceAndRetainCommittedHistory+exactFullResponseMeasurementCeilingsWithActualProtectedRpcAndNoReplay+authoritativeAdminReviewIsTenantBoundPagedAndRetainsHistoricalCaseIds",
+        "-Dshale.acceptance.confinement=V1",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataLocalSqlServerTest-partition-5",
+      "selector": "AiCaseDataLocalSqlServerTest#concurrentDedicatedPoolRequestsAndFailedReuseKeepAuthorityAndAuditSeparated+protectedQuotaSurvivesReplacementJvmAndNewAccessGrantWithoutReplayOrConcurrentOverspend+protectedCallRateSurvivesReplacementJvmAndFreshGrant",
+      "port": "14338",
+      "version": "V1",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 54.89,
+      "counts": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 3,
+        "passed": 3
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataLocalSqlServerTest#concurrentDedicatedPoolRequestsAndFailedReuseKeepAuthorityAndAuditSeparated+protectedQuotaSurvivesReplacementJvmAndNewAccessGrantWithoutReplayOrConcurrentOverspend+protectedCallRateSurvivesReplacementJvmAndFreshGrant",
+        "-Dshale.acceptance.confinement=V1",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataLocalSqlServerTest-external",
+      "selector": "AiCaseDataLocalSqlServerTest#azureStructuralInventoryRejectsRealExternalTable",
+      "port": "14339",
+      "version": "V1",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 30.5,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataLocalSqlServerTest#azureStructuralInventoryRejectsRealExternalTable",
+        "-Dshale.acceptance.confinement=V1",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2LocalSqlServerTest-partition-1",
+      "selector": "AiCaseDataV2LocalSqlServerTest#productionInfrastructureRequiresSeparateCatalogAndBootstrapSids+productionVerifierRejectsCaseAuthorityInheritedFromPublic+allPublicApplicationAuthorityAndGrantOptionsRemoveAttestation+azureStructuralInventoryRejectsUnprivilegedExternalRoutes+azureStructuralInventoryRejectsExplicitDatabaseDependency+migrationRepeatAndLiveAttestationRejectDrift",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 152.38,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2LocalSqlServerTest#productionInfrastructureRequiresSeparateCatalogAndBootstrapSids+productionVerifierRejectsCaseAuthorityInheritedFromPublic+allPublicApplicationAuthorityAndGrantOptionsRemoveAttestation+azureStructuralInventoryRejectsUnprivilegedExternalRoutes+azureStructuralInventoryRejectsExplicitDatabaseDependency+migrationRepeatAndLiveAttestationRejectDrift",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2LocalSqlServerTest-partition-2",
+      "selector": "AiCaseDataV2LocalSqlServerTest#attestationRejectsIdentityRoleImpersonationOwnershipAndIndirectViewRoutes+actualRestrictedLoginCannotEscapeBySelectingContextOrWritingForeignPhi+validSearchOverviewAndProofBoundOneShotHandoffHaveRequiredAudits+incomingForeignContextNeverControlsProtectedReadsOrPhiOwnership+malformedProofWrongInvocationAndForeignDigestFailBeforeCaseWork+executableSearchParityCoversEveryPageProbeAndWindow",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 97.92,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2LocalSqlServerTest#attestationRejectsIdentityRoleImpersonationOwnershipAndIndirectViewRoutes+actualRestrictedLoginCannotEscapeBySelectingContextOrWritingForeignPhi+validSearchOverviewAndProofBoundOneShotHandoffHaveRequiredAudits+incomingForeignContextNeverControlsProtectedReadsOrPhiOwnership+malformedProofWrongInvocationAndForeignDigestFailBeforeCaseWork+executableSearchParityCoversEveryPageProbeAndWindow",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2LocalSqlServerTest-partition-3",
+      "selector": "AiCaseDataV2LocalSqlServerTest#executableSearchParityCoversNormalizationLiteralEscapingUnicodeAndPolicy+executableOverviewParityCoversEightFieldsNullsUnassignedClosedAndLocalTimestamps+normalizationMatchesJavaReferenceIncludingContextualSigmaAndSupplementaryText+revokedAndExpiredProofHaveOnlyHistoricalFailureOwnershipAndCannotRead+suppressedPhiAndFailedParentOrChildRollBackEverySuccessFactWithoutRefund+physicalAiPoolReuseDerivesA1A2B1A1AndEvictsReadOnlyPoison",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 108.37,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2LocalSqlServerTest#executableSearchParityCoversNormalizationLiteralEscapingUnicodeAndPolicy+executableOverviewParityCoversEightFieldsNullsUnassignedClosedAndLocalTimestamps+normalizationMatchesJavaReferenceIncludingContextualSigmaAndSupplementaryText+revokedAndExpiredProofHaveOnlyHistoricalFailureOwnershipAndCannotRead+suppressedPhiAndFailedParentOrChildRollBackEverySuccessFactWithoutRefund+physicalAiPoolReuseDerivesA1A2B1A1AndEvictsReadOnlyPoison",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2LocalSqlServerTest-partition-4",
+      "selector": "AiCaseDataV2LocalSqlServerTest#phiTimezoneConversionMatchesJavaAcrossDstBoundaries+finalHandoffWaitsAcrossDatabaseExpiryAndDeniesWithoutProtectedOutput+authoritativeSourceMaximumCannotReachOverviewByteCeilingsAndOverlengthStillFails+exactSearchStructuredBoundariesUseValidAuthoritativeSourceAndRetainCommittedHistory+exactFullResponseMeasurementCeilingsWithActualProtectedRpcAndNoReplay+authoritativeAdminReviewIsTenantBoundPagedAndRetainsHistoricalCaseIds",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 103.77,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2LocalSqlServerTest#phiTimezoneConversionMatchesJavaAcrossDstBoundaries+finalHandoffWaitsAcrossDatabaseExpiryAndDeniesWithoutProtectedOutput+authoritativeSourceMaximumCannotReachOverviewByteCeilingsAndOverlengthStillFails+exactSearchStructuredBoundariesUseValidAuthoritativeSourceAndRetainCommittedHistory+exactFullResponseMeasurementCeilingsWithActualProtectedRpcAndNoReplay+authoritativeAdminReviewIsTenantBoundPagedAndRetainsHistoricalCaseIds",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2LocalSqlServerTest-partition-5",
+      "selector": "AiCaseDataV2LocalSqlServerTest#concurrentDedicatedPoolRequestsAndFailedReuseKeepAuthorityAndAuditSeparated+protectedQuotaSurvivesReplacementJvmAndNewAccessGrantWithoutReplayOrConcurrentOverspend+protectedCallRateSurvivesReplacementJvmAndFreshGrant+v2ReceiptAndCumulativeVerifierAreExclusive+semanticColumnMutationsNeverBecomeRepresentationVariants+rlsAndOwnershipMutationsRemainClosed",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 103.08,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2LocalSqlServerTest#concurrentDedicatedPoolRequestsAndFailedReuseKeepAuthorityAndAuditSeparated+protectedQuotaSurvivesReplacementJvmAndNewAccessGrantWithoutReplayOrConcurrentOverspend+protectedCallRateSurvivesReplacementJvmAndFreshGrant+v2ReceiptAndCumulativeVerifierAreExclusive+semanticColumnMutationsNeverBecomeRepresentationVariants+rlsAndOwnershipMutationsRemainClosed",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2LocalSqlServerTest-partition-6",
+      "selector": "AiCaseDataV2LocalSqlServerTest#syntaxLookingLiteralChangesAreNotNormalized+changedRlsModuleSemanticsAndSettingsAreRejectedBeforeCoverage",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 39.87,
+      "counts": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 2,
+        "passed": 2
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2LocalSqlServerTest#syntaxLookingLiteralChangesAreNotNormalized+changedRlsModuleSemanticsAndSettingsAreRejectedBeforeCoverage",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2LocalSqlServerTest-external",
+      "selector": "AiCaseDataV2LocalSqlServerTest#azureStructuralInventoryRejectsRealExternalTable",
+      "port": "14339",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 29.25,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2LocalSqlServerTest#azureStructuralInventoryRejectsRealExternalTable",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2AuthoritativeLocalSqlServerTest-partition-1",
+      "selector": "AiCaseDataV2AuthoritativeLocalSqlServerTest#productionInfrastructureRequiresSeparateCatalogAndBootstrapSids+productionVerifierRejectsCaseAuthorityInheritedFromPublic+allPublicApplicationAuthorityAndGrantOptionsRemoveAttestation+azureStructuralInventoryRejectsUnprivilegedExternalRoutes+azureStructuralInventoryRejectsExplicitDatabaseDependency+migrationRepeatAndLiveAttestationRejectDrift",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 150.58,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2AuthoritativeLocalSqlServerTest#productionInfrastructureRequiresSeparateCatalogAndBootstrapSids+productionVerifierRejectsCaseAuthorityInheritedFromPublic+allPublicApplicationAuthorityAndGrantOptionsRemoveAttestation+azureStructuralInventoryRejectsUnprivilegedExternalRoutes+azureStructuralInventoryRejectsExplicitDatabaseDependency+migrationRepeatAndLiveAttestationRejectDrift",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2AuthoritativeLocalSqlServerTest-partition-2",
+      "selector": "AiCaseDataV2AuthoritativeLocalSqlServerTest#attestationRejectsIdentityRoleImpersonationOwnershipAndIndirectViewRoutes+actualRestrictedLoginCannotEscapeBySelectingContextOrWritingForeignPhi+validSearchOverviewAndProofBoundOneShotHandoffHaveRequiredAudits+incomingForeignContextNeverControlsProtectedReadsOrPhiOwnership+malformedProofWrongInvocationAndForeignDigestFailBeforeCaseWork+executableSearchParityCoversEveryPageProbeAndWindow",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 90.05,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2AuthoritativeLocalSqlServerTest#attestationRejectsIdentityRoleImpersonationOwnershipAndIndirectViewRoutes+actualRestrictedLoginCannotEscapeBySelectingContextOrWritingForeignPhi+validSearchOverviewAndProofBoundOneShotHandoffHaveRequiredAudits+incomingForeignContextNeverControlsProtectedReadsOrPhiOwnership+malformedProofWrongInvocationAndForeignDigestFailBeforeCaseWork+executableSearchParityCoversEveryPageProbeAndWindow",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2AuthoritativeLocalSqlServerTest-partition-3",
+      "selector": "AiCaseDataV2AuthoritativeLocalSqlServerTest#executableSearchParityCoversNormalizationLiteralEscapingUnicodeAndPolicy+executableOverviewParityCoversEightFieldsNullsUnassignedClosedAndLocalTimestamps+normalizationMatchesJavaReferenceIncludingContextualSigmaAndSupplementaryText+revokedAndExpiredProofHaveOnlyHistoricalFailureOwnershipAndCannotRead+suppressedPhiAndFailedParentOrChildRollBackEverySuccessFactWithoutRefund+physicalAiPoolReuseDerivesA1A2B1A1AndEvictsReadOnlyPoison",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 91.11,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2AuthoritativeLocalSqlServerTest#executableSearchParityCoversNormalizationLiteralEscapingUnicodeAndPolicy+executableOverviewParityCoversEightFieldsNullsUnassignedClosedAndLocalTimestamps+normalizationMatchesJavaReferenceIncludingContextualSigmaAndSupplementaryText+revokedAndExpiredProofHaveOnlyHistoricalFailureOwnershipAndCannotRead+suppressedPhiAndFailedParentOrChildRollBackEverySuccessFactWithoutRefund+physicalAiPoolReuseDerivesA1A2B1A1AndEvictsReadOnlyPoison",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2AuthoritativeLocalSqlServerTest-partition-4",
+      "selector": "AiCaseDataV2AuthoritativeLocalSqlServerTest#phiTimezoneConversionMatchesJavaAcrossDstBoundaries+finalHandoffWaitsAcrossDatabaseExpiryAndDeniesWithoutProtectedOutput+authoritativeSourceMaximumCannotReachOverviewByteCeilingsAndOverlengthStillFails+exactSearchStructuredBoundariesUseValidAuthoritativeSourceAndRetainCommittedHistory+exactFullResponseMeasurementCeilingsWithActualProtectedRpcAndNoReplay+authoritativeAdminReviewIsTenantBoundPagedAndRetainsHistoricalCaseIds",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 87.92,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2AuthoritativeLocalSqlServerTest#phiTimezoneConversionMatchesJavaAcrossDstBoundaries+finalHandoffWaitsAcrossDatabaseExpiryAndDeniesWithoutProtectedOutput+authoritativeSourceMaximumCannotReachOverviewByteCeilingsAndOverlengthStillFails+exactSearchStructuredBoundariesUseValidAuthoritativeSourceAndRetainCommittedHistory+exactFullResponseMeasurementCeilingsWithActualProtectedRpcAndNoReplay+authoritativeAdminReviewIsTenantBoundPagedAndRetainsHistoricalCaseIds",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2AuthoritativeLocalSqlServerTest-partition-5",
+      "selector": "AiCaseDataV2AuthoritativeLocalSqlServerTest#concurrentDedicatedPoolRequestsAndFailedReuseKeepAuthorityAndAuditSeparated+protectedQuotaSurvivesReplacementJvmAndNewAccessGrantWithoutReplayOrConcurrentOverspend+protectedCallRateSurvivesReplacementJvmAndFreshGrant+v2ReceiptAndCumulativeVerifierAreExclusive+semanticColumnMutationsNeverBecomeRepresentationVariants+rlsAndOwnershipMutationsRemainClosed",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 95.57,
+      "counts": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 6,
+        "passed": 6
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2AuthoritativeLocalSqlServerTest#concurrentDedicatedPoolRequestsAndFailedReuseKeepAuthorityAndAuditSeparated+protectedQuotaSurvivesReplacementJvmAndNewAccessGrantWithoutReplayOrConcurrentOverspend+protectedCallRateSurvivesReplacementJvmAndFreshGrant+v2ReceiptAndCumulativeVerifierAreExclusive+semanticColumnMutationsNeverBecomeRepresentationVariants+rlsAndOwnershipMutationsRemainClosed",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2AuthoritativeLocalSqlServerTest-partition-6",
+      "selector": "AiCaseDataV2AuthoritativeLocalSqlServerTest#syntaxLookingLiteralChangesAreNotNormalized+changedRlsModuleSemanticsAndSettingsAreRejectedBeforeCoverage",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 39.76,
+      "counts": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 2,
+        "passed": 2
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2AuthoritativeLocalSqlServerTest#syntaxLookingLiteralChangesAreNotNormalized+changedRlsModuleSemanticsAndSettingsAreRejectedBeforeCoverage",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2AuthoritativeLocalSqlServerTest-external",
+      "selector": "AiCaseDataV2AuthoritativeLocalSqlServerTest#azureStructuralInventoryRejectsRealExternalTable",
+      "port": "14339",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 26.26,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AiCaseDataV2AuthoritativeLocalSqlServerTest#azureStructuralInventoryRejectsRealExternalTable",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "phase1r-ordinary-auth-sql",
+      "selector": "Phase1RLocalSqlServerTest,PreTenantAuthenticationLocalSqlServerTest",
+      "port": "14338",
+      "version": "V2",
+      "production": false,
+      "extras": [],
+      "exit": 0,
+      "seconds": 23.2,
+      "counts": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 2,
+        "passed": 2
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase1RLocalSqlServerTest,PreTenantAuthenticationLocalSqlServerTest",
+        "-Dshale.acceptance.confinement=V2",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "oauth-sql",
+      "selector": "OAuthAuthorizationFlowTest",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [],
+      "exit": 0,
+      "seconds": 30.93,
+      "counts": {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 17,
+        "passed": 17
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=OAuthAuthorizationFlowTest",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "bearer-expiry-race",
+      "selector": "AuthoritativeCaseMcpLocalSqlServerTest",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [],
+      "exit": 0,
+      "seconds": 75.72,
+      "counts": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 2,
+        "passed": 2
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=AuthoritativeCaseMcpLocalSqlServerTest",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "client-ts",
+      "selector": "Phase3b7AcceptanceLocalSqlServerTest#identicalFinishedCorpus",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [
+        "-Dshale.acceptance.client=ts"
+      ],
+      "exit": 0,
+      "seconds": 187.44,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#identicalFinishedCorpus",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "-Dshale.acceptance.client=ts",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "client-python",
+      "selector": "Phase3b7AcceptanceLocalSqlServerTest#identicalFinishedCorpus",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [
+        "-Dshale.acceptance.client=python"
+      ],
+      "exit": 0,
+      "seconds": 204.43,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#identicalFinishedCorpus",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "-Dshale.acceptance.client=python",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "productionTlsProxy",
+      "selector": "Phase3b7AcceptanceLocalSqlServerTest#productionTlsProxy",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [],
+      "exit": 0,
+      "seconds": 42.56,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#productionTlsProxy",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "productionCatalogPublicGrantDeniesServing",
+      "selector": "Phase3b7AcceptanceLocalSqlServerTest#productionCatalogPublicGrantDeniesServing",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [],
+      "exit": 0,
+      "seconds": 105.77,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#productionCatalogPublicGrantDeniesServing",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "finishedResponseBoundaries",
+      "selector": "Phase3b7AcceptanceLocalSqlServerTest#finishedResponseBoundaries",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [],
+      "exit": 0,
+      "seconds": 41.15,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#finishedResponseBoundaries",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "finishedConformanceTlsAndPerformance",
+      "selector": "Phase3b7AcceptanceLocalSqlServerTest#finishedConformanceTlsAndPerformance",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [],
+      "exit": 0,
+      "seconds": 94.11,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#finishedConformanceTlsAndPerformance",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "test"
+      ],
+      "mandatory": false,
+      "scope": "Supplemental raw conformance execution wrapper; success is completion, not full conformance. See rawConformance."
+    },
+    {
+      "name": "finishedModernConformance",
+      "selector": "Phase3b7AcceptanceLocalSqlServerTest#finishedModernConformance",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [],
+      "exit": 0,
+      "seconds": 77.96,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#finishedModernConformance",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "test"
+      ],
+      "mandatory": false,
+      "scope": "Supplemental raw conformance execution wrapper; success is completion, not full conformance. See rawConformance."
+    },
+    {
+      "name": "finishedFrozenConformance",
+      "selector": "Phase3b7AcceptanceLocalSqlServerTest#finishedFrozenConformance",
+      "port": "14338",
+      "version": "V2",
+      "production": true,
+      "extras": [],
+      "exit": 0,
+      "seconds": 164.8,
+      "counts": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 1,
+        "passed": 1
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Djavax.net.ssl.trustStore=<owned-task-truststore>",
+        "-Djavax.net.ssl.trustStorePassword=<task-local>",
+        "-Dtest=Phase3b7AcceptanceLocalSqlServerTest#finishedFrozenConformance",
+        "-Dshale.acceptance.confinement=V2",
+        "-Dshale.acceptance.production=true",
+        "test"
+      ],
+      "mandatory": false,
+      "scope": "Supplemental raw conformance execution wrapper; success is completion, not full conformance. See rawConformance."
+    },
+    {
+      "name": "AiCaseDataLocalSqlServerTest-aggregate",
+      "exit": 0,
+      "seconds": 47.94,
+      "counts": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 3,
+        "passed": 3
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-data",
+        "-am",
+        "-Dtest=AiCaseDataLocalSqlServerTest#protectedAggregateQuotaCeilingsApplyAcrossUsersIntegrationsAndInstances",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2LocalSqlServerTest-aggregate",
+      "exit": 0,
+      "seconds": 54.63,
+      "counts": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 3,
+        "passed": 3
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-data",
+        "-am",
+        "-Dtest=AiCaseDataV2LocalSqlServerTest#protectedAggregateQuotaCeilingsApplyAcrossUsersIntegrationsAndInstances",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "AiCaseDataV2AuthoritativeLocalSqlServerTest-aggregate",
+      "exit": 0,
+      "seconds": 51.44,
+      "counts": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 3,
+        "passed": 3
+      },
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-data",
+        "-am",
+        "-Dtest=AiCaseDataV2AuthoritativeLocalSqlServerTest#protectedAggregateQuotaCeilingsApplyAcrossUsersIntegrationsAndInstances",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "mandatory": true
+    },
+    {
+      "name": "ordinary-auth-oauth-focused",
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-Dtest=AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,AuthServiceAdapterTest,PreTenantAuthenticationModuleContractTest,AuthControllerTest,AiCaseDataAttestationTest,AiCaseDataV2MigrationContractTest,AiCaseDataMigrationContractTest,McpCaseCompositionTest,OAuthConfigurationTest,OAuthFilterIsolationTest,OAuthMetadataTest,OAuthClientMappingTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,ShaleOAuthHumanTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "exit": 0,
+      "seconds": 18.62,
+      "counts": {
+        "tests": 63,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 63,
+        "passed": 63
+      },
+      "skipsAreAcceptance": false,
+      "mandatory": true
+    },
+    {
+      "name": "affected-1",
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-core,shale-data,shale-server",
+        "-am",
+        "-Dtest=com.shale.core.security.ai.AiScopeTest,com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.security.ai.AiAccessContractTest,com.shale.data.security.ai.AiCaseDataAccessTest,com.shale.data.security.ai.AiCaseDataAttestationTest,com.shale.data.security.ai.AiCaseDataAzureSqlDatabaseReadOnlyTest,com.shale.data.security.ai.AiCaseDataLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataMigrationContractTest,com.shale.data.security.ai.AiCaseDataV2AuthoritativeLocalSqlServerTest,com.shale.data.security.ai.AiCaseDataV2LocalSqlServerTest,com.shale.data.security.ai.AiCaseDataV2MigrationContractTest,com.shale.data.security.ai.AiOAuthCredentialContractTest,com.shale.data.security.ai.AiOAuthExchangeContractTest,com.shale.data.security.ai.AiOAuthRevocationContractTest,com.shale.data.security.ai.AiSecurityContractTest,com.shale.data.security.ai.AiSecurityLocalSqlServerTest,com.shale.data.security.ai.IntegrationAccessContractTest,com.shale.data.security.ai.IntegrationCaseReadTest,com.shale.data.security.ai.ProofDigestTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "test"
+      ],
+      "exit": 0,
+      "seconds": 15.06,
+      "counts": {
+        "tests": 137,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "executed": 136,
+        "passed": 136
+      },
+      "skipsAreAcceptance": false,
+      "mandatory": true
+    },
+    {
+      "name": "critical",
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "test"
+      ],
+      "exit": 0,
+      "seconds": 35.19,
+      "counts": {
+        "tests": 228,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 228,
+        "passed": 228
+      },
+      "skipsAreAcceptance": false,
+      "mandatory": true
+    },
+    {
+      "name": "local-package",
+      "command": [
+        "mvn",
+        "-B",
+        "-ntp",
+        "-pl",
+        "shale-server",
+        "-am",
+        "-DskipTests",
+        "package"
+      ],
+      "exit": 0,
+      "seconds": 10.97,
+      "counts": {
+        "tests": 0,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed": 0,
+        "passed": 0
+      },
+      "skipsAreAcceptance": false,
+      "mandatory": true
+    }
+  ],
+  "date": "2026-10-28",
+  "timezone": "America/Denver",
+  "confinementMethodCoverage": [
+    {
+      "class": "AiCaseDataLocalSqlServerTest",
+      "expectedMethods": 29,
+      "selectedMethods": 29,
+      "missing": [],
+      "unexpected": []
+    },
+    {
+      "class": "AiCaseDataV2LocalSqlServerTest",
+      "expectedMethods": 34,
+      "selectedMethods": 34,
+      "missing": [],
+      "unexpected": []
+    },
+    {
+      "class": "AiCaseDataV2AuthoritativeLocalSqlServerTest",
+      "expectedMethods": 34,
+      "selectedMethods": 34,
+      "missing": [],
+      "unexpected": []
+    }
+  ],
+  "confinementTotals": {
+    "AiCaseDataLocalSqlServerTest": {
+      "tests": 31,
+      "executed": 31,
+      "passed": 31,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "AiCaseDataV2LocalSqlServerTest": {
+      "tests": 36,
+      "executed": 36,
+      "passed": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "AiCaseDataV2AuthoritativeLocalSqlServerTest": {
+      "tests": 36,
+      "executed": 36,
+      "passed": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "pythonGroups": [
+    {
+      "name": "phase1r",
+      "executed": 3,
+      "passed": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "selector",
+      "executed": 27,
+      "passed": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "case-launcher",
+      "executed": 4,
+      "passed": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "v2-private",
+      "executed": 4,
+      "passed": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "rawConformance": {
+    "finished-conformance-active": {
+      "rawCounts": {
+        "SUCCESS": 23,
+        "FAILURE": 18,
+        "INFO": 1
+      },
+      "newFailureIds": [],
+      "resolvedFailureIds": [],
+      "previousDocumentedRawCounts": {
+        "FAILURE": 18,
+        "SUCCESS": 23,
+        "INFO": 1
+      },
+      "failureIds": [
+        [
+          "server-completion-complete",
+          "completion-complete"
+        ],
+        [
+          "server-dns-rebinding-protection",
+          "localhost-host-valid-accepted"
+        ],
+        [
+          "server-prompts-get-embedded-resource",
+          "prompts-get-embedded-resource"
+        ],
+        [
+          "server-prompts-get-simple",
+          "prompts-get-simple"
+        ],
+        [
+          "server-prompts-get-with-args",
+          "prompts-get-with-args"
+        ],
+        [
+          "server-prompts-get-with-image",
+          "prompts-get-with-image"
+        ],
+        [
+          "server-prompts-list",
+          "prompts-list"
+        ],
+        [
+          "server-resources-list",
+          "resources-list"
+        ],
+        [
+          "server-resources-read-binary",
+          "resources-read-binary"
+        ],
+        [
+          "server-resources-read-text",
+          "resources-read-text"
+        ],
+        [
+          "server-resources-templates-read",
+          "resources-templates-read"
+        ],
+        [
+          "server-tools-call-audio",
+          "tools-call-audio"
+        ],
+        [
+          "server-tools-call-embedded-resource",
+          "tools-call-embedded-resource"
+        ],
+        [
+          "server-tools-call-error",
+          "tools-call-error"
+        ],
+        [
+          "server-tools-call-image",
+          "tools-call-image"
+        ],
+        [
+          "server-tools-call-mixed-content",
+          "tools-call-mixed-content"
+        ],
+        [
+          "server-tools-call-simple-text",
+          "tools-call-simple-text"
+        ],
+        [
+          "server-tools-call-with-progress",
+          "tools-call-with-progress"
+        ]
+      ],
+      "cliExit": 1,
+      "dispositionReference": "docs/testing/phase3b7-verification.json recoveredInputAcceptance.conformance.selections",
+      "fullConformanceClaim": false
+    },
+    "modern-server-stateless": {
+      "rawCounts": {
+        "SUCCESS": 21,
+        "FAILURE": 6,
+        "SKIPPED": 3
+      },
+      "newFailureIds": [],
+      "resolvedFailureIds": [],
+      "previousDocumentedRawCounts": {
+        "SUCCESS": 21,
+        "FAILURE": 6,
+        "SKIPPED": 3
+      },
+      "failureIds": [
+        [
+          "server-server-stateless",
+          "sep-2575-http-server-no-independent-requests-on-stream"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-missing-capability-http-400"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-server-no-log-without-loglevel"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-server-rejects-undeclared-capability"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-server-sends-subscription-ack"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-server-tags-subscription-id"
+        ]
+      ],
+      "cliExit": 1,
+      "dispositionReference": "docs/testing/phase3b7-verification.json recoveredInputAcceptance.conformance.selections",
+      "fullConformanceClaim": false
+    },
+    "modern-http-header-validation": {
+      "rawCounts": {
+        "SUCCESS": 14
+      },
+      "newFailureIds": [],
+      "resolvedFailureIds": [],
+      "previousDocumentedRawCounts": {
+        "SUCCESS": 14
+      },
+      "failureIds": [],
+      "cliExit": 0,
+      "dispositionReference": "docs/testing/phase3b7-verification.json recoveredInputAcceptance.conformance.selections",
+      "fullConformanceClaim": false
+    },
+    "modern-caching": {
+      "rawCounts": {
+        "SUCCESS": 4,
+        "FAILURE": 3,
+        "SKIPPED": 1
+      },
+      "newFailureIds": [],
+      "resolvedFailureIds": [],
+      "previousDocumentedRawCounts": {
+        "SUCCESS": 4,
+        "FAILURE": 3,
+        "SKIPPED": 1
+      },
+      "failureIds": [
+        [
+          "server-caching",
+          "sep-2549-prompts-list-caching-hints"
+        ],
+        [
+          "server-caching",
+          "sep-2549-resources-list-caching-hints"
+        ],
+        [
+          "server-caching",
+          "sep-2549-resources-templates-list-caching-hints"
+        ]
+      ],
+      "cliExit": 1,
+      "dispositionReference": "docs/testing/phase3b7-verification.json recoveredInputAcceptance.conformance.selections",
+      "fullConformanceClaim": false
+    },
+    "finished-conformance-frozen": {
+      "rawCounts": {
+        "FAILURE": 73,
+        "SUCCESS": 95,
+        "SKIPPED": 5,
+        "WARNING": 4,
+        "INFO": 1
+      },
+      "newFailureIds": [],
+      "resolvedFailureIds": [],
+      "previousDocumentedRawCounts": {
+        "SUCCESS": 95,
+        "FAILURE": 73,
+        "WARNING": 4,
+        "SKIPPED": 5,
+        "INFO": 1
+      },
+      "failureIds": [
+        [
+          "server-caching",
+          "sep-2549-prompts-list-caching-hints"
+        ],
+        [
+          "server-caching",
+          "sep-2549-resources-list-caching-hints"
+        ],
+        [
+          "server-caching",
+          "sep-2549-resources-templates-list-caching-hints"
+        ],
+        [
+          "server-completion-complete",
+          "completion-complete"
+        ],
+        [
+          "server-dns-rebinding-protection",
+          "localhost-host-valid-accepted"
+        ],
+        [
+          "server-http-custom-header-server-validation",
+          "sep-2243-server-decode-base64"
+        ],
+        [
+          "server-http-custom-header-server-validation",
+          "sep-2243-server-no-xmcp-tool"
+        ],
+        [
+          "server-http-custom-header-server-validation",
+          "sep-2243-server-reject-invalid-param-chars"
+        ],
+        [
+          "server-http-custom-header-server-validation",
+          "sep-2243-server-reject-param-mismatch"
+        ],
+        [
+          "server-http-custom-header-server-validation",
+          "sep-2243-server-validate-param-match"
+        ],
+        [
+          "server-input-required-result-basic-elicitation",
+          "sep-2322-elicitation-incomplete"
+        ],
+        [
+          "server-input-required-result-basic-list-roots",
+          "sep-2322-list-roots-incomplete"
+        ],
+        [
+          "server-input-required-result-basic-sampling",
+          "sep-2322-sampling-incomplete"
+        ],
+        [
+          "server-input-required-result-capability-check",
+          "sep-2322-respect-client-capabilities"
+        ],
+        [
+          "server-input-required-result-multi-round",
+          "sep-2322-multi-round-r1"
+        ],
+        [
+          "server-input-required-result-multiple-input-requests",
+          "sep-2322-multiple-inputs-incomplete"
+        ],
+        [
+          "server-input-required-result-non-tool-request",
+          "sep-2322-non-tool-incomplete"
+        ],
+        [
+          "server-input-required-result-request-state",
+          "sep-2322-request-state-incomplete"
+        ],
+        [
+          "server-input-required-result-result-type",
+          "sep-2322-result-type-included"
+        ],
+        [
+          "server-input-required-result-tampered-state",
+          "sep-2322-reject-tampered-state"
+        ],
+        [
+          "server-json-schema-2020-12",
+          "json-schema-2020-12-tool-found"
+        ],
+        [
+          "server-prompts-get-embedded-resource",
+          "prompts-get-embedded-resource"
+        ],
+        [
+          "server-prompts-get-simple",
+          "prompts-get-simple"
+        ],
+        [
+          "server-prompts-get-with-args",
+          "prompts-get-with-args"
+        ],
+        [
+          "server-prompts-get-with-image",
+          "prompts-get-with-image"
+        ],
+        [
+          "server-prompts-list",
+          "prompts-list"
+        ],
+        [
+          "server-resources-list",
+          "resources-list"
+        ],
+        [
+          "server-resources-read-binary",
+          "resources-read-binary"
+        ],
+        [
+          "server-resources-read-text",
+          "resources-read-text"
+        ],
+        [
+          "server-resources-templates-read",
+          "resources-templates-read"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-http-server-no-independent-requests-on-stream"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-missing-capability-http-400"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-server-no-log-without-loglevel"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-server-rejects-undeclared-capability"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-server-sends-subscription-ack"
+        ],
+        [
+          "server-server-stateless",
+          "sep-2575-server-tags-subscription-id"
+        ],
+        [
+          "server-tasks-capability-negotiation",
+          "sep-2663-server-rejects-undeclared-client"
+        ],
+        [
+          "server-tasks-capability-negotiation",
+          "sep-2663-tasks-methods-non-declaring"
+        ],
+        [
+          "server-tasks-capability-negotiation",
+          "tasks-extension-advertised"
+        ],
+        [
+          "server-tasks-capability-negotiation",
+          "tasks-per-request-meta-opt-in"
+        ],
+        [
+          "server-tasks-dispatch-and-envelope",
+          "sep-2663-durable-create-strong-consistency"
+        ],
+        [
+          "server-tasks-dispatch-and-envelope",
+          "sep-2663-legacy-task-param-ignored"
+        ],
+        [
+          "server-tasks-dispatch-and-envelope",
+          "sep-2663-tasks-get-invalid-task-id-32602"
+        ],
+        [
+          "server-tasks-dispatch-and-envelope",
+          "tasks-immediate-result-shortcut"
+        ],
+        [
+          "server-tasks-dispatch-and-envelope",
+          "tasks-result-type-complete-on-non-task-responses"
+        ],
+        [
+          "server-tasks-dispatch-and-envelope",
+          "tasks-server-directed-creation-no-hint"
+        ],
+        [
+          "server-tasks-lifecycle",
+          "sep-2663-cancel-ack-empty-result"
+        ],
+        [
+          "server-tasks-lifecycle",
+          "sep-2663-result-type-task-on-create"
+        ],
+        [
+          "server-tasks-lifecycle",
+          "sep-2663-tasks-get-status-completed"
+        ],
+        [
+          "server-tasks-lifecycle",
+          "sep-2663-tasks-get-status-failed"
+        ],
+        [
+          "server-tasks-lifecycle",
+          "sep-2663-tasks-get-status-working"
+        ],
+        [
+          "server-tasks-lifecycle",
+          "sep-2663-tool-error-uses-completed-status"
+        ],
+        [
+          "server-tasks-lifecycle",
+          "tasks-cancel-terminal-idempotent-ack"
+        ],
+        [
+          "server-tasks-lifecycle",
+          "tasks-sync-tool-call"
+        ],
+        [
+          "server-tasks-mrtr-composition",
+          "sep-2663-mrtr-synchronous-before-task-creation"
+        ],
+        [
+          "server-tasks-mrtr-input",
+          "sep-2663-tasks-get-status-input-required"
+        ],
+        [
+          "server-tasks-mrtr-input",
+          "tasks-mrtr-partial-fulfillment"
+        ],
+        [
+          "server-tasks-mrtr-input",
+          "tasks-mrtr-tasks-update-resumes"
+        ],
+        [
+          "server-tasks-request-headers",
+          "sep-2663-routing-headers-accepted-on-tasks-get"
+        ],
+        [
+          "server-tasks-request-headers",
+          "sep-2663-server-rejects-mismatched-mcp-name-on-tasks-get"
+        ],
+        [
+          "server-tasks-request-headers",
+          "tasks-headers-tolerate-mcp-method-on-tools-call"
+        ],
+        [
+          "server-tasks-request-state-removal",
+          "tasks-request-state-removal-setup"
+        ],
+        [
+          "server-tasks-required-task-error",
+          "sep-2663-server-returns-missing-capability-when-required"
+        ],
+        [
+          "server-tasks-wire-fields",
+          "tasks-no-early-ttl-expiry"
+        ],
+        [
+          "server-tasks-wire-fields",
+          "tasks-no-related-task-meta-on-inlined-result"
+        ],
+        [
+          "server-tasks-wire-fields",
+          "tasks-wire-field-renames"
+        ],
+        [
+          "server-tools-call-audio",
+          "tools-call-audio"
+        ],
+        [
+          "server-tools-call-embedded-resource",
+          "tools-call-embedded-resource"
+        ],
+        [
+          "server-tools-call-error",
+          "tools-call-error"
+        ],
+        [
+          "server-tools-call-image",
+          "tools-call-image"
+        ],
+        [
+          "server-tools-call-mixed-content",
+          "tools-call-mixed-content"
+        ],
+        [
+          "server-tools-call-simple-text",
+          "tools-call-simple-text"
+        ],
+        [
+          "server-tools-call-with-progress",
+          "tools-call-with-progress"
+        ]
+      ],
+      "cliExit": 1,
+      "dispositionReference": "docs/testing/phase3b7-verification.json recoveredInputAcceptance.conformance.selections",
+      "fullConformanceClaim": false
+    }
+  },
+  "rawConformanceMeaning": "Supplemental inventory, not a full conformance claim. Raw nonzero exits, failures, warnings and skips remain reported; identical failure IDs retain the existing NOT TESTABLE/not-applicable dispositions in phase3b7-local-acceptance-closeout.md and phase3b7-verification.json. These are not added to passing test counts.",
+  "affectedSelector": {
+    "areas": [
+      "security-data"
+    ],
+    "reportedTests": 137,
+    "executed": 136,
+    "passed": 136,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1,
+    "expectedNativeSkip": "AiCaseDataAzureSqlDatabaseReadOnlyTest: native Azure inputs absent; gate OPEN, never locally satisfied",
+    "zeroTestOptInClasses": {
+      "AiCaseDataLocalSqlServerTest": "full 31-test SQL run reported separately",
+      "AiCaseDataV2LocalSqlServerTest": "full 36-test SQL run reported separately",
+      "AiCaseDataV2AuthoritativeLocalSqlServerTest": "full 36-test SQL run reported separately",
+      "AiSecurityLocalSqlServerTest": "Historical supplemental legacy SQL suite not executed by the standard no-opt-in selector; not claimed. Required current confinement/OAuth/expiry/authority/corpus SQL groups run separately."
+    },
+    "meaning": "The no-opt-in affected selector is not SQL acceptance; required local SQL cases are independently executed above with zero skips."
+  },
+  "clientCorpora": {
+    "ts": {
+      "vectors": 66,
+      "passed": 66,
+      "failed": 0,
+      "skipped": 0,
+      "servingFaultEvidence": {
+        "readCalls": {
+          "cancel-before": 1,
+          "cancel-during": 1,
+          "child": 1,
+          "cleanup": 1,
+          "close": 1,
+          "commit": 1,
+          "failure-audit": 1,
+          "interruption": 1,
+          "lost-ack": 1,
+          "parent": 1,
+          "phi": 1,
+          "quota": 1,
+          "rejected-task": 1,
+          "timeout": 1
+        },
+        "positiveSqlWaits": {
+          "cancel-during": 1,
+          "commit": 1
+        }
+      }
+    },
+    "python": {
+      "vectors": 66,
+      "passed": 66,
+      "failed": 0,
+      "skipped": 0,
+      "servingFaultEvidence": {
+        "readCalls": {
+          "cancel-before": 1,
+          "cancel-during": 1,
+          "child": 1,
+          "cleanup": 1,
+          "close": 1,
+          "commit": 1,
+          "failure-audit": 1,
+          "interruption": 1,
+          "lost-ack": 1,
+          "parent": 1,
+          "phi": 1,
+          "quota": 1,
+          "rejected-task": 1,
+          "timeout": 1
+        },
+        "positiveSqlWaits": {
+          "cancel-during": 1,
+          "commit": 1
+        }
+      }
+    }
+  },
+  "tlsProxy": {
+    "proxy": "Caddy 2.11.7",
+    "checks": 20,
+    "passed": 20,
+    "certificateValidated": true,
+    "hostnameValidated": true,
+    "scope": "Owned loopback TLS only; expected negative handshakes are successful rejection checks, not HTTP successes"
+  },
+  "httpAuthorityMatrix": {
+    "faults": 42,
+    "deniedDiscoveryRequests": 42,
+    "deniedProtectedOverviewRequests": 42,
+    "result": "PASS; fresh restoration attestation required for each fault"
+  },
+  "caseCatalogHash": "6e9182b6e9b75200a16d51dbd537ca8926b358d603220d287a9710ad6ca8063a",
+  "sourceReceipt": "60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891",
+  "countsOverlap": true,
+  "productionAccess": false,
+  "productionMigrationsRerun": false,
+  "productionDeploymentOrActivation": false,
+  "privateInputsCommitted": false
+}
