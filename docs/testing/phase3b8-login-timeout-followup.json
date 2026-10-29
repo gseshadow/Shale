@@ -1,18 +1,16 @@
 {
-  "classification": "BLOCKED",
+  "classification": "V2 LOCAL DEPLOYMENT-PREPARATION ACCEPTANCE COMPLETE",
   "date": "2026-10-28",
   "base": "5e84669fe5f287a05d472609e29ae6ebb9b6521f",
   "historicalEvidence": "PR #1927 was merged with the ordinary production login readiness blocker unresolved; original acceptance record and JSON preserved.",
   "caseCatalogHash": "6e9182b6e9b75200a16d51dbd537ca8926b358d603220d287a9710ad6ca8063a",
   "sourceReceipt": "60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891",
-  "rootCause": "UNRESOLVED: unchanged readiness passes on reconstructed SQL/TLS harness; historical login timeout not reproduced",
+  "rootCause": "No causal explanation established; UNREPRODUCED HISTORICAL TRANSIENT after ten clean repeated executions under the owner-authorized acceptance criterion",
   "fix": "None applied; documentation-only follow-up",
   "timeoutAndAssertionsRelaxed": false,
   "runtimeDiagnosticsCollected": true,
   "productionAccess": false,
-  "mandatoryUnexecuted": [
-    "Post-fix complete V1/V2/OAuth SQL acceptance: no root-cause fix exists"
-  ],
+  "mandatoryUnexecuted": [],
   "nativeAzureIdentityReadOnlyGate": "OPEN",
   "nativeAzureMutationFaultGate": "OPEN",
   "results": [
@@ -162,5 +160,9 @@
     }
   },
   "previousRootCauseStatus": "UNIDENTIFIED; reproduction blocked by absent private hash-gated schema and disposable SQL/TLS harness configuration",
-  "runtimeDiagnosticsScope": "HTTP timings, sampled Java threads and SQL session metadata; no stalled authentication captured"
+  "runtimeDiagnosticsScope": "HTTP timings, sampled Java threads and SQL session metadata; no stalled authentication captured",
+  "historicalTimeoutClassification": "UNREPRODUCED HISTORICAL TRANSIENT",
+  "latestAcceptanceRecord": "phase3b8-repeatability-acceptance.json",
+  "criterionChange": "Root-cause fix required only if the historical readiness failure reproduces; it did not.",
+  "previousStagesRemainHistorical": true
 }
