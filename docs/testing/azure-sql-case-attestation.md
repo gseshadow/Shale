@@ -1,5 +1,10 @@
 # Azure SQL Database attestation acceptance
 
+Current native follow-up (2026-10-29): [pending record](native-azure-readonly-acceptance.md) and
+[exact disposable operator packet](native-azure-readonly-operator-runbook.md). The native JUnit gate
+now requires the disposable V2 fixture and refuses production; the older command/settings below
+are historical context, not a complete current execution packet. No native Azure pass is claimed.
+
 Date: 2026-10-28. Base: `a8b216f6cc89897121988c675b0ea58280a80cca` (merged #1925).
 Branch: `codex/authoritative-acceptance-20261028`. Tested implementation: `61ec3bf59b2ae7ed67e5adec95fd7d7644e887e7`.
 Subsequent record-only edits leave the tested runtime and test source unchanged.

@@ -4434,3 +4434,15 @@ governed contained identities, dedicated secrets with controls OFF, reviewed JAR
 no-disclosure smoke, and later separately authorized pilot. No production object rewrite to match V1.
 Local V2 acceptance and native/disposable Azure gates must be reported separately. This task authorizes
 repository preparation and an unmerged PR only; no production connection/change or activation.
+
+### Native Azure identity/read-only preparation — 2026-10-29
+
+**OPERATOR ACTION REQUIRED.** Based on merged #1928, the existing native gate has a separate
+[disposable fixture/operator packet](../testing/native-azure-readonly-operator-runbook.md) and
+[pending evidence record](../testing/native-azure-readonly-acceptance.md). No Azure credentials or
+authorized disposable resource were supplied. The native test now checks five contained identities,
+V2 attestation, exact tokens, denied zero-row reads/impersonation/cross-database queries and identity
+substitution; owner setup reuses existing authoritative V2 fixture helpers under a distinct opt-in.
+No production code, SQL receipt/canonicalization, audit schema or capability default changes.
+Native read-only and disposable mutation/fault gates remain OPEN; production deployment and pilot
+remain unauthorized. Local #1928 acceptance and its historical-transient disposition are preserved.
