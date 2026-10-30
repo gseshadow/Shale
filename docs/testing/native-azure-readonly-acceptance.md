@@ -1,5 +1,9 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+Current follow-up (2026-10-30): **BLOCKED** for operator retry readiness; see
+[owner Stage 0 failure, effective-driver proof and Windows correction](native-azure-setup-timeout-followup.md).
+The original preparation evidence below is historical. Both native Azure gates remain OPEN.
+
 **OPERATOR ACTION REQUIRED.** Native acceptance has not executed. The repository packet is
 prepared; the owner must supply an authorized disposable Azure scope and execute the
 [exact PowerShell / Maven runbook](native-azure-readonly-operator-runbook.md). Standard Maven

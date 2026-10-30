@@ -1,6 +1,7 @@
 # Native Azure contained identity / read-only operator packet
 
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
+Updated 2026-10-30 for deterministic Windows checkout and separately bounded setup connections.
 Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
 This packet creates an empty disposable **Azure SQL Database** (EngineEdition 5), imports the
 existing private authoritative fixture, and runs the existing native gate with V2 explicitly selected.
@@ -23,6 +24,20 @@ git status --short
 if ($LASTEXITCODE -ne 0) { throw 'Git inspection failed' }
 git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source identity unavailable' }
+# Requires this PR's current .gitattributes. Reapply it to a clean existing Windows checkout.
+$PinnedFiles = @(git ls-files -- 'docs/sql/ai-integration/*.sql' 'shale-data/src/main/resources/ai/*.sql' 'shale-data/src/main/resources/ai/confinement*-modules.properties' 'build/sql-confinement/*.sql' 'build/sql-confinement/*.sha256' 'build/sql-confinement/reviewed-case-module-variants-v2.json')
+if ($LASTEXITCODE -ne 0 -or $PinnedFiles.Count -eq 0) { throw 'Pinned Git inputs unavailable' }
+git diff --quiet -- $PinnedFiles
+if ($LASTEXITCODE -ne 0) { throw 'Preserve local SQL/resource edits before refreshing the checkout' }
+git diff --cached --quiet -- $PinnedFiles
+if ($LASTEXITCODE -ne 0) { throw 'Preserve staged SQL/resource edits before refreshing the checkout' }
+$Endings = @(git check-attr eol -- $PinnedFiles)
+if ($LASTEXITCODE -ne 0 -or @($Endings | Where-Object { $_ -notmatch ': eol: lf$' }).Count -ne 0) { throw 'Current PR LF attributes required' }
+$RefreshArgs = @('checkout-index','--force','--') + $PinnedFiles
+& git @RefreshArgs
+if ($LASTEXITCODE -ne 0) { throw 'Pinned checkout refresh failed' }
+python -m unittest discover -s build/sql-confinement -p test_checkout.py
+if ($LASTEXITCODE -ne 0) { throw 'Windows-style Git checkout regression failed' }
 java -version
 if ($LASTEXITCODE -ne 0) { throw 'JDK 21 required' }
 mvn -version
@@ -34,7 +49,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Candidate).Hash.ToLowerInvaria
 }
 $env:SHALE_CASE_VERIFY_SCHEMA = $Candidate
 $env:SHALE_CASE_VERIFY_SCHEMA_SHA256 = $ExpectedCandidate
-mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAttestationTest,AiCaseDataV2MigrationContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
 if ($LASTEXITCODE -ne 0) { throw 'Offline prerequisite tests failed; STOP' }
 ```
 
@@ -44,6 +59,12 @@ arbitrary administrative SQL. No raw private schema or production catalog belong
 The supplied receipt alone is not proof of the candidate's bytes. The exact-production catalog is
 not required by the unmodified authoritative representation chosen here; it remains a private
 input to the separately established production-representation projection tests.
+
+The narrow `.gitattributes` rules preserve LF for the AI migration chain, paired packaged verifiers,
+V1/V2 manifests and catalog-generation inputs even when Windows `core.autocrlf=true`. They do not
+change SQL/module canonicalization or any reviewed receipt. Existing historical blobs are unchanged.
+Do not manually convert the installer or replace the source receipt with the CRLF-derived hash.
+Python is required for the real Git checkout regression above; it uses no Azure connection.
 
 ## 2. Capture the owner-specific scope and create a disposable database
 
@@ -127,10 +148,35 @@ $AdminCredential = $null
 if ($SetupExit -ne 0) { throw 'Setup failed; STOP, preserve private diagnostics and clean up the exact owned resources' }
 ```
 
+Owner setup has its own datasource: validated TLS, explicit disposable database, SQL credentials
+outside the URL, 15-second login, 120,000-millisecond socket read, 20-second JDBC statement query
+timeout and 5-second cancellation acknowledgement timeout. The total JUnit cap remains 300 seconds.
+These are distinct bounds, not a promise to allow a statement to run for 120 seconds. The read-only
+identity datasource stays at 3-second login / 5,000-millisecond socket timeout, and the runtime
+attestation budget remains ten seconds. No retry or unbounded timeout is added.
+
+Expect `AZURE_SETUP phase=OWNER_CONNECT status=BEGIN/PASS` and a sanitized bounds/driver-version
+line. JDBC `Connection.getNetworkTimeout()` must report 120000 immediately after connection and
+before each phase; a mismatch stops before the phase's work. Subsequent markers identify
+OWNER_PREFLIGHT, STAGE0_BEFORE, SCHEMA_IMPORT, PREREQUISITE_MIGRATIONS,
+PHASE1R_AND_V2_PREREQUISITE, V2_INSTALL, CONTAINED_USERS, DEPLOYMENT_BINDING,
+CUMULATIVE_VERIFY, STAGE0_AFTER and OFF_CHECK, with BEGIN and PASS/FAIL plus elapsed milliseconds.
+No SQL body, schema, connection URL, credential or SID is printed. Quiet logging does not suppress
+these direct test markers. Record the exact last phase and driver/bounds line privately on failure.
+
+The first owner-reported failure maps to line 34 of commit `23f96ed69d6548dd3073318cd7be0c9923070dbc`:
+the **initial Stage 0** script, before schema import/migrations. Offline driver introspection proves
+that the old later `setSocketTimeout(120000)` setter does override 5000 in the pinned 12.6.1.jre11
+driver's merged properties. The historical five-second live failure's cause is not established;
+the new connected-socket guard and phase markers are required evidence, not a claimed Azure fix.
+
 Require **one executed setup test, zero failures/errors/skips**, plus fresh
 `work/azure-native/setup-sequence.txt`. Delete any stale output files before a new attempt. A setup
 failure may leave partial objects in this exact disposable database: delete it and start with a new
 nonce. No retry/adoption, receipt replacement, module rewrite or canonicalization change is permitted.
+This includes the owner-reported Stage 0 timeout: absence of `setup-sequence.txt` is not proof that
+the database is reusable. Confirm deletion through section 5, clear stale variables/evidence, then
+repeat resource creation with a fresh nonce and independent secrets. Do not rerun setup on that DB.
 
 The setup executes these exact contained-user statements with separately generated SQL-escaped
 password literals inside JDBC memory. The notation below explains the statements; **do not paste

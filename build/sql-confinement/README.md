@@ -1,5 +1,13 @@
 # Confined SQL build inputs
 
+Git attributes pin LF for the reviewed AI SQL chain, paired packaged verifier SQL/manifests and
+catalog inputs, including Windows checkouts with `core.autocrlf=true`. Historical SQL blobs and
+source receipts remain unchanged; never accept a CRLF-derived receipt or normalize module text.
+`python -m unittest discover -s build/sql-confinement -p test_checkout.py` exercises a real Git
+checkout and checks both V1/V2 source receipts without newline normalization. See the
+[native operator packet](../../docs/testing/native-azure-readonly-operator-runbook.md) for refreshing
+an existing clean checkout and for mandatory replacement of a failed disposable setup database.
+
 `generate.py` is run from any directory with JDK 21 `java`/`javac` on PATH. It reads the unchanged
 historical migrations, normalization template and JDK Unicode reference, then writes the additive
 migration, standalone/cumulative verifier and packaged module/source manifest deterministically.

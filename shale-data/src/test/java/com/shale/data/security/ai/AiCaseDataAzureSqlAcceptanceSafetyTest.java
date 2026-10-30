@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Offline guards: unsafe targets/secret reuse must fail before opening any connection. */
 class AiCaseDataAzureSqlAcceptanceSafetyTest {
-    private static Map<String,String> settings() {
+    static Map<String,String> settings() {
         var env=new HashMap<String,String>();String db="ShaleAzureReadOnly_"+"a".repeat(32);
         env.put("SHALE_AZURE_DATABASE",db);env.put("SHALE_AZURE_JDBC_URL","jdbc:sqlserver://shale-attest-test.database.windows.net:1433;databaseName="+db);
         env.put("SHALE_AZURE_CONTRACT_VERSION","V2");env.put("SHALE_AZURE_ISSUER",AiCaseDataLocalSqlServerTest.ISSUER);env.put("SHALE_AZURE_RESOURCE",AiCaseDataLocalSqlServerTest.RESOURCE);

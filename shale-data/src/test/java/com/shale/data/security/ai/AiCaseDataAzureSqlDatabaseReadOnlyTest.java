@@ -111,16 +111,19 @@ class AiCaseDataAzureSqlDatabaseReadOnlyTest {
         }
     }
     static DataSource source(String identity) {
-        String url=required("JDBC_URL");
+        return source(System.getenv(),identity);
+    }
+    static com.microsoft.sqlserver.jdbc.SQLServerDataSource source(Map<String,String> env,String identity) {
+        String url=setting(env,"JDBC_URL");
         // Explicit database; no auth/TLS overrides or alternate transport.
         assertTrue(url.matches("jdbc:sqlserver://[A-Za-z0-9.-]+(?::[0-9]+)?;databaseName=[A-Za-z0-9_-]+;?"),"Dedicated SQL-auth URL with explicit target database required");
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();
-        source.setURL(url);source.setUser(required(identity+"_USERNAME"));source.setPassword(required(identity+"_PASSWORD"));
+        source.setURL(url);source.setUser(setting(env,identity+"_USERNAME"));source.setPassword(setting(env,identity+"_PASSWORD"));
         source.setEncrypt("true");source.setTrustServerCertificate(false);source.setLoginTimeout(3);source.setSocketTimeout(5000);
         return source;
     }
     static String required(String suffix){return setting(System.getenv(),suffix);}
-    private static String setting(Map<String,String> env,String suffix) {
+    static String setting(Map<String,String> env,String suffix) {
         String value=env.get("SHALE_AZURE_"+suffix);
         if(value==null||value.isBlank())throw new IllegalStateException("Missing read-only Azure acceptance setting: "+suffix);
         return value;
