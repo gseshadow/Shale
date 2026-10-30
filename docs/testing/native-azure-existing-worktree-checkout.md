@@ -1,5 +1,9 @@
 # Existing Windows checkout diagnosis — 2026-10-30
 
+The subsequent [stat-cache completion follow-up](native-azure-index-stat-followup.md) records the
+owner's successful Windows byte/receipt repair and focused Maven suite, followed by the remaining
+`.M` issue and its native Git stat update. Retry readiness remains BLOCKED pending validation.
+
 **BLOCKED.** The existing-worktree failure is reproduced with the operator's exact byte hashes,
 and the guarded refresh/actual-byte preflight fixes that reproduction. Mandatory Maven suites
 and packaging cannot execute in this environment because Spring Boot 4.1.1 dependency resolution

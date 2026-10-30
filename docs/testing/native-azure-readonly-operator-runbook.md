@@ -70,13 +70,25 @@ above. The tool obtains the same 25 pinned inputs from Git, refuses staged/genui
 deletions and unsafe paths, and permits refresh only from exact LF or its exact CRLF checkout
 form. It materializes a fresh temporary prefix through Git, verifies every file against HEAD and
 both reviewed source receipts, then atomically replaces conversion-only working copies. A final
-read checks the actual destination files. No manual `git show > file`, index renormalization,
+read checks the actual destination files. It then runs `git checkout-index --force --index` on
+only the pinned inputs: `--index` updates worktree stat information while using the existing
+index entries; it does not stage file content. The helper verifies all index blob/mode/stage
+records and tracking flags are unchanged, rechecks actual bytes/receipts, and requires empty
+textual diff, raw `diff-files` and porcelain status for the protected paths. This also repairs
+the prior helper's already-LF-but-`.M` state without reverting the files to CRLF.
+No manual `git show > file`, index renormalization,
 global Git configuration change or checkout hook is needed. Unrelated files are untouched.
 
 Require `PINNED_CHECKOUT PASS files=25`, `PINNED_RECEIPT V1 PASS
 b949079a9d1e639db206f535502441b59aada5cc6af74da5fda1549f566db7a3` and
 `PINNED_RECEIPT V2 PASS 60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891`
 from both commands. A missing/nonzero check stops this packet before Maven or resource creation.
+Also require `PINNED_INDEX PASS clean=true` from both commands. This means the 25 pinned inputs
+are genuinely clean in Git; unrelated existing edits/staged changes are preserved and remain
+visible. A content-only PASS is insufficient. Do not stage repaired inputs or use
+assume-unchanged/skip-worktree flags to hide `.M`; do not alter index blobs or reviewed receipts.
+Ordinary `update-index --refresh` / `--really-refresh` alone can still report `needs update`
+after the old atomic replacement. Use the approved helper, not a manual index workaround.
 The verifier reuses the regression's raw-byte calculation: zero only the embedded digest field,
 then SHA-256; no newline/module normalization. Existing SQL/resource blobs and receipts are unchanged.
 Do not manually convert the installer or replace its receipt with the CRLF-derived hash.

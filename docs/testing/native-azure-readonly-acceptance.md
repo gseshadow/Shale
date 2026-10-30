@@ -1,5 +1,9 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+Current [stat-cache follow-up](native-azure-index-stat-followup.md): Windows byte/receipt and
+focused Maven validation passed, but clean Git status after the repaired workflow still needs
+operator confirmation. Classification remains **BLOCKED**. Native Azure gates remain OPEN.
+
 Latest checkout follow-up: **BLOCKED**, with the real existing-worktree failure reproduced and
 [a guarded byte/receipt refresh](native-azure-existing-worktree-checkout.md). The owner confirmed
 the failed Azure resource group was deleted before this testing; no Azure connection was retried.

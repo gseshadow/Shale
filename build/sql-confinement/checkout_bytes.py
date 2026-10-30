@@ -75,6 +75,12 @@ def verify_receipts(files):
 
 def verify(root=ROOT):
     expected = inventory(root)
+    result = verify_bytes(root, expected)
+    verify_git_clean(root, expected)
+    return result
+
+
+def verify_bytes(root, expected):
     actual = {}
     for path, raw in expected.items():
         target = root / path
@@ -86,9 +92,19 @@ def verify(root=ROOT):
     return len(actual), verify_receipts(actual)
 
 
+def verify_git_clean(root, expected):
+    git(root, 'diff', '--quiet', '--', *expected)
+    if git(root, 'diff-files', '--raw', '--', *expected):
+        raise ValueError('Pinned worktree/index stat mismatch; run --refresh before Maven or Azure')
+    if git(root, 'status', '--porcelain', '--', *expected):
+        raise ValueError('Pinned inputs are not clean in Git; preserve edits and inspect before continuing')
+
+
 def refresh(root=ROOT):
     root = Path(root).resolve()
     expected = inventory(root)
+    index_before = git(root, 'ls-files', '--stage', '-z')
+    flags_before = git(root, 'ls-files', '-v', '-z')
     originals = {}
     # Git status can be clean for CRLF bytes. Accept only the two exact, known byte forms;
     # never overwrite a genuine edit, deletion, symlink or a staged change.
@@ -125,7 +141,19 @@ def refresh(root=ROOT):
                 os.replace(temporary, target)
             finally:
                 temporary.unlink(missing_ok=True)
-    return verify(root)
+    # Atomic replacement changes inode/size/mtime. A plain update-index --refresh can
+    # retain "needs update" against cached CRLF sizes even when the LF bytes match HEAD.
+    # First prove actual destination bytes/receipts, then let Git check out its EXISTING
+    # entries and update their stat metadata (-u). No worktree content is staged.
+    verify_bytes(root, expected)
+    git(root, 'diff', '--cached', '--quiet', 'HEAD', '--', *PATTERNS)
+    git(root, 'checkout-index', '--force', '--index', '--', *expected)
+    result = verify(root)
+    if index_before != git(root, 'ls-files', '--stage', '-z'):
+        raise ValueError('Index blob/mode/stage records changed during stat refresh; stop and inspect')
+    if flags_before != git(root, 'ls-files', '-v', '-z'):
+        raise ValueError('Index tracking flags changed during stat refresh; stop and inspect')
+    return result
 
 
 def main():
@@ -135,6 +163,7 @@ def main():
     try:
         count, receipts = refresh() if args.refresh else verify()
         print(f'PINNED_CHECKOUT PASS files={count}')
+        print('PINNED_INDEX PASS clean=true')
         for version, receipt in receipts.items():
             print(f'PINNED_RECEIPT {version} PASS {receipt}')
         return 0

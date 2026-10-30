@@ -3,6 +3,7 @@ from pathlib import Path
 from contextlib import contextmanager
 import hashlib
 import os
+import stat
 import sys
 import checkout_bytes
 import subprocess
@@ -114,6 +115,53 @@ class PinnedCheckout(unittest.TestCase):
         with self.existing_checkout(switch=False) as (repo, expected, git):
             self.assert_refreshed(repo, expected)
 
+    def test_repaired_bytes_receipts_and_git_status_are_clean_without_staging(self):
+        with self.existing_checkout() as (repo, expected, git):
+            # An unrelated staged edit must survive the pinned stat refresh unchanged.
+            unrelated = repo / 'unrelated-staged.txt'
+            unrelated.write_bytes(b'keep this staged\n')
+            git('add', '--', unrelated.name)
+            index_before = git('ls-files', '--stage', '-z')
+            flags_before = git('ls-files', '-v', '-z')
+            self.assert_refreshed(repo, expected)
+            self.assertEqual(index_before, git('ls-files', '--stage', '-z'), 'No index blob, mode or stage may change')
+            self.assertEqual(flags_before, git('ls-files', '-v', '-z'), 'No assume-unchanged or skip-worktree masking')
+            observations = {
+                'diff': git('diff', '--', *expected),
+                'diff-files': git('diff-files', '--raw', '--', *expected),
+                'status': git('status', '--porcelain', '--', *expected),
+                'status-v2': git('status', '--porcelain=v2', '--', *expected),
+            }
+            for command, output in observations.items():
+                self.assertFalse(output, command + ' must be empty for the repaired pinned inputs')
+
+    def test_refresh_recovers_prior_atomic_repair_with_lf_bytes_but_stale_crlf_stats(self):
+        with self.existing_checkout() as (repo, expected, git):
+            index_before = git('ls-files', '--stage', '-z')
+            # Reproduce the previous helper's atomic replacement without its missing stat step.
+            for path, raw in expected.items():
+                target = repo / path
+                if target.read_bytes() == raw:
+                    continue
+                replacement = target.with_name('.old-atomic-repair')
+                replacement.write_bytes(raw)
+                os.chmod(replacement, stat.S_IMODE(target.stat().st_mode))
+                os.replace(replacement, target)
+            self.assertEqual(len(expected), checkout_bytes.verify_bytes(repo, expected)[0])
+            self.assertFalse(git('diff', '--', *expected), 'Textual diff alone must reproduce the empty result')
+            self.assertTrue(git('diff-files', '--raw', '--', *expected), 'Stat-only dirt must be present')
+            self.assertIn(b'1 .M ', git('status', '--porcelain=v2', '--', *expected))
+            for option in ('--refresh', '--really-refresh'):
+                result = subprocess.run(['git', 'update-index', option], cwd=repo, capture_output=True)
+                self.assertEqual(1, result.returncode)
+                self.assertIn(b'needs update', result.stdout)
+            with self.assertRaises(ValueError):
+                checkout_bytes.verify(repo)
+            self.assert_refreshed(repo, expected)
+            self.assertEqual(index_before, git('ls-files', '--stage', '-z'))
+            self.assertFalse(git('diff-files', '--raw', '--', *expected))
+            self.assertFalse(git('status', '--porcelain', '--', *expected))
+
     def test_clearing_only_cached_index_stat_makes_old_command_rewrite_lf(self):
         with self.existing_checkout() as (repo, expected, git):
             path = 'docs/sql/ai-integration/phase3b8-confinement.sql'
@@ -172,6 +220,7 @@ class PinnedCheckout(unittest.TestCase):
             result = run('--refresh')
             self.assertEqual(0, result.returncode, result.stdout)
             self.assertIn('PINNED_CHECKOUT PASS files=25', result.stdout)
+            self.assertIn('PINNED_INDEX PASS clean=true', result.stdout)
             for version, (_, receipt) in checkout_bytes.RECEIPTS.items():
                 self.assertIn(f'PINNED_RECEIPT {version} PASS {receipt}', result.stdout)
             self.assertEqual(0, run().returncode)
