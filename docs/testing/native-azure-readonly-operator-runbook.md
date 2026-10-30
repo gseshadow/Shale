@@ -24,18 +24,17 @@ git status --short
 if ($LASTEXITCODE -ne 0) { throw 'Git inspection failed' }
 git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source identity unavailable' }
-# Requires this PR's current .gitattributes. Reapply it to a clean existing Windows checkout.
-$PinnedFiles = @(git ls-files -- 'docs/sql/ai-integration/*.sql' 'shale-data/src/main/resources/ai/*.sql' 'shale-data/src/main/resources/ai/confinement*-modules.properties' 'build/sql-confinement/*.sql' 'build/sql-confinement/*.sha256' 'build/sql-confinement/reviewed-case-module-variants-v2.json')
-if ($LASTEXITCODE -ne 0 -or $PinnedFiles.Count -eq 0) { throw 'Pinned Git inputs unavailable' }
-git diff --quiet -- $PinnedFiles
-if ($LASTEXITCODE -ne 0) { throw 'Preserve local SQL/resource edits before refreshing the checkout' }
-git diff --cached --quiet -- $PinnedFiles
-if ($LASTEXITCODE -ne 0) { throw 'Preserve staged SQL/resource edits before refreshing the checkout' }
-$Endings = @(git check-attr eol -- $PinnedFiles)
-if ($LASTEXITCODE -ne 0 -or @($Endings | Where-Object { $_ -notmatch ': eol: lf$' }).Count -ne 0) { throw 'Current PR LF attributes required' }
-$RefreshArgs = @('checkout-index','--force','--') + $PinnedFiles
-& git @RefreshArgs
-if ($LASTEXITCODE -ne 0) { throw 'Pinned checkout refresh failed' }
+# Non-Azure validation must not inherit an old native acceptance opt-in.
+Remove-Item Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_ATTESTATION_OPT_IN -ErrorAction SilentlyContinue
+git --version
+if ($LASTEXITCODE -ne 0) { throw 'Git required' }
+$RepoRoot = (git rev-parse --show-toplevel).Trim()
+if ($LASTEXITCODE -ne 0 -or (Get-Location).Path -ne (Resolve-Path -LiteralPath $RepoRoot).Path) { throw 'Run from this checkout repository root' }
+# Actual-byte refresh and receipt checks, not just Git status/check-attr.
+python build/sql-confinement/checkout_bytes.py --refresh
+if ($LASTEXITCODE -ne 0) { throw 'Pinned byte refresh/receipt verification failed; STOP before Maven or Azure' }
+python build/sql-confinement/checkout_bytes.py
+if ($LASTEXITCODE -ne 0) { throw 'Actual working-tree byte verification failed; STOP before Maven or Azure' }
 python -m unittest discover -s build/sql-confinement -p test_checkout.py
 if ($LASTEXITCODE -ne 0) { throw 'Windows-style Git checkout regression failed' }
 java -version
@@ -60,11 +59,28 @@ The supplied receipt alone is not proof of the candidate's bytes. The exact-prod
 not required by the unmodified authoritative representation chosen here; it remains a private
 input to the separately established production-representation projection tests.
 
-The narrow `.gitattributes` rules preserve LF for the AI migration chain, paired packaged verifiers,
-V1/V2 manifests and catalog-generation inputs even when Windows `core.autocrlf=true`. They do not
-change SQL/module canonicalization or any reviewed receipt. Existing historical blobs are unchanged.
-Do not manually convert the installer or replace the source receipt with the CRLF-derived hash.
-Python is required for the real Git checkout regression above; it uses no Azure connection.
+The narrow `.gitattributes` rules select LF when Git writes the protected inputs, including on
+Windows with `core.autocrlf=true`. **Attributes do not force Git to rewrite unchanged existing
+files.** A clean existing worktree can retain CRLF, and `checkout-index --force`, `git restore`
+and `git checkout HEAD -- <paths>` can all skip the cached file. A fresh-prefix test alone did
+not cover this transition. Do not use those commands or `git check-attr` as byte verification.
+
+After a fresh clone, branch switch or update to this PR, run the two `checkout_bytes.py` commands
+above. The tool obtains the same 25 pinned inputs from Git, refuses staged/genuine local edits,
+deletions and unsafe paths, and permits refresh only from exact LF or its exact CRLF checkout
+form. It materializes a fresh temporary prefix through Git, verifies every file against HEAD and
+both reviewed source receipts, then atomically replaces conversion-only working copies. A final
+read checks the actual destination files. No manual `git show > file`, index renormalization,
+global Git configuration change or checkout hook is needed. Unrelated files are untouched.
+
+Require `PINNED_CHECKOUT PASS files=25`, `PINNED_RECEIPT V1 PASS
+b949079a9d1e639db206f535502441b59aada5cc6af74da5fda1549f566db7a3` and
+`PINNED_RECEIPT V2 PASS 60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891`
+from both commands. A missing/nonzero check stops this packet before Maven or resource creation.
+The verifier reuses the regression's raw-byte calculation: zero only the embedded digest field,
+then SHA-256; no newline/module normalization. Existing SQL/resource blobs and receipts are unchanged.
+Do not manually convert the installer or replace its receipt with the CRLF-derived hash.
+Python 3.9+ and Git are required. The tool and transition regressions make no Azure connection.
 
 ## 2. Capture the owner-specific scope and create a disposable database
 

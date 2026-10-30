@@ -1,10 +1,21 @@
 # Confined SQL build inputs
 
-Git attributes pin LF for the reviewed AI SQL chain, paired packaged verifier SQL/manifests and
-catalog inputs, including Windows checkouts with `core.autocrlf=true`. Historical SQL blobs and
-source receipts remain unchanged; never accept a CRLF-derived receipt or normalize module text.
-`python -m unittest discover -s build/sql-confinement -p test_checkout.py` exercises a real Git
-checkout and checks both V1/V2 source receipts without newline normalization. See the
+Git attributes select LF when Git writes the reviewed AI SQL chain and paired resources. An
+existing cached CRLF worktree can remain clean and can be skipped by `checkout-index --force`
+even after the attributes change. After cloning/switching/updating, run:
+
+```sh
+python build/sql-confinement/checkout_bytes.py --refresh
+python build/sql-confinement/checkout_bytes.py
+```
+
+These offline commands refresh only exact conversion-only pinned files, refuse local/staged edits,
+verify all 25 actual working-tree byte sequences against HEAD, and print the unchanged V1/V2 source
+receipts. They materialize a fresh Git prefix and verify it before replacing worktree copies;
+they do not change historical SQL, normalize security-contract text or touch unrelated files.
+`python -m unittest discover -s build/sql-confinement -p test_checkout.py` covers the cached existing
+worktree transition, fresh clone/prefix, byte preflight and refusal paths. The raw source receipt
+calculation formerly in that regression is shared with the operator tool. See the
 [native operator packet](../../docs/testing/native-azure-readonly-operator-runbook.md) for refreshing
 an existing clean checkout and for mandatory replacement of a failed disposable setup database.
 

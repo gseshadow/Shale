@@ -1,5 +1,9 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+Latest checkout follow-up: **BLOCKED**, with the real existing-worktree failure reproduced and
+[a guarded byte/receipt refresh](native-azure-existing-worktree-checkout.md). The owner confirmed
+the failed Azure resource group was deleted before this testing; no Azure connection was retried.
+
 Current follow-up (2026-10-30): **BLOCKED** for operator retry readiness; see
 [owner Stage 0 failure, effective-driver proof and Windows correction](native-azure-setup-timeout-followup.md).
 The original preparation evidence below is historical. Both native Azure gates remain OPEN.

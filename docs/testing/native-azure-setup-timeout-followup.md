@@ -1,5 +1,9 @@
 # Azure setup timeout and Windows checkout follow-up — 2026-10-30
 
+The subsequent [existing-worktree checkout investigation](native-azure-existing-worktree-checkout.md)
+supersedes the fresh-prefix-only checkout conclusion below. The owner confirmed deletion of the
+failed resource group. Current retry readiness remains BLOCKED; native gates stay OPEN.
+
 **BLOCKED.** The separate bounded owner datasource, live timeout guard, sanitized phase diagnostics
 and exact-byte checkout protection are implemented and focused checks pass. Mandatory Maven
 verification/package remain blocked by the unavailable Spring Boot 4.1.1 BOM. The historical
