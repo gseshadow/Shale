@@ -1,5 +1,12 @@
 # Production MCP deployment preflight
 
+The first remaining native Azure gate has a separate
+[disposable owner packet](testing/native-azure-readonly-operator-runbook.md) and
+[pending acceptance record](testing/native-azure-readonly-acceptance.md). The native JUnit selector
+now explicitly refuses production targets; execute it only on that fresh disposable fixture.
+Future deployed production attestation remains separately governed. No production step below
+is authorized by preparation of this packet.
+
 This is a future governed sequence, not execution authorization. The production composition's
 [prior SQL Server local acceptance passed](testing/production-mcp-case-composition.md), including the
 inherited-verifier-authority fix. The [Azure SQL Database successor](testing/azure-sql-case-attestation.md)

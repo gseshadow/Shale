@@ -1,5 +1,12 @@
 # Azure SQL Database Case attestation contract
 
+Current disposable native-gate packet (2026-10-29):
+[operator commands](../testing/native-azure-readonly-operator-runbook.md) and
+[unexecuted acceptance record](../testing/native-azure-readonly-acceptance.md).
+The native JUnit gate now requires a nonce-named disposable V2 database and reserved test binding;
+it must never target production. Deployed production attestation remains a separate future
+`AiCaseDataAttestation`/production-readiness operation. Production authority/audits are unchanged.
+
 Date: 2026-10-27. Base: `efd8be8a350523344bf69b72bbc715f9e888589d` (#1924).
 This supplements the [confinement contract](phase3b7-sql-confinement-contract.md).
 Current evidence (2026-10-28): **production Stage 0 platform PASS** (operator-reported),
