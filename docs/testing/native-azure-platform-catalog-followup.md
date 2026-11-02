@@ -1,8 +1,11 @@
 # Owner catalog failure investigation — 2026-11-02
 
 PR #1929 stays draft and unmerged. No Azure or production access occurred. Both native
-gates remain OPEN. **Another Azure attempt is BLOCKED**, including resource creation.
-Windows owner validation of this follow-up is pending. The owner authorized the scoped
+gates remain OPEN. **READY FOR ONE FRESH DISPOSABLE AZURE OWNER ATTEMPT** after
+owner-observed Windows validation at `c5d13ea4d93f0b0ca732244506d7b0f5d1b96047`
+and review of the mandatory-cleanup live packet. See the
+[owner evidence](native-azure-readonly-acceptance.md#windows-owner-validation-and-retry-classification--2026-11-02).
+This readiness is not native acceptance. The owner authorized the scoped
 Phase1R identity-contract fix after reconciling the stack. Existing valid boxed receipts
 and all V1/V2 confinement SQL, module manifests and receipts are preserved.
 
@@ -148,9 +151,10 @@ substitution. No existing receipt is upgraded or repaired. V1/V2 confinement sou
 hashes and SQL remain unchanged because this receipt is Phase1R metadata, not a confinement
 module/hash input. A private original change-control receipt remains required.
 
-The operator packet remains blocked before resource creation pending Windows offline
-validation of this fix and review of the next live packet. Native read-only and mutation/fault
-gates remain OPEN. The failed fixture has been deleted; no retry/adoption is permitted.
+Windows offline validation of this fix is now owner-confirmed and the next live packet
+has been reviewed. The operator packet permits one fresh disposable owner attempt only.
+Native read-only and mutation/fault gates remain OPEN. The failed fixture has been deleted;
+no retry on that fixture or adoption is permitted.
 
 TLS validation, exact-workstation-only firewall, credential separation, login/socket/query/
 cancel/JUnit limits, V2 SQL/receipts and Phase1R ownership/rollback guards, authority boundaries, read-only gate and all
@@ -173,7 +177,7 @@ connection occurred. Native Windows/Azure validation is not credited from these 
 | `python -m unittest discover -s build/sql-confinement -p test_checkout.py` | **11/11 passed** |
 | `python build/sql-confinement/checkout_bytes.py` | All **25** inputs, clean index and original V1/V2 source receipts PASS |
 | Diff, relative links, exact protected production Java/V1/V2 SQL/resources and credential-generation block comparison | PASS; only the authorized Phase1R engine/README, focused tests and runbook/evidence change |
-| Windows PowerShell packet and owner validation of this head | **Pending**; not performed on this Linux host |
+| Windows owner validation at `c5d13ea4d93f0b0ca732244506d7b0f5d1b96047` | Owner reports checkout/receipts, focused and affected/critical PASS; all 7 modules SUCCESS; Shale Server 65/0/0/0; Phase1R 2+6=8/0/0/0, BUILD SUCCESS; local container removed, `PHASE1R_LOCAL_CLEANUP CONFIRMED`; no Azure/production access |
 
 The local fixture used a new loopback-only SQL Server 2022 Developer container from
 `mcr.microsoft.com/mssql/server:2022-latest`, image digest
@@ -221,6 +225,8 @@ The affected cases/security-data selection covers request/authority/audit regres
 core/data/server; no mapping exception or optional historical full-suite run was needed.
 The final changed-file review found no production Java or confinement SQL/manifest changes.
 
-**Not operator retry ready.** Complete Windows owner validation of the fix and review the
-next exact live packet before any new Azure attempt. Both native gates remain OPEN;
+**Ready for one fresh disposable owner attempt.** Windows validation is complete and the
+[exact live packet](native-azure-readonly-operator-runbook.md) is reviewed, including
+probe → setup → read-only ordering and mandatory exact-scope cleanup. Both native gates remain OPEN;
 no deployment, enablement or production change is authorized or performed.
+

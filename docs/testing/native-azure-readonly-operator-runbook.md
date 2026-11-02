@@ -1,13 +1,14 @@
 # Native Azure contained identity / read-only operator packet
 
-**STOP before section 2/resource creation: Windows owner validation of the
-[Phase1R database-identity fix](native-azure-platform-catalog-followup.md) is pending.**
-The latest probe passed; setup failed later in Phase1R, and that failed resource group
-was deleted with cleanup CONFIRMED. No live retry is classified ready. Section 1 is
-offline validation only; the remaining live packet requires subsequent review.
+**READY FOR ONE FRESH DISPOSABLE AZURE OWNER ATTEMPT**, based on owner-observed Windows
+validation at `c5d13ea4d93f0b0ca732244506d7b0f5d1b96047` and this packet review.
+See the [owner evidence and classification](native-azure-readonly-acceptance.md#windows-owner-validation-and-retry-classification--2026-11-02).
+Both native gates remain OPEN; #1929 remains draft and unmerged. All previous failed
+fixtures were deleted with cleanup CONFIRMED and must never be reused or adopted.
+No Azure or production access occurred during Windows validation or this packet review.
 
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
-Updated 2026-11-02 for owner login diagnostics, bounded non-mutating preflight and portable execution.
+Updated 2026-11-02 for completed Windows owner validation and the reviewed fresh-resource live launcher.
 The second owner fixture was deleted with cleanup CONFIRMED; never reuse it. See the
 [offline login investigation](native-azure-owner-login-followup.md).
 Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
@@ -30,8 +31,21 @@ Check out this PR's reviewed task branch, targeting `codex/latest`, then:
 $ErrorActionPreference = 'Stop'
 git status --short
 if ($LASTEXITCODE -ne 0) { throw 'Git inspection failed' }
+$ValidatedHead = 'c5d13ea4d93f0b0ca732244506d7b0f5d1b96047'
 git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source identity unavailable' }
+git merge-base --is-ancestor $ValidatedHead HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Windows-validated head required' }
+$AllowedEvidence = @('docs/testing/native-azure-readonly-operator-runbook.md',
+    'docs/testing/native-azure-readonly-acceptance.md',
+    'docs/testing/native-azure-platform-catalog-followup.md')
+$ChangedSinceValidation = @(git diff --name-only $ValidatedHead HEAD)
+if ($LASTEXITCODE -ne 0 -or @($ChangedSinceValidation | Where-Object { $_ -notin $AllowedEvidence }).Count -ne 0) {
+    throw 'Executable inputs changed since Windows validation; new review/validation required'
+}
+if (@(git status --porcelain --untracked-files=no).Count -ne 0 -or $LASTEXITCODE -ne 0) {
+    throw 'Reviewed source must have no tracked edits'
+}
 # Non-Azure validation must not inherit an old native acceptance opt-in.
 Remove-Item Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_ATTESTATION_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue
 git --version
@@ -137,6 +151,65 @@ Require 2 offline contract tests and 6 local SQL tests, zero failures/errors/ski
 Local SQL edition injection tests batch dispatch, receipt binding and rollback; it does
 not turn the local instance into Azure or close either native gate.
 
+## Reviewed live launcher — mandatory
+
+Complete section 1 first on the owner workstation, including the offline credential/syntax
+check in the same PowerShell host. The exact Windows-validated executable baseline is pinned
+above; only these three evidence Markdown files may differ. Do not paste live sections
+individually. Run this launcher once from the repository root in that same private session.
+It executes the first PowerShell block in each of sections 2, 3 and 4 in order and always
+enters section 5 after recording the new scope, including resource/probe/setup/read-only failure.
+A missing, skipped or failing selected test stops downstream work. Interrupting/closing the
+host or losing power cannot run a finally block: recover immediately using the non-secret
+scope record and section 5 from a new owner session; cleanup is mandatory before any new attempt.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+if (@(Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*').Count -ne 0) {
+    throw 'Use a fresh process without inherited SHALE_AZURE_* values; complete section 1 first'
+}
+if (Test-Path -LiteralPath work/azure-native/resource-scope.json) {
+    throw 'Retain prior private evidence separately and confirm prior cleanup before a fresh packet'
+}
+$Packet = [IO.File]::ReadAllText((Resolve-Path docs/testing/native-azure-readonly-operator-runbook.md).Path)
+$LiveBlocks = @{}
+foreach ($Number in @(2,3,4,5)) {
+    $Section = [regex]::Match($Packet, "(?ms)^## $Number\. .*?(?=^## |\z)")
+    $FenceMarker = ([string][char]96) * 3
+    $Fence = [regex]::Match($Section.Value, "(?s)${FenceMarker}powershell\r?\n(.*?)${FenceMarker}")
+    if (-not $Section.Success -or -not $Fence.Success) { throw 'Reviewed live section missing' }
+    $LiveBlocks[$Number] = [scriptblock]::Create($Fence.Groups[1].Value)
+}
+$ScopeWritten = $false
+$Nonce = $null
+try {
+    . $LiveBlocks[2]
+    if ((Read-Host 'Allow exact IPv4 firewall propagation (up to five minutes); type READY to probe once') -cne 'READY') {
+        throw 'Owner readiness not confirmed; clean up without probing'
+    }
+    . $LiveBlocks[3]
+    . $LiveBlocks[4]
+}
+finally {
+    try {
+        if ($ScopeWritten) {
+            $RecordedScope = Get-Content work/azure-native/resource-scope.json -Raw | ConvertFrom-Json
+            if ($RecordedScope.nonce -cne $Nonce) { throw 'Cleanup scope changed; STOP for owner reconciliation' }
+            . $LiveBlocks[5]
+        }
+    }
+    finally {
+        Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*' | Remove-Item
+        Remove-Item Env:SHALE_CASE_VERIFY_SCHEMA,Env:SHALE_CASE_VERIFY_SCHEMA_SHA256 -ErrorAction SilentlyContinue
+        $AdminCredential = $null
+        $LocalCredential = $null
+        $Bytes = $null
+        $Secret = $null
+        $rng = $null
+    }
+}
+```
+
 ## 2. Capture the owner-specific scope and create a disposable database
 
 Choose an authorized acceptance subscription and region. These are environment-specific inputs,
@@ -159,11 +232,15 @@ if (-not [System.Net.IPAddress]::TryParse($ClientIp, [ref]$ParsedIp) -or
     $ParsedIp.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork -or
     $ClientIp -eq '0.0.0.0') { throw 'A single workstation IPv4 address is required' }
 # Persist non-secret cleanup scope BEFORE the first resource mutation, including partial failures.
+if (@(Get-AzResourceGroup -ErrorAction Stop | Where-Object ResourceGroupName -CEQ $ResourceGroup).Count -ne 0) {
+    throw 'Generated resource group already exists; never adopt it'
+}
 New-Item -ItemType Directory -Force -Path work/azure-native | Out-Null
 @{ subscription=$SubscriptionId; resourceGroup=$ResourceGroup; server=$ServerName;
    database=$DatabaseName; nonce=$Nonce; createdResourceGroup=$true;
    createdFirewall=$true; productionAccess=$false } |
    ConvertTo-Json | Set-Content -Encoding utf8 work/azure-native/resource-scope.json
+$ScopeWritten = $true
 New-AzResourceGroup -Name $ResourceGroup -Location $Location -Tag @{ Purpose='ShaleNativeReadOnly'; Nonce=$Nonce } | Out-Null
 New-AzSqlServer -ResourceGroupName $ResourceGroup -ServerName $ServerName -Location $Location -SqlAdministratorCredentials $AdminCredential -MinimalTlsVersion '1.2' -PublicNetworkAccess Enabled | Out-Null
 New-AzSqlServerFirewallRule -ResourceGroupName $ResourceGroup -ServerName $ServerName -FirewallRuleName "acceptance-$Nonce" -StartIpAddress $ClientIp -EndIpAddress $ClientIp | Out-Null
@@ -178,15 +255,9 @@ New-Item -ItemType Directory -Force -Path work/azure-native | Out-Null
    ConvertTo-Json | Set-Content -Encoding utf8 work/azure-native/resource-scope.json
 ```
 
-An **existing owned disposable logical server** may instead be used if its owner authorizes this
-acceptance, it is not `shale.database.windows.net`, and its firewall/secret consumers are controlled.
-Skip creation of the resource group/server only; capture its actual resource group, server, FQDN and
-administrator credential into the same variables. Generate a fresh `$Nonce` and `$DatabaseName` as
-above and run `New-AzSqlDatabase` once. Never adopt an existing database, even one that looks empty.
-Write the scope record before database creation with `createdResourceGroup=$false` and
-`createdFirewall=$true` only if this packet adds the exact nonce firewall rule; otherwise set it false. Use
-the existing-server cleanup below. An existing database would require a separate reviewed fixture
-provenance plan; this packet deliberately refuses it. New S0 resources incur charges until deleted.
+Only a newly created resource group, logical server and database are permitted for this
+attempt. No existing-server alternative, existing database, failed fixture or adoption is allowed.
+New S0 resources incur charges until deleted. Cleanup includes any partial creation failure.
 
 ## 3. Supply independent contained credentials in child-process environment only
 
@@ -212,6 +283,14 @@ It refuses inherited `SHALE_AZURE_*` values and never loads Az modules, JDBC, or
 A Linux PowerShell pass does not replace this Windows host check.
 
 ```powershell
+function Assert-NativeReport([string]$Class) {
+    $Report = "shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.$Class.xml"
+    if (-not (Test-Path -LiteralPath $Report)) { throw 'Fresh selected Surefire report required; STOP' }
+    [xml]$Result = Get-Content -LiteralPath $Report -Raw
+    if ([int]$Result.testsuite.tests -ne 1 -or
+        [int]$Result.testsuite.failures -ne 0 -or [int]$Result.testsuite.errors -ne 0 -or
+        [int]$Result.testsuite.skipped -ne 0) { throw 'Require 1 test, 0 failures/errors/skips; STOP' }
+}
 $env:SHALE_AZURE_JDBC_URL = "jdbc:sqlserver://${Fqdn}:1433;databaseName=$DatabaseName"
 $env:SHALE_AZURE_DATABASE = $DatabaseName
 $env:SHALE_AZURE_CONTRACT_VERSION = 'V2'
@@ -264,6 +343,7 @@ try {
     Remove-Item work/azure-native/setup-sequence.txt -ErrorAction SilentlyContinue
     # Probe only after creation/firewall propagation, before enabling mutating setup.
     $ProbeExit = $null
+    Remove-Item shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlOwnerConnectivityProbeTest.xml -ErrorAction SilentlyContinue
     $env:SHALE_AZURE_OWNER_PROBE_OPT_IN = 'PROBE_OWNED_DISPOSABLE_AZURE_LOGIN'
     try {
         mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlOwnerConnectivityProbeTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
@@ -271,9 +351,14 @@ try {
     }
     finally { Remove-Item Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue }
     if ($ProbeExit -ne 0) { throw 'Owner probe failed; STOP before setup and clean up the exact owned scope' }
+    Remove-Item shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlDisposableSetupTest.xml -ErrorAction SilentlyContinue
+    Assert-NativeReport 'AiCaseDataAzureSqlOwnerConnectivityProbeTest'
     $env:SHALE_AZURE_SETUP_OPT_IN = 'CREATE_OWNED_DISPOSABLE_AZURE_FIXTURE'
     mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlDisposableSetupTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
     $SetupExit = $LASTEXITCODE
+    if ($SetupExit -ne 0) { throw 'Setup failed; STOP and clean up exact owned scope' }
+    Assert-NativeReport 'AiCaseDataAzureSqlDisposableSetupTest'
+    if (-not (Test-Path work/azure-native/setup-sequence.txt)) { throw 'Fresh setup sequence required; STOP' }
 }
 finally {
     Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue
@@ -383,11 +468,14 @@ switches are enabled; no synthetic user/Case/integration rows are necessary for 
 
 ```powershell
 Remove-Item work/azure-native/read-only.properties -ErrorAction SilentlyContinue
+Remove-Item shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlDatabaseReadOnlyTest.xml -ErrorAction SilentlyContinue
 $env:SHALE_AZURE_ATTESTATION_OPT_IN = 'AZURE_SQL_DATABASE_READ_ONLY'
 mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlDatabaseReadOnlyTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
 $ReadOnlyExit = $LASTEXITCODE
 Remove-Item Env:SHALE_AZURE_ATTESTATION_OPT_IN
 if ($ReadOnlyExit -ne 0) { throw 'Native Azure gate did not pass; STOP and clean up' }
+Assert-NativeReport 'AiCaseDataAzureSqlDatabaseReadOnlyTest'
+if (-not (Test-Path work/azure-native/read-only.properties)) { throw 'Fresh read-only evidence required; STOP' }
 Get-Content work/azure-native/read-only.properties
 ```
 
@@ -433,35 +521,38 @@ a new owner session. For the newly created acceptance resource group:
 
 ```powershell
 $Scope = Get-Content work/azure-native/resource-scope.json -Raw | ConvertFrom-Json
-Set-AzContext -SubscriptionId $Scope.subscription | Out-Null
-if (-not $Scope.createdResourceGroup -or $Scope.resourceGroup -ne "shale-attest-$($Scope.nonce)") { throw 'Use the existing-server cleanup instead' }
-$Group = Get-AzResourceGroup -Name $Scope.resourceGroup
-if ($Group.Tags.Purpose -ne 'ShaleNativeReadOnly' -or $Group.Tags.Nonce -ne $Scope.nonce) { throw 'Owned resource tags mismatch' }
-Remove-AzResourceGroup -Name $Scope.resourceGroup -Force | Out-Null
-if (Get-AzResourceGroup -Name $Scope.resourceGroup -ErrorAction SilentlyContinue) { throw 'Cleanup not confirmed' }
-Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*' | Remove-Item
-Remove-Item Env:SHALE_CASE_VERIFY_SCHEMA,Env:SHALE_CASE_VERIFY_SCHEMA_SHA256 -ErrorAction SilentlyContinue
-@{ resourceGroup=$Scope.resourceGroup; cleanup='CONFIRMED'; productionAccess=$false; productionChange=$false } |
-    ConvertTo-Json | Set-Content -Encoding utf8 work/azure-native/cleanup.json
-```
-
-For an **existing disposable server**, do not delete its resource group/server:
-
-```powershell
-$Scope = Get-Content work/azure-native/resource-scope.json -Raw | ConvertFrom-Json
-Set-AzContext -SubscriptionId $Scope.subscription | Out-Null
-if ($Scope.createdResourceGroup -or $Scope.database -ne "ShaleAzureReadOnly_$($Scope.nonce)" -or $Scope.server -eq 'shale') { throw 'Owned scope mismatch' }
-Remove-AzSqlDatabase -ResourceGroupName $Scope.resourceGroup -ServerName $Scope.server -DatabaseName $Scope.database -Force | Out-Null
-if (Get-AzSqlDatabase -ResourceGroupName $Scope.resourceGroup -ServerName $Scope.server -DatabaseName $Scope.database -ErrorAction SilentlyContinue) { throw 'Database cleanup not confirmed' }
-if ($Scope.createdFirewall) {
-    Remove-AzSqlServerFirewallRule -ResourceGroupName $Scope.resourceGroup -ServerName $Scope.server -FirewallRuleName "acceptance-$($Scope.nonce)" -ErrorAction SilentlyContinue
-    if (Get-AzSqlServerFirewallRule -ResourceGroupName $Scope.resourceGroup -ServerName $Scope.server -FirewallRuleName "acceptance-$($Scope.nonce)" -ErrorAction SilentlyContinue) { throw 'Firewall cleanup not confirmed' }
+if ($Scope.nonce -cnotmatch '^[a-f0-9]{32}$' -or
+    -not $Scope.createdResourceGroup -or
+    $Scope.resourceGroup -cne "shale-attest-$($Scope.nonce)" -or
+    $Scope.server -cne "shale-attest-$($Scope.nonce)" -or
+    $Scope.database -cne "ShaleAzureReadOnly_$($Scope.nonce)" -or
+    $Scope.productionAccess -ne $false) { throw 'Exact fresh owned scope required; reconcile privately' }
+Set-AzContext -SubscriptionId $Scope.subscription -ErrorAction Stop | Out-Null
+# Successful inventory reads distinguish absence from authentication/authorization/read errors.
+$Group = @(Get-AzResourceGroup -ErrorAction Stop | Where-Object ResourceGroupName -CEQ $Scope.resourceGroup)
+if ($Group.Count -gt 1) { throw 'Ambiguous owned resource group; cleanup not confirmed' }
+if ($Group.Count -eq 1) {
+    if ($Group[0].Tags.Purpose -cne 'ShaleNativeReadOnly' -or
+        $Group[0].Tags.Nonce -cne $Scope.nonce) { throw 'Owned resource tags mismatch; cleanup not confirmed' }
+    Remove-AzResourceGroup -Name $Scope.resourceGroup -Force -ErrorAction Stop | Out-Null
+}
+if (@(Get-AzResourceGroup -ErrorAction Stop | Where-Object ResourceGroupName -CEQ $Scope.resourceGroup).Count -ne 0) {
+    throw 'Cleanup not confirmed; no further attempt'
 }
 Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*' | Remove-Item
 Remove-Item Env:SHALE_CASE_VERIFY_SCHEMA,Env:SHALE_CASE_VERIFY_SCHEMA_SHA256 -ErrorAction SilentlyContinue
-@{ database=$Scope.database; cleanup='CONFIRMED'; productionAccess=$false; productionChange=$false } |
+@{ resourceGroup=$Scope.resourceGroup; nonce=$Scope.nonce; cleanup='CONFIRMED';
+   productionAccess=$false; productionChange=$false } |
     ConvertTo-Json | Set-Content -Encoding utf8 work/azure-native/cleanup.json
+Write-Output 'AZURE_NATIVE_CLEANUP CONFIRMED'
 ```
+
+A resource creation failure is also a failed attempt. The initial scope record is written
+before the first mutation; deletion of its entire new group removes the exact database,
+logical server and nonce firewall rule, including partial resources. Never clean a group
+whose nonce/name/tags differ. A cleanup error remains BLOCKED until owner reconciliation
+and confirmed deletion; it does not permit a retry. The launcher erases process secrets
+even when cleanup itself fails. Close the private session afterward.
 
 Keep raw Surefire logs, resource records and all attachments private. Review sanitized counts,
 platform/version, effective authority, receipts, any representation finding, resource scope,
@@ -470,3 +561,4 @@ SIDs, connection strings, passwords, access tokens or schema/module artifacts. O
 required live/operator evidence passes may the record use
 `NATIVE AZURE IDENTITY / READ-ONLY ACCEPTANCE COMPLETE`. This never closes the mutation/fault gate
 or authorizes production SQL, identities, JAR deployment, AI/MCP/OAuth activation or a pilot.
+

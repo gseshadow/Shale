@@ -1,17 +1,65 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
-Latest follow-up (2026-11-02): owner probe and shared OWNER_PREFLIGHT passed on
+## Windows owner validation and retry classification — 2026-11-02
+
+Owner-observed on Windows at exact head `c5d13ea4d93f0b0ca732244506d7b0f5d1b96047`;
+reported by the owner, not independently rerun by this agent:
+
+| Check | Owner-observed result |
+| --- | --- |
+| Reviewed checkout / receipt validation | PASS |
+| Focused Phase1R / Azure prerequisite gate | PASS |
+| Selector-generated affected / critical execution | PASS |
+| Critical reactor | All seven modules SUCCESS |
+| Shale Server | 65 tests; 0 failures, 0 errors, 0 skips |
+| Dedicated identity fixture | New localhost-only SQL Server 2022 Developer |
+| `Phase1RDatabaseIdentityContractTest` | 2 passed |
+| `Phase1RDatabaseIdentityLocalSqlServerTest` | 6 passed |
+| Combined Phase1R identity gate | 8 passed; 0 failures, 0 errors, 0 skips; Maven BUILD SUCCESS |
+| Local fixture cleanup | Disposable SQL container removed; `PHASE1R_LOCAL_CLEANUP CONFIRMED` |
+| Azure / production access during this validation | None |
+
+**READY FOR ONE FRESH DISPOSABLE AZURE OWNER ATTEMPT.** The Windows prerequisite
+blocker is cleared and the next exact live packet has been reviewed against this head's
+probe, setup, read-only selectors and safety contracts. Use the
+[reviewed operator packet](native-azure-readonly-operator-runbook.md), including its
+mandatory cleanup launcher. Fresh nonce/resource group/server/database and independent
+secrets only; exact workstation IPv4 firewall; no failed-fixture reuse/adoption.
+TLS verification and all Java deadlines remain unchanged; V2 is explicit.
+
+This is readiness to attempt, not native acceptance. Native identity/read-only and
+disposable mutation/fault gates remain **OPEN**. PR #1929 stays **draft and unmerged**.
+Probe, setup or read-only failure stops downstream work and enters exact-scope cleanup.
+No Azure or production access, deployment or activation was performed by this agent.
+Local edition injection is SQL dispatch/receipt evidence, not native Azure metadata evidence.
+
+Packet verification for this documentation update: PowerShell 7.4.6 on Linux parsed every
+PowerShell fence and passed the existing `test_runbook_credentials.ps1` check (two fresh
+rounds, five independent identities, partial-generation cleanup). A temporary offline
+mock harness executed the exact launcher and extracted section blocks in 12 scenarios:
+success; partial resource creation failure; failure, skipped report and missing report at
+each of probe/setup/read-only; and cleanup failure. Downstream work stopped at the failed
+stage, exact owned cleanup ran, secrets were erased, and cleanup failure produced no false
+confirmation. All 12 passed; Azure cmdlets and Maven were mocked, with no Az module loaded
+or external connection. These checks do not replace the same-host Windows offline check
+in section 1. The marked credential block and native Maven selectors remain unchanged;
+only these three evidence Markdown files change. No Java/SQL/receipt or audit schema changed.
+
+## Historical attempts and preparation evidence
+
+Historical catalog follow-up (2026-11-02): owner probe and shared OWNER_PREFLIGHT passed on
 `da7933eacc358080014dfba2558473d31c349a47`. Setup then failed in
 **PHASE1R_AND_V2_PREREQUISITE**, not platform detection: its inherited preparation
 executed the SQL Server/MI-only `sys.database_recovery_status` receipt query. The owner
 reconciled the full stack and confirmed deletion (`cleanup=CONFIRMED`, production
 access/change false). Never reuse it. The [catalog investigation and scoped identity fix](native-azure-platform-catalog-followup.md)
 records the Azure physical-incarnation binding and boxed receipt compatibility.
-**Windows owner validation is pending; another live attempt is BLOCKED. Both native
-gates remain OPEN; keep #1929 draft and unmerged.** Earlier timeout evidence below
+At that point Windows owner validation was pending and another attempt was BLOCKED.
+The owner validation/readiness record above supersedes that blocker; both native gates
+remain OPEN and #1929 stays draft and unmerged. Earlier timeout evidence below
 remains historical and does not describe this latest failure.
 
-Current follow-up (2026-11-02): the **second owner attempt failed at OWNER_CONNECT** on
+Earlier login follow-up (2026-11-02): the **second owner attempt failed at OWNER_CONNECT** on
 `ccf59e0fda6efc2e703b6e06454afc5619d5bc64`: 1 setup test / 0 failures / 1 error / 0 skips,
 approximately 15.46 seconds, SQLServerException / SocketTimeoutException during JDBC
 `sendLogon`, before a connection was returned. No OWNER_PREFLIGHT, Stage 0, import,
@@ -24,9 +72,9 @@ explains the initial socket/login clamp, adds sanitized connection-failure marke
 only the owner login budget to the driver/Azure-recommended 30 seconds, explicitly establishes
 the post-login 120000-ms guard, and adds a separate non-mutating owner probe to the
 [operator packet](native-azure-readonly-operator-runbook.md). Focused direct JDK/JUnit checks
-pass; current Maven affected/critical verification is blocked by dependency/network access.
-**Both native Azure gates remain OPEN. Further operator execution is pending prerequisite
-verification; keep #1929 draft and unmerged. No Azure or production access occurred in this task.**
+passed; Maven affected/critical verification was then blocked by dependency/network access.
+Both native Azure gates remain OPEN. This historical prerequisite block is superseded
+by the completed owner validation above; keep #1929 draft and unmerged.
 
 The owner previously reported all non-Azure Windows security gates PASS: pinned refresh
 25/25, clean index, both receipts, focused Azure/V1/V2 contracts, Phase1R local SQL, critical
@@ -137,3 +185,4 @@ Do not classify the gate complete on absent opt-in, skipped tests, owner-only/lo
 or missing metadata visibility. No production Phase1R/V2 install, identity provisioning, JAR
 deployment, AI/MCP/OAuth activation or pilot is authorized. The seven already-installed production
 prerequisites must not be rerun. The PR remains unmerged.
+
