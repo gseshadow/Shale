@@ -1,5 +1,16 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+Latest follow-up (2026-11-02): owner probe and shared OWNER_PREFLIGHT passed on
+`da7933eacc358080014dfba2558473d31c349a47`. Setup then failed in
+**PHASE1R_AND_V2_PREREQUISITE**, not platform detection: its inherited preparation
+executed the SQL Server/MI-only `sys.database_recovery_status` receipt query. The owner
+reconciled the full stack and confirmed deletion (`cleanup=CONFIRMED`, production
+access/change false). Never reuse it. The [catalog investigation and scoped identity fix](native-azure-platform-catalog-followup.md)
+records the Azure physical-incarnation binding and boxed receipt compatibility.
+**Windows owner validation is pending; another live attempt is BLOCKED. Both native
+gates remain OPEN; keep #1929 draft and unmerged.** Earlier timeout evidence below
+remains historical and does not describe this latest failure.
+
 Current follow-up (2026-11-02): the **second owner attempt failed at OWNER_CONNECT** on
 `ccf59e0fda6efc2e703b6e06454afc5619d5bc64`: 1 setup test / 0 failures / 1 error / 0 skips,
 approximately 15.46 seconds, SQLServerException / SocketTimeoutException during JDBC

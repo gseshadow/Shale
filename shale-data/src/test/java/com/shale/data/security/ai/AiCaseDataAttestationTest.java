@@ -18,13 +18,34 @@ class AiCaseDataAttestationTest {
         assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.platform(connection(q->List.of())));
         assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.platform(connection(q->List.of(new Object[]{5},new Object[]{5}))));
     }
+    @Test void platformDetectionUsesOnlyTheDocumentedEnginePropertyOnEveryBranch()throws Exception {
+        // Platform classification must not inherit the fixture's receipt/backup catalog needs.
+        for(int edition:List.of(2,3,4,5,8)) {
+            var queries=new ArrayList<String>();
+            AiCaseDataAttestation.platform(connection(q->{
+                queries.add(q);
+                assertEquals("SELECT CONVERT(int,SERVERPROPERTY('EngineEdition'))",q,
+                        "Platform detection must work without any system catalog, including recovery status");
+                return rows(edition);
+            }));
+            assertEquals(1,queries.size(),"Platform detection must issue exactly one property read");
+        }
+    }
+    @Test void platformSqlFailureIsPropagatedWithoutFallbackOrExtraQueries() {
+        var queries=new ArrayList<String>();
+        assertThrows(SQLException.class,()->AiCaseDataAttestation.platform(connection(q->{
+            queries.add(q);throw new QueryFailure();
+        })));
+        assertEquals(List.of("SELECT CONVERT(int,SERVERPROPERTY('EngineEdition'))"),queries,
+                "A failed property read must never fall back to SQL Server catalogs");
+    }
     @Test void azureNeverProbesServerCatalogsEvenWhenCatalogAttestationFails() {
         var observed=new ArrayList<String>();
         Connection caller=azure("ai",10,observed),review=azure("catalog",11,observed);
         var failure=assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(source(caller),source(review),List.of(),"db","issuer","resource").verify());
         assertTrue(failure.getMessage().contains("CATALOG_RECEIPT"),failure.getMessage());
         assertTrue(observed.stream().anyMatch(q->q.contains("sys.external_data_sources")));
-        for(String forbidden:List.of("sys.server_permissions","sys.server_principals","sys.endpoints","sys.login_token","HAS_DBACCESS","IS_SRVROLEMEMBER","'SERVER'"))
+        for(String forbidden:List.of("sys.database_recovery_status","sys.server_permissions","sys.server_principals","sys.endpoints","sys.login_token","HAS_DBACCESS","IS_SRVROLEMEMBER","'SERVER'"))
             assertFalse(observed.stream().anyMatch(q->q.contains(forbidden)),forbidden);
     }
     @Test void v2AzureCatalogFailureDoesNotTryHistoricalReceipt() {
@@ -34,7 +55,7 @@ class AiCaseDataAttestationTest {
         assertTrue(failure.getMessage().contains("CATALOG_RECEIPT"));
         assertTrue(observed.stream().anyMatch(q->q.contains("Shale.AiCaseDataV2")));
         assertFalse(observed.stream().anyMatch(q->q.contains("Shale.AiCaseDataV1")));
-        for(String forbidden:List.of("sys.server_permissions","sys.server_principals","sys.endpoints","sys.login_token","HAS_DBACCESS"))
+        for(String forbidden:List.of("sys.database_recovery_status","sys.server_permissions","sys.server_principals","sys.endpoints","sys.login_token","HAS_DBACCESS"))
             assertFalse(observed.stream().anyMatch(q->q.contains(forbidden)),forbidden);
     }
     @Test void azureRejectsLoginMappedAndExternalIdentitiesBeforeCatalogAcceptance() {
@@ -83,10 +104,30 @@ class AiCaseDataAttestationTest {
         assertTrue(dispatcher.contains("EXEC sys.sp_executesql N'"+azure.replace("'","''")+"';"),"Dispatcher must execute the reviewed Azure verifier bytes");
         String executable=azure.replaceAll("(?s)/\\*.*?\\*/","");
         assertFalse(java.util.regex.Pattern.compile("(?i)\\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|MERGE|GRANT|DENY|REVOKE)\\b").matcher(executable).find(),"Stage 0 may not persist mutations");
-        for(String surface:List.of("sys.server_permissions","sys.server_principals","sys.endpoints","sys.login_token","HAS_DBACCESS"))assertFalse(azure.contains(surface),surface);
+        for(String surface:List.of("sys.database_recovery_status","sys.server_permissions","sys.server_principals","sys.endpoints","sys.login_token","HAS_DBACCESS"))assertFalse(azure.contains(surface),surface);
         assertTrue(azure.contains("sys.database_scoped_credentials"));
         assertTrue(azure.contains("'CONTROL'"));assertTrue(azure.contains("'STOP'"));
         assertFalse(executable.contains("SELECT *"));assertFalse(executable.contains("credential_identity"));assertFalse(executable.contains("location"));
+    }
+    @Test void azureMigrationAndPackagedVerificationSqlExcludeBoxedServerCatalogs()throws Exception {
+        // Phase1R has separately tested dynamic platform dispatch; it is not a runtime detector.
+        // This inventory covers SQL that Azure executes without such dispatch.
+        var paths=new ArrayList<java.nio.file.Path>();
+        try(var files=java.nio.file.Files.list(java.nio.file.Path.of("../docs/sql/ai-integration"))) {
+            files.filter(p->p.toString().endsWith(".sql"))
+                    .filter(p->!p.getFileName().toString().equals("stage0-platform-verify.sql"))
+                    .forEach(paths::add);
+        }
+        paths.add(java.nio.file.Path.of("src/main/resources/ai/confinement-catalog.sql"));
+        paths.add(java.nio.file.Path.of("src/main/resources/ai/confinement-v2-catalog.sql"));
+        assertTrue(paths.size()>10,"The Azure migration/verification inventory must not be empty");
+        for(var path:paths) {
+            String sql=java.nio.file.Files.readString(path).toLowerCase(Locale.ROOT);
+            for(String unsupported:List.of("sys.database_recovery_status","sys.server_permissions","sys.server_principals",
+                    "sys.endpoints","sys.login_token","sys.master_files","sys.configurations","sys.linked_logins",
+                    "sys.servers","sys.dm_xe_sessions","sys.dm_xe_session_targets","msdb.","master."))
+                assertFalse(sql.contains(unsupported),path+": unsupported Azure catalog "+unsupported);
+        }
     }
     private static Connection azure(String name,int id,List<String> observed) {return azure(name,id,observed,2,"S");}
     private static Connection azure(String name,int id,List<String> observed,int authentication,String type) {return azure(name,id,observed,authentication,type,1);}

@@ -62,6 +62,28 @@ application table, user audit event or grant. Retain it with the database until 
 needed. Protected metadata authority is required; it cannot defend against a malicious administrator
 rewriting both the policy and receipt. Preserve a private original change-control copy for later review.
 
+### Database identity compatibility — 2026-11-02
+
+The engine positively dispatches by `SERVERPROPERTY('EngineEdition')`. SQL Server editions
+2/3/4 and Managed Instance edition 8 retain receipt JSON version 1 and the original
+`sys.database_recovery_status.database_guid` value. Existing valid receipts are verified in place;
+they are never rewritten or upgraded. The property name `Shale.Phase1R.v1` remains unchanged.
+
+Azure SQL Database edition 5 uses JSON version 2 and
+`AZURE_SQL_DATABASE_PHYSICAL:` followed by the current database's full
+`sys.databases.physical_database_name`. This is an incarnation binding, not a database-name,
+DB_ID or pricing-tier substitute. Microsoft documents this identifier as changing on restore
+or service-level-objective changes. Those events deliberately invalidate the receipt and require
+separate review; never refresh/relabel it to make validation pass. The fixed platform queries
+are separate dynamic batches so Azure never binds the recovery catalog and older SQL Server
+never binds the physical-name column. Missing/NULL/blank/ambiguous evidence, unknown engines,
+wrong versions, foreign identities and SQL errors fail closed. All other ten-field receipt,
+predicate, rollback and ownership guards remain in force. No V1/V2 confinement hash is regenerated.
+
+The earlier executable evidence was local SQL Server evidence, not native Azure validation.
+See the [catalog investigation and exact validation scope](../../testing/native-azure-platform-catalog-followup.md).
+Windows owner validation is pending; another Azure attempt is not classified ready.
+
 Using the same reviewed SQLCMD variables/environment and the existing approved **local** authentication
 mechanism, the entry-point invocations from repository root are:
 

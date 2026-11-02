@@ -130,17 +130,34 @@ class AiCaseDataAzureSqlDataSourceTest {
         var failure=assertThrows(AssertionError.class,()->AiCaseDataAzureSqlDisposableSetupTest.ownerPreflight(catalogConnection(new ArrayList<>(),"private-target",0),"synthetic-db"));
         assertFalse(failure.toString().contains("private-target"));
     }
+    @Test void sharedOwnerPreflightRefusesEveryNonAzureEngineBeforeReadingObjects() {
+        for(int edition:List.of(0,1,2,3,4,6,8,9,11,12)) {
+            var queries=new ArrayList<String>();
+            Class<? extends Throwable> refusal=Set.of(2,3,4,8).contains(edition)?AssertionError.class:IllegalStateException.class;
+            assertThrows(refusal,()->AiCaseDataAzureSqlDisposableSetupTest.ownerPreflight(
+                    catalogConnection(queries,"synthetic-db",0,edition),"synthetic-db"));
+            assertEquals(List.of("SELECT CONVERT(int,SERVERPROPERTY('EngineEdition'))"),queries,
+                    "Neither probe nor setup may inspect or provision an unsupported engine: "+edition);
+        }
+    }
     private static Connection catalogConnection(List<String> queries,String db,int objects) {
+        return catalogConnection(queries,db,objects,5);
+    }
+    private static Connection catalogConnection(List<String> queries,String db,int objects,int engineEdition) {
         return (Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(p,m,a)->{
             assertEquals("createStatement",m.getName(),"Probe must not perform any non-catalog operation");
             return Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{java.sql.Statement.class},(sp,sm,sa)->switch(sm.getName()) {
                 case "setQueryTimeout","close"->null;
                 case "executeQuery"->{
-                    String sql=(String)sa[0];assertTrue(sql.startsWith("SELECT "),"No mutating statement belongs in owner preflight");queries.add(sql);
+                    String sql=(String)sa[0];
+                    assertTrue(Set.of("SELECT CONVERT(int,SERVERPROPERTY('EngineEdition'))",
+                            "SELECT DB_NAME(),USER_NAME(),(SELECT COUNT(*) FROM sys.objects WHERE is_ms_shipped=0),(SELECT COUNT(*) FROM sys.database_principals WHERE principal_id>4 AND type<>'R')").contains(sql),
+                            "Shared probe/setup preflight must never query recovery status or any other catalog");
+                    queries.add(sql);
                     boolean edition=sql.contains("EngineEdition");var row=new boolean[1];
                     yield Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{java.sql.ResultSet.class},(rp,rm,ra)->switch(rm.getName()) {
                         case "next"->{boolean first=!row[0];row[0]=true;yield first;}
-                        case "getInt"->edition?5:((int)ra[0]==3?objects:0);
+                        case "getInt"->edition?engineEdition:((int)ra[0]==3?objects:0);
                         case "getString"->(int)ra[0]==1?db:"dbo";
                         case "wasNull"->false;
                         case "close"->null;

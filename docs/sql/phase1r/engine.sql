@@ -16,6 +16,33 @@ BEGIN TRY
  IF CONVERT(nvarchar(128),DATABASEPROPERTYEX(DB_NAME(),'Collation')) COLLATE Latin1_General_100_BIN2
        <>N'$(ReviewedCollation)' COLLATE Latin1_General_100_BIN2
   THROW 58503,N'Phase1R identifier collation requires review.',1;
+ -- Resolve one live database-incarnation identity. Keep the historical SQL Server/MI
+ -- GUID and v1 receipt unchanged. Azure's physical identity changes on restore/SLO
+ -- changes: a receipt from the old incarnation must then fail closed, never be reissued.
+ -- Fixed dynamic batches prevent either platform from binding the other's catalog.
+ DECLARE @EngineEdition int=CONVERT(int,SERVERPROPERTY('EngineEdition')),
+         @DatabaseIdentity nvarchar(160),@IdentityRows int,@ReceiptVersion int;
+ IF @EngineEdition=5
+ BEGIN
+  SET @ReceiptVersion=2;
+  EXEC sys.sp_executesql N'SELECT @Identity=physical_database_name,@Matches=COUNT(*) OVER()
+   FROM sys.databases WHERE name COLLATE Latin1_General_100_BIN2=DB_NAME() COLLATE Latin1_General_100_BIN2;',
+   N'@Identity nvarchar(160) OUTPUT,@Matches int OUTPUT',@Identity=@DatabaseIdentity OUTPUT,@Matches=@IdentityRows OUTPUT;
+  IF @IdentityRows IS NULL OR @IdentityRows<>1 OR @DatabaseIdentity IS NULL OR LEN(LTRIM(RTRIM(@DatabaseIdentity)))=0
+   THROW 58515,N'Phase1R database incarnation identity unavailable.',1;
+  SET @DatabaseIdentity=N'AZURE_SQL_DATABASE_PHYSICAL:'+@DatabaseIdentity;
+ END
+ ELSE IF @EngineEdition IN(2,3,4,8)
+ BEGIN
+  SET @ReceiptVersion=1;
+  EXEC sys.sp_executesql N'SELECT @Identity=CONVERT(nvarchar(36),database_guid),@Matches=COUNT(*) OVER()
+   FROM sys.database_recovery_status WHERE database_id=DB_ID();',
+   N'@Identity nvarchar(160) OUTPUT,@Matches int OUTPUT',@Identity=@DatabaseIdentity OUTPUT,@Matches=@IdentityRows OUTPUT;
+  IF @IdentityRows IS NULL OR @IdentityRows<>1 OR @DatabaseIdentity IS NULL
+   OR @DatabaseIdentity=N'00000000-0000-0000-0000-000000000000'
+   THROW 58515,N'Phase1R database incarnation identity unavailable.',1;
+ END
+ ELSE THROW 58515,N'Phase1R unsupported database engine.',1;
  DECLARE @Policy int=OBJECT_ID(N'sec.TenantFilter'),@Strict int=OBJECT_ID(N'sec.fn_FilterByTenant',N'IF'),
          @Overlay int=OBJECT_ID(N'sec.fn_FilterByTenantOrGlobal',N'IF');
  IF NOT EXISTS(SELECT 1 FROM sys.security_policies WHERE object_id=@Policy AND name COLLATE Latin1_General_100_BIN2=N'TenantFilter' AND is_enabled=1 AND is_schema_bound=1)
@@ -64,13 +91,13 @@ BEGIN TRY
  IF @Receipt IS NOT NULL
  BEGIN
   IF ISJSON(@Receipt)<>1 THROW 58510,N'Phase1R receipt malformed.',1;
-  IF COALESCE(JSON_VALUE(@Receipt,'$.version'),'')<>'1' OR COALESCE(JSON_VALUE(@Receipt,'$.policy'),'')<>CONVERT(varchar(20),@Policy)
+  IF COALESCE(JSON_VALUE(@Receipt,'$.version'),'')<>CONVERT(varchar(1),@ReceiptVersion) OR COALESCE(JSON_VALUE(@Receipt,'$.policy'),'')<>CONVERT(varchar(20),@Policy)
    OR COALESCE(JSON_VALUE(@Receipt,'$.created'),'')<>(SELECT CONVERT(varchar(33),create_date,126) FROM sys.objects WHERE object_id=@Policy)
    OR COALESCE(JSON_VALUE(@Receipt,'$.strict'),'')<>@StrictHash OR COALESCE(JSON_VALUE(@Receipt,'$.overlay'),'')<>@OverlayHash
    OR COALESCE(JSON_VALUE(@Receipt,'$.other'),'')<>'$(ReviewedOtherPredicatesHash)'
    OR COALESCE(JSON_VALUE(@Receipt,'$.after'),'')<>CONVERT(varchar(64),HASHBYTES('SHA2_256',@Before),2)
    OR COALESCE(LEN(JSON_VALUE(@Receipt,'$.before')),0)<>64
-   OR COALESCE(JSON_VALUE(@Receipt,'$.database'),'')<>CONVERT(varchar(36),(SELECT database_guid FROM sys.database_recovery_status WHERE database_id=DB_ID()))
+   OR COALESCE(JSON_VALUE(@Receipt,'$.database'),'') COLLATE Latin1_General_100_BIN2<>@DatabaseIdentity COLLATE Latin1_General_100_BIN2
    OR (SELECT COUNT(*) FROM OPENJSON(@Receipt))<>10
    OR NOT EXISTS(SELECT 1 FROM OPENJSON(@Receipt) WHERE [key]='added' AND type=4)
    OR (SELECT COUNT(*) FROM OPENJSON(@Receipt,'$.added')) NOT BETWEEN 1 AND 3
@@ -118,9 +145,9 @@ BEGIN TRY
   -- All-pre-existing matching coverage is a true no-op: do not claim ownership of it.
   IF EXISTS(SELECT 1 FROM @Targets WHERE Added=1)
   BEGIN
-   SET @Receipt=(SELECT 1 AS version,@Policy AS policy,
+   SET @Receipt=(SELECT @ReceiptVersion AS version,@Policy AS policy,
     (SELECT CONVERT(varchar(33),create_date,126) FROM sys.objects WHERE object_id=@Policy) AS created,
-    CONVERT(varchar(36),(SELECT database_guid FROM sys.database_recovery_status WHERE database_id=DB_ID())) AS [database],
+    @DatabaseIdentity AS [database],
     @StrictHash AS strict,@OverlayHash AS overlay,'$(ReviewedOtherPredicatesHash)' AS other,
     CONVERT(varchar(64),HASHBYTES('SHA2_256',@Before),2) AS before,
     CONVERT(varchar(64),HASHBYTES('SHA2_256',@After),2) AS after,JSON_QUERY(@Added) AS added FOR JSON PATH,WITHOUT_ARRAY_WRAPPER);

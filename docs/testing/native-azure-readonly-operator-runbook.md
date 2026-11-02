@@ -1,5 +1,11 @@
 # Native Azure contained identity / read-only operator packet
 
+**STOP before section 2/resource creation: Windows owner validation of the
+[Phase1R database-identity fix](native-azure-platform-catalog-followup.md) is pending.**
+The latest probe passed; setup failed later in Phase1R, and that failed resource group
+was deleted with cleanup CONFIRMED. No live retry is classified ready. Section 1 is
+offline validation only; the remaining live packet requires subsequent review.
+
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
 Updated 2026-11-02 for owner login diagnostics, bounded non-mutating preflight and portable execution.
 The second owner fixture was deleted with cleanup CONFIRMED; never reuse it. See the
@@ -53,7 +59,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Candidate).Hash.ToLowerInvaria
 }
 $env:SHALE_CASE_VERIFY_SCHEMA = $Candidate
 $env:SHALE_CASE_VERIFY_SCHEMA_SHA256 = $ExpectedCandidate
-mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAzureSqlDriverTimeoutTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAzureSqlDriverTimeoutTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,Phase1RDatabaseIdentityContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
 if ($LASTEXITCODE -ne 0) { throw 'Offline prerequisite tests failed; STOP' }
 ```
 
@@ -98,6 +104,38 @@ The verifier reuses the regression's raw-byte calculation: zero only the embedde
 then SHA-256; no newline/module normalization. Existing SQL/resource blobs and receipts are unchanged.
 Do not manually convert the installer or replace its receipt with the CRLF-derived hash.
 Python 3.9+ and Git are required. The tool and transition regressions make no Azure connection.
+
+The clean focused build must run from the reviewed head with no tracked edits. Record
+`git rev-parse HEAD` and the fresh Surefire counts for each selector. Windows owner
+validation must also run the affected/critical suites and the separately opted-in local
+Phase1R identity regressions on a dedicated loopback SQL instance. No Azure opt-in is
+needed for those checks. A local edition-injection pass is dispatch/receipt evidence,
+not live Azure identity acceptance. Review the physical-incarnation receipt behavior:
+restore or service-tier changes invalidate it; never rewrite a receipt to bypass drift.
+
+For those local regressions only, use a **new dedicated loopback SQL Server**, not an
+ordinary development/shared/production instance. The test creates and drops only its
+nonce-named synthetic databases; it uses the existing local fixture connection helper.
+It cannot accept a remote hostname or Azure URL:
+
+```powershell
+$LocalCredential = Get-Credential -UserName 'sa' -Message 'Dedicated loopback test SQL Server only'
+try {
+    $env:SHALE_PHASE1R_IDENTITY_OPT_IN = 'LOCAL_DISPOSABLE_PHASE1R_IDENTITY'
+    $env:SHALE_PHASE1R_IDENTITY_PORT = Read-Host 'Dedicated loopback SQL port (1024-65535)'
+    $env:SHALE_PHASE1R_IDENTITY_PASSWORD = $LocalCredential.GetNetworkCredential().Password
+    mvn -B -ntp -pl shale-data -am '-Dtest=Phase1RDatabaseIdentityContractTest,Phase1RDatabaseIdentityLocalSqlServerTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+    if ($LASTEXITCODE -ne 0) { throw 'Local Phase1R identity regression failed; STOP' }
+}
+finally {
+    Remove-Item Env:SHALE_PHASE1R_IDENTITY_OPT_IN,Env:SHALE_PHASE1R_IDENTITY_PORT,Env:SHALE_PHASE1R_IDENTITY_PASSWORD -ErrorAction SilentlyContinue
+    $LocalCredential = $null
+}
+```
+
+Require 2 offline contract tests and 6 local SQL tests, zero failures/errors/skips.
+Local SQL edition injection tests batch dispatch, receipt binding and rollback; it does
+not turn the local instance into Azure or close either native gate.
 
 ## 2. Capture the owner-specific scope and create a disposable database
 
