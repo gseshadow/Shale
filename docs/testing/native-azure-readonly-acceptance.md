@@ -1,21 +1,19 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
-Current [stat-cache follow-up](native-azure-index-stat-followup.md): Windows byte/receipt and
-focused Maven validation passed, but clean Git status after the repaired workflow still needs
-operator confirmation. Classification remains **BLOCKED**. Native Azure gates remain OPEN.
+Current follow-up (2026-11-02): the owner reports **all non-Azure Windows security gates
+PASS**: pinned refresh 25/25, clean index, both receipts, focused Azure/V1/V2 contracts,
+Phase1R local SQL, critical reactor, package verification and selector-generated affected
+Maven batch. The owner's affected plan reported no full-suite escalation. These are owner
+observations, not reruns by this task. They supersede the earlier operator-validation and
+Maven-blocker status below; the historical records retain their original results.
 
-Latest checkout follow-up: **BLOCKED**, with the real existing-worktree failure reproduced and
-[a guarded byte/receipt refresh](native-azure-existing-worktree-checkout.md). The owner confirmed
-the failed Azure resource group was deleted before this testing; no Azure connection was retried.
-
-Current follow-up (2026-10-30): **BLOCKED** for operator retry readiness; see
-[owner Stage 0 failure, effective-driver proof and Windows correction](native-azure-setup-timeout-followup.md).
-The original preparation evidence below is historical. Both native Azure gates remain OPEN.
-
-**OPERATOR ACTION REQUIRED.** Native acceptance has not executed. The repository packet is
-prepared; the owner must supply an authorized disposable Azure scope and execute the
-[exact PowerShell / Maven runbook](native-azure-readonly-operator-runbook.md). Standard Maven
-focused/affected/critical verification also remains unverified in this environment.
+Two operator portability fixes are now prepared: selector `--run` resolves the Windows
+Maven launcher, and contained secrets use the compatible instance RNG API. See the
+[portability validation](native-azure-windows-portability.md) and the updated
+[exact PowerShell / Maven runbook](native-azure-readonly-operator-runbook.md).
+**Windows validation of these new fixes remains pending. Both native Azure gates remain OPEN.**
+After owner validation, the next action is a fresh disposable Azure SQL retry with a new nonce.
+No Azure or production access is authorized by this follow-up. Keep PR #1929 draft and unmerged.
 
 Base: `e129f2733bf7175425299a12ae97efdae3f23d22`, current `codex/latest`, merged #1928.
 The #1928 local V2 acceptance retains its recorded scope. Its historical login timeout remains

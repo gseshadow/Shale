@@ -35,6 +35,14 @@ python build/test-selection/select_tests.py --area ui-presentation --run
 python build/test-selection/select_tests.py --area ui-behavior --run
 ```
 
+`--run` shares the structured plan runner's PATH resolution: Windows prefers `mvn.cmd`
+then `mvn`; other platforms prefer `mvn` then `mvn.cmd`. Both affected batches and the
+critical command receive the resolved executable plus the original argument list with
+`shell=False`. The existing batch limit remains unchanged; on Windows, execution also
+checks the quoted command length including the resolved launcher path against 7,000
+characters and refuses the plan before starting commands if it exceeds that limit.
+A missing launcher produces an actionable failure with exit code 2.
+
 The emitted Maven commands remain structured and shell-safe. Complete feature ownership can be requested explicitly; ordinary work should use the smallest relevant local checks.
 
 ### Optional full and visual suites

@@ -1,14 +1,14 @@
 # Native Azure contained identity / read-only operator packet
 
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
-Updated 2026-10-30 for deterministic Windows checkout and separately bounded setup connections.
+Updated 2026-11-02 for portable Maven execution and Windows PowerShell credential generation.
 Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
 This packet creates an empty disposable **Azure SQL Database** (EngineEdition 5), imports the
 existing private authoritative fixture, and runs the existing native gate with V2 explicitly selected.
 SQL Server, Managed Instance and a production database are not substitutes.
 
 No authorized Azure resource, Azure identity or database credential is available in the task environment.
-The following commands are for the resource owner. Run from the repository root in PowerShell 7,
+The following commands are for the resource owner. Run from the repository root in Windows PowerShell 5.1 (.NET Framework 4.8) or PowerShell 7,
 with JDK 21, Maven, Git, and the `Az.Accounts`, `Az.Resources`, and `Az.Sql` modules installed.
 Use a workstation with validated Azure SQL TLS and outbound TCP 1433. Do not enable Azure-services-wide
 firewall access, disable certificate verification, use a production connection, or run PowerShell
@@ -37,6 +37,9 @@ python build/sql-confinement/checkout_bytes.py
 if ($LASTEXITCODE -ne 0) { throw 'Actual working-tree byte verification failed; STOP before Maven or Azure' }
 python -m unittest discover -s build/sql-confinement -p test_checkout.py
 if ($LASTEXITCODE -ne 0) { throw 'Windows-style Git checkout regression failed' }
+# Offline only: executes the exact credential block below, verifies it, then erases test secrets.
+powershell.exe -NoProfile -File build/azure-native/test_runbook_credentials.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Offline credential syntax/cleanup check failed; STOP' }
 java -version
 if ($LASTEXITCODE -ne 0) { throw 'JDK 21 required' }
 mvn -version
@@ -151,6 +154,22 @@ These variables are the exact test interface. The server admin is used only for 
 before the read-only Maven process. Generated secrets are cryptographically random, independent,
 and used only by this acceptance. They are neither printed nor persisted. Keep this PowerShell
 session open until cleanup; a new session requires independently retained approved secret access.
+The instance `Create()` / `GetBytes(byte[])` API works on Windows PowerShell's .NET Framework;
+the newer static `GetBytes(int)` overload is deliberately unused. Each identity gets a fresh
+48-byte cryptographic draw. Byte buffers are cleared and local secret references released even
+on failure; the RNG is disposed. Generation failure removes all five partial credential pairs.
+The owner credential and setup opt-in are removed in `finally`, including launcher failures.
+.NET strings and inherited environment/JDBC copies cannot be reliably zeroed; keep the session
+private and erase its environment through section 5, then close it. No secret is printed, saved,
+or supplied as a command argument.
+
+Before supplying any credentials, run the offline check from section 1 in the **same Windows
+PowerShell/.NET host** used for this packet. On PowerShell 7 use `pwsh -NoProfile -File
+build/azure-native/test_runbook_credentials.ps1` instead of `powershell.exe`. It extracts and
+executes the marked block below, checks independent 48-byte credentials, a fresh second run,
+no output, local cleanup, and partial-generation failure cleanup, then removes its test environment.
+It refuses inherited `SHALE_AZURE_*` values and never loads Az modules, JDBC, or a database.
+A Linux PowerShell pass does not replace this Windows host check.
 
 ```powershell
 $env:SHALE_AZURE_JDBC_URL = "jdbc:sqlserver://${Fqdn}:1433;databaseName=$DatabaseName"
@@ -159,20 +178,58 @@ $env:SHALE_AZURE_CONTRACT_VERSION = 'V2'
 $env:SHALE_AZURE_ISSUER = 'https://shale.test/oauth/mcp'
 $env:SHALE_AZURE_RESOURCE = 'https://shale.test/mcp'
 $env:SHALE_AZURE_OWNED_DATABASE_ACK = $DatabaseName
-$env:SHALE_AZURE_OWNER_USERNAME = $AdminCredential.UserName
-$env:SHALE_AZURE_OWNER_PASSWORD = $AdminCredential.GetNetworkCredential().Password
-foreach ($Identity in @('AI','VERIFIER','AUTH','RUNTIME','BOOTSTRAP')) {
-    [Environment]::SetEnvironmentVariable("SHALE_AZURE_${Identity}_USERNAME", "azro_$($Identity.ToLowerInvariant())", 'Process')
-    $Secret = [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48)) + 'aB9!'
-    [Environment]::SetEnvironmentVariable("SHALE_AZURE_${Identity}_PASSWORD", $Secret, 'Process')
+$SetupExit = $null
+try {
+    $env:SHALE_AZURE_OWNER_USERNAME = $AdminCredential.UserName
+    $env:SHALE_AZURE_OWNER_PASSWORD = $AdminCredential.GetNetworkCredential().Password
+    # BEGIN OFFLINE-TESTED CONTAINED CREDENTIALS
+    $rng = $null
+    $Bytes = $null
+    $Secret = $null
+    try {
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        foreach ($Identity in @('AI','VERIFIER','AUTH','RUNTIME','BOOTSTRAP')) {
+            try {
+                [Environment]::SetEnvironmentVariable(
+                    "SHALE_AZURE_${Identity}_USERNAME",
+                    "azro_$($Identity.ToLowerInvariant())",
+                    'Process'
+                )
+                $Bytes = New-Object byte[] 48
+                $rng.GetBytes($Bytes)
+                $Secret = [Convert]::ToBase64String($Bytes) + 'aB9!'
+                [Environment]::SetEnvironmentVariable(
+                    "SHALE_AZURE_${Identity}_PASSWORD", $Secret, 'Process'
+                )
+            }
+            finally {
+                if ($null -ne $Bytes) { [Array]::Clear($Bytes, 0, $Bytes.Length) }
+                $Bytes = $null
+                $Secret = $null
+            }
+        }
+    }
+    catch {
+        foreach ($Identity in @('AI','VERIFIER','AUTH','RUNTIME','BOOTSTRAP')) {
+            [Environment]::SetEnvironmentVariable("SHALE_AZURE_${Identity}_USERNAME", $null, 'Process')
+            [Environment]::SetEnvironmentVariable("SHALE_AZURE_${Identity}_PASSWORD", $null, 'Process')
+        }
+        throw 'Contained credential generation failed; STOP and clean up the owned scope'
+    }
+    finally {
+        if ($null -ne $rng) { $rng.Dispose() }
+        $rng = $null
+    }
+    # END OFFLINE-TESTED CONTAINED CREDENTIALS
+    Remove-Item work/azure-native/setup-sequence.txt -ErrorAction SilentlyContinue
+    $env:SHALE_AZURE_SETUP_OPT_IN = 'CREATE_OWNED_DISPOSABLE_AZURE_FIXTURE'
+    mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlDisposableSetupTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
+    $SetupExit = $LASTEXITCODE
 }
-$Secret = $null
-Remove-Item work/azure-native/setup-sequence.txt -ErrorAction SilentlyContinue
-$env:SHALE_AZURE_SETUP_OPT_IN = 'CREATE_OWNED_DISPOSABLE_AZURE_FIXTURE'
-mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlDisposableSetupTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
-$SetupExit = $LASTEXITCODE
-Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN -ErrorAction SilentlyContinue
-$AdminCredential = $null
+finally {
+    Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN -ErrorAction SilentlyContinue
+    $AdminCredential = $null
+}
 if ($SetupExit -ne 0) { throw 'Setup failed; STOP, preserve private diagnostics and clean up the exact owned resources' }
 ```
 
