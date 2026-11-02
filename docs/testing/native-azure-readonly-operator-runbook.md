@@ -1,7 +1,9 @@
 # Native Azure contained identity / read-only operator packet
 
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
-Updated 2026-11-02 for portable Maven execution and Windows PowerShell credential generation.
+Updated 2026-11-02 for owner login diagnostics, bounded non-mutating preflight and portable execution.
+The second owner fixture was deleted with cleanup CONFIRMED; never reuse it. See the
+[offline login investigation](native-azure-owner-login-followup.md).
 Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
 This packet creates an empty disposable **Azure SQL Database** (EngineEdition 5), imports the
 existing private authoritative fixture, and runs the existing native gate with V2 explicitly selected.
@@ -25,7 +27,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Git inspection failed' }
 git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source identity unavailable' }
 # Non-Azure validation must not inherit an old native acceptance opt-in.
-Remove-Item Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_ATTESTATION_OPT_IN -ErrorAction SilentlyContinue
+Remove-Item Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_ATTESTATION_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue
 git --version
 if ($LASTEXITCODE -ne 0) { throw 'Git required' }
 $RepoRoot = (git rev-parse --show-toplevel).Trim()
@@ -51,7 +53,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Candidate).Hash.ToLowerInvaria
 }
 $env:SHALE_CASE_VERIFY_SCHEMA = $Candidate
 $env:SHALE_CASE_VERIFY_SCHEMA_SHA256 = $ExpectedCandidate
-mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAzureSqlDriverTimeoutTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
 if ($LASTEXITCODE -ne 0) { throw 'Offline prerequisite tests failed; STOP' }
 ```
 
@@ -222,32 +224,67 @@ try {
     }
     # END OFFLINE-TESTED CONTAINED CREDENTIALS
     Remove-Item work/azure-native/setup-sequence.txt -ErrorAction SilentlyContinue
+    # Probe only after creation/firewall propagation, before enabling mutating setup.
+    $ProbeExit = $null
+    $env:SHALE_AZURE_OWNER_PROBE_OPT_IN = 'PROBE_OWNED_DISPOSABLE_AZURE_LOGIN'
+    try {
+        mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlOwnerConnectivityProbeTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
+        $ProbeExit = $LASTEXITCODE
+    }
+    finally { Remove-Item Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue }
+    if ($ProbeExit -ne 0) { throw 'Owner probe failed; STOP before setup and clean up the exact owned scope' }
     $env:SHALE_AZURE_SETUP_OPT_IN = 'CREATE_OWNED_DISPOSABLE_AZURE_FIXTURE'
-    mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlDisposableSetupTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
+    mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlDisposableSetupTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
     $SetupExit = $LASTEXITCODE
 }
 finally {
-    Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN -ErrorAction SilentlyContinue
+    Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue
     $AdminCredential = $null
 }
 if ($SetupExit -ne 0) { throw 'Setup failed; STOP, preserve private diagnostics and clean up the exact owned resources' }
 ```
 
-Owner setup has its own datasource: validated TLS, explicit disposable database, SQL credentials
-outside the URL, 15-second login, 120,000-millisecond socket read, 20-second JDBC statement query
-timeout and 5-second cancellation acknowledgement timeout. The total JUnit cap remains 300 seconds.
-These are distinct bounds, not a promise to allow a statement to run for 120 seconds. The read-only
-identity datasource stays at 3-second login / 5,000-millisecond socket timeout, and the runtime
-attestation budget remains ten seconds. No retry or unbounded timeout is added.
+Before invoking section 3, allow the exact-workstation firewall change to propagate (Azure
+reports up to five minutes); successful control-plane resource creation alone does not prove
+JDBC readiness. Do not widen the firewall, pin an IP, change the connection policy or disable TLS.
+A TCP-1433-only check cannot prove TLS validation or database login. The narrow probe above makes
+one datasource connection invocation with the same validated owner configuration as setup, then
+reads only edition, current database/user and empty custom-object/principal counts. No private
+schema input, Stage 0, application object creation/adoption, migrations, Phase1R, V2 installer,
+contained users, binding or acceptance receipt is involved. It closes the connection before setup.
+Require a fresh Surefire report: **1 executed / 0 failures / 0 errors / 0 skips**, OWNER_CONNECT and
+OWNER_PREFLIGHT PASS and `AZURE_OWNER_PROBE status=PASS applicationObjectsCreated=false
+nativeAcceptance=false`. This is connectivity evidence only; setup repeats all checks independently.
+The probe's JUnit cap is 180 seconds. There is no automatic probe/setup retry. On any probe failure,
+STOP and clean up the exact owned scope; never turn a failed probe into permission to start setup.
 
-Expect `AZURE_SETUP phase=OWNER_CONNECT status=BEGIN/PASS` and a sanitized bounds/driver-version
-line. JDBC `Connection.getNetworkTimeout()` must report 120000 immediately after connection and
-before each phase; a mismatch stops before the phase's work. Subsequent markers identify
-OWNER_PREFLIGHT, STAGE0_BEFORE, SCHEMA_IMPORT, PREREQUISITE_MIGRATIONS,
-PHASE1R_AND_V2_PREREQUISITE, V2_INSTALL, CONTAINED_USERS, DEPLOYMENT_BINDING,
-CUMULATIVE_VERIFY, STAGE0_AFTER and OFF_CHECK, with BEGIN and PASS/FAIL plus elapsed milliseconds.
-No SQL body, schema, connection URL, credential or SID is printed. Quiet logging does not suppress
-these direct test markers. Record the exact last phase and driver/bounds line privately on failure.
+Owner setup has its own datasource: validated TLS, explicit disposable database, SQL credentials
+outside the URL, **30-second login**, **120,000-millisecond connected socket read**, **20-second
+JDBC statement query** and **5-second cancellation acknowledgement** bounds. The setup JUnit cap
+remains **300 seconds**, not a substitute for JDBC I/O bounds. JDBC 12.6.1 clamps initial socket
+reads to the smaller of remaining login time and the configured finite socket timeout, including
+initial TLS/TDS traffic. It does not automatically restore the 120000-ms guard after login:
+`ownerConnect` explicitly sets that guard on the established connection and verifies it before
+metadata/preflight/SQL; every subsequent phase verifies it again. A setter failure or mismatch
+closes the connection and refuses work. The 30-second choice matches the pinned driver default
+and Azure's at-least-30-second guidance; it does not claim a newly provisioned S0 database must
+be ready within 30 seconds. See the [source analysis and limits](native-azure-owner-login-followup.md).
+Read-only identity datasource bounds remain 3-second login / 5000-ms socket and runtime
+attestation remains ten seconds. No security/SQL authority deadline or JUnit setup cap is extended.
+
+Expect `AZURE_SETUP phase=OWNER_CONNECT status=BEGIN` followed by PASS or FAIL, elapsedMillis
+and configured loginSeconds/socketMillis/querySeconds/cancelSeconds, even if login fails. PASS
+additionally records connectedSocketMillis=120000. FAIL records exception/root classes and a
+five-character uppercase alphanumeric SQL state (otherwise unavailable) and numeric SQL error
+code. No exception message/cause/suppressed chain is rethrown to Surefire. Driver JUL logging is
+separate from Logback: the owner commands load `quiet-jdbc-logging.properties`; the harness refuses
+to open an owner connection if driver loggers permit raw output. Do not enable JDBC tracing.
+Subsequent markers identify OWNER_PREFLIGHT, STAGE0_BEFORE, SCHEMA_IMPORT,
+PREREQUISITE_MIGRATIONS, PHASE1R_AND_V2_PREREQUISITE, V2_INSTALL, CONTAINED_USERS,
+DEPLOYMENT_BINDING, CUMULATIVE_VERIFY, STAGE0_AFTER and OFF_CHECK, with BEGIN and PASS/FAIL
+plus elapsed milliseconds. Connection diagnostics contain no URL, target names, credentials,
+SQL/schema, SID or token. Retain only these sanitized fields for shared connection evidence;
+keep all other raw harness/Surefire evidence private.
 
 The first owner-reported failure maps to line 34 of commit `23f96ed69d6548dd3073318cd7be0c9923070dbc`:
 the **initial Stage 0** script, before schema import/migrations. Offline driver introspection proves
@@ -259,7 +296,7 @@ Require **one executed setup test, zero failures/errors/skips**, plus fresh
 `work/azure-native/setup-sequence.txt`. Delete any stale output files before a new attempt. A setup
 failure may leave partial objects in this exact disposable database: delete it and start with a new
 nonce. No retry/adoption, receipt replacement, module rewrite or canonicalization change is permitted.
-This includes the owner-reported Stage 0 timeout: absence of `setup-sequence.txt` is not proof that
+This includes both the owner-reported Stage 0 timeout and the second OWNER_CONNECT timeout: absence of `setup-sequence.txt` is not proof that
 the database is reusable. Confirm deletion through section 5, clear stale variables/evidence, then
 repeat resource creation with a fresh nonce and independent secrets. Do not rerun setup on that DB.
 

@@ -1,19 +1,28 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
-Current follow-up (2026-11-02): the owner reports **all non-Azure Windows security gates
-PASS**: pinned refresh 25/25, clean index, both receipts, focused Azure/V1/V2 contracts,
-Phase1R local SQL, critical reactor, package verification and selector-generated affected
-Maven batch. The owner's affected plan reported no full-suite escalation. These are owner
-observations, not reruns by this task. They supersede the earlier operator-validation and
-Maven-blocker status below; the historical records retain their original results.
+Current follow-up (2026-11-02): the **second owner attempt failed at OWNER_CONNECT** on
+`ccf59e0fda6efc2e703b6e06454afc5619d5bc64`: 1 setup test / 0 failures / 1 error / 0 skips,
+approximately 15.46 seconds, SQLServerException / SocketTimeoutException during JDBC
+`sendLogon`, before a connection was returned. No OWNER_PREFLIGHT, Stage 0, import,
+migration or Phase1R/V2 work ran; no setup-sequence file was created. This differs from
+the original Stage 0 failure. The owner confirmed resource-group deletion afterward:
+`cleanup=CONFIRMED`, `productionAccess=false`, `productionChange=false`. Never reuse that fixture.
 
-Two operator portability fixes are now prepared: selector `--run` resolves the Windows
-Maven launcher, and contained secrets use the compatible instance RNG API. See the
-[portability validation](native-azure-windows-portability.md) and the updated
-[exact PowerShell / Maven runbook](native-azure-readonly-operator-runbook.md).
-**Windows validation of these new fixes remains pending. Both native Azure gates remain OPEN.**
-After owner validation, the next action is a fresh disposable Azure SQL retry with a new nonce.
-No Azure or production access is authorized by this follow-up. Keep PR #1929 draft and unmerged.
+The [offline driver investigation and verification](native-azure-owner-login-followup.md)
+explains the initial socket/login clamp, adds sanitized connection-failure markers, changes
+only the owner login budget to the driver/Azure-recommended 30 seconds, explicitly establishes
+the post-login 120000-ms guard, and adds a separate non-mutating owner probe to the
+[operator packet](native-azure-readonly-operator-runbook.md). Focused direct JDK/JUnit checks
+pass; current Maven affected/critical verification is blocked by dependency/network access.
+**Both native Azure gates remain OPEN. Further operator execution is pending prerequisite
+verification; keep #1929 draft and unmerged. No Azure or production access occurred in this task.**
+
+The owner previously reported all non-Azure Windows security gates PASS: pinned refresh
+25/25, clean index, both receipts, focused Azure/V1/V2 contracts, Phase1R local SQL, critical
+reactor, package verification and selector-generated affected Maven batch. These earlier
+observations do not verify the new follow-up. Historical evidence below retains its original
+scope; the original unavailable-environment/cleanup rows describe agent preparation, while
+the second real owner's confirmed cleanup is recorded above.
 
 Base: `e129f2733bf7175425299a12ae97efdae3f23d22`, current `codex/latest`, merged #1928.
 The #1928 local V2 acceptance retains its recorded scope. Its historical login timeout remains

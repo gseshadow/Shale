@@ -16,6 +16,17 @@ class AiCaseDataAzureSqlAcceptanceSafetyTest {
         }
         return env;
     }
+    @Test void ownerProbeAndSetupRequireExactAcknowledgementAndIndependentOwnerCredentials() {
+        var env=settings();
+        env.put("SHALE_AZURE_OWNER_USERNAME","synthetic_owner");env.put("SHALE_AZURE_OWNER_PASSWORD","synthetic-owner-only");
+        env.put("SHALE_AZURE_OWNED_DATABASE_ACK",env.get("SHALE_AZURE_DATABASE"));
+        assertDoesNotThrow(()->AiCaseDataAzureSqlDisposableSetupTest.validateOwner(env));
+        for(var entry:Map.of("OWNED_DATABASE_ACK","private-wrong-database","OWNER_USERNAME","AZRO_AI","OWNER_PASSWORD",env.get("SHALE_AZURE_AI_PASSWORD")).entrySet()) {
+            var changed=new HashMap<>(env);changed.put("SHALE_AZURE_"+entry.getKey(),entry.getValue());
+            var failure=assertThrows(AssertionError.class,()->AiCaseDataAzureSqlDisposableSetupTest.validateOwner(changed));
+            assertFalse(failure.toString().contains("private-wrong-database"),"Acknowledgement failure must not echo targets");
+        }
+    }
     @Test void explicitDisposableV2ConfigurationIsAcceptedOffline(){assertDoesNotThrow(()->AiCaseDataAzureSqlDatabaseReadOnlyTest.validate(settings()));}
     @Test void productionImplicitDatabaseTlsOverridesAndAlternatePlatformsAreRefused() {
         var env=settings();String db=env.get("SHALE_AZURE_DATABASE");

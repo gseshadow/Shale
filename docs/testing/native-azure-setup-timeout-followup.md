@@ -1,5 +1,11 @@
 # Azure setup timeout and Windows checkout follow-up — 2026-10-30
 
+The [2026-11-02 owner login investigation](native-azure-owner-login-followup.md) supersedes
+this record's 15-second owner budget and assumption that login automatically restores the
+configured 120000-ms socket guard. Its historical test results and unresolved Stage 0 failure
+remain unchanged. The second owner failure was earlier, at OWNER_CONNECT, and its cleanup
+is confirmed. See the current operator packet before any further attempt.
+
 The subsequent [existing-worktree checkout investigation](native-azure-existing-worktree-checkout.md)
 supersedes the fresh-prefix-only checkout conclusion below. The owner confirmed deletion of the
 failed resource group. Current retry readiness remains BLOCKED; native gates stay OPEN.
