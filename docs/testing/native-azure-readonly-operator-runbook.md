@@ -1,14 +1,15 @@
 # Native Azure contained identity / read-only operator packet
 
-**PENDING WINDOWS OWNER VALIDATION OF THE TIMEOUT-ONLY CHANGE.**
-Executable baseline requiring validation: `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`.
-The earlier Windows result at `f767c1e97da22cb9c3406104c36d85f35474e094` does not
-validate this delta. No updated live launcher is published yet; the retained launcher
-below is historical and must not be run or bypassed. Both native gates remain OPEN;
-#1929 stays draft/unmerged. No Azure or production access occurred during this update.
+**READY FOR ONE FRESH DISPOSABLE AZURE TIMEOUT-ONLY OWNER ATTEMPT.**
+Windows-validated executable baseline: `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`.
+Owner-validated PR head: `5150145ae91aed80f5b204c418daf861b2d8a561`.
+See the [reviewed owner evidence](native-azure-readonly-acceptance.md#timeout-only-windows-validation-complete--2026-11-02).
+The exact launcher below is published for one fresh attempt only. Both native gates remain
+OPEN; #1929 stays draft/unmerged. Previous readiness is consumed and failed fixtures remain
+forbidden. No Azure or production access occurred during this review.
 
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
-Updated 2026-11-02 for the 600-second V2 baseline and pending Windows owner validation.
+Updated 2026-11-02 for completed Windows validation and the 600-second V2 live launcher.
 The second owner fixture was deleted with cleanup CONFIRMED; never reuse it. See the
 [offline login investigation](native-azure-owner-login-followup.md).
 Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
@@ -186,6 +187,13 @@ predicts Azure S0 timing. Validation alone does not authorize another live attem
 
 ## Minimum Windows validation for the timeout-only change
 
+**Completed by owner at `5150145ae91aed80f5b204c418daf861b2d8a561`.**
+Reported results: focused 38/0/0/0; V2 helper/local SQL 12/0/0/0; affected PASS;
+critical 65/0/0/0; 25 pinned files, clean index and both receipts PASS; dedicated
+local fixture removed with `V2_INSTALL_LOCAL_CLEANUP CONFIRMED`. These are owner reports,
+not an independent Windows rerun. The checklist remains the required reference for this
+validation; section 1, including the same-host offline credential check, still precedes launch.
+
 Validate executable baseline `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6` or a clean descendant with only the four
 existing evidence Markdown files changed. Section 1 pins this baseline for **validation**,
 not live execution. Record exact HEAD and require no tracked edits. No Azure opt-in,
@@ -242,12 +250,10 @@ new diagnostic, query rewrite, new fault injection or additional timeout change 
 Linux results are 23 focused passed, 147 affected passed plus one intentional Azure skip,
 and 228 critical passed; they do not replace this Windows validation.
 
-**After these Windows results pass**, review them and the exact candidate packet, then publish
-one exact live launcher pinned to `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6` with only the four evidence files
-allowed to differ. Retain the existing live-section digest, credential block, TLS, exact
-workstation IPv4 firewall, probe → setup → read-only ordering and mandatory exact-scope
-cleanup on success or failure. Until that review, the older launcher below remains withheld
-for this executable revision; changing its pin now would falsely imply Windows validation.
+The owner results have passed and the exact candidate packet has been reviewed. The live
+launcher below now pins `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`, permitting only the four evidence
+files to differ. Its live-section digest, credential block, TLS, exact workstation IPv4
+firewall, probe → setup → read-only ordering and exact-scope cleanup are unchanged.
 
 The next live attempt asks only whether the unchanged installer succeeds with the
 **600-second V2 migration ceiling** (existing five-second cancellation/close allowance).
@@ -260,15 +266,15 @@ absence. No retry, failed-fixture reuse, production access or deployment.
 
 ## Reviewed live launcher — mandatory
 
-**Historical launcher; withheld for the timeout-only revision. Do not execute.**
-Its old executable pin is intentionally retained until the Windows checklist above passes
-and a subsequent exact-packet review publishes the replacement. The following text and
-launcher describe the prior baseline, not current readiness.
+**Published for one fresh disposable timeout-only attempt.**
+The sole question is whether the unchanged installer completes under the 600-second V2
+ceiling. Record its actual elapsed time; continue into the existing read-only gate after
+complete setup success. Every outcome requires destruction and confirmed absence.
 
 Complete section 1 first, including its same-host Windows offline credential/fence check.
-Windows owner validation at `f767c1e97da22cb9c3406104c36d85f35474e094`
-is complete; see the acceptance record. Run this exact launcher once from the repository
-root in that same private session. It rechecks the baseline, clean tracked state, pinned
+Windows owner validation at `5150145ae91aed80f5b204c418daf861b2d8a561`
+is complete for executable baseline `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`; see the
+acceptance record. Run this exact launcher once from the repository root in that same private session. It rechecks the baseline, clean tracked state, pinned
 checkout bytes, private input and live-section digest before any resource creation.
 Only the four listed evidence Markdown files may differ from the validated baseline.
 Do not paste live sections individually or remove a guard.
@@ -280,7 +286,7 @@ scope record and section 5 from a new owner session; cleanup is mandatory before
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ValidatedHead = 'f767c1e97da22cb9c3406104c36d85f35474e094'
+$ValidatedHead = '5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6'
 $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',

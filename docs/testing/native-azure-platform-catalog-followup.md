@@ -1,43 +1,74 @@
 # Owner catalog failure investigation — 2026-11-02
 
-## Timeout-only executable baseline — Windows validation pending
+## Timeout-only Windows validation complete — 2026-11-02
 
-**PENDING WINDOWS OWNER VALIDATION; THE UPDATED LIVE LAUNCHER IS NOT YET PUBLISHED.**
-The executable baseline requiring validation is `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`,
-parent `5df0357b5d167580d7202e3a82a68aef373d0880`. It changes only the owner V2
-execution ceiling to **600 seconds**, retains the existing five-second cancellation/close
-allowance, and raises the enclosing setup cap to **880 seconds** to preserve its previous
-280-second allowance outside V2. Login remains 30 seconds, connected socket/read 120,000 ms,
-ordinary queries and rollback/absence checks 20 seconds. All SQL, modules, hashes, receipts,
-Phase1R and authority boundaries are unchanged. No additional diagnostic or optimization.
+**READY FOR ONE FRESH DISPOSABLE AZURE TIMEOUT-ONLY OWNER ATTEMPT.**
+Windows owner validation is complete at PR head
+`5150145ae91aed80f5b204c418daf861b2d8a561`, a descendant of validated executable
+baseline `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`. Git comparison confirms that only
+the four existing evidence Markdown files differ between those commits. The following
+results are owner-observed and reported in this review; private Surefire XML and the
+private candidate were not independently inspected or rerun here. Counts overlap and
+must not be added as unique tests.
 
-Linux validation: 23 focused tests passed; affected suite 147 passed with only the unopted
-live-Azure setup test skipped; critical reactor 228 passed. Zero failures/errors. All 25
-pinned inputs, V1/V2 receipts and `git diff --check` passed. These are local results, not
-Windows or Azure acceptance. No Azure resources or production connections were created.
+| Check | Owner-observed result |
+| --- | --- |
+| Focused Windows validation | 38 passed; 0 failures, 0 errors, 0 skips |
+| V2 helper / dedicated local SQL gate | 12 passed; 0 failures, 0 errors, 0 skips |
+| Selector-generated affected suite | PASS; detailed counts not supplied |
+| Critical reactor, as reported by owner | 65 passed; 0 failures, 0 errors, 0 skips |
+| `git diff --check` | PASS |
+| Pinned checkout / index | 25 files PASS; `clean=true` |
+| V1 receipt | PASS: `b949079a9d1e639db206f535502441b59aada5cc6af74da5fda1549f566db7a3` |
+| V2 receipt | PASS: `60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891` |
+| Dedicated local fixture | Removed; `V2_INSTALL_LOCAL_CLEANUP CONFIRMED` |
+| Final tracked state | No tracked changes; only untracked Python `__pycache__` directories |
 
-Use the [minimum Windows validation checklist](native-azure-readonly-operator-runbook.md#minimum-windows-validation-for-the-timeout-only-change).
-Windows results for this baseline remain **PENDING**, including the private-authoritative
-complete-installer tests and confirmed local fixture destruction. The prior owner evidence
-at `f767c1e97da22cb9c3406104c36d85f35474e094` remains historical evidence for unchanged
-behavior, not Windows validation of this executable delta. All older READY statements in
-this file are superseded by this pending classification.
+The reported 12/0/0/0 local gate clears the timeout-only checklist's five-helper/seven-local
+SQL prerequisite, including its private-authoritative complete-installer coverage and
+cancellation/rollback checks. Prior Phase1R local identity evidence carries forward for
+unchanged behavior. Local results do not predict Azure S0 timing or establish native
+Azure acceptance. Earlier Linux results remain historical validation, not new Windows counts.
 
-After the owner reports passing results, review the exact descendant head, executable diff,
-protected bytes, Windows reports, PowerShell parsing/credential checks, unchanged live
-sections and cleanup ordering. Only then publish a launcher pinned to this validated
-executable baseline, permitting only the existing four evidence Markdown files to differ.
-Do not bypass the retained launcher's older baseline guard or paste its live sections.
+The executable delta from parent `5df0357b5d167580d7202e3a82a68aef373d0880` changes
+only the owner V2 execution ceiling to **600 seconds** and the enclosing setup cap to
+**880 seconds**, preserving the previous 280-second allowance outside V2. The existing
+five-second cancellation/physical-close allowance, 30-second login, 120,000-ms connected
+socket/read bound, and 20-second ordinary/rollback/absence checks remain unchanged.
+SQL, modules, hashes, receipts, Phase1R, credentials and authority boundaries are unchanged.
+No new diagnostic, optimization or timeout adjustment is included in this evidence update.
 
-The sole live question is whether the unchanged `phase3b8-confinement.sql` completes under
-the 600-second V2 migration ceiling. On V2 success record the actual `elapsedMillis` from
-existing `AZURE_V2` / `AZURE_SETUP phase=V2_INSTALL status=PASS` markers and continue the
-existing downstream read-only gate. On a different failure stop and report the specific
-sanitized failure already available; do not relabel it as a 600-second expiration or tune
-another bound. If those fields cannot distinguish the cause, report it as unconfirmed.
-On deadline expiration stop; performance investigation is separate work. Every outcome
-requires destruction of the exact fresh disposable scope and confirmed absence. No failed
-fixture reuse, retry, production access, deployment or gate closure is authorized.
+Use the [exact reviewed live launcher](native-azure-readonly-operator-runbook.md#reviewed-live-launcher--mandatory)
+after section 1, including its same-host offline PowerShell check. The launcher pins
+`5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`, permits only the four evidence Markdown
+files to differ, and requires clean tracked source, actual pinned bytes/index/receipts,
+the hash-verified private candidate and unchanged live-section digest before creation.
+All four live PowerShell sections (2–5), the credential block and the launcher's main
+try/finally remain unchanged from the validated packet. Probe → setup → read-only ordering,
+refusal of missing/skipped/failed selected reports, validated TLS, exact-workstation IPv4
+firewall, independent secrets and mandatory exact-scope cleanup remain in force.
+
+The sole live question is: **Does unchanged `phase3b8-confinement.sql` complete successfully
+with the 600-second V2 migration ceiling?** On success record actual `elapsedMillis` from
+existing `AZURE_V2` and `AZURE_SETUP phase=V2_INSTALL status=PASS` markers, then continue
+the existing read-only native Azure gate only after the complete setup gate passes.
+On any different failure stop and report the existing sanitized phase/category/SQL state/code;
+do not relabel it as a 600-second expiration or tune another bound. If those markers cannot
+distinguish the cause, report it as unconfirmed. Deadline expiration stops the attempt;
+performance investigation is separate work.
+
+This readiness permits **one** new nonce/resource group/server/database and fresh independent
+secrets. All previous readiness is consumed; all failed fixtures remain forbidden. Every
+outcome requires exact-scope destruction and successful absence confirmation. Cleanup failure
+remains BLOCKED until owner reconciliation and confirmed deletion. No retry, reuse, adoption,
+receipt repair, production access or deployment. Both native gates remain **OPEN**; #1929
+stays **draft and unmerged**. No Azure resource or production connection was made in this review.
+Audit integration uses the unchanged existing contracts; no audit event/schema change is introduced.
+
+## Historical validation and investigations
+
+All pending, withheld, READY and BLOCKED classifications below describe earlier states.
+The timeout-only classification above supersedes them and authorizes only this one fresh attempt.
 
 ## Windows owner validation and diagnostic readiness — 2026-11-02
 
