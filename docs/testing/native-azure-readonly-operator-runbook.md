@@ -1,15 +1,14 @@
 # Native Azure contained identity / read-only operator packet
 
-**BLOCKED before resource creation.** The one attempt authorized at
-`f82e2842bef2f4b732566e7a7a255cf30b5d0105` was consumed: setup timed out in
-V2_INSTALL, downstream read-only work did not run, and the owner reports
-`AZURE_NATIVE_CLEANUP CONFIRMED`. No failed fixture may be reused.
-[Current V2 investigation](native-azure-v2-install-followup.md) requires new Windows
-owner validation of executable changes and a subsequent exact-packet review before
-any new live classification. Both native gates remain OPEN; #1929 stays draft/unmerged.
+**READY FOR ONE FRESH DISPOSABLE AZURE DIAGNOSTIC OWNER ATTEMPT.**
+Windows-validated executable baseline: `f767c1e97da22cb9c3406104c36d85f35474e094`.
+See the [owner evidence and reviewed classification](native-azure-readonly-acceptance.md#windows-owner-validation-and-diagnostic-readiness--2026-11-02).
+Both native gates remain OPEN; #1929 stays draft/unmerged. All failed fixtures remain
+forbidden; earlier readiness was consumed. This packet permits one fresh attempt only.
+No Azure or production access occurred during this review.
 
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
-Updated 2026-11-02 for the consumed attempt, V2 diagnostics and offline-only validation; live work is blocked.
+Updated 2026-11-02 for completed Windows owner validation and this reviewed diagnostic launcher.
 The second owner fixture was deleted with cleanup CONFIRMED; never reuse it. See the
 [offline login investigation](native-azure-owner-login-followup.md).
 Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
@@ -30,17 +29,25 @@ Check out this PR's reviewed task branch, targeting `codex/latest`, then:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-# This section is offline validation only. No live readiness is implied.
 git status --short
 if ($LASTEXITCODE -ne 0) { throw 'Git inspection failed' }
-# Historical Windows baseline: c5d13ea4d93f0b0ca732244506d7b0f5d1b96047
 git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source identity unavailable' }
-# The previous validated head is historical. Record this new HEAD and all offline results;
-# a subsequent reviewed packet must pin the newly Windows-validated executable baseline.
-if (@(git status --porcelain --untracked-files=no).Count -ne 0 -or $LASTEXITCODE -ne 0) {
-    throw 'Reviewed source must have no tracked edits'
+$ValidatedHead = 'f767c1e97da22cb9c3406104c36d85f35474e094'
+$AllowedEvidence = @(
+    'docs/testing/native-azure-readonly-operator-runbook.md',
+    'docs/testing/native-azure-readonly-acceptance.md',
+    'docs/testing/native-azure-v2-install-followup.md',
+    'docs/testing/native-azure-platform-catalog-followup.md'
+)
+git merge-base --is-ancestor $ValidatedHead HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Windows-validated executable baseline required' }
+$ChangedSinceValidation = @(git diff --name-only $ValidatedHead HEAD)
+if ($LASTEXITCODE -ne 0 -or @($ChangedSinceValidation | Where-Object { $_ -notin $AllowedEvidence }).Count -ne 0) {
+    throw 'Executable inputs changed since Windows validation; new validation/review required'
 }
+$TrackedState = @(git status --porcelain --untracked-files=no)
+if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean tracked source required' }
 # Non-Azure validation must not inherit an old native acceptance opt-in.
 Remove-Item Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_ATTESTATION_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue
 git --version
@@ -177,10 +184,13 @@ predicts Azure S0 timing. Validation alone does not authorize another live attem
 
 ## Reviewed live launcher — mandatory
 
-The preserved launcher is disabled by an explicit STOP. Complete the offline validation
-above and obtain subsequent exact-packet review; that review must pin the newly validated
-executable baseline before removing the STOP. Do not paste live sections individually.
-The following describes the launcher's behavior for that future review.
+Complete section 1 first, including its same-host Windows offline credential/fence check.
+Windows owner validation at `f767c1e97da22cb9c3406104c36d85f35474e094`
+is complete; see the acceptance record. Run this exact launcher once from the repository
+root in that same private session. It rechecks the baseline, clean tracked state, pinned
+checkout bytes, private input and live-section digest before any resource creation.
+Only the four listed evidence Markdown files may differ from the validated baseline.
+Do not paste live sections individually or remove a guard.
 It executes the first PowerShell block in each of sections 2, 3 and 4 in order and always
 enters section 5 after recording the new scope, including resource/probe/setup/read-only failure.
 A missing, skipped or failing selected test stops downstream work. Interrupting/closing the
@@ -189,7 +199,32 @@ scope record and section 5 from a new owner session; cleanup is mandatory before
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-throw 'BLOCKED: new Windows owner validation and exact-packet review required before resource creation'
+$ValidatedHead = 'f767c1e97da22cb9c3406104c36d85f35474e094'
+$AllowedEvidence = @(
+    'docs/testing/native-azure-readonly-operator-runbook.md',
+    'docs/testing/native-azure-readonly-acceptance.md',
+    'docs/testing/native-azure-v2-install-followup.md',
+    'docs/testing/native-azure-platform-catalog-followup.md'
+)
+git merge-base --is-ancestor $ValidatedHead HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Windows-validated executable baseline required' }
+$ChangedSinceValidation = @(git diff --name-only $ValidatedHead HEAD)
+if ($LASTEXITCODE -ne 0 -or @($ChangedSinceValidation | Where-Object { $_ -notin $AllowedEvidence }).Count -ne 0) {
+    throw 'Executable inputs changed since Windows validation; new validation/review required'
+}
+$TrackedState = @(git status --porcelain --untracked-files=no)
+if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean tracked source required' }
+$RepoRoot = (git rev-parse --show-toplevel).Trim()
+if ($LASTEXITCODE -ne 0 -or (Get-Location).Path -ne (Resolve-Path -LiteralPath $RepoRoot).Path) { throw 'Run from repository root' }
+python build/sql-confinement/checkout_bytes.py
+if ($LASTEXITCODE -ne 0) { throw 'Pinned bytes/index/receipts required before Azure' }
+if ([string]::IsNullOrWhiteSpace($env:SHALE_CASE_VERIFY_SCHEMA) -or
+    $env:SHALE_CASE_VERIFY_SCHEMA_SHA256 -cne '4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f') {
+    throw 'Complete section 1 private input verification first'
+}
+if ((Get-FileHash -Algorithm SHA256 -LiteralPath $env:SHALE_CASE_VERIFY_SCHEMA).Hash.ToLowerInvariant() -cne $env:SHALE_CASE_VERIFY_SCHEMA_SHA256) {
+    throw 'Private input changed; STOP before resource creation'
+}
 if (@(Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*').Count -ne 0) {
     throw 'Use a fresh process without inherited SHALE_AZURE_* values; complete section 1 first'
 }
@@ -198,13 +233,21 @@ if (Test-Path -LiteralPath work/azure-native/resource-scope.json) {
 }
 $Packet = [IO.File]::ReadAllText((Resolve-Path docs/testing/native-azure-readonly-operator-runbook.md).Path)
 $LiveBlocks = @{}
+$LiveSources = @()
 foreach ($Number in @(2,3,4,5)) {
     $Section = [regex]::Match($Packet, "(?ms)^## $Number\. .*?(?=^## |\z)")
     $FenceMarker = ([string][char]96) * 3
     $Fence = [regex]::Match($Section.Value, "(?s)${FenceMarker}powershell\r?\n(.*?)${FenceMarker}")
     if (-not $Section.Success -or -not $Fence.Success) { throw 'Reviewed live section missing' }
+    $LiveSources += $Fence.Groups[1].Value.Replace("`r`n", "`n")
     $LiveBlocks[$Number] = [scriptblock]::Create($Fence.Groups[1].Value)
 }
+$Digest = [Security.Cryptography.SHA256]::Create()
+try {
+    $LiveDigest = [BitConverter]::ToString($Digest.ComputeHash([Text.Encoding]::UTF8.GetBytes(($LiveSources -join "`n")))).Replace('-', '').ToLowerInvariant()
+}
+finally { $Digest.Dispose() }
+if ($LiveDigest -cne '60e11e30133675c1a48b260463eee25aed69740c3bd3d1700389705a5e7050d5') { throw 'Reviewed live sections changed; STOP before resource creation' }
 $ScopeWritten = $false
 $Nonce = $null
 try {
@@ -602,4 +645,5 @@ SIDs, connection strings, passwords, access tokens or schema/module artifacts. O
 required live/operator evidence passes may the record use
 `NATIVE AZURE IDENTITY / READ-ONLY ACCEPTANCE COMPLETE`. This never closes the mutation/fault gate
 or authorizes production SQL, identities, JAR deployment, AI/MCP/OAuth activation or a pilot.
+
 

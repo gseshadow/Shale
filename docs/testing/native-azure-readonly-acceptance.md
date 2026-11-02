@@ -1,5 +1,71 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+## Windows owner validation and diagnostic readiness — 2026-11-02
+
+**READY FOR ONE FRESH DISPOSABLE AZURE DIAGNOSTIC OWNER ATTEMPT.**
+The owner reports Windows validation at exact executable baseline
+`f767c1e97da22cb9c3406104c36d85f35474e094`; these results are owner-observed,
+not independently rerun by this reviewer.
+
+| Check | Owner-observed result |
+| --- | --- |
+| Focused/offline prerequisites | 37 passed; 0 failures, 0 errors, 0 skips |
+| Dedicated loopback V2 gate: `AzureOwnerV2InstallTest` + `AzureOwnerV2InstallLocalSqlServerTest` | 11 passed; 0 failures, 0 errors, 0 skips |
+| Complete V2 execution coverage | All 7 local SQL tests executed, including both private-authoritative complete-installer tests |
+| Phase1R identity gate | 8 passed; 0 failures, 0 errors, 0 skips |
+| Selector-generated affected execution | PASS |
+| Critical reactor | PASS |
+| Local cleanup | Dedicated loopback SQL Server removed; `V2_INSTALL_LOCAL_CLEANUP CONFIRMED` |
+| Azure opt-in / Azure resource creation during Windows validation | None |
+
+The missing Windows/private complete-installer prerequisite is cleared. Exact-head source
+and packet review confirms probe → setup → read-only ordering, refusal of missing/skipped/
+failed selected reports, and mandatory exact-scope cleanup on success or failure. The
+[reviewed launcher](native-azure-readonly-operator-runbook.md#reviewed-live-launcher--mandatory)
+pins this executable baseline and permits differences only in these four evidence/runbook
+Markdown files. Its live sections are digest-pinned before resource creation. No Java,
+SQL, packaged resource, receipt, driver configuration or credential-generation block changes
+are part of this evidence update.
+
+This readiness is limited to one fresh diagnostic attempt; it does not predict S0 timing
+or close either native gate. Previous attempt readiness was consumed and previous failed
+fixtures remain forbidden. Use a new nonce/resource group/server/database, exact-workstation
+IPv4 firewall only, unchanged TLS validation, explicit V2 and independent contained
+credentials. Any probe/setup failure stops downstream read-only work and enters cleanup;
+no retry, reuse, adoption, receipt repair or timeout increase is permitted. Cleanup failure
+is BLOCKED pending confirmed deletion. Both native gates remain **OPEN**; PR #1929 stays
+**draft and unmerged**. No Azure or production access occurred during this review; no
+production SQL, deployment, enablement or pilot is authorized.
+
+## Packet verification for this evidence update
+
+Static checks PASS: all four live PowerShell sections (2–5), including credential
+generation, native Maven selectors and cleanup, are identical to the Windows-validated
+baseline packet. The launcher's existing main try/finally sequence is also unchanged.
+New guards pin the executable baseline, restrict descendant changes to four Markdown
+files, require clean tracked source and pinned bytes/index/receipts, recheck the private
+candidate, and verify the live-section SHA-256
+`60e11e30133675c1a48b260463eee25aed69740c3bd3d1700389705a5e7050d5`
+over LF-normalized extracted blocks joined with one LF. Static review confirms explicit
+V2, exact IPv4 endpoints, unchanged TLS, report refusal, setup-failure ordering and exact
+owned cleanup.
+
+PowerShell parsing and mocked launcher execution were **not rerun in this review**:
+PowerShell is unavailable in the task runtime. Section 1 still requires the existing
+offline credential/fence check in the same Windows host before launch. Maven/SQL tests
+were not rerun for this four-file documentation update; the exact-head owner results
+above are the validation evidence. No new runtime Java/SQL behavior is introduced.
+The shell Git fetch failed because its configured proxy was unavailable; files and PR
+identity were read at the exact head through the GitHub connector. The stale attached
+checkout was not modified or used as evidence for this head.
+
+## Historical investigation and consumed classifications
+
+All BLOCKED/pending or READY statements below describe earlier review states and are
+superseded by the exact-baseline diagnostic readiness above. They do not authorize
+additional attempts. Historical agent test skips are preserved as historical results;
+the Windows owner results above supply the previously missing complete-installer evidence.
+
 ## Current classification after V2_INSTALL timeout — 2026-11-02
 
 **BLOCKED: no further live attempt authorized.** The single attempt at
@@ -197,4 +263,5 @@ Do not classify the gate complete on absent opt-in, skipped tests, owner-only/lo
 or missing metadata visibility. No production Phase1R/V2 install, identity provisioning, JAR
 deployment, AI/MCP/OAuth activation or pilot is authorized. The seven already-installed production
 prerequisites must not be rerun. The PR remains unmerged.
+
 
