@@ -13,7 +13,8 @@ class AiCaseDataAzureSqlDisposableSetupTest {
     enum Phase { OWNER_CONNECT, OWNER_PREFLIGHT, STAGE0_BEFORE, SCHEMA_IMPORT, PREREQUISITE_MIGRATIONS,
         PHASE1R_AND_V2_PREREQUISITE, V2_INSTALL, CONTAINED_USERS, DEPLOYMENT_BINDING, CUMULATIVE_VERIFY, STAGE0_AFTER, OFF_CHECK }
     @FunctionalInterface interface Work { void run()throws Exception; }
-    @Test @Timeout(300) void provisionEmptyOwnedAzureFixture()throws Exception {
+    // Preserve the previous 280-second allowance outside the migration, including cleanup.
+    @Test @Timeout(280 + AzureOwnerV2Install.EXECUTION_SECONDS) void provisionEmptyOwnedAzureFixture()throws Exception {
         Assumptions.assumeTrue("CREATE_OWNED_DISPOSABLE_AZURE_FIXTURE".equals(System.getenv("SHALE_AZURE_SETUP_OPT_IN")),"Separate mutating setup opt-in required");
         requireQuietDriverLogging(); // Before datasource setters can log target/credentials.
         String db=validateOwner(System.getenv());

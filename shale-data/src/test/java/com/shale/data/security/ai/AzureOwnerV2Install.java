@@ -9,6 +9,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Disposable owner harness only. Original migration/module bytes and receipts stay frozen. */
 final class AzureOwnerV2Install {
     private AzureOwnerV2Install() {}
+    // Diagnostic migration budget only; ordinary owner statements keep their existing bound.
+    static final int EXECUTION_SECONDS=600;
     static final String RAW_SHA256="7f8c10d6bb41660fe59505a3386b74216eaa83c2d63726a657bb7ffeb1336ad8";
     record Plan(String sql, List<String> stages) {}
 
@@ -40,7 +42,7 @@ final class AzureOwnerV2Install {
     static String checkpoint(int stage) {return "RAISERROR(N'AZURE_V2_CHECKPOINT_"+stage+"',10,1) WITH NOWAIT;\n";}
 
     static void install(Connection c,byte[] raw)throws SQLException {
-        execute(c,diagnosticPlan(raw),AiCaseDataAzureSqlDisposableSetupTest.OWNER_QUERY_SECONDS);
+        execute(c,diagnosticPlan(raw),EXECUTION_SECONDS);
     }
     // Separate entry point permits constrained synthetic local cancellation tests, never an Azure opt-in.
     static void execute(Connection c,Plan plan,int seconds)throws SQLException {

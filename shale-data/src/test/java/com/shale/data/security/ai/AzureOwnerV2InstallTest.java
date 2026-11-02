@@ -27,6 +27,12 @@ class AzureOwnerV2InstallTest {
         assertTrue(closed.get());assertTrue(failure.getMessage().contains("rollback=UNCONFIRMED"));
         assertNull(failure.getCause());assertEquals(0,failure.getSuppressed().length);assertFalse(failure.toString().contains("private"));
     }
+    @Test void outerSetupBudgetAllowsFullMigrationAndPreservesOtherWorkAllowance()throws Exception {
+        var timeout=AiCaseDataAzureSqlDisposableSetupTest.class.getDeclaredMethod("provisionEmptyOwnedAzureFixture")
+                .getAnnotation(org.junit.jupiter.api.Timeout.class);
+        assertEquals(880,timeout.value(),"Setup must allow 600 seconds for V2 plus its existing 280-second allowance");
+        assertEquals(java.util.concurrent.TimeUnit.SECONDS,timeout.unit());
+    }
     @Test void diagnosticsOnlyInsertFixedWarningsIntoTheExactReviewedSource()throws Exception {
         byte[] raw=Files.readAllBytes(Path.of("../docs/sql/ai-integration/phase3b8-confinement.sql"));
         var plan=AzureOwnerV2Install.diagnosticPlan(raw);
@@ -54,7 +60,7 @@ class AzureOwnerV2InstallTest {
                 assertEquals("createStatement",m.getName(),"Never call JDBC rollback in autocommit or change transaction mode");
                 return Proxy.newProxyInstance(Statement.class.getClassLoader(),new Class<?>[]{Statement.class},(sp,sm,sa)->switch(sm.getName()) {
                     case "setQueryTimeout"->{limits.add((int)sa[0]);yield null;}
-                    case "execute"->{String sql=(String)sa[0];queries.add(sql);if(sql.equals("synthetic"))throw new SQLTimeoutException("private sql target token","HYT00");yield false;}
+                    case "execute"->{String sql=(String)sa[0];queries.add(sql);if(queries.size()==1)throw new SQLTimeoutException("private sql target token","HYT00");yield false;}
                     case "getWarnings"->new SQLWarning("AZURE_V2_CHECKPOINT_1");
                     case "executeQuery"->{queries.add((String)sa[0]);var read=new boolean[1];yield Proxy.newProxyInstance(ResultSet.class.getClassLoader(),new Class<?>[]{ResultSet.class},(rp,rm,ra)->switch(rm.getName()) {
                         case "next"->{boolean first=!read[0];read[0]=true;yield first;}
@@ -69,7 +75,7 @@ class AzureOwnerV2InstallTest {
             var bytes=new java.io.ByteArrayOutputStream();var prior=System.err;
             try(var output=new java.io.PrintStream(bytes)) {
                 System.setErr(output);
-                var failure=assertThrows(SQLException.class,()->AzureOwnerV2Install.execute(c,new AzureOwnerV2Install.Plan("synthetic",List.of("SESSION")),20));
+                var failure=assertThrows(SQLException.class,()->AzureOwnerV2Install.install(c,Files.readAllBytes(Path.of("../docs/sql/ai-integration/phase3b8-confinement.sql"))));
                 failure.printStackTrace(output);
                 assertNull(failure.getCause());assertEquals(0,failure.getSuppressed().length);
             }finally{System.setErr(prior);}
@@ -79,7 +85,8 @@ class AzureOwnerV2InstallTest {
             assertTrue(log.contains("rollback="+(verificationFails?"UNCONFIRMED":"CONFIRMED")));
             assertEquals("IF XACT_STATE()<>0 ROLLBACK TRANSACTION",queries.get(1));
             assertTrue(queries.get(2).contains("@@TRANCOUNT,XACT_STATE()"));
-            assertTrue(limits.stream().allMatch(n->n==20),"Ordinary, install and rollback limits remain bounded at 20 seconds");
+            assertEquals(600,limits.getFirst(),"Only the owner V2 installer receives the ten-minute diagnostic budget");
+            assertTrue(limits.subList(1,limits.size()).stream().allMatch(n->n==20),"Rollback and absence verification retain their 20-second limits");
         }
     }
 }
