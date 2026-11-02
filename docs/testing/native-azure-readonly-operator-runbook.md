@@ -1,14 +1,14 @@
 # Native Azure contained identity / read-only operator packet
 
-**READY FOR ONE FRESH DISPOSABLE AZURE DIAGNOSTIC OWNER ATTEMPT.**
-Windows-validated executable baseline: `f767c1e97da22cb9c3406104c36d85f35474e094`.
-See the [owner evidence and reviewed classification](native-azure-readonly-acceptance.md#windows-owner-validation-and-diagnostic-readiness--2026-11-02).
-Both native gates remain OPEN; #1929 stays draft/unmerged. All failed fixtures remain
-forbidden; earlier readiness was consumed. This packet permits one fresh attempt only.
-No Azure or production access occurred during this review.
+**PENDING WINDOWS OWNER VALIDATION OF THE TIMEOUT-ONLY CHANGE.**
+Executable baseline requiring validation: `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`.
+The earlier Windows result at `f767c1e97da22cb9c3406104c36d85f35474e094` does not
+validate this delta. No updated live launcher is published yet; the retained launcher
+below is historical and must not be run or bypassed. Both native gates remain OPEN;
+#1929 stays draft/unmerged. No Azure or production access occurred during this update.
 
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
-Updated 2026-11-02 for completed Windows owner validation and this reviewed diagnostic launcher.
+Updated 2026-11-02 for the 600-second V2 baseline and pending Windows owner validation.
 The second owner fixture was deleted with cleanup CONFIRMED; never reuse it. See the
 [offline login investigation](native-azure-owner-login-followup.md).
 Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
@@ -33,18 +33,18 @@ git status --short
 if ($LASTEXITCODE -ne 0) { throw 'Git inspection failed' }
 git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source identity unavailable' }
-$ValidatedHead = 'f767c1e97da22cb9c3406104c36d85f35474e094'
+$ExecutableHead = '5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6'
 $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
     'docs/testing/native-azure-v2-install-followup.md',
     'docs/testing/native-azure-platform-catalog-followup.md'
 )
-git merge-base --is-ancestor $ValidatedHead HEAD
-if ($LASTEXITCODE -ne 0) { throw 'Windows-validated executable baseline required' }
-$ChangedSinceValidation = @(git diff --name-only $ValidatedHead HEAD)
+git merge-base --is-ancestor $ExecutableHead HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Timeout-only executable baseline required' }
+$ChangedSinceValidation = @(git diff --name-only $ExecutableHead HEAD)
 if ($LASTEXITCODE -ne 0 -or @($ChangedSinceValidation | Where-Object { $_ -notin $AllowedEvidence }).Count -ne 0) {
-    throw 'Executable inputs changed since Windows validation; new validation/review required'
+    throw 'Executable inputs differ from timeout-only baseline; STOP'
 }
 $TrackedState = @(git status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean tracked source required' }
@@ -123,8 +123,9 @@ Python 3.9+ and Git are required. The tool and transition regressions make no Az
 
 The clean focused build must run from the reviewed head with no tracked edits. Record
 `git rev-parse HEAD` and the fresh Surefire counts for each selector. Windows owner
-validation must also run the affected/critical suites and the separately opted-in local
-Phase1R identity regressions on a dedicated loopback SQL instance. No Azure opt-in is
+validation for this timeout-only revision follows the minimum checklist below. The older
+Phase1R-only local gate is retained for reference; its unchanged eight-test owner evidence
+can carry forward from the prior validated baseline. No Azure opt-in is
 needed for those checks. A local edition-injection pass is dispatch/receipt evidence,
 not live Azure identity acceptance. Review the physical-incarnation receipt behavior:
 restore or service-tier changes invalidate it; never rewrite a receipt to bypass drift.
@@ -178,11 +179,91 @@ finally {
 
 Require every selected test executed, zero failures/errors/skips, complete-installer success
 and cumulative verifier success, real cancellation rollback, and owned fixture cleanup.
-Also run the existing Phase1R local gate, selector-generated affected suite and critical
-`mvn -B -ntp test`. Record exact HEAD and fresh Surefire counts. No timing result here
+For this timeout-only revision, follow the minimum checklist below for the affected and
+critical suites; the unchanged Phase1R-only local gate need not be repeated. Record exact
+HEAD and fresh Surefire counts. No timing result here
 predicts Azure S0 timing. Validation alone does not authorize another live attempt.
 
+## Minimum Windows validation for the timeout-only change
+
+Validate executable baseline `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6` or a clean descendant with only the four
+existing evidence Markdown files changed. Section 1 pins this baseline for **validation**,
+not live execution. Record exact HEAD and require no tracked edits. No Azure opt-in,
+Azure resource, production connection, production catalog input or deployment is needed.
+
+1. Run section 1 completely: actual-byte refresh/check, checkout regressions, same-host
+   offline PowerShell credential/fence parsing check, private input hash and clean focused
+   Maven build. Require every selected focused test executed with zero failures/errors/skips.
+   This includes all **5 `AzureOwnerV2InstallTest` tests**, checking the 600-second migration
+   setting, 880-second outer cap, existing five-second close fallback, unchanged 20-second
+   rollback checks, fixed warning sanitization and exact installer-byte recovery. No test
+   needs to wait ten minutes to verify a configured ten-minute ceiling.
+2. Supply the private authoritative schema-only candidate through
+   `SHALE_CASE_VERIFY_SCHEMA`; its exact SHA-256 must remain
+   `4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f`.
+   Section 1 verifies it and sets `SHALE_CASE_VERIFY_SCHEMA_SHA256`. Do not attach the
+   candidate, its path, credentials or raw SQL output to shared evidence. The receipt alone
+   is insufficient. The exact-production catalog is unnecessary for this delta.
+3. Run the existing V2 local-validation block above on one **new dedicated loopback SQL
+   Server** with that candidate available. Require **12 tests executed / 0 failures / 0
+   errors / 0 skips**: five helper tests plus all seven local SQL tests, including complete
+   reviewed-installer success/cumulative verification and cancellation before the real V2
+   receipt with rollback/absence verification. Keep the local tests' existing time bounds.
+   No native Azure or S0 performance claim follows from local timing. Destroy the dedicated
+   local fixture on success or failure and report `V2_INSTALL_LOCAL_CLEANUP CONFIRMED` only
+   after independently confirming it was removed. A skipped complete-installer test fails
+   this prerequisite.
+4. Remove the local V2 opt-in/credentials as in its existing `finally` block, then run the
+   selector's affected suite and critical reactor below. The only acceptable affected skip
+   is the intentionally unopted `AiCaseDataAzureSqlDisposableSetupTest`; all other selected
+   tests must execute. Critical tests require zero failures/errors/skips. Do not set an Azure
+   opt-in just to eliminate that expected affected-suite skip.
+
+```powershell
+python build/test-selection/select_tests.py --base 5df0357b5d167580d7202e3a82a68aef373d0880 --head HEAD --format json --output work/azure-native/timeout-selection.json --plan-output work/azure-native/timeout-plan.json
+if ($LASTEXITCODE -ne 0) { throw 'Timeout-only affected selection failed; STOP' }
+python build/test-selection/run_selection.py work/azure-native/timeout-plan.json --command affected
+if ($LASTEXITCODE -ne 0) { throw 'Timeout-only affected suite failed; STOP' }
+mvn -B -ntp test
+if ($LASTEXITCODE -ne 0) { throw 'Critical reactor failed; STOP' }
+git diff --check
+if ($LASTEXITCODE -ne 0) { throw 'Whitespace verification failed; STOP' }
+python build/sql-confinement/checkout_bytes.py
+if ($LASTEXITCODE -ne 0) { throw 'Final pinned bytes/index/receipts failed; STOP' }
+git status --short
+git rev-parse HEAD
+```
+
+Retain fresh Surefire XML privately; report exact HEAD, per-class executed/failure/error/skip
+counts, protected-byte/receipt results, same-host PowerShell result and confirmed local
+fixture destruction. The prior eight-test Phase1R local identity result may carry forward:
+the executable delta changes no Phase1R code, SQL or identity semantics. No full-suite,
+new diagnostic, query rewrite, new fault injection or additional timeout change is required.
+Linux results are 23 focused passed, 147 affected passed plus one intentional Azure skip,
+and 228 critical passed; they do not replace this Windows validation.
+
+**After these Windows results pass**, review them and the exact candidate packet, then publish
+one exact live launcher pinned to `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6` with only the four evidence files
+allowed to differ. Retain the existing live-section digest, credential block, TLS, exact
+workstation IPv4 firewall, probe → setup → read-only ordering and mandatory exact-scope
+cleanup on success or failure. Until that review, the older launcher below remains withheld
+for this executable revision; changing its pin now would falsely imply Windows validation.
+
+The next live attempt asks only whether the unchanged installer succeeds with the
+**600-second V2 migration ceiling** (existing five-second cancellation/close allowance).
+Record actual V2 `elapsedMillis` from the existing success markers and continue the existing
+read-only gate only after setup passes. On any non-deadline failure, stop and report its
+specific sanitized phase/category/SQL state/code without claiming a 600-second expiration;
+if the existing evidence cannot identify the cause, say so. On deadline expiration stop
+and leave performance work separate. Always destroy the fresh disposable scope and confirm
+absence. No retry, failed-fixture reuse, production access or deployment.
+
 ## Reviewed live launcher — mandatory
+
+**Historical launcher; withheld for the timeout-only revision. Do not execute.**
+Its old executable pin is intentionally retained until the Windows checklist above passes
+and a subsequent exact-packet review publishes the replacement. The following text and
+launcher describe the prior baseline, not current readiness.
 
 Complete section 1 first, including its same-host Windows offline credential/fence check.
 Windows owner validation at `f767c1e97da22cb9c3406104c36d85f35474e094`
@@ -452,7 +533,8 @@ STOP and clean up the exact owned scope; never turn a failed probe into permissi
 Owner setup has its own datasource: validated TLS, explicit disposable database, SQL credentials
 outside the URL, **30-second login**, **120,000-millisecond connected socket read**, **20-second
 JDBC statement query** and **5-second cancellation acknowledgement** bounds. The setup JUnit cap
-remains **300 seconds**, not a substitute for JDBC I/O bounds. JDBC 12.6.1 clamps initial socket
+is **880 seconds**, preserving its previous 280-second allowance outside V2; it is not a
+substitute for JDBC I/O bounds. JDBC 12.6.1 clamps initial socket
 reads to the smaller of remaining login time and the configured finite socket timeout, including
 initial TLS/TDS traffic. It does not automatically restore the 120000-ms guard after login:
 `ownerConnect` explicitly sets that guard on the established connection and verifies it before
@@ -461,7 +543,8 @@ closes the connection and refuses work. The 30-second choice matches the pinned 
 and Azure's at-least-30-second guidance; it does not claim a newly provisioned S0 database must
 be ready within 30 seconds. See the [source analysis and limits](native-azure-owner-login-followup.md).
 Read-only identity datasource bounds remain 3-second login / 5000-ms socket and runtime
-attestation remains ten seconds. No security/SQL authority deadline or JUnit setup cap is extended.
+attestation remains ten seconds. No security/SQL authority deadline is extended; only the
+enclosing setup cap accommodates the V2 migration-budget increase.
 
 Expect `AZURE_SETUP phase=OWNER_CONNECT status=BEGIN` followed by PASS or FAIL, elapsedMillis
 and configured loginSeconds/socketMillis/querySeconds/cancelSeconds, even if login fails. PASS
@@ -477,9 +560,10 @@ plus elapsed milliseconds. Connection diagnostics contain no URL, target names, 
 SQL/schema, SID or token. Retain only these sanitized fields for shared connection evidence;
 keep all other raw harness/Surefire evidence private.
 
-The diagnostic V2 wrapper retains `Statement.setQueryTimeout(20)` and adds an independent
-20-second install wall deadline, `Statement.cancel()`, and physical-close fallback after
-five more seconds. This is necessary because the pinned adaptive driver stops its own
+The diagnostic V2 wrapper uses migration-specific `Statement.setQueryTimeout(600)` and an independent
+600-second install wall deadline, `Statement.cancel()`, and the unchanged physical-close fallback after
+five more seconds. Ordinary owner statements remain bounded at 20 seconds. This is necessary
+because the pinned adaptive driver stops its own
 query timer at the first TDS response; NOWAIT warnings must not weaken execution bounds.
 It validates the complete reviewed LF source hash, then inserts fixed severity-10 checkpoint
 statements outside module bodies. Original installer/manifest/source receipts stay exact;

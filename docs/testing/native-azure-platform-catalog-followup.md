@@ -1,5 +1,44 @@
 # Owner catalog failure investigation — 2026-11-02
 
+## Timeout-only executable baseline — Windows validation pending
+
+**PENDING WINDOWS OWNER VALIDATION; THE UPDATED LIVE LAUNCHER IS NOT YET PUBLISHED.**
+The executable baseline requiring validation is `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`,
+parent `5df0357b5d167580d7202e3a82a68aef373d0880`. It changes only the owner V2
+execution ceiling to **600 seconds**, retains the existing five-second cancellation/close
+allowance, and raises the enclosing setup cap to **880 seconds** to preserve its previous
+280-second allowance outside V2. Login remains 30 seconds, connected socket/read 120,000 ms,
+ordinary queries and rollback/absence checks 20 seconds. All SQL, modules, hashes, receipts,
+Phase1R and authority boundaries are unchanged. No additional diagnostic or optimization.
+
+Linux validation: 23 focused tests passed; affected suite 147 passed with only the unopted
+live-Azure setup test skipped; critical reactor 228 passed. Zero failures/errors. All 25
+pinned inputs, V1/V2 receipts and `git diff --check` passed. These are local results, not
+Windows or Azure acceptance. No Azure resources or production connections were created.
+
+Use the [minimum Windows validation checklist](native-azure-readonly-operator-runbook.md#minimum-windows-validation-for-the-timeout-only-change).
+Windows results for this baseline remain **PENDING**, including the private-authoritative
+complete-installer tests and confirmed local fixture destruction. The prior owner evidence
+at `f767c1e97da22cb9c3406104c36d85f35474e094` remains historical evidence for unchanged
+behavior, not Windows validation of this executable delta. All older READY statements in
+this file are superseded by this pending classification.
+
+After the owner reports passing results, review the exact descendant head, executable diff,
+protected bytes, Windows reports, PowerShell parsing/credential checks, unchanged live
+sections and cleanup ordering. Only then publish a launcher pinned to this validated
+executable baseline, permitting only the existing four evidence Markdown files to differ.
+Do not bypass the retained launcher's older baseline guard or paste its live sections.
+
+The sole live question is whether the unchanged `phase3b8-confinement.sql` completes under
+the 600-second V2 migration ceiling. On V2 success record the actual `elapsedMillis` from
+existing `AZURE_V2` / `AZURE_SETUP phase=V2_INSTALL status=PASS` markers and continue the
+existing downstream read-only gate. On a different failure stop and report the specific
+sanitized failure already available; do not relabel it as a 600-second expiration or tune
+another bound. If those fields cannot distinguish the cause, report it as unconfirmed.
+On deadline expiration stop; performance investigation is separate work. Every outcome
+requires destruction of the exact fresh disposable scope and confirmed absence. No failed
+fixture reuse, retry, production access, deployment or gate closure is authorized.
+
 ## Windows owner validation and diagnostic readiness — 2026-11-02
 
 **READY FOR ONE FRESH DISPOSABLE AZURE DIAGNOSTIC OWNER ATTEMPT.**
