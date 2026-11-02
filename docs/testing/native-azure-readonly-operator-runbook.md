@@ -1,14 +1,15 @@
 # Native Azure contained identity / read-only operator packet
 
-**READY FOR ONE FRESH DISPOSABLE AZURE OWNER ATTEMPT**, based on owner-observed Windows
-validation at `c5d13ea4d93f0b0ca732244506d7b0f5d1b96047` and this packet review.
-See the [owner evidence and classification](native-azure-readonly-acceptance.md#windows-owner-validation-and-retry-classification--2026-11-02).
-Both native gates remain OPEN; #1929 remains draft and unmerged. All previous failed
-fixtures were deleted with cleanup CONFIRMED and must never be reused or adopted.
-No Azure or production access occurred during Windows validation or this packet review.
+**BLOCKED before resource creation.** The one attempt authorized at
+`f82e2842bef2f4b732566e7a7a255cf30b5d0105` was consumed: setup timed out in
+V2_INSTALL, downstream read-only work did not run, and the owner reports
+`AZURE_NATIVE_CLEANUP CONFIRMED`. No failed fixture may be reused.
+[Current V2 investigation](native-azure-v2-install-followup.md) requires new Windows
+owner validation of executable changes and a subsequent exact-packet review before
+any new live classification. Both native gates remain OPEN; #1929 stays draft/unmerged.
 
 Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
-Updated 2026-11-02 for completed Windows owner validation and the reviewed fresh-resource live launcher.
+Updated 2026-11-02 for the consumed attempt, V2 diagnostics and offline-only validation; live work is blocked.
 The second owner fixture was deleted with cleanup CONFIRMED; never reuse it. See the
 [offline login investigation](native-azure-owner-login-followup.md).
 Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
@@ -29,20 +30,14 @@ Check out this PR's reviewed task branch, targeting `codex/latest`, then:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
+# This section is offline validation only. No live readiness is implied.
 git status --short
 if ($LASTEXITCODE -ne 0) { throw 'Git inspection failed' }
-$ValidatedHead = 'c5d13ea4d93f0b0ca732244506d7b0f5d1b96047'
+# Historical Windows baseline: c5d13ea4d93f0b0ca732244506d7b0f5d1b96047
 git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source identity unavailable' }
-git merge-base --is-ancestor $ValidatedHead HEAD
-if ($LASTEXITCODE -ne 0) { throw 'Windows-validated head required' }
-$AllowedEvidence = @('docs/testing/native-azure-readonly-operator-runbook.md',
-    'docs/testing/native-azure-readonly-acceptance.md',
-    'docs/testing/native-azure-platform-catalog-followup.md')
-$ChangedSinceValidation = @(git diff --name-only $ValidatedHead HEAD)
-if ($LASTEXITCODE -ne 0 -or @($ChangedSinceValidation | Where-Object { $_ -notin $AllowedEvidence }).Count -ne 0) {
-    throw 'Executable inputs changed since Windows validation; new review/validation required'
-}
+# The previous validated head is historical. Record this new HEAD and all offline results;
+# a subsequent reviewed packet must pin the newly Windows-validated executable baseline.
 if (@(git status --porcelain --untracked-files=no).Count -ne 0 -or $LASTEXITCODE -ne 0) {
     throw 'Reviewed source must have no tracked edits'
 }
@@ -73,7 +68,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Candidate).Hash.ToLowerInvaria
 }
 $env:SHALE_CASE_VERIFY_SCHEMA = $Candidate
 $env:SHALE_CASE_VERIFY_SCHEMA_SHA256 = $ExpectedCandidate
-mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAzureSqlDriverTimeoutTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,Phase1RDatabaseIdentityContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
+mvn -B -ntp -pl shale-data -am '-Dtest=AzureOwnerV2InstallTest,AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAzureSqlDriverTimeoutTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,Phase1RDatabaseIdentityContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
 if ($LASTEXITCODE -ne 0) { throw 'Offline prerequisite tests failed; STOP' }
 ```
 
@@ -151,12 +146,41 @@ Require 2 offline contract tests and 6 local SQL tests, zero failures/errors/ski
 Local SQL edition injection tests batch dispatch, receipt binding and rollback; it does
 not turn the local instance into Azure or close either native gate.
 
+## V2 install local validation — required before any new packet review
+
+On a new dedicated loopback SQL Server only, with the hash-verified private candidate
+already selected in section 1, run the following offline gate. No Azure opt-in is used.
+The local helper retains its existing self-signed loopback TLS exception; this does not
+validate Azure TLS. Synthetic cancellation tests also run without the private candidate,
+but the two complete-installer tests must not be skipped for Windows validation.
+
+```powershell
+$LocalCredential = Get-Credential -UserName 'sa' -Message 'New dedicated loopback SQL fixture only'
+try {
+    $env:SHALE_V2_INSTALL_OPT_IN = 'LOCAL_DISPOSABLE_V2_INSTALL'
+    $env:SHALE_V2_INSTALL_PORT = Read-Host 'Dedicated loopback SQL port (1024-65535)'
+    $env:SHALE_V2_INSTALL_PASSWORD = $LocalCredential.GetNetworkCredential().Password
+    mvn -B -ntp -pl shale-data -am '-Dtest=AzureOwnerV2InstallTest,AzureOwnerV2InstallLocalSqlServerTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+    if ($LASTEXITCODE -ne 0) { throw 'Local V2 execution/rollback validation failed; STOP' }
+}
+finally {
+    Remove-Item Env:SHALE_V2_INSTALL_OPT_IN,Env:SHALE_V2_INSTALL_PORT,Env:SHALE_V2_INSTALL_PASSWORD -ErrorAction SilentlyContinue
+    $LocalCredential = $null
+}
+```
+
+Require every selected test executed, zero failures/errors/skips, complete-installer success
+and cumulative verifier success, real cancellation rollback, and owned fixture cleanup.
+Also run the existing Phase1R local gate, selector-generated affected suite and critical
+`mvn -B -ntp test`. Record exact HEAD and fresh Surefire counts. No timing result here
+predicts Azure S0 timing. Validation alone does not authorize another live attempt.
+
 ## Reviewed live launcher — mandatory
 
-Complete section 1 first on the owner workstation, including the offline credential/syntax
-check in the same PowerShell host. The exact Windows-validated executable baseline is pinned
-above; only these three evidence Markdown files may differ. Do not paste live sections
-individually. Run this launcher once from the repository root in that same private session.
+The preserved launcher is disabled by an explicit STOP. Complete the offline validation
+above and obtain subsequent exact-packet review; that review must pin the newly validated
+executable baseline before removing the STOP. Do not paste live sections individually.
+The following describes the launcher's behavior for that future review.
 It executes the first PowerShell block in each of sections 2, 3 and 4 in order and always
 enters section 5 after recording the new scope, including resource/probe/setup/read-only failure.
 A missing, skipped or failing selected test stops downstream work. Interrupting/closing the
@@ -165,6 +189,7 @@ scope record and section 5 from a new owner session; cleanup is mandatory before
 
 ```powershell
 $ErrorActionPreference = 'Stop'
+throw 'BLOCKED: new Windows owner validation and exact-packet review required before resource creation'
 if (@(Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*').Count -ne 0) {
     throw 'Use a fresh process without inherited SHALE_AZURE_* values; complete section 1 first'
 }
@@ -408,6 +433,22 @@ DEPLOYMENT_BINDING, CUMULATIVE_VERIFY, STAGE0_AFTER and OFF_CHECK, with BEGIN an
 plus elapsed milliseconds. Connection diagnostics contain no URL, target names, credentials,
 SQL/schema, SID or token. Retain only these sanitized fields for shared connection evidence;
 keep all other raw harness/Surefire evidence private.
+
+The diagnostic V2 wrapper retains `Statement.setQueryTimeout(20)` and adds an independent
+20-second install wall deadline, `Statement.cancel()`, and physical-close fallback after
+five more seconds. This is necessary because the pinned adaptive driver stops its own
+query timer at the first TDS response; NOWAIT warnings must not weaken execution bounds.
+It validates the complete reviewed LF source hash, then inserts fixed severity-10 checkpoint
+statements outside module bodies. Original installer/manifest/source receipts stay exact;
+these diagnostic statements are a harness overlay, not a replacement installer or new receipt.
+Only exact allowlisted warning tokens are interpreted. The last observed ordinal/category
+and total elapsed time are evidence; zero means unobserved (including compilation/send),
+not proof no work ran. Warnings may be unavailable after transport loss. SQL state is allowlisted,
+error code numeric, and original driver messages/throwable chains are suppressed.
+On install failure the harness explicitly rolls back in T-SQL, checks transaction closure and
+absence of V2 objects/types/roles/index/receipts, then fails setup. UNCONFIRMED is never acceptance.
+A timeout after COMMIT may leave a complete installation; mandatory scope deletion still applies.
+See the [diagnosis and validation limits](native-azure-v2-install-followup.md).
 
 The first owner-reported failure maps to line 34 of commit `23f96ed69d6548dd3073318cd7be0c9923070dbc`:
 the **initial Stage 0** script, before schema import/migrations. Offline driver introspection proves

@@ -1,5 +1,17 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+## Current classification after V2_INSTALL timeout — 2026-11-02
+
+**BLOCKED: no further live attempt authorized.** The single attempt at
+`f82e2842bef2f4b732566e7a7a255cf30b5d0105` stopped in V2_INSTALL after all earlier
+setup phases returned. Owner reports mandatory `AZURE_NATIVE_CLEANUP CONFIRMED`;
+no fixture reuse or native read-only gate. The historical readiness below was consumed.
+[Current bounded diagnosis, rollback review and Windows prerequisites](native-azure-v2-install-followup.md)
+supersede earlier readiness statements. New executable changes require Windows owner
+validation and subsequent exact-packet review. Both native gates remain OPEN; keep
+#1929 draft/unmerged. No Azure or production access occurred in this investigation.
+
+
 ## Windows owner validation and retry classification — 2026-11-02
 
 Owner-observed on Windows at exact head `c5d13ea4d93f0b0ca732244506d7b0f5d1b96047`;

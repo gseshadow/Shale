@@ -38,7 +38,7 @@ class AiCaseDataAzureSqlDisposableSetupTest {
             // uses guarded Phase1R PREFLIGHT/APPLY/POSTCHECK. Reviewed hashes come from this private fixture.
             phase(c,Phase.PHASE1R_AND_V2_PREREQUISITE,()->{var fixture=new AiCaseDataV2AuthoritativeLocalSqlServerTest();fixture.db=db;fixture.beforeConfinement(c);});
             sequence.add("existing authoritative V2 beforeConfinement: Phase1R PREFLIGHT/APPLY/POSTCHECK + V2 prerequisite");
-            phase(c,Phase.V2_INSTALL,()->execute(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b8-confinement.sql"))));sequence.add("phase3b8-confinement.sql");
+            phase(c,Phase.V2_INSTALL,()->AzureOwnerV2Install.install(c,Files.readAllBytes(Path.of("../docs/sql/ai-integration/phase3b8-confinement.sql"))));sequence.add("phase3b8-confinement.sql");
             phase(c,Phase.CONTAINED_USERS,()->{
             for(String identity:AiCaseDataAzureSqlDatabaseReadOnlyTest.IDENTITIES) {
                 // CREATE USER requires a literal. Never place it in shell arguments/logs; redact failure.
@@ -62,6 +62,9 @@ class AiCaseDataAzureSqlDisposableSetupTest {
                 assertTrue(r.next());assertEquals(0,r.getInt(1),"Capabilities and integration authority must remain absent/OFF");
             }
             });
+        } catch(Exception|AssertionError failure) {
+            // Includes resource-close failures; do not let Surefire print private SQL/targets.
+            throw new IllegalStateException("Owned disposable setup failed; discard owned scope; no retry/adoption");
         }
         Path output=Path.of("../work/azure-native/setup-sequence.txt");Files.createDirectories(output.getParent());Files.write(output,sequence);
     }
