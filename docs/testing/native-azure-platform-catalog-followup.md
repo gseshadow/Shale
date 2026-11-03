@@ -1,5 +1,10 @@
 # Owner catalog failure investigation — 2026-11-02
 
+Current status: the earlier timeout-only attempt is consumed. The unchanged installer completed
+under 600 seconds (owner report); `CATALOG_RECEIPT (SQL 0)` establishes only the failing stage.
+See the [19-component diagnostic and pending validation](native-azure-catalog-component-diagnostic.md).
+The readiness statements below are historical; use only the updated guarded runbook launcher.
+
 ## Timeout-only Windows validation complete — 2026-11-02
 
 **READY FOR ONE FRESH DISPOSABLE AZURE TIMEOUT-ONLY OWNER ATTEMPT.**

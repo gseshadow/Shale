@@ -1,5 +1,10 @@
 # V2_INSTALL timeout investigation — 2026-11-02
 
+Current status: the unchanged V2 installer completed under 600 seconds in the subsequent owner
+attempt. The old timeout-only launcher is consumed. The next delta is the
+[read-only 19-component diagnostic](native-azure-catalog-component-diagnostic.md), pending its
+Windows validation; earlier readiness and validation statements below retain only their historical scope.
+
 ## Timeout-only Windows validation complete — 2026-11-02
 
 **READY FOR ONE FRESH DISPOSABLE AZURE TIMEOUT-ONLY OWNER ATTEMPT.**

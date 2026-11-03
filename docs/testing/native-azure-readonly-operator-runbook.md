@@ -1,297 +1,112 @@
 # Native Azure contained identity / read-only operator packet
 
-**READY FOR ONE FRESH DISPOSABLE AZURE TIMEOUT-ONLY OWNER ATTEMPT.**
-Windows-validated executable baseline: `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`.
-Owner-validated PR head: `5150145ae91aed80f5b204c418daf861b2d8a561`.
-See the [reviewed owner evidence](native-azure-readonly-acceptance.md#timeout-only-windows-validation-complete--2026-11-02).
-The exact launcher below is published for one fresh attempt only. Both native gates remain
-OPEN; #1929 stays draft/unmerged. Previous readiness is consumed and failed fixtures remain
-forbidden. No Azure or production access occurred during this review.
+**CATALOG COMPONENT DIAGNOSTIC: WINDOWS VALIDATION PENDING.**
+This supersedes the consumed timeout-only launcher published at `7a70ea76db26351632b647863a4d814182bc472b`.
+The unchanged V2 installer has completed on Azure under its 600-second ceiling (owner report).
+`CATALOG_RECEIPT (SQL 0)` identifies a failing execution stage; it does not establish receipt drift.
+The next attempt asks only which of the 19 catalog components differs between owner and verifier.
+See [scope, review and evidence](native-azure-catalog-component-diagnostic.md).
+Both native acceptance gates remain OPEN; #1929 stays draft/unmerged.
 
-Prepared 2026-10-29 from `e129f2733bf7175425299a12ae97efdae3f23d22` (merged #1928).
-Updated 2026-11-02 for completed Windows validation and the 600-second V2 live launcher.
-The second owner fixture was deleted with cleanup CONFIRMED; never reuse it. See the
-[offline login investigation](native-azure-owner-login-followup.md).
-Current evidence is in [the acceptance record](native-azure-readonly-acceptance.md).
-This packet creates an empty disposable **Azure SQL Database** (EngineEdition 5), imports the
-existing private authoritative fixture, and runs the existing native gate with V2 explicitly selected.
-SQL Server, Managed Instance and a production database are not substitutes.
+Run from `C:\Eclipse\Workspace\shale-parent` in a fresh private Windows PowerShell 5.1
+(.NET Framework 4.8) or PowerShell 7 session with JDK 21, Maven, Git, Python, and the
+`Az.Accounts`, `Az.Resources`, and `Az.Sql` modules. Complete section 1 in that same session first.
+The existing launcher creates independent credentials at runtime. Never paste them into Git/chat,
+enable transcription/debug/JDBC tracing, reuse a failed fixture, or use production.
+Validated TLS, outbound TCP 1433, exact-workstation IPv4 firewall and mandatory cleanup still apply.
 
-No authorized Azure resource, Azure identity or database credential is available in the task environment.
-The following commands are for the resource owner. Run from the repository root in Windows PowerShell 5.1 (.NET Framework 4.8) or PowerShell 7,
-with JDK 21, Maven, Git, and the `Az.Accounts`, `Az.Resources`, and `Az.Sql` modules installed.
-Use a workstation with validated Azure SQL TLS and outbound TCP 1433. Do not enable Azure-services-wide
-firewall access, disable certificate verification, use a production connection, or run PowerShell
-transcription / Maven debug / JDBC bind tracing during secret handling.
+## 1. Validate the diagnostic-only delta on Windows
 
-## 1. Verify source and private input before creating a resource
-
-Check out this PR's reviewed task branch, targeting `codex/latest`, then:
+The existing V2 SQL/helper and Phase1R local Windows evidence carries forward for unchanged inputs.
+Do not repeat a mutating local fixture rehearsal for this test-only delta. The focused comparison
+tests, checkout/receipt checks, same-host PowerShell credential/fence check, selector affected suite
+and critical reactor below remain required. No live Azure test is opted in during validation.
+The validation marker is written only after all required commands pass and is consumed at launch.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-git status --short
-if ($LASTEXITCODE -ne 0) { throw 'Git inspection failed' }
-git rev-parse HEAD
-if ($LASTEXITCODE -ne 0) { throw 'Source identity unavailable' }
-$ExecutableHead = '5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6'
+$ExecutableHead = '5867337464e2caf0eabdf5c8694061ab43d3c8a7'
 $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
     'docs/testing/native-azure-v2-install-followup.md',
-    'docs/testing/native-azure-platform-catalog-followup.md'
+    'docs/testing/native-azure-platform-catalog-followup.md',
+    'docs/testing/native-azure-catalog-component-diagnostic.md'
 )
+$ValidationPath = 'work/azure-native/catalog-diagnostic-validation.json'
+Remove-Item -LiteralPath $ValidationPath -ErrorAction SilentlyContinue
 git merge-base --is-ancestor $ExecutableHead HEAD
-if ($LASTEXITCODE -ne 0) { throw 'Timeout-only executable baseline required' }
-$ChangedSinceValidation = @(git diff --name-only $ExecutableHead HEAD)
-if ($LASTEXITCODE -ne 0 -or @($ChangedSinceValidation | Where-Object { $_ -notin $AllowedEvidence }).Count -ne 0) {
-    throw 'Executable inputs differ from timeout-only baseline; STOP'
-}
+if ($LASTEXITCODE -ne 0) { throw 'Reviewed diagnostic code required' }
+$Changed = @(git diff --name-only $ExecutableHead HEAD)
+if ($LASTEXITCODE -ne 0 -or @($Changed | Where-Object { $_ -notin $AllowedEvidence }).Count -ne 0) { throw 'Executable inputs changed; new review required' }
 $TrackedState = @(git status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean tracked source required' }
-# Non-Azure validation must not inherit an old native acceptance opt-in.
-Remove-Item Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_ATTESTATION_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue
-git --version
-if ($LASTEXITCODE -ne 0) { throw 'Git required' }
 $RepoRoot = (git rev-parse --show-toplevel).Trim()
-if ($LASTEXITCODE -ne 0 -or (Get-Location).Path -ne (Resolve-Path -LiteralPath $RepoRoot).Path) { throw 'Run from this checkout repository root' }
-# Actual-byte refresh and receipt checks, not just Git status/check-attr.
+if ($LASTEXITCODE -ne 0 -or (Get-Location).Path -ne (Resolve-Path -LiteralPath $RepoRoot).Path) { throw 'Run from repository root' }
+if (@(Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*').Count -ne 0) { throw 'Fresh process without inherited Azure settings required' }
 python build/sql-confinement/checkout_bytes.py --refresh
-if ($LASTEXITCODE -ne 0) { throw 'Pinned byte refresh/receipt verification failed; STOP before Maven or Azure' }
+if ($LASTEXITCODE -ne 0) { throw 'Pinned byte refresh failed' }
 python build/sql-confinement/checkout_bytes.py
-if ($LASTEXITCODE -ne 0) { throw 'Actual working-tree byte verification failed; STOP before Maven or Azure' }
+if ($LASTEXITCODE -ne 0) { throw 'Pinned bytes/index/receipts failed' }
 python -m unittest discover -s build/sql-confinement -p test_checkout.py
-if ($LASTEXITCODE -ne 0) { throw 'Windows-style Git checkout regression failed' }
-# Offline only: executes the exact credential block below, verifies it, then erases test secrets.
+if ($LASTEXITCODE -ne 0) { throw 'Checkout regressions failed' }
+python -m unittest discover -s build/azure-native -p test_catalog_components.py
+if ($LASTEXITCODE -ne 0) { throw 'Catalog diagnostic launcher guards failed' }
 powershell.exe -NoProfile -File build/azure-native/test_runbook_credentials.ps1
-if ($LASTEXITCODE -ne 0) { throw 'Offline credential syntax/cleanup check failed; STOP' }
+if ($LASTEXITCODE -ne 0) { throw 'Same-host offline PowerShell credential/fence checks failed' }
 java -version
 if ($LASTEXITCODE -ne 0) { throw 'JDK 21 required' }
 mvn -version
 if ($LASTEXITCODE -ne 0) { throw 'Maven required' }
+mvn -B -ntp -pl shale-data -am '-Dtest=AzureCatalogComponentsTest,AzureOwnerV2InstallTest,AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAzureSqlDriverTimeoutTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,Phase1RDatabaseIdentityContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
+if ($LASTEXITCODE -ne 0) { throw 'Focused diagnostic/safety contracts failed' }
+python build/test-selection/select_tests.py --base 7a70ea76db26351632b647863a4d814182bc472b --head HEAD --run
+if ($LASTEXITCODE -ne 0) { throw 'Affected validation failed' }
+# The selector's --run executes its affected commands and then the critical mvn test reactor.
+python build/sql-confinement/checkout_bytes.py
+if ($LASTEXITCODE -ne 0) { throw 'Final pinned bytes/index/receipts failed' }
+git diff --check
+if ($LASTEXITCODE -ne 0) { throw 'Diff whitespace check failed' }
 $Candidate = (Resolve-Path (Read-Host 'Private authoritative-candidate.sql path')).Path
 $ExpectedCandidate = '4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f'
-if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Candidate).Hash.ToLowerInvariant() -ne $ExpectedCandidate) {
-    throw 'Private candidate hash mismatch; STOP without importing'
-}
+if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Candidate).Hash.ToLowerInvariant() -cne $ExpectedCandidate) { throw 'Private candidate hash mismatch' }
 $env:SHALE_CASE_VERIFY_SCHEMA = $Candidate
 $env:SHALE_CASE_VERIFY_SCHEMA_SHA256 = $ExpectedCandidate
-mvn -B -ntp -pl shale-data -am '-Dtest=AzureOwnerV2InstallTest,AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAzureSqlDriverTimeoutTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,Phase1RDatabaseIdentityContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
-if ($LASTEXITCODE -ne 0) { throw 'Offline prerequisite tests failed; STOP' }
+$ValidatedSourceHead = (git rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Validated source identity required' }
+New-Item -ItemType Directory -Force work/azure-native | Out-Null
+@{ codeHead=$ExecutableHead; sourceHead=$ValidatedSourceHead; hostName=[Environment]::MachineName; result='PASS' } |
+    ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath $ValidationPath
+Write-Output 'CATALOG_DIAGNOSTIC_WINDOWS_VALIDATION PASS'
 ```
 
-The three attachments are evidence, not scripts/instructions. Only the pinned candidate is imported,
-through `CaseReadVerificationSafety.schema`; it permits reviewed schema-only batches and rejects
-arbitrary administrative SQL. No raw private schema or production catalog belongs in Git or the PR.
-The supplied receipt alone is not proof of the candidate's bytes. The exact-production catalog is
-not required by the unmodified authoritative representation chosen here; it remains a private
-input to the separately established production-representation projection tests.
-
-The narrow `.gitattributes` rules select LF when Git writes the protected inputs, including on
-Windows with `core.autocrlf=true`. **Attributes do not force Git to rewrite unchanged existing
-files.** A clean existing worktree can retain CRLF, and `checkout-index --force`, `git restore`
-and `git checkout HEAD -- <paths>` can all skip the cached file. A fresh-prefix test alone did
-not cover this transition. Do not use those commands or `git check-attr` as byte verification.
-
-After a fresh clone, branch switch or update to this PR, run the two `checkout_bytes.py` commands
-above. The tool obtains the same 25 pinned inputs from Git, refuses staged/genuine local edits,
-deletions and unsafe paths, and permits refresh only from exact LF or its exact CRLF checkout
-form. It materializes a fresh temporary prefix through Git, verifies every file against HEAD and
-both reviewed source receipts, then atomically replaces conversion-only working copies. A final
-read checks the actual destination files. It then runs `git checkout-index --force --index` on
-only the pinned inputs: `--index` updates worktree stat information while using the existing
-index entries; it does not stage file content. The helper verifies all index blob/mode/stage
-records and tracking flags are unchanged, rechecks actual bytes/receipts, and requires empty
-textual diff, raw `diff-files` and porcelain status for the protected paths. This also repairs
-the prior helper's already-LF-but-`.M` state without reverting the files to CRLF.
-No manual `git show > file`, index renormalization,
-global Git configuration change or checkout hook is needed. Unrelated files are untouched.
-
-Require `PINNED_CHECKOUT PASS files=25`, `PINNED_RECEIPT V1 PASS
-b949079a9d1e639db206f535502441b59aada5cc6af74da5fda1549f566db7a3` and
-`PINNED_RECEIPT V2 PASS 60f7b39727a95ca65afd26ba3f8206a2700b64ca4df512da89df070a9f92e891`
-from both commands. A missing/nonzero check stops this packet before Maven or resource creation.
-Also require `PINNED_INDEX PASS clean=true` from both commands. This means the 25 pinned inputs
-are genuinely clean in Git; unrelated existing edits/staged changes are preserved and remain
-visible. A content-only PASS is insufficient. Do not stage repaired inputs or use
-assume-unchanged/skip-worktree flags to hide `.M`; do not alter index blobs or reviewed receipts.
-Ordinary `update-index --refresh` / `--really-refresh` alone can still report `needs update`
-after the old atomic replacement. Use the approved helper, not a manual index workaround.
-The verifier reuses the regression's raw-byte calculation: zero only the embedded digest field,
-then SHA-256; no newline/module normalization. Existing SQL/resource blobs and receipts are unchanged.
-Do not manually convert the installer or replace its receipt with the CRLF-derived hash.
-Python 3.9+ and Git are required. The tool and transition regressions make no Azure connection.
-
-The clean focused build must run from the reviewed head with no tracked edits. Record
-`git rev-parse HEAD` and the fresh Surefire counts for each selector. Windows owner
-validation for this timeout-only revision follows the minimum checklist below. The older
-Phase1R-only local gate is retained for reference; its unchanged eight-test owner evidence
-can carry forward from the prior validated baseline. No Azure opt-in is
-needed for those checks. A local edition-injection pass is dispatch/receipt evidence,
-not live Azure identity acceptance. Review the physical-incarnation receipt behavior:
-restore or service-tier changes invalidate it; never rewrite a receipt to bypass drift.
-
-For those local regressions only, use a **new dedicated loopback SQL Server**, not an
-ordinary development/shared/production instance. The test creates and drops only its
-nonce-named synthetic databases; it uses the existing local fixture connection helper.
-It cannot accept a remote hostname or Azure URL:
-
-```powershell
-$LocalCredential = Get-Credential -UserName 'sa' -Message 'Dedicated loopback test SQL Server only'
-try {
-    $env:SHALE_PHASE1R_IDENTITY_OPT_IN = 'LOCAL_DISPOSABLE_PHASE1R_IDENTITY'
-    $env:SHALE_PHASE1R_IDENTITY_PORT = Read-Host 'Dedicated loopback SQL port (1024-65535)'
-    $env:SHALE_PHASE1R_IDENTITY_PASSWORD = $LocalCredential.GetNetworkCredential().Password
-    mvn -B -ntp -pl shale-data -am '-Dtest=Phase1RDatabaseIdentityContractTest,Phase1RDatabaseIdentityLocalSqlServerTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
-    if ($LASTEXITCODE -ne 0) { throw 'Local Phase1R identity regression failed; STOP' }
-}
-finally {
-    Remove-Item Env:SHALE_PHASE1R_IDENTITY_OPT_IN,Env:SHALE_PHASE1R_IDENTITY_PORT,Env:SHALE_PHASE1R_IDENTITY_PASSWORD -ErrorAction SilentlyContinue
-    $LocalCredential = $null
-}
-```
-
-Require 2 offline contract tests and 6 local SQL tests, zero failures/errors/skips.
-Local SQL edition injection tests batch dispatch, receipt binding and rollback; it does
-not turn the local instance into Azure or close either native gate.
-
-## V2 install local validation — required before any new packet review
-
-On a new dedicated loopback SQL Server only, with the hash-verified private candidate
-already selected in section 1, run the following offline gate. No Azure opt-in is used.
-The local helper retains its existing self-signed loopback TLS exception; this does not
-validate Azure TLS. Synthetic cancellation tests also run without the private candidate,
-but the two complete-installer tests must not be skipped for Windows validation.
-
-```powershell
-$LocalCredential = Get-Credential -UserName 'sa' -Message 'New dedicated loopback SQL fixture only'
-try {
-    $env:SHALE_V2_INSTALL_OPT_IN = 'LOCAL_DISPOSABLE_V2_INSTALL'
-    $env:SHALE_V2_INSTALL_PORT = Read-Host 'Dedicated loopback SQL port (1024-65535)'
-    $env:SHALE_V2_INSTALL_PASSWORD = $LocalCredential.GetNetworkCredential().Password
-    mvn -B -ntp -pl shale-data -am '-Dtest=AzureOwnerV2InstallTest,AzureOwnerV2InstallLocalSqlServerTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
-    if ($LASTEXITCODE -ne 0) { throw 'Local V2 execution/rollback validation failed; STOP' }
-}
-finally {
-    Remove-Item Env:SHALE_V2_INSTALL_OPT_IN,Env:SHALE_V2_INSTALL_PORT,Env:SHALE_V2_INSTALL_PASSWORD -ErrorAction SilentlyContinue
-    $LocalCredential = $null
-}
-```
-
-Require every selected test executed, zero failures/errors/skips, complete-installer success
-and cumulative verifier success, real cancellation rollback, and owned fixture cleanup.
-For this timeout-only revision, follow the minimum checklist below for the affected and
-critical suites; the unchanged Phase1R-only local gate need not be repeated. Record exact
-HEAD and fresh Surefire counts. No timing result here
-predicts Azure S0 timing. Validation alone does not authorize another live attempt.
-
-## Minimum Windows validation for the timeout-only change
-
-**Completed by owner at `5150145ae91aed80f5b204c418daf861b2d8a561`.**
-Reported results: focused 38/0/0/0; V2 helper/local SQL 12/0/0/0; affected PASS;
-critical 65/0/0/0; 25 pinned files, clean index and both receipts PASS; dedicated
-local fixture removed with `V2_INSTALL_LOCAL_CLEANUP CONFIRMED`. These are owner reports,
-not an independent Windows rerun. The checklist remains the required reference for this
-validation; section 1, including the same-host offline credential check, still precedes launch.
-
-Validate executable baseline `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6` or a clean descendant with only the four
-existing evidence Markdown files changed. Section 1 pins this baseline for **validation**,
-not live execution. Record exact HEAD and require no tracked edits. No Azure opt-in,
-Azure resource, production connection, production catalog input or deployment is needed.
-
-1. Run section 1 completely: actual-byte refresh/check, checkout regressions, same-host
-   offline PowerShell credential/fence parsing check, private input hash and clean focused
-   Maven build. Require every selected focused test executed with zero failures/errors/skips.
-   This includes all **5 `AzureOwnerV2InstallTest` tests**, checking the 600-second migration
-   setting, 880-second outer cap, existing five-second close fallback, unchanged 20-second
-   rollback checks, fixed warning sanitization and exact installer-byte recovery. No test
-   needs to wait ten minutes to verify a configured ten-minute ceiling.
-2. Supply the private authoritative schema-only candidate through
-   `SHALE_CASE_VERIFY_SCHEMA`; its exact SHA-256 must remain
-   `4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f`.
-   Section 1 verifies it and sets `SHALE_CASE_VERIFY_SCHEMA_SHA256`. Do not attach the
-   candidate, its path, credentials or raw SQL output to shared evidence. The receipt alone
-   is insufficient. The exact-production catalog is unnecessary for this delta.
-3. Run the existing V2 local-validation block above on one **new dedicated loopback SQL
-   Server** with that candidate available. Require **12 tests executed / 0 failures / 0
-   errors / 0 skips**: five helper tests plus all seven local SQL tests, including complete
-   reviewed-installer success/cumulative verification and cancellation before the real V2
-   receipt with rollback/absence verification. Keep the local tests' existing time bounds.
-   No native Azure or S0 performance claim follows from local timing. Destroy the dedicated
-   local fixture on success or failure and report `V2_INSTALL_LOCAL_CLEANUP CONFIRMED` only
-   after independently confirming it was removed. A skipped complete-installer test fails
-   this prerequisite.
-4. Remove the local V2 opt-in/credentials as in its existing `finally` block, then run the
-   selector's affected suite and critical reactor below. The only acceptable affected skip
-   is the intentionally unopted `AiCaseDataAzureSqlDisposableSetupTest`; all other selected
-   tests must execute. Critical tests require zero failures/errors/skips. Do not set an Azure
-   opt-in just to eliminate that expected affected-suite skip.
-
-```powershell
-python build/test-selection/select_tests.py --base 5df0357b5d167580d7202e3a82a68aef373d0880 --head HEAD --format json --output work/azure-native/timeout-selection.json --plan-output work/azure-native/timeout-plan.json
-if ($LASTEXITCODE -ne 0) { throw 'Timeout-only affected selection failed; STOP' }
-python build/test-selection/run_selection.py work/azure-native/timeout-plan.json --command affected
-if ($LASTEXITCODE -ne 0) { throw 'Timeout-only affected suite failed; STOP' }
-mvn -B -ntp test
-if ($LASTEXITCODE -ne 0) { throw 'Critical reactor failed; STOP' }
-git diff --check
-if ($LASTEXITCODE -ne 0) { throw 'Whitespace verification failed; STOP' }
-python build/sql-confinement/checkout_bytes.py
-if ($LASTEXITCODE -ne 0) { throw 'Final pinned bytes/index/receipts failed; STOP' }
-git status --short
-git rev-parse HEAD
-```
-
-Retain fresh Surefire XML privately; report exact HEAD, per-class executed/failure/error/skip
-counts, protected-byte/receipt results, same-host PowerShell result and confirmed local
-fixture destruction. The prior eight-test Phase1R local identity result may carry forward:
-the executable delta changes no Phase1R code, SQL or identity semantics. No full-suite,
-new diagnostic, query rewrite, new fault injection or additional timeout change is required.
-Linux results are 23 focused passed, 147 affected passed plus one intentional Azure skip,
-and 228 critical passed; they do not replace this Windows validation.
-
-The owner results have passed and the exact candidate packet has been reviewed. The live
-launcher below now pins `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`, permitting only the four evidence
-files to differ. Its live-section digest, credential block, TLS, exact workstation IPv4
-firewall, probe → setup → read-only ordering and exact-scope cleanup are unchanged.
-
-The next live attempt asks only whether the unchanged installer succeeds with the
-**600-second V2 migration ceiling** (existing five-second cancellation/close allowance).
-Record actual V2 `elapsedMillis` from the existing success markers and continue the existing
-read-only gate only after setup passes. On any non-deadline failure, stop and report its
-specific sanitized phase/category/SQL state/code without claiming a 600-second expiration;
-if the existing evidence cannot identify the cause, say so. On deadline expiration stop
-and leave performance work separate. Always destroy the fresh disposable scope and confirm
-absence. No retry, failed-fixture reuse, production access or deployment.
+Require the focused selector to execute 45 tests with zero failures/errors/skips. The affected
+selector can intentionally skip unopted local/Azure gates; that never constitutes live acceptance.
+Keep the private schema local; its supplied digest alone is not a substitute for verifying its bytes.
 
 ## Reviewed live launcher — mandatory
 
-**Published for one fresh disposable timeout-only attempt.**
-The sole question is whether the unchanged installer completes under the 600-second V2
-ceiling. Record its actual elapsed time; continue into the existing read-only gate after
-complete setup success. Every outcome requires destruction and confirmed absence.
-
-Complete section 1 first, including its same-host Windows offline credential/fence check.
-Windows owner validation at `5150145ae91aed80f5b204c418daf861b2d8a561`
-is complete for executable baseline `5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6`; see the
-acceptance record. Run this exact launcher once from the repository root in that same private session. It rechecks the baseline, clean tracked state, pinned
-checkout bytes, private input and live-section digest before any resource creation.
-Only the four listed evidence Markdown files may differ from the validated baseline.
-Do not paste live sections individually or remove a guard.
-It executes the first PowerShell block in each of sections 2, 3 and 4 in order and always
-enters section 5 after recording the new scope, including resource/probe/setup/read-only failure.
-A missing, skipped or failing selected test stops downstream work. Interrupting/closing the
-host or losing power cannot run a finally block: recover immediately using the non-secret
-scope record and section 5 from a new owner session; cleanup is mandatory before any new attempt.
+**After section 1 passes: one fresh disposable catalog-component attempt only.**
+The launcher pins the diagnostic code, requires the same-host validation marker and unchanged
+source head, and consumes that marker before resource creation. It runs sections 2 and 3, then
+always section 5 once the new scope is recorded. Section 3 performs the unchanged probe/setup,
+then the separate read-only component test while the owner credential is still available.
+The full native attestation in section 4 is deliberately not selected for this diagnostic attempt.
+On component differences, stop with the exact ordinal/name list and clean up. On 19 matches,
+record the TSV and clean up; investigate `confinement-v2-catalog.sql` execution separately.
+A missing, skipped or failing selected test stops downstream work. Host interruption cannot run
+finally: recover using the private non-secret scope record and section 5, confirm deletion, and
+never reuse the fixture or automatically retry. Cleanup failure remains BLOCKED until reconciled.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ValidatedHead = '5d3fea8a8e19c4a58e445dbe6eb8bce2574b7cb6'
+$ValidatedHead = '5867337464e2caf0eabdf5c8694061ab43d3c8a7'
 $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
     'docs/testing/native-azure-v2-install-followup.md',
-    'docs/testing/native-azure-platform-catalog-followup.md'
+    'docs/testing/native-azure-platform-catalog-followup.md',
+    'docs/testing/native-azure-catalog-component-diagnostic.md'
 )
 git merge-base --is-ancestor $ValidatedHead HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Windows-validated executable baseline required' }
@@ -303,6 +118,13 @@ $TrackedState = @(git status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean tracked source required' }
 $RepoRoot = (git rev-parse --show-toplevel).Trim()
 if ($LASTEXITCODE -ne 0 -or (Get-Location).Path -ne (Resolve-Path -LiteralPath $RepoRoot).Path) { throw 'Run from repository root' }
+$ValidationPath = 'work/azure-native/catalog-diagnostic-validation.json'
+if (-not (Test-Path -LiteralPath $ValidationPath)) { throw 'Complete section 1 Windows validation first' }
+$Validation = Get-Content -LiteralPath $ValidationPath -Raw | ConvertFrom-Json
+$CurrentHead = (git rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $Validation.result -cne 'PASS' -or
+    $Validation.codeHead -cne $ValidatedHead -or $Validation.sourceHead -cne $CurrentHead -or
+    $Validation.hostName -cne [Environment]::MachineName) { throw 'Same-host validation of this exact source required' }
 python build/sql-confinement/checkout_bytes.py
 if ($LASTEXITCODE -ne 0) { throw 'Pinned bytes/index/receipts required before Azure' }
 if ([string]::IsNullOrWhiteSpace($env:SHALE_CASE_VERIFY_SCHEMA) -or
@@ -321,7 +143,7 @@ if (Test-Path -LiteralPath work/azure-native/resource-scope.json) {
 $Packet = [IO.File]::ReadAllText((Resolve-Path docs/testing/native-azure-readonly-operator-runbook.md).Path)
 $LiveBlocks = @{}
 $LiveSources = @()
-foreach ($Number in @(2,3,4,5)) {
+foreach ($Number in @(2,3,5)) {
     $Section = [regex]::Match($Packet, "(?ms)^## $Number\. .*?(?=^## |\z)")
     $FenceMarker = ([string][char]96) * 3
     $Fence = [regex]::Match($Section.Value, "(?s)${FenceMarker}powershell\r?\n(.*?)${FenceMarker}")
@@ -334,7 +156,9 @@ try {
     $LiveDigest = [BitConverter]::ToString($Digest.ComputeHash([Text.Encoding]::UTF8.GetBytes(($LiveSources -join "`n")))).Replace('-', '').ToLowerInvariant()
 }
 finally { $Digest.Dispose() }
-if ($LiveDigest -cne '60e11e30133675c1a48b260463eee25aed69740c3bd3d1700389705a5e7050d5') { throw 'Reviewed live sections changed; STOP before resource creation' }
+if ($LiveDigest -cne 'fdb9e31752dec1f1da350c07f0c61c4fc85d8e3661e905c5f02a7c0c964b138a') { throw 'Reviewed live sections changed; STOP before resource creation' }
+# Consume before the first live command; a failed attempt cannot reuse this validation marker.
+Remove-Item -LiteralPath $ValidationPath -ErrorAction Stop
 $ScopeWritten = $false
 $Nonce = $null
 try {
@@ -343,7 +167,6 @@ try {
         throw 'Owner readiness not confirmed; clean up without probing'
     }
     . $LiveBlocks[3]
-    . $LiveBlocks[4]
 }
 finally {
     try {
@@ -514,9 +337,24 @@ try {
     if ($SetupExit -ne 0) { throw 'Setup failed; STOP and clean up exact owned scope' }
     Assert-NativeReport 'AiCaseDataAzureSqlDisposableSetupTest'
     if (-not (Test-Path work/azure-native/setup-sequence.txt)) { throw 'Fresh setup sequence required; STOP' }
+    # Setup is complete. No mutating setup opt-in remains during the separate diagnostic.
+    Remove-Item Env:SHALE_AZURE_SETUP_OPT_IN -ErrorAction SilentlyContinue
+    Remove-Item work/azure-native/catalog-components.tsv -ErrorAction SilentlyContinue
+    Remove-Item shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlCatalogComponentTest.xml -ErrorAction SilentlyContinue
+    $env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN = 'AZURE_SQL_DATABASE_CATALOG_COMPONENTS'
+    $ComponentExit = $null
+    try {
+        mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlCatalogComponentTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
+        $ComponentExit = $LASTEXITCODE
+    }
+    finally { Remove-Item Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN -ErrorAction SilentlyContinue }
+    if (Test-Path work/azure-native/catalog-components.tsv) { Get-Content work/azure-native/catalog-components.tsv }
+    if ($ComponentExit -ne 0) { throw 'Component diagnostic failed or differs; report only fixed ordinal/name and metadata; STOP and clean up' }
+    Assert-NativeReport 'AiCaseDataAzureSqlCatalogComponentTest'
+    if (-not (Test-Path work/azure-native/catalog-components.tsv)) { throw 'Fresh 19-component comparison required; STOP' }
 }
 finally {
-    Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN -ErrorAction SilentlyContinue
+    Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN,Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN -ErrorAction SilentlyContinue
     $AdminCredential = $null
 }
 if ($SetupExit -ne 0) { throw 'Setup failed; STOP, preserve private diagnostics and clean up the exact owned resources' }
@@ -639,6 +477,9 @@ there**. This clean-room sequence has no production target. No application start
 switches are enabled; no synthetic user/Case/integration rows are necessary for this structural gate.
 
 ## 4. Run READ-ONLY NATIVE AZURE GATE
+
+Historical full-gate instructions, not selected by the current diagnostic launcher. Do not run
+this section in the component-only attempt, even if all 19 components match.
 
 ```powershell
 Remove-Item work/azure-native/read-only.properties -ErrorAction SilentlyContinue

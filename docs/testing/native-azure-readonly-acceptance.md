@@ -1,5 +1,18 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+## Current catalog-component diagnostic — 2026-11-02
+
+The timeout-only attempt below is consumed. The owner reports that the unchanged V2 installer
+completed on Azure within 600 seconds, followed by `CATALOG_RECEIPT (SQL 0)`. That stage label does
+not establish receipt drift. All 97 owned names and 19 component constructions match statically.
+The [new test-only diagnostic](native-azure-catalog-component-diagnostic.md) compares owner and
+verifier component lengths/hashes in one fresh disposable database, using the existing setup.
+Windows validation of this delta and live comparison remain PENDING. The updated
+[exact launcher](native-azure-readonly-operator-runbook.md#reviewed-live-launcher--mandatory)
+requires section 1 validation first. No retry/reuse, production access, deployment, hash/receipt/
+grant/authority/installer/timeout change is authorized. Both native acceptance gates remain OPEN.
+Historical Windows evidence below applies only to its stated earlier scope.
+
 ## Timeout-only Windows validation complete — 2026-11-02
 
 **READY FOR ONE FRESH DISPOSABLE AZURE TIMEOUT-ONLY OWNER ATTEMPT.**
