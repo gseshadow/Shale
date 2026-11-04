@@ -41,7 +41,7 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         launcher = self.launcher()
         self.assertIn('foreach ($Number in @(2,3,5))', launcher)
         expected = hashlib.sha256('\n'.join(self.block(n) for n in (2, 3, 5)).encode()).hexdigest()
-        self.assertEqual('3b3a5eef6faff948959ca81714e93c5e35716cb39588f94061b3b07d89f5e03a', expected,
+        self.assertEqual('02b611cdc6546c40c9431003c273df7b315e62e161cb5c976da534100dc4f021', expected,
                          'Only reviewed section 3 diagnostic parsing may change the live digest')
         self.assertIn(f"if ($LiveDigest -cne '{expected}')", launcher)
         self.assertNotIn('. $LiveBlocks[4]', launcher, 'This attempt may only compare components after setup')
@@ -154,6 +154,13 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         self.assertIn('if ($Messages.Count -ne 1) { return $Fallback }', block)
         self.assertIn('$SafeFailure = Get-SafeCatalogFailure -Messages $Messages', block)
         self.assertIn('throw (Get-SafeCatalogFailure -Messages @($_.Exception.Message))', block)
+        invocation = re.search(r'(?s)# BEGIN OFFLINE-TESTED CATALOG INVOCATION\n(.*?)# END OFFLINE-TESTED CATALOG INVOCATION', block).group(1)
+        self.assertIn("$ErrorActionPreference = 'Continue'", invocation)
+        self.assertIn('$PSNativeCommandUseErrorActionPreference = $false', invocation)
+        self.assertIn('catch { $ComponentExit = 1 }', invocation)
+        self.assertNotIn("throw 'Catalog component diagnostic failed", invocation)
+        self.assertLess(block.index('# END OFFLINE-TESTED CATALOG INVOCATION'), block.index('# BEGIN OFFLINE-TESTED CATALOG REPORT FAILURE'))
+
         parser = re.search(r'(?s)# BEGIN OFFLINE-TESTED CATALOG FAILURE PARSER\n(.*?)# END OFFLINE-TESTED CATALOG FAILURE PARSER', block).group(1)
         java = (ROOT / 'shale-data/src/test/java/com/shale/data/security/ai/AzureCatalogComponents.java').read_text(encoding='utf-8')
         names = re.search(r'(?s)NAMES=List.of\((.*?)\);', java).group(1)

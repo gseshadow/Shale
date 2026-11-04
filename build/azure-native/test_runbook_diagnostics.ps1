@@ -8,6 +8,9 @@ $Boundary = [regex]::Match($Text, '(?s)# BEGIN OFFLINE-TESTED CATALOG REPORT FAI
 if (-not $Parser.Success -or -not $Boundary.Success) { throw 'Required diagnostic parser/boundary missing' }
 . ([scriptblock]::Create($Parser.Groups[1].Value))
 $ReportFailure = [scriptblock]::Create($Boundary.Groups[1].Value)
+$InvokeMatch = [regex]::Match($Text, '(?s)# BEGIN OFFLINE-TESTED CATALOG INVOCATION\r?\n(.*?)# END OFFLINE-TESTED CATALOG INVOCATION')
+if (-not $InvokeMatch.Success) { throw 'Required invocation boundary missing' }
+$Invoke = [scriptblock]::Create($InvokeMatch.Groups[1].Value)
 function Assert-NativeReport { throw 'Unexpected success path in offline failure test' }
 $Prefix = 'Catalog component diagnostic failed before a complete comparison; stage='
 $Suffix = '; discard fixture; no retry/adoption'
@@ -88,6 +91,51 @@ try {
         catch { $Caught = $_.Exception.Message }
         if ($Caught -cne $Fallback) { throw 'Missing/malformed report did not fail closed' }
         $script:Checks++
+    }
+    # Simulate native stderr and terminating launch errors before the real private report parser.
+    foreach ($Relative in @('build/azure-native/quiet-jdbc-logging.properties','build/case-read-verification/quiet-logback.xml')) {
+        $Dummy = Join-Path $Scratch $Relative
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Dummy))
+        [IO.File]::WriteAllText($Dummy, 'offline placeholder')
+    }
+    $InvocationMessage = "${Prefix}VERIFIER_COMPONENT_READ; component=0:before_first_component; phase=BATCH_EXECUTE$Suffix"
+    function mvn {
+        if ($InvocationScenario -eq 'missing') { throw 'private executable SQL SID token' }
+        if ($InvocationScenario -ne 'success') {
+            [IO.File]::WriteAllText($ReportPath, '<testsuite><testcase><failure message="' + [Security.SecurityElement]::Escape($InvocationMessage) + '" /></testcase></testsuite>')
+        }
+        if ($InvocationScenario -eq 'throwsAfterReport') { throw 'private driver password SID token' }
+        Write-Error 'private native stderr SQL password SID token'
+        Write-Output 'private stdout SQL password SID token'
+        $global:LASTEXITCODE = if ($InvocationScenario -eq 'success') { 0 } else { 1 }
+    }
+    $PriorNativePreference = $PSNativeCommandUseErrorActionPreference
+    try {
+        $PSNativeCommandUseErrorActionPreference = $true
+        foreach ($InvocationScenario in @('stderr','throwsAfterReport','missing','success')) {
+            [IO.File]::Delete($ReportPath)
+            $env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN = 'OFFLINE_SENTINEL'
+            $Output = @(. $Invoke *>&1)
+            if ($Output.Count -ne 0) { throw 'Invocation leaked output' }
+            if ($ErrorActionPreference -cne 'Stop') { throw 'Invocation changed parent error preference' }
+            if ($PSNativeCommandUseErrorActionPreference -ne $true) { throw 'Invocation changed parent native preference' }
+            if ($null -ne $env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN) { throw 'Invocation retained opt-in' }
+            $ExpectedExit = if ($InvocationScenario -eq 'success') { 0 } else { 1 }
+            if ($ComponentExit -ne $ExpectedExit) { throw 'Invocation exit status was lost' }
+            if ($ComponentExit -ne 0) {
+                $Caught = $null
+                try { . $ReportFailure }
+                catch { $Caught = $_.Exception.Message }
+                $Expected = if ($InvocationScenario -eq 'missing') { $Fallback } else { $InvocationMessage }
+                if ($Caught -cne $Expected) { throw 'Invocation failure bypassed fresh safe Surefire evidence' }
+            }
+            $script:Checks++
+        }
+    }
+    finally {
+        Remove-Item Function:mvn -ErrorAction SilentlyContinue
+        $PSNativeCommandUseErrorActionPreference = $PriorNativePreference
+        Remove-Item Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN -ErrorAction SilentlyContinue
     }
 }
 finally {

@@ -1,5 +1,23 @@
 # Read-only Azure catalog component diagnostic
 
+## Current batch review and invocation correction
+
+The latest authorized run failed inside verifier `statement.execute()` and cleanup was confirmed.
+The [complete batch/authority review](native-azure-catalog-batch-review.md) lists every reference,
+proves the unchanged batch under a restricted local principal, explains later compilation errors
+and timeout behavior, and replaces another full Azure fixture with an optional tiny isolated probe
+design. No missing V2 grant is established. No SQL, permission, receipt or timeout change.
+
+The launcher invocation now suppresses native failure streams, captures the exit and reaches the
+existing safe Surefire parser instead of throwing REPORT_WRITE early. The offline diagnostic fence
+expands from 204 to 208 cases. Its new invocation regressions cover stderr/nonzero exit, terminating
+errors after fresh XML, missing execution/report and success, with parent preferences and opt-in
+cleanup checked. New sections 2/3/5 digest:
+`02b611cdc6546c40c9431003c273df7b315e62e161cb5c976da534100dc4f021`.
+Sections 2/4/5, creation/firewall, credentials, marker-consumption ordering and cleanup are unchanged.
+Earlier packet/marker protocols below are historical until separate Windows validation/review; do
+not run the old full-fixture launcher or relabel 204-case evidence. No Azure executed or authorized.
+
 ## Before-first phase packet refresh — 2026-11-04
 
 The owner reports complete native Windows validation at executable baseline

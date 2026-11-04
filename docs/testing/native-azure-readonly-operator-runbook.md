@@ -1,5 +1,13 @@
 # Native Azure contained identity / read-only operator packet
 
+**BATCH AUTHORITY REVIEW: do not repeat the full Azure fixture for this investigation.**
+The unchanged 19-component batch passes locally with only the existing verifier grants. A 5-second
+verifier socket bound can preempt the 20-second query timeout; the preserved Azure message does not
+prove a permission denial. The Maven invocation now reaches the fixed allowlisted Surefire parser
+even after native stderr/nonzero exit. See the [authority inventory, real local tests and tiny probe plan](native-azure-catalog-batch-review.md).
+The packet pins/204-case evidence protocol below are historical and intentionally reject this
+changed test/fence delta; do not create/relabel markers or run the live launcher. No Azure authorized.
+
 **2026-11-04: BEFORE-FIRST PHASE BASELINE REFRESH. NO AZURE AUTHORIZATION.**
 The owner reports complete native Windows validation at
 `bec7ecbac86a2026bc16dac7a2e8963d7467dd4e`: 15 Java tests, zero failures/errors/skips;
@@ -255,7 +263,7 @@ try {
     $LiveDigest = [BitConverter]::ToString($Digest.ComputeHash([Text.Encoding]::UTF8.GetBytes(($LiveSources -join "`n")))).Replace('-', '').ToLowerInvariant()
 }
 finally { $Digest.Dispose() }
-if ($LiveDigest -cne '3b3a5eef6faff948959ca81714e93c5e35716cb39588f94061b3b07d89f5e03a') { throw 'Reviewed live sections changed; STOP before resource creation' }
+if ($LiveDigest -cne '02b611cdc6546c40c9431003c273df7b315e62e161cb5c976da534100dc4f021') { throw 'Reviewed live sections changed; STOP before resource creation' }
 # A future run requires separate owner authorization; packet validation never grants it.
 if ((Read-Host 'Only after separate explicit owner authorization, type AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT') -cne 'AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT') {
     throw 'Azure not authorized; STOP without mutation or manual continuation'
@@ -504,13 +512,24 @@ try {
     }
     # END OFFLINE-TESTED CATALOG FAILURE PARSER
     $env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN = 'AZURE_SQL_DATABASE_CATALOG_COMPONENTS'
+    # BEGIN OFFLINE-TESTED CATALOG INVOCATION
     $ComponentExit = $null
     try {
-        mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlCatalogComponentTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test *> $null
-        $ComponentExit = $LASTEXITCODE
+        $ComponentExit = & {
+            # Child scope: native stderr/nonzero exits must complete before private XML parsing.
+            $ErrorActionPreference = 'Continue'
+            $PSNativeCommandUseErrorActionPreference = $false
+            try {
+                mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlCatalogComponentTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test *> $null
+                if ($null -eq $LASTEXITCODE) { return 1 }
+                return $LASTEXITCODE
+            }
+            catch { return 1 } # Missing executable/invocation failure: still inspect fresh evidence.
+        } 2>$null 3>$null 4>$null 5>$null 6>$null
     }
-    catch { throw 'Catalog component diagnostic failed; stage=REPORT_WRITE; discard fixture; no retry/adoption' }
+    catch { $ComponentExit = 1 }
     finally { Remove-Item Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN -ErrorAction SilentlyContinue }
+    # END OFFLINE-TESTED CATALOG INVOCATION
     # BEGIN OFFLINE-TESTED CATALOG REPORT FAILURE
     try {
         $ComponentReport = 'shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlCatalogComponentTest.xml'
