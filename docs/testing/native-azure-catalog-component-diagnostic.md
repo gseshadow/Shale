@@ -1,6 +1,87 @@
 # Read-only Azure catalog component diagnostic
 
-## Localization packet refresh — 2026-11-04
+## Before-first operation diagnostic — 2026-11-04
+
+The latest separately authorized disposable attempt passed setup, V2 installation and cumulative
+verification, failed at `VERIFIER_COMPONENT_READ; component=0:before_first_component`, and cleaned
+up with `AZURE_NATIVE_CLEANUP CONFIRMED`. Verifier target/preflight had previously passed.
+This is evidence only; no permission/visibility change, fixture adoption or new Azure attempt.
+
+The five stages and existing component ordinal/name semantics are unchanged. Only a zero-component
+read failure adds one fixed `AzureCatalogComponents.ReadPhase` value:
+
+- `STATEMENT_CREATE`: `connection.createStatement()`
+- `QUERY_TIMEOUT_SETUP`: the unchanged `statement.setQueryTimeout(20)`
+- `BATCH_EXECUTE`: the existing `statement.execute(sql())` call, including resource evaluation
+- `BEFORE_FIRST_RESULT`: execute returned, but traversal failed/exhausted before the first fixed
+  component slot; this includes `getUpdateCount()`, `getMoreResults()` and before-first cleanup
+
+The phase is assigned before its operation and captured outside JDBC resource scopes, discarding
+driver/SQL/target/credential/SID/token text, causes and suppressed close failures. Nonzero-component
+messages have no phase suffix. The single batch execution, SQL and finite traversal budget remain
+unchanged. No error text or JDBC evidence can supply a phase, ordinal or component name.
+
+Section 3 now constructs complete candidate failure messages from the exact five stages, fixed
+ordinal/name pairs and four phases. It preserves exact matches, including legacy stage-only and
+zero-component messages. Phases are accepted only with component zero on owner/verifier read stages.
+Unknown values, wrong ordinal/name pairs, extra text/fields, malformed XML, missing evidence or
+multiple messages fall back to a constructed sanitized `REPORT_WRITE` message. Both report parsing
+and the final catch use the same allowlist; arbitrary exception text is never returned or echoed.
+
+Only this diagnostic parser changes section 3 executable content. Sections 2, 4 and 5, console-only
+credentials, marker consumption, resource/one-IP firewall commands and cleanup/finally are exact.
+The new live sections 2/3/5 digest is
+`3b3a5eef6faff948959ca81714e93c5e35716cb39588f94061b3b07d89f5e03a`.
+The digest guard and Python expectation are updated together. Executable pins remain at the prior
+validated baseline `8d6bfa11b31a0334e16cc99c81cac3f35bfada48`; their permitted-delta fences
+intentionally reject this Java change. Earlier packet-validation/marker protocols below are
+historical until this delta passes Windows and a separate packet refresh is reviewed.
+Do not create/relabel markers, execute the live launcher or treat this edit as Azure authorization.
+
+### Required offline Windows validation
+
+Use the exact handoff commit in a clean native Windows checkout with JDK 21/Maven/Python, in a
+fresh private PowerShell session without `SHALE_AZURE_*` variables. Run:
+
+```powershell
+mvn -B -ntp -pl shale-data -am '-Dtest=AzureCatalogComponentsTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
+if ($LASTEXITCODE -ne 0) { throw 'Focused diagnostic tests failed' }
+python -m unittest discover -s build/azure-native -p test_catalog_components.py
+if ($LASTEXITCODE -ne 0) { throw 'Five launcher guards failed' }
+$PowerShellExe = (Get-Process -Id $PID).Path
+foreach ($Test in @('test_runbook_diagnostics.ps1','test_runbook_credentials.ps1','test_runbook_launcher.ps1')) {
+    & $PowerShellExe -NoProfile -File (Join-Path 'build/azure-native' $Test)
+    if ($LASTEXITCODE -ne 0) { throw 'Offline PowerShell diagnostic/fence tests failed' }
+}
+```
+
+Require fresh `AzureCatalogComponentsTest` Surefire XML: 15 tests, zero failures/errors/skips;
+five Python passes; all three PowerShell PASS markers. The expanded Java phase test injects all
+four before-first phases for both identities, including non-result exhaustion, update-count/
+advancement failure and close failures carrying SQL/driver/credential/SID/token canaries. Existing
+19-slot, malformed/reordered evidence, five-stage and no-cause/suppression assertions remain.
+The new PowerShell test executes the exact runbook parser and report-failure/catch boundary with
+synthetic private XML: all stages, every ordinal/name, both read identities, every phase, legacy
+messages, invalid combinations, canaries, multiple messages and missing/malformed reports.
+The existing credential/launcher fences remain unchanged. No database or private candidate is
+needed; do not repeat setup, V2, Phase1R, timeout/datasource or broad Maven rehearsals for this delta.
+
+Pre-edit review carried forward repository prompt rules, tenancy/RLS, relevant schema/audit,
+confinement V2 and Azure attestation contracts; inspected all reader/component/stage references,
+the five Python guards, runbook failure routing and both existing PowerShell fence scripts.
+No production path, SQL/catalog expression/order, receipt/hash, grant/role/authority boundary,
+datasource configuration, query timeout or V2 timeout changes. Metadata-only diagnostics need no
+PHI/entity audit event or migration.
+
+Local supplemental JDK 21 compilation with the real dependency closure and cached JUnit 5.10.3:
+15 passed, zero failures/errors/skips. Five Python launcher guards pass. Protected-section,
+full-tree delta and narrow whitespace checks pass. Focused configured Maven is blocked before
+tests by the uncached Spring Boot BOM 4.1.1 and unavailable dependency transport. Native Windows
+Maven and PowerShell execution of the new parser test remain unverified here (no PowerShell).
+Commit/push uses connected GitHub Git-data tools. No Azure was executed or authorized.
+
+
+## Historical localization packet refresh — 2026-11-04
 
 Owner-reported native Windows validation is complete at executable baseline
 `8d6bfa11b31a0334e16cc99c81cac3f35bfada48`: `AzureCatalogComponentsTest` 15 tests,

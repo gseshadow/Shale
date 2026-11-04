@@ -144,7 +144,7 @@ class AzureCatalogComponentsTest {
                     var owner=diagnosticSource("owner",scenario.getKey(),closed,parent);
                     var verifier=diagnosticSource("verifier",scenario.getKey(),closed,parent);
                     var failure=assertThrows(IllegalStateException.class,()->AiCaseDataAzureSqlCatalogComponentTest.compare(owner,verifier,"private database","private user",output),scenario.getKey());
-                    String component=scenario.getValue().endsWith("COMPONENT_READ")?"; component=0:before_first_component":"";
+                    String component=scenario.getValue().endsWith("COMPONENT_READ")?"; component=0:before_first_component; phase=STATEMENT_CREATE":"";
                     assertEquals("Catalog component diagnostic failed before a complete comparison; stage="+scenario.getValue()+component+"; discard fixture; no retry/adoption",failure.getMessage());
                     assertSanitized(failure);
                     assertFalse(Files.exists(output),"Failed comparisons must not leave stale or partial evidence");
@@ -161,14 +161,18 @@ class AzureCatalogComponentsTest {
                 assertDiagnosticComponent(role,ordinal,operation);
             }
     }
-    @Test void executeFailuresBeforeTheFirstComponentAreFixedAndSanitizedForBothIdentities()throws Exception {
-        for(String role:List.of("owner","verifier"))assertDiagnosticComponent(role,0,"execute");
+    @Test void beforeFirstPhasesAreFixedAndSanitizedForBothIdentities()throws Exception {
+        for(String role:List.of("owner","verifier"))
+            for(String operation:List.of("createStatement","setQueryTimeout","execute","getUpdateCount","getMoreResults","exhaustion","close"))
+                assertDiagnosticComponent(role,0,operation);
         var before=assertThrows(AzureCatalogComponents.ReadFailure.class,
                 ()->AzureCatalogComponents.read(connection(19,"valid",new ArrayList<>(),4,true,2,"getMoreResults")));
         assertEquals("0:before_first_component",before.componentLabel());assertSanitized(before);
+        assertEquals("; phase=BEFORE_FIRST_RESULT",before.phaseLabel());
         var after=assertThrows(AzureCatalogComponents.ReadFailure.class,
                 ()->AzureCatalogComponents.read(connection(19,"valid",new ArrayList<>(),0,false,0,"close")));
         assertEquals("19:word_transitions",after.componentLabel());assertSanitized(after);
+        assertEquals("",after.phaseLabel(),"Nonzero component behavior must remain unchanged");
     }
     @Test void malformedEvidenceHasOnlyExpectedAllowlistedLabels() {
         for(String mode:List.of("missing","extra","null","duplicate","order","name","update","zeroUpdate","lateUpdate","lateZeroUpdate")) {
@@ -192,7 +196,12 @@ class AzureCatalogComponentsTest {
             var failure=assertThrows(IllegalStateException.class,()->AiCaseDataAzureSqlCatalogComponentTest.compare(
                     diagnosticSource("owner",mode,closed,parent),diagnosticSource("verifier",mode,closed,parent),
                     "private database","private user",output),mode);
-            String label=ordinal==0?"0:before_first_component":ordinal+":"+AzureCatalogComponents.NAMES.get(ordinal-1);
+            String label=ordinal==0?"0:before_first_component; phase="+switch(operation) {
+                case "createStatement"->"STATEMENT_CREATE";
+                case "setQueryTimeout"->"QUERY_TIMEOUT_SETUP";
+                case "execute"->"BATCH_EXECUTE";
+                default->"BEFORE_FIRST_RESULT";
+            }:ordinal+":"+AzureCatalogComponents.NAMES.get(ordinal-1);
             assertEquals("Catalog component diagnostic failed before a complete comparison; stage="+role.toUpperCase(Locale.ROOT)+
                     "_COMPONENT_READ; component="+label+"; discard fixture; no retry/adoption",failure.getMessage(),mode);
             assertSanitized(failure);
@@ -214,7 +223,10 @@ class AzureCatalogComponentsTest {
                     if(mode.equals(role+"Read")||mode.equals(role+"ReadAndClose"))throw privateJdbcFailure();
                     if(mode.startsWith(role+"Read:")) {
                         var fault=mode.split(":");
-                        yield connection(19,"valid",new ArrayList<>(),0,false,Integer.parseInt(fault[1]),fault[2]).createStatement();
+                        int ordinal=Integer.parseInt(fault[1]);String operation=fault[2];
+                        int count=ordinal==0&&List.of("exhaustion","close").contains(operation)?0:19;
+                        int leading=ordinal==0&&List.of("getUpdateCount","getMoreResults").contains(operation)?4:0;
+                        yield connection(count,"valid",new ArrayList<>(),leading,false,ordinal,operation).createStatement();
                     }
                     yield connection(19,"valid",new ArrayList<>(),4,true).createStatement();
                 }
@@ -273,6 +285,8 @@ class AzureCatalogComponentsTest {
         java.util.function.IntSupplier index=()->state[0]<states.size()?states.get(state[0]):-1;
         Statement statement=(Statement)Proxy.newProxyInstance(Statement.class.getClassLoader(),new Class<?>[]{Statement.class},(p,m,a)->{
             if(m.getName().equals(operation)&&((operation.equals("execute")&&fault==0)||
+                    (operation.equals("setQueryTimeout")&&fault==0)||
+                    (operation.equals("getMoreResults")&&fault==0&&index.getAsInt()<0)||
                     (operation.equals("getMoreResults")&&state[0]+2==fault)||
                     (!operation.equals("getMoreResults")&&index.getAsInt()+1==fault)))throw privateJdbcFailure();
             return switch(m.getName()) {
@@ -300,6 +314,7 @@ class AzureCatalogComponentsTest {
             default->throw new AssertionError("Unexpected statement operation");
         };});
         return (Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(p,m,a)->{
+            if(fault==0&&operation.equals("createStatement"))throw privateJdbcFailure();
             assertEquals("createStatement",m.getName(),"Diagnostic may not change transactions, sessions or authority");return statement;
         });
     }

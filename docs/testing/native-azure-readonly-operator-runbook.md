@@ -1,5 +1,10 @@
 # Native Azure contained identity / read-only operator packet
 
+**BEFORE-FIRST PHASE DELTA: Windows validation and separate packet refresh pending. DO NOT RUN AZURE.**
+The fixed phase diagnostic and allowlisted section 3 parser change executable inputs. The previous
+baseline pins below intentionally reject this delta. Use only the [offline delta tests](native-azure-catalog-component-diagnostic.md#required-offline-windows-validation); do not create/relabel markers or execute section 1/live fences yet.
+The updated sections 2/3/5 digest is `3b3a5eef6faff948959ca81714e93c5e35716cb39588f94061b3b07d89f5e03a`.
+
 **2026-11-04: LOCALIZATION BASELINE REFRESH. NO AZURE AUTHORIZATION.**
 The owner reports native Windows localization validation PASS at
 `8d6bfa11b31a0334e16cc99c81cac3f35bfada48`: 15 tests, zero failures/errors/skips,
@@ -241,7 +246,7 @@ try {
     $LiveDigest = [BitConverter]::ToString($Digest.ComputeHash([Text.Encoding]::UTF8.GetBytes(($LiveSources -join "`n")))).Replace('-', '').ToLowerInvariant()
 }
 finally { $Digest.Dispose() }
-if ($LiveDigest -cne '32f1a91f1b1e7389af9b1513a11484e509ba299f23fb202eda5270bd3f6bce12') { throw 'Reviewed live sections changed; STOP before resource creation' }
+if ($LiveDigest -cne '3b3a5eef6faff948959ca81714e93c5e35716cb39588f94061b3b07d89f5e03a') { throw 'Reviewed live sections changed; STOP before resource creation' }
 # A future run requires separate owner authorization; packet validation never grants it.
 if ((Read-Host 'Only after separate explicit owner authorization, type AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT') -cne 'AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT') {
     throw 'Azure not authorized; STOP without mutation or manual continuation'
@@ -463,6 +468,32 @@ try {
     Remove-Item Env:SHALE_AZURE_SETUP_OPT_IN -ErrorAction SilentlyContinue
     Remove-Item work/azure-native/catalog-components.tsv -ErrorAction SilentlyContinue
     Remove-Item shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlCatalogComponentTest.xml -ErrorAction SilentlyContinue
+    # BEGIN OFFLINE-TESTED CATALOG FAILURE PARSER
+    function Get-SafeCatalogFailure([string[]]$Messages) {
+        $Fallback = 'Catalog component diagnostic failed before a complete comparison; stage=REPORT_WRITE; discard fixture; no retry/adoption'
+        if ($Messages.Count -ne 1) { return $Fallback }
+        $ComponentNames = @('objects_and_modules','columns','constraints','foreign_key_columns',
+            'indexes','security_predicates','object_permissions','triggers','integration_role_owners',
+            'tenant_filter_definition','runtime_verifier_permissions','execution_and_schema_owners','dependencies',
+            'runtime_role_owner','verifier_role_owner','database_options','unicode_ranges','unicode_lower','word_transitions')
+        $Phases = @('STATEMENT_CREATE','QUERY_TIMEOUT_SETUP','BATCH_EXECUTE','BEFORE_FIRST_RESULT')
+        foreach ($Fixed in @('OWNER_TARGET_PREFLIGHT','VERIFIER_TARGET_PREFLIGHT','OWNER_COMPONENT_READ','VERIFIER_COMPONENT_READ','REPORT_WRITE')) {
+            $Labels = @('') # Preserve legacy stage-only diagnostics too.
+            if ($Fixed -cin @('OWNER_COMPONENT_READ','VERIFIER_COMPONENT_READ')) {
+                $Labels += '; component=0:before_first_component'
+                foreach ($Phase in $Phases) { $Labels += "; component=0:before_first_component; phase=$Phase" }
+                for ($Index = 0; $Index -lt $ComponentNames.Count; $Index++) {
+                    $Labels += "; component=$($Index+1):$($ComponentNames[$Index])"
+                }
+            }
+            foreach ($Label in $Labels) {
+                $SafeMessage = "Catalog component diagnostic failed before a complete comparison; stage=$Fixed$Label; discard fixture; no retry/adoption"
+                if ($Messages -ccontains $SafeMessage) { return $SafeMessage }
+            }
+        }
+        return $Fallback
+    }
+    # END OFFLINE-TESTED CATALOG FAILURE PARSER
     $env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN = 'AZURE_SQL_DATABASE_CATALOG_COMPONENTS'
     $ComponentExit = $null
     try {
@@ -471,20 +502,18 @@ try {
     }
     catch { throw 'Catalog component diagnostic failed; stage=REPORT_WRITE; discard fixture; no retry/adoption' }
     finally { Remove-Item Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN -ErrorAction SilentlyContinue }
+    # BEGIN OFFLINE-TESTED CATALOG REPORT FAILURE
     try {
         $ComponentReport = 'shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlCatalogComponentTest.xml'
         if ($ComponentExit -ne 0) {
             # Read privately; never echo XML, stack traces, driver output or exception chains.
-            $Category = 'REPORT_WRITE'
+            $SafeFailure = Get-SafeCatalogFailure -Messages @()
             if (Test-Path -LiteralPath $ComponentReport) {
                 [xml]$FailureReport = Get-Content -LiteralPath $ComponentReport -Raw
                 $Messages = @($FailureReport.SelectNodes('//testcase/failure | //testcase/error') | ForEach-Object { $_.GetAttribute('message') })
-                foreach ($Fixed in @('OWNER_TARGET_PREFLIGHT','VERIFIER_TARGET_PREFLIGHT','OWNER_COMPONENT_READ','VERIFIER_COMPONENT_READ','REPORT_WRITE')) {
-                    $SafeMessage = "Catalog component diagnostic failed before a complete comparison; stage=$Fixed; discard fixture; no retry/adoption"
-                    if ($Messages -ccontains $SafeMessage) { $Category = $Fixed; break }
-                }
+                $SafeFailure = Get-SafeCatalogFailure -Messages $Messages
             }
-            throw $Category
+            throw $SafeFailure
         }
         Assert-NativeReport 'AiCaseDataAzureSqlCatalogComponentTest'
         $Names = @('objects_and_modules','columns','constraints','foreign_key_columns',
@@ -504,12 +533,9 @@ try {
         $Lines | Write-Output
     }
     catch {
-        $SafeCategory = 'REPORT_WRITE'
-        if ($_.Exception.Message -cin @('OWNER_TARGET_PREFLIGHT','VERIFIER_TARGET_PREFLIGHT','OWNER_COMPONENT_READ','VERIFIER_COMPONENT_READ','REPORT_WRITE')) {
-            $SafeCategory = $_.Exception.Message
-        }
-        throw "Catalog component diagnostic failed; stage=$SafeCategory; discard fixture; no retry/adoption"
+        throw (Get-SafeCatalogFailure -Messages @($_.Exception.Message))
     }
+    # END OFFLINE-TESTED CATALOG REPORT FAILURE
 }
 finally {
     Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN,Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN -ErrorAction SilentlyContinue

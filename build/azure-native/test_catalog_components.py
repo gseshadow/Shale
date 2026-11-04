@@ -41,8 +41,8 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         launcher = self.launcher()
         self.assertIn('foreach ($Number in @(2,3,5))', launcher)
         expected = hashlib.sha256('\n'.join(self.block(n) for n in (2, 3, 5)).encode()).hexdigest()
-        self.assertEqual('32f1a91f1b1e7389af9b1513a11484e509ba299f23fb202eda5270bd3f6bce12', expected,
-                         'Sections 2/3/5 executable content must remain unchanged')
+        self.assertEqual('3b3a5eef6faff948959ca81714e93c5e35716cb39588f94061b3b07d89f5e03a', expected,
+                         'Only reviewed section 3 diagnostic parsing may change the live digest')
         self.assertIn(f"if ($LiveDigest -cne '{expected}')", launcher)
         self.assertNotIn('. $LiveBlocks[4]', launcher, 'This attempt may only compare components after setup')
         self.assertRegex(launcher, r'(?s)try \{\s*\. \$LiveBlocks\[2\].*?\. \$LiveBlocks\[3\].*?finally \{.*?\. \$LiveBlocks\[5\]')
@@ -139,8 +139,21 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         for category in ('OWNER_TARGET_PREFLIGHT', 'VERIFIER_TARGET_PREFLIGHT',
                          'OWNER_COMPONENT_READ', 'VERIFIER_COMPONENT_READ', 'REPORT_WRITE'):
             self.assertIn(category, block)
-        self.assertIn('if ($Messages -ccontains $SafeMessage)', block)
-        self.assertIn("throw \"Catalog component diagnostic failed; stage=$SafeCategory; discard fixture; no retry/adoption\"", block)
+        self.assertIn('if ($Messages -ccontains $SafeMessage) { return $SafeMessage }', block)
+        self.assertIn('if ($Messages.Count -ne 1) { return $Fallback }', block)
+        self.assertIn('$SafeFailure = Get-SafeCatalogFailure -Messages $Messages', block)
+        self.assertIn('throw (Get-SafeCatalogFailure -Messages @($_.Exception.Message))', block)
+        parser = re.search(r'(?s)# BEGIN OFFLINE-TESTED CATALOG FAILURE PARSER\n(.*?)# END OFFLINE-TESTED CATALOG FAILURE PARSER', block).group(1)
+        java = (ROOT / 'shale-data/src/test/java/com/shale/data/security/ai/AzureCatalogComponents.java').read_text(encoding='utf-8')
+        names = re.search(r'(?s)NAMES=List.of\((.*?)\);', java).group(1)
+        self.assertEqual(re.findall(r'"([a-z_]+)"', names),
+                         re.findall(r"'([a-z_]+)'", re.search(r'(?s)\$ComponentNames = @\((.*?)\)', parser).group(1)))
+        phases = re.search(r'ReadPhase \{([^}]+)\}', java).group(1)
+        self.assertEqual(re.findall(r'[A-Z_]+', phases),
+                         re.findall(r"'([A-Z_]+)'", re.search(r'\$Phases = @\((.*?)\)', parser).group(1)))
+        self.assertNotIn('return $Messages', parser)
+        self.assertNotIn('throw $_', block)
+
 
 
 if __name__ == '__main__':

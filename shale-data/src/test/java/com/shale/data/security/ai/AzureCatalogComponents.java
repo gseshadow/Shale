@@ -15,6 +15,7 @@ final class AzureCatalogComponents {
     // JDBC normally treats false/-1 as terminal. Tolerate exposed non-result states
     // only within this finite budget per gap; never execute again or retry SQL.
     static final int NON_RESULT_BUDGET=4+NAMES.size();
+    enum ReadPhase { STATEMENT_CREATE, QUERY_TIMEOUT_SETUP, BATCH_EXECUTE, BEFORE_FIRST_RESULT }
     record Component(long bytes,String sha256) {
         Component {
             if(bytes<0||sha256==null||!sha256.matches("[0-9A-Fa-f]{64}"))throw refused();
@@ -29,11 +30,15 @@ final class AzureCatalogComponents {
     }
     static List<Component> read(Connection connection)throws SQLException,IOException {
         int component=0; // execute/preamble failure cannot identify the first result.
+        ReadPhase phase=ReadPhase.STATEMENT_CREATE;
         try {
             var rows=new ArrayList<Component>();
             try(var statement=connection.createStatement()) {
+                phase=ReadPhase.QUERY_TIMEOUT_SETUP;
                 statement.setQueryTimeout(AiCaseDataAzureSqlDisposableSetupTest.OWNER_QUERY_SECONDS);
+                phase=ReadPhase.BATCH_EXECUTE;
                 boolean more=statement.execute(sql());
+                phase=ReadPhase.BEFORE_FIRST_RESULT;
                 int nonResults=0;
                 while(true) {
                     if(more) {
@@ -62,13 +67,15 @@ final class AzureCatalogComponents {
             return List.copyOf(rows);
         } catch(Exception|AssertionError failure) {
             // Outside JDBC resource scopes: discard causes and suppressed close failures too.
-            throw new ReadFailure(component);
+            throw new ReadFailure(component,phase);
         }
     }
     static final class ReadFailure extends IllegalStateException {
         private final int component;
-        private ReadFailure(int component){super("Incomplete or invalid catalog component metadata; discard fixture; no retry/adoption");this.component=component;}
+        private final ReadPhase phase;
+        private ReadFailure(int component,ReadPhase phase){super("Incomplete or invalid catalog component metadata; discard fixture; no retry/adoption");this.component=component;this.phase=phase;}
         String componentLabel(){return component==0?"0:before_first_component":component+":"+NAMES.get(component-1);}
+        String phaseLabel(){return component==0?"; phase="+phase.name():"";}
     }
     static List<String> report(List<Component> owner,List<Component> verifier) {
         if(owner.size()!=NAMES.size()||verifier.size()!=NAMES.size())throw refused();

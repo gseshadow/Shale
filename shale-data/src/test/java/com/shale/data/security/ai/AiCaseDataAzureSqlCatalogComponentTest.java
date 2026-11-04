@@ -66,7 +66,7 @@ class AiCaseDataAzureSqlCatalogComponentTest {
     private static DiagnosticFailure incomplete(Stage stage,Throwable failure){
         String component="";
         if(stage==Stage.OWNER_COMPONENT_READ||stage==Stage.VERIFIER_COMPONENT_READ)
-            component="; component="+(failure instanceof AzureCatalogComponents.ReadFailure read?read.componentLabel():"0:before_first_component");
+            component="; component="+(failure instanceof AzureCatalogComponents.ReadFailure read?read.componentLabel()+read.phaseLabel():"0:before_first_component; phase="+AzureCatalogComponents.ReadPhase.STATEMENT_CREATE.name());
         return new DiagnosticFailure("Catalog component diagnostic failed before a complete comparison; stage="+stage.name()+component+"; discard fixture; no retry/adoption");
     }
     private static final class DiagnosticFailure extends IllegalStateException {
