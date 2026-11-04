@@ -1,20 +1,16 @@
 # Native Azure contained identity / read-only operator packet
 
-**2026-11-04: BLOCKED — no further Azure run pending Windows validation of the revised reader.**
-The fresh component attempt failed before a complete comparison; the owner confirmed
-`AZURE_NATIVE_CLEANUP CONFIRMED`. That fixture was destroyed and supplies diagnostic evidence only.
-See the [harness investigation](native-azure-catalog-component-diagnostic.md#harness-investigation--2026-11-04).
-The pinned validation/live fences below are historical and intentionally reject the revised
-executable inputs. Do not override them or reuse a validation marker. This investigation
-does not authorize a new live launcher.
-
-**CATALOG COMPONENT DIAGNOSTIC: WINDOWS VALIDATION PENDING.**
-This supersedes the consumed timeout-only launcher published at `7a70ea76db26351632b647863a4d814182bc472b`.
-The unchanged V2 installer has completed on Azure under its 600-second ceiling (owner report).
-`CATALOG_RECEIPT (SQL 0)` identifies a failing execution stage; it does not establish receipt drift.
-The next attempt asks only which of the 19 catalog components differs between owner and verifier.
+**2026-11-04: REVISED PACKET FOR OWNER REVIEW. AZURE NOT AUTHORIZED.**
+The owner reports Windows reader-delta validation PASS for
+`5b88402940fc9950228eb5320bed9b37fc64e359`: 12 tests, zero failures/errors/skips and five launcher guards.
+Section 1 requires that same-host test-only marker and checks this exact final packet without
+rerunning Maven, Azure setup, Phase1R or V2 rehearsals. The final live marker records the exact
+reviewed packet commit as `sourceHead`, and the validated reader commit as `codeHead`.
+Neither marker authorizes Azure. Do not execute the live launcher until separately authorized.
+The earlier failed fixture was destroyed (`AZURE_NATIVE_CLEANUP CONFIRMED`); no retry/adoption.
+Both native acceptance gates remain OPEN. The diagnostic asks only whether the 19 fixed
+components compare after unchanged setup; full native attestation section 4 is excluded.
 See [scope, review and evidence](native-azure-catalog-component-diagnostic.md).
-Both native acceptance gates remain OPEN; #1929 stays draft/unmerged.
 
 Run from `C:\Eclipse\Workspace\shale-parent` in a fresh private Windows PowerShell 5.1
 (.NET Framework 4.8) or PowerShell 7 session with JDK 21, Maven, Git, Python, and the
@@ -25,24 +21,30 @@ Validated TLS, outbound TCP 1433, exact-workstation IPv4 firewall and mandatory 
 
 ## 1. Validate the diagnostic-only delta on Windows
 
-The existing V2 SQL/helper and Phase1R local Windows evidence carries forward for unchanged inputs.
-Do not repeat a mutating local fixture rehearsal for this test-only delta. The focused comparison
-tests, checkout/receipt checks, same-host PowerShell credential/fence check, selector affected suite
-and critical reactor below remain required. No live Azure test is opted in during validation.
-The validation marker is written only after all required commands pass and is consumed at launch.
+Set `$ReviewedPacketHead` to the **final commit SHA from the review handoff**, check out that
+commit cleanly, and execute this complete fence in a fresh Windows session. A terminating guard
+failure invalidates the sequence: stop, resolve the guard, then rerun the entire offline fence.
+Never paste downstream commands manually. Do not overwrite/relabel old validation markers.
+The reader marker must be the already-passed baseline evidence, not a newly fabricated marker.
+Only same-source packet guards, pinned-byte/receipt checks and same-host credential/fence checks
+run here. No Maven or database rehearsal is needed. Keep both markers local and private.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ExecutableHead = '5867337464e2caf0eabdf5c8694061ab43d3c8a7'
+$ExecutableHead = '5b88402940fc9950228eb5320bed9b37fc64e359'
 $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
-    'docs/testing/native-azure-v2-install-followup.md',
-    'docs/testing/native-azure-platform-catalog-followup.md',
-    'docs/testing/native-azure-catalog-component-diagnostic.md'
+    'docs/testing/native-azure-catalog-component-diagnostic.md',
+    'build/azure-native/test_catalog_components.py'
 )
+# Set this to the final packet SHA from the review handoff, never an inferred moving branch.
+if ($ReviewedPacketHead -cnotmatch '^[a-f0-9]{40}$') { throw 'Set the exact reviewed final packet commit first' }
 $ValidationPath = 'work/azure-native/catalog-diagnostic-validation.json'
-Remove-Item -LiteralPath $ValidationPath -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $ValidationPath) { throw 'Existing live marker forbidden; retain prior evidence separately, never reuse it' }
+if (Test-Path -LiteralPath work/azure-native/resource-scope.json) { throw 'Prior scope must be reconciled and cleanup confirmed first' }
+$ValidatedSourceHead = (git rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $ValidatedSourceHead -cne $ReviewedPacketHead) { throw 'Exact final reviewed packet checkout required' }
 git merge-base --is-ancestor $ExecutableHead HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Reviewed diagnostic code required' }
 $Changed = @(git diff --name-only $ExecutableHead HEAD)
@@ -52,27 +54,35 @@ if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean tracked so
 $RepoRoot = (git rev-parse --show-toplevel).Trim()
 if ($LASTEXITCODE -ne 0 -or (Get-Location).Path -ne (Resolve-Path -LiteralPath $RepoRoot).Path) { throw 'Run from repository root' }
 if (@(Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*').Count -ne 0) { throw 'Fresh process without inherited Azure settings required' }
+$ReaderValidationPath = 'work/azure-native/catalog-reader-windows-validation.json'
+function Assert-ReaderValidation([string]$Baseline) {
+    if (-not (Test-Path -LiteralPath $ReaderValidationPath -PathType Leaf)) { throw 'Passed Windows reader marker required; no reuse of earlier markers' }
+    $Reader = Get-Content -LiteralPath $ReaderValidationPath -Raw | ConvertFrom-Json
+    if ($Reader.codeHead -cne $Baseline -or $Reader.sourceHead -cne $Baseline -or
+        $Reader.hostName -cne [Environment]::MachineName -or $Reader.result -cne 'PASS' -or
+        $Reader.scope -cne 'CATALOG_READER_DELTA_ONLY' -or
+        ($Reader.tests -isnot [int] -and $Reader.tests -isnot [long]) -or $Reader.tests -ne 12 -or
+        ($Reader.failures -isnot [int] -and $Reader.failures -isnot [long]) -or $Reader.failures -ne 0 -or
+        ($Reader.errors -isnot [int] -and $Reader.errors -isnot [long]) -or $Reader.errors -ne 0 -or
+        ($Reader.skipped -isnot [int] -and $Reader.skipped -isnot [long]) -or $Reader.skipped -ne 0 -or
+        ($Reader.launcherGuards -isnot [int] -and $Reader.launcherGuards -isnot [long]) -or $Reader.launcherGuards -ne 5 -or
+        $Reader.azureAuthorized -isnot [bool] -or $Reader.azureAuthorized -ne $false) {
+        throw 'Exact same-host reader PASS (12 tests, zero failures/errors/skips, 5 guards, no Azure authorization) required'
+    }
+}
+Assert-ReaderValidation $ExecutableHead
+$ReaderDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $ReaderValidationPath).Hash.ToLowerInvariant()
 python build/sql-confinement/checkout_bytes.py --refresh
 if ($LASTEXITCODE -ne 0) { throw 'Pinned byte refresh failed' }
 python build/sql-confinement/checkout_bytes.py
 if ($LASTEXITCODE -ne 0) { throw 'Pinned bytes/index/receipts failed' }
-python -m unittest discover -s build/sql-confinement -p test_checkout.py
-if ($LASTEXITCODE -ne 0) { throw 'Checkout regressions failed' }
 python -m unittest discover -s build/azure-native -p test_catalog_components.py
-if ($LASTEXITCODE -ne 0) { throw 'Catalog diagnostic launcher guards failed' }
-powershell.exe -NoProfile -File build/azure-native/test_runbook_credentials.ps1
-if ($LASTEXITCODE -ne 0) { throw 'Same-host offline PowerShell credential/fence checks failed' }
-java -version
-if ($LASTEXITCODE -ne 0) { throw 'JDK 21 required' }
-mvn -version
-if ($LASTEXITCODE -ne 0) { throw 'Maven required' }
-mvn -B -ntp -pl shale-data -am '-Dtest=AzureCatalogComponentsTest,AzureOwnerV2InstallTest,AiCaseDataAzureSqlAcceptanceSafetyTest,AiCaseDataAzureSqlDataSourceTest,AiCaseDataAzureSqlDriverTimeoutTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,Phase1RDatabaseIdentityContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
-if ($LASTEXITCODE -ne 0) { throw 'Focused diagnostic/safety contracts failed' }
-python build/test-selection/select_tests.py --base 7a70ea76db26351632b647863a4d814182bc472b --head HEAD --run
-if ($LASTEXITCODE -ne 0) { throw 'Affected validation failed' }
-# The selector's --run executes its affected commands and then the critical mvn test reactor.
-python build/sql-confinement/checkout_bytes.py
-if ($LASTEXITCODE -ne 0) { throw 'Final pinned bytes/index/receipts failed' }
+if ($LASTEXITCODE -ne 0) { throw 'Catalog diagnostic launcher guards failed; no manual continuation' }
+# Run the credential/fence check in this exact PowerShell edition and Windows host.
+if ($env:OS -cne 'Windows_NT') { throw 'Native Windows host required' }
+$PowerShellExe = (Get-Process -Id $PID).Path
+& $PowerShellExe -NoProfile -File build/azure-native/test_runbook_credentials.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Same-host offline PowerShell credential/fence checks failed; no manual continuation' }
 git diff --check
 if ($LASTEXITCODE -ne 0) { throw 'Diff whitespace check failed' }
 $Candidate = (Resolve-Path (Read-Host 'Private authoritative-candidate.sql path')).Path
@@ -80,27 +90,34 @@ $ExpectedCandidate = '4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6
 if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Candidate).Hash.ToLowerInvariant() -cne $ExpectedCandidate) { throw 'Private candidate hash mismatch' }
 $env:SHALE_CASE_VERIFY_SCHEMA = $Candidate
 $env:SHALE_CASE_VERIFY_SCHEMA_SHA256 = $ExpectedCandidate
-$ValidatedSourceHead = (git rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0) { throw 'Validated source identity required' }
+Assert-ReaderValidation $ExecutableHead
+if ((Get-FileHash -Algorithm SHA256 -LiteralPath $ReaderValidationPath).Hash.ToLowerInvariant() -cne $ReaderDigest) { throw 'Reader evidence changed during packet validation' }
+$FinalHead = (git rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $FinalHead -cne $ReviewedPacketHead) { throw 'Packet head changed during validation' }
+$TrackedState = @(git status --porcelain --untracked-files=no)
+if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean final packet required' }
 New-Item -ItemType Directory -Force work/azure-native | Out-Null
-@{ codeHead=$ExecutableHead; sourceHead=$ValidatedSourceHead; hostName=[Environment]::MachineName; result='PASS' } |
+@{ codeHead=$ExecutableHead; sourceHead=$ValidatedSourceHead; hostName=[Environment]::MachineName;
+   result='PASS'; scope='CATALOG_COMPONENT_PACKET_ONLY'; readerValidationSha256=$ReaderDigest;
+   launcherGuards=5; azureAuthorized=$false } |
     ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath $ValidationPath
-Write-Output 'CATALOG_DIAGNOSTIC_WINDOWS_VALIDATION PASS'
+Write-Output 'CATALOG_DIAGNOSTIC_WINDOWS_VALIDATION PASS azureAuthorized=false'
 ```
 
-Require the focused selector to execute 45 tests with zero failures/errors/skips. The affected
-selector can intentionally skip unopted local/Azure gates; that never constitutes live acceptance.
-Keep the private schema local; its supplied digest alone is not a substitute for verifying its bytes.
+The live marker remains `azureAuthorized=false`. The original reader marker is hash-bound to it;
+both are rechecked and consumed before any future resource creation. A consumed/failed attempt
+requires a separately reviewed new evidence/attempt protocol; do not restore an earlier marker.
+Keep the private schema local; its supplied digest never substitutes for checking actual bytes.
 
 ## Reviewed live launcher — mandatory
 
-**After section 1 passes: one fresh disposable catalog-component attempt only.**
+**DO NOT RUN: separate explicit owner authorization is still required after packet review.**
 The launcher pins the diagnostic code, requires the same-host validation marker and unchanged
 source head, and consumes that marker before resource creation. It runs sections 2 and 3, then
 always section 5 once the new scope is recorded. Section 3 performs the unchanged probe/setup,
 then the separate read-only component test while the owner credential is still available.
 The full native attestation in section 4 is deliberately not selected for this diagnostic attempt.
-On component differences, stop with the exact ordinal/name list and clean up. On 19 matches,
+On any diagnostic failure expose only a fixed category (and approved component metadata), then clean up. On 19 matches,
 record the TSV and clean up; investigate `confinement-v2-catalog.sql` execution separately.
 A missing, skipped or failing selected test stops downstream work. Host interruption cannot run
 finally: recover using the private non-secret scope record and section 5, confirm deletion, and
@@ -108,13 +125,12 @@ never reuse the fixture or automatically retry. Cleanup failure remains BLOCKED 
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ValidatedHead = '5867337464e2caf0eabdf5c8694061ab43d3c8a7'
+$ValidatedHead = '5b88402940fc9950228eb5320bed9b37fc64e359'
 $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
-    'docs/testing/native-azure-v2-install-followup.md',
-    'docs/testing/native-azure-platform-catalog-followup.md',
-    'docs/testing/native-azure-catalog-component-diagnostic.md'
+    'docs/testing/native-azure-catalog-component-diagnostic.md',
+    'build/azure-native/test_catalog_components.py'
 )
 git merge-base --is-ancestor $ValidatedHead HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Windows-validated executable baseline required' }
@@ -128,11 +144,32 @@ $RepoRoot = (git rev-parse --show-toplevel).Trim()
 if ($LASTEXITCODE -ne 0 -or (Get-Location).Path -ne (Resolve-Path -LiteralPath $RepoRoot).Path) { throw 'Run from repository root' }
 $ValidationPath = 'work/azure-native/catalog-diagnostic-validation.json'
 if (-not (Test-Path -LiteralPath $ValidationPath)) { throw 'Complete section 1 Windows validation first' }
+$ReaderValidationPath = 'work/azure-native/catalog-reader-windows-validation.json'
+function Assert-ReaderValidation([string]$Baseline) {
+    if (-not (Test-Path -LiteralPath $ReaderValidationPath -PathType Leaf)) { throw 'Passed Windows reader marker required; no reuse of earlier markers' }
+    $Reader = Get-Content -LiteralPath $ReaderValidationPath -Raw | ConvertFrom-Json
+    if ($Reader.codeHead -cne $Baseline -or $Reader.sourceHead -cne $Baseline -or
+        $Reader.hostName -cne [Environment]::MachineName -or $Reader.result -cne 'PASS' -or
+        $Reader.scope -cne 'CATALOG_READER_DELTA_ONLY' -or
+        ($Reader.tests -isnot [int] -and $Reader.tests -isnot [long]) -or $Reader.tests -ne 12 -or
+        ($Reader.failures -isnot [int] -and $Reader.failures -isnot [long]) -or $Reader.failures -ne 0 -or
+        ($Reader.errors -isnot [int] -and $Reader.errors -isnot [long]) -or $Reader.errors -ne 0 -or
+        ($Reader.skipped -isnot [int] -and $Reader.skipped -isnot [long]) -or $Reader.skipped -ne 0 -or
+        ($Reader.launcherGuards -isnot [int] -and $Reader.launcherGuards -isnot [long]) -or $Reader.launcherGuards -ne 5 -or
+        $Reader.azureAuthorized -isnot [bool] -or $Reader.azureAuthorized -ne $false) {
+        throw 'Exact same-host reader PASS (12 tests, zero failures/errors/skips, 5 guards, no Azure authorization) required'
+    }
+}
+Assert-ReaderValidation $ValidatedHead
 $Validation = Get-Content -LiteralPath $ValidationPath -Raw | ConvertFrom-Json
 $CurrentHead = (git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $Validation.result -cne 'PASS' -or
     $Validation.codeHead -cne $ValidatedHead -or $Validation.sourceHead -cne $CurrentHead -or
-    $Validation.hostName -cne [Environment]::MachineName) { throw 'Same-host validation of this exact source required' }
+    $Validation.hostName -cne [Environment]::MachineName -or
+    $Validation.scope -cne 'CATALOG_COMPONENT_PACKET_ONLY' -or
+    $Validation.launcherGuards -ne 5 -or $Validation.azureAuthorized -isnot [bool] -or
+    $Validation.azureAuthorized -ne $false -or
+    $Validation.readerValidationSha256 -cne (Get-FileHash -Algorithm SHA256 -LiteralPath $ReaderValidationPath).Hash.ToLowerInvariant()) { throw 'Same-host validation of this exact source required' }
 python build/sql-confinement/checkout_bytes.py
 if ($LASTEXITCODE -ne 0) { throw 'Pinned bytes/index/receipts required before Azure' }
 if ([string]::IsNullOrWhiteSpace($env:SHALE_CASE_VERIFY_SCHEMA) -or
@@ -164,8 +201,13 @@ try {
     $LiveDigest = [BitConverter]::ToString($Digest.ComputeHash([Text.Encoding]::UTF8.GetBytes(($LiveSources -join "`n")))).Replace('-', '').ToLowerInvariant()
 }
 finally { $Digest.Dispose() }
-if ($LiveDigest -cne 'fdb9e31752dec1f1da350c07f0c61c4fc85d8e3661e905c5f02a7c0c964b138a') { throw 'Reviewed live sections changed; STOP before resource creation' }
-# Consume before the first live command; a failed attempt cannot reuse this validation marker.
+if ($LiveDigest -cne 'fcae9c725c01f9f5cc36fbd1a5847e6a0e0502d4e9c9aed6eab10d073ca613fb') { throw 'Reviewed live sections changed; STOP before resource creation' }
+# A future run requires separate owner authorization; packet validation never grants it.
+if ((Read-Host 'Only after separate explicit owner authorization, type AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT') -cne 'AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT') {
+    throw 'Azure not authorized; STOP without mutation or manual continuation'
+}
+# Consume BOTH markers before the first live command; never recreate/relabel consumed evidence.
+Remove-Item -LiteralPath $ReaderValidationPath -ErrorAction Stop
 Remove-Item -LiteralPath $ValidationPath -ErrorAction Stop
 $ScopeWritten = $false
 $Nonce = $null
@@ -352,14 +394,50 @@ try {
     $env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN = 'AZURE_SQL_DATABASE_CATALOG_COMPONENTS'
     $ComponentExit = $null
     try {
-        mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlCatalogComponentTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test
+        mvn -B -ntp -pl shale-data -am '-Dtest=AiCaseDataAzureSqlCatalogComponentTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-Duser.timezone=UTC' "-Djava.util.logging.config.file=$((Resolve-Path build/azure-native/quiet-jdbc-logging.properties).Path)" "-Dlogback.configurationFile=$((Resolve-Path build/case-read-verification/quiet-logback.xml).Path)" test *> $null
         $ComponentExit = $LASTEXITCODE
     }
+    catch { throw 'Catalog component diagnostic failed; stage=REPORT_WRITE; discard fixture; no retry/adoption' }
     finally { Remove-Item Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN -ErrorAction SilentlyContinue }
-    if (Test-Path work/azure-native/catalog-components.tsv) { Get-Content work/azure-native/catalog-components.tsv }
-    if ($ComponentExit -ne 0) { throw 'Component diagnostic failed or differs; report only fixed ordinal/name and metadata; STOP and clean up' }
-    Assert-NativeReport 'AiCaseDataAzureSqlCatalogComponentTest'
-    if (-not (Test-Path work/azure-native/catalog-components.tsv)) { throw 'Fresh 19-component comparison required; STOP' }
+    try {
+        $ComponentReport = 'shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlCatalogComponentTest.xml'
+        if ($ComponentExit -ne 0) {
+            # Read privately; never echo XML, stack traces, driver output or exception chains.
+            $Category = 'REPORT_WRITE'
+            if (Test-Path -LiteralPath $ComponentReport) {
+                [xml]$FailureReport = Get-Content -LiteralPath $ComponentReport -Raw
+                $Messages = @($FailureReport.SelectNodes('//testcase/failure | //testcase/error') | ForEach-Object { $_.GetAttribute('message') })
+                foreach ($Fixed in @('OWNER_TARGET_PREFLIGHT','VERIFIER_TARGET_PREFLIGHT','OWNER_COMPONENT_READ','VERIFIER_COMPONENT_READ','REPORT_WRITE')) {
+                    $SafeMessage = "Catalog component diagnostic failed before a complete comparison; stage=$Fixed; discard fixture; no retry/adoption"
+                    if ($Messages -ccontains $SafeMessage) { $Category = $Fixed; break }
+                }
+            }
+            throw $Category
+        }
+        Assert-NativeReport 'AiCaseDataAzureSqlCatalogComponentTest'
+        $Names = @('objects_and_modules','columns','constraints','foreign_key_columns',
+            'indexes','security_predicates','object_permissions','triggers','integration_role_owners',
+            'tenant_filter_definition','runtime_verifier_permissions','execution_and_schema_owners','dependencies',
+            'runtime_role_owner','verifier_role_owner','database_options','unicode_ranges','unicode_lower','word_transitions')
+        $Lines = @(Get-Content -LiteralPath work/azure-native/catalog-components.tsv)
+        if ($Lines.Count -ne 20 -or $Lines[0] -cne "ordinal`tname`townerBytes`tverifierBytes`townerSha256`tverifierSha256`tequal") { throw 'REPORT_WRITE' }
+        for ($Index = 0; $Index -lt 19; $Index++) {
+            $Fields = $Lines[$Index+1].Split([char]9)
+            if ($Fields.Count -ne 7 -or $Fields[0] -cne [string]($Index+1) -or $Fields[1] -cne $Names[$Index] -or
+                $Fields[2] -cnotmatch '^(0|[1-9][0-9]{0,18})$' -or $Fields[3] -cnotmatch '^(0|[1-9][0-9]{0,18})$' -or
+                $Fields[4] -cnotmatch '^[a-f0-9]{64}$' -or $Fields[5] -cnotmatch '^[a-f0-9]{64}$' -or
+                $Fields[6] -cne 'true' -or $Fields[2] -cne $Fields[3] -or $Fields[4] -cne $Fields[5]) { throw 'REPORT_WRITE' }
+        }
+        # Emit exactly the seven approved columns, once, only after complete successful validation.
+        $Lines | Write-Output
+    }
+    catch {
+        $SafeCategory = 'REPORT_WRITE'
+        if ($_.Exception.Message -cin @('OWNER_TARGET_PREFLIGHT','VERIFIER_TARGET_PREFLIGHT','OWNER_COMPONENT_READ','VERIFIER_COMPONENT_READ','REPORT_WRITE')) {
+            $SafeCategory = $_.Exception.Message
+        }
+        throw "Catalog component diagnostic failed; stage=$SafeCategory; discard fixture; no retry/adoption"
+    }
 }
 finally {
     Remove-Item Env:SHALE_AZURE_OWNER_USERNAME,Env:SHALE_AZURE_OWNER_PASSWORD,Env:SHALE_AZURE_SETUP_OPT_IN,Env:SHALE_AZURE_OWNER_PROBE_OPT_IN,Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN -ErrorAction SilentlyContinue
@@ -584,5 +662,6 @@ SIDs, connection strings, passwords, access tokens or schema/module artifacts. O
 required live/operator evidence passes may the record use
 `NATIVE AZURE IDENTITY / READ-ONLY ACCEPTANCE COMPLETE`. This never closes the mutation/fault gate
 or authorizes production SQL, identities, JAR deployment, AI/MCP/OAuth activation or a pilot.
+
 
 

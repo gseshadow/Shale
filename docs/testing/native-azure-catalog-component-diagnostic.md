@@ -1,6 +1,75 @@
 # Read-only Azure catalog component diagnostic
 
+## Reviewed packet refresh — 2026-11-04
+
+**AZURE NOT AUTHORIZED. Packet prepared for owner review only.**
+The owner reports native Windows reader-delta PASS at
+`5b88402940fc9950228eb5320bed9b37fc64e359`. This exact commit is now both
+`$ExecutableHead` and `$ValidatedHead`, and is the eventual live marker's `codeHead`.
+The reader Java and all SQL/security/runtime inputs remain unchanged in this packet refresh.
+The historical preparation and validation sections below record earlier work; the current
+[operator runbook section 1](native-azure-readonly-operator-runbook.md#1-validate-the-diagnostic-only-delta-on-windows)
+supersedes their broader validation commands and pending-reader status.
+
+The existing `work/azure-native/catalog-reader-windows-validation.json` must prove:
+both heads equal the exact reader baseline above, the same Windows `hostName`, `result=PASS`,
+`scope=CATALOG_READER_DELTA_ONLY`, 12 tests, zero failures/errors/skips, five launcher guards,
+and boolean `azureAuthorized=false`. Missing fields, wrong types/counts, host or heads refuse.
+Do not manufacture this evidence or rerun unrelated Maven/Azure/Phase1R/V2 rehearsals.
+
+On the exact final packet commit reported in the handoff, set `$ReviewedPacketHead` to that
+full SHA and execute **only the first PowerShell fence in runbook section 1**. It checks the
+reader marker, the exact packet head, permitted file changes, clean tracked state, pinned bytes/
+receipts, five updated launcher guards, and same-host PowerShell fences/credential generation.
+It verifies the private candidate digest locally. It writes a new
+`work/azure-native/catalog-diagnostic-validation.json` with `sourceHead` equal to that exact
+final reviewed commit, `codeHead` equal to the reader baseline, `scope=CATALOG_COMPONENT_PACKET_ONLY`,
+same host, `result=PASS`, five guards, the original reader marker's SHA-256, and
+`azureAuthorized=false`. It refuses an existing live marker or unresolved scope record.
+There is no new Maven command and no database contact in this sequence.
+
+For a future separately authorized attempt, the launcher revalidates and consumes **both**
+markers before resource creation. Never relabel, restore or reuse consumed/earlier markers.
+A guard failure stops the entire sequence; no manual continuation. Packet validation does
+not grant Azure permission, and the live launcher requires a separate explicit owner opt-in.
+This refresh does not execute the live launcher, create a live marker, or authorize Azure.
+
+Live sections 2, 3 and 5 SHA-256 (LF-normalized fence bodies joined by one LF):
+`fcae9c725c01f9f5cc36fbd1a5847e6a0e0502d4e9c9aed6eab10d073ca613fb`.
+Creation/one-IP firewall, cleanup and credential-generation fence bytes remain exact. Section 3
+retains the same probe/setup; its only command changes follow setup in the component diagnostic.
+Full native attestation section 4 remains excluded. Setup and the 600-second V2 install ceiling
+are unchanged. Scope is persisted before mutation; `finally` always invokes exact owned-scope
+cleanup, including partial creation. No production access/credentials, retry or fixture adoption.
+
+Diagnostic Maven streams are discarded rather than forwarded. A failure exposes only one fixed
+category: `OWNER_TARGET_PREFLIGHT`, `VERIFIER_TARGET_PREFLIGHT`, `OWNER_COMPONENT_READ`,
+`VERIFIER_COMPONENT_READ`, or `REPORT_WRITE`. Only exact allowlisted reader messages may select
+the first four; missing/malformed evidence, invocation/report failure or an incomplete/non-equal
+comparison falls back to `REPORT_WRITE`. No XML, driver messages, SQL, connection targets,
+credentials, SIDs, tokens, causes or suppressed exceptions are printed. Raw local Surefire
+artifacts remain private. A complete success prints the approved TSV header and exactly 19 rows,
+once: ordinal, fixed name, owner/verifier byte lengths, owner/verifier SHA256 and equality.
+Every row and equality is checked before any table output. No raw report or partial table is echoed.
+
+Review/test impact: only the three current packet/evidence documents and the existing five
+Python launcher guards change. The guards now protect the baseline pins, exact packet identity,
+reader proof, dual-marker consumption, authorization fence, diagnostic stream suppression,
+fixed categories and complete approved table output, while retaining the original byte checks.
+`python -m unittest discover -s build/azure-native -p test_catalog_components.py`: **5 passed**.
+Static protected-block comparison and whitespace checks pass. Native Windows PowerShell packet
+checks cannot execute in this Linux environment and remain required by section 1; the owner's
+passed reader-delta evidence is reused, not claimed as a new packet validation here.
+
+Protected-state review: installer SQL, all catalog expressions, receipts, expected hashes,
+grants/roles, authority boundaries, production paths and all timeouts have no tree changes.
+Architecture review covered `architecture/codex-prompt-rules.md`, tenancy/RLS, relevant schema/audit
+sections, confinement V2 and Azure SQL attestation contracts. Audit compatibility is unchanged:
+metadata-only diagnostics add no PHI/entity mutation or audit migration.
+
 ## Harness investigation — 2026-11-04
+
+Historical status as of the reader commit; superseded by the packet refresh above.
 
 **BLOCKED pending Windows validation of the revised reader. No further Azure run is authorized.**
 The owner reports that the fresh component attempt failed before a complete comparison and
@@ -141,7 +210,7 @@ it does not prove that the stored receipt differs from the recomputed catalog ha
   VIEW DEFINITION and absence of the mutating setup opt-in. SQL/close/configuration failures
   are sanitized without cause/suppressed exception chains.
 - `shale-data/src/test/java/com/shale/data/security/ai/AzureCatalogComponentsTest.java`:
-  seven offline expression, metadata, difference, JDBC-closure and error-sanitization tests.
+  twelve offline expression, metadata, difference, JDBC-closure and error-sanitization tests.
 - `build/azure-native/test_catalog_components.py`: five offline launcher safeguard tests.
 - [Operator runbook](native-azure-readonly-operator-runbook.md): existing fresh-resource creation,
   owner probe and setup, followed by the diagnostic before owner-secret cleanup. The historical
@@ -156,34 +225,11 @@ stop and clean up. Nineteen equal rows record a complete context match; clean up
 `confinement-v2-catalog.sql` execution behavior in separate work. Equality does not close either
 native gate, prove receipt equality, or authorize another attempt or production deployment.
 
-## Minimum Windows validation and exact subsequent launcher
+## Historical packet validation
 
-Use `C:\Eclipse\Workspace\shale-parent`, checkout this PR head cleanly, and execute the **first
-PowerShell fence in runbook section 1** in a fresh private Windows session. It pins the code
-baseline above, permits only the listed evidence documents to differ, verifies all 25 existing
-pinned files/index and V1/V2 receipts, runs 11 checkout regressions and five new launcher guards,
-parses all PowerShell fences and tests the exact existing credential block on the same host,
-then runs the focused 45-test selector with JDK 21/Maven and the repository selector's affected
-suite plus critical reactor. The private candidate is verified locally against its existing
-digest; it is never attached or committed. Only a passing sequence writes the local same-host,
-exact-source validation marker. No mutating V2/Phase1R local rehearsal needs repeating because
-those inputs and paths are unchanged; prior validated evidence carries forward for that scope.
-
-After validation succeeds, execute the **first PowerShell fence under
-[Reviewed live launcher — mandatory](native-azure-readonly-operator-runbook.md#reviewed-live-launcher--mandatory)**
-from the same private session and repository root. This is the updated exact launcher; do not
-paste sections individually. It checks the same-source/same-host validation marker, clean tracked
-state, actual pinned bytes/receipts, private input hash and the live-section digest, then consumes
-the marker before creating one nonce/resource group/server/database. It refuses an existing scope
-record. Existing runtime secret generation, validated TLS and exact IPv4 firewall remain in place.
-Probe/setup/diagnostic failures all enter exact-scope deletion and confirmed-absence checks.
-Any interrupted or failed attempt forbids fixture reuse; cleanup failure remains BLOCKED until
-reconciled and deletion confirmed. No automatic retry and no production access/deployment.
-
-Live sections 2, 3 and 5 SHA-256:
-`fdb9e31752dec1f1da350c07f0c61c4fc85d8e3661e905c5f02a7c0c964b138a`.
-Resource-creation and cleanup blocks, and the credential-generation block, remain exactly those
-from the reviewed packet; the five launcher tests protect those bytes and diagnostic ordering.
+The earlier broad Windows checklist and live-section digest are superseded by the reviewed
+packet refresh above and current runbook section 1. Do not run earlier validation/live fences,
+reuse their markers or repeat unrelated rehearsals for this documentation/launcher refresh.
 
 ## Review and verification evidence
 
@@ -219,3 +265,4 @@ Audit compatibility: metadata and the three existing Unicode reference tables ar
 There is no tenant/PHI read, business/admin mutation, new authority or audit schema. No application
 audit row is appropriate for this diagnostic. Installer, catalog construction, module/source/catalog
 receipts, grants, roles, hashes, credentials and authority boundaries are unchanged.
+

@@ -1,6 +1,32 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
-## Component attempt consumed; harness investigation — 2026-11-04
+## Current reviewed packet — 2026-11-04
+
+**AZURE NOT AUTHORIZED. No new live attempt or native acceptance result.**
+Owner-reported Windows reader-delta PASS pins executable/validated/live `codeHead` to
+`5b88402940fc9950228eb5320bed9b37fc64e359`: 12 tests, zero failures/errors/skips,
+five launcher guards and `azureAuthorized=false`.
+The [refreshed packet](native-azure-catalog-component-diagnostic.md#reviewed-packet-refresh--2026-11-04)
+requires that same-host marker and new final-packet-only validation. Its live marker `sourceHead`
+must be the exact final reviewed commit from the handoff. Neither marker authorizes Azure;
+both are checked and consumed before any future separately authorized disposable attempt.
+No unrelated Maven/Azure/Phase1R/V2 rehearsal is repeated. Earlier marker/live instructions below
+are historical, consumed and superseded; never restore or reuse them.
+
+Reviewed live sections 2/3/5 SHA-256:
+`fcae9c725c01f9f5cc36fbd1a5847e6a0e0502d4e9c9aed6eab10d073ca613fb`.
+Fresh disposable database, exact one-IP firewall, pre-mutation scope recording, `finally` cleanup
+and exact owned-scope verification remain unchanged. Probe/setup and the 600-second V2 timeout
+remain exact; only the catalog component diagnostic follows setup, never full section 4.
+All SQL/catalog expressions, receipts, expected hashes, grants/roles, authority and production
+paths remain unchanged. No production access or credentials, fixture retry/adoption or manual
+continuation after guard failure is permitted. Fixed sanitized failure categories and validated
+seven-column/19-row output are documented in the current packet.
+
+Five updated Python launcher guards pass locally. New same-host Windows packet checks remain
+pending; the existing reader validation is owner-reported. Both native acceptance gates stay OPEN.
+
+## Historical component attempt consumed; harness investigation — 2026-11-04
 
 Owner-reported: component diagnostic failed before a complete comparison; cleanup returned
 `AZURE_NATIVE_CLEANUP CONFIRMED`. The fixture was destroyed. No component difference, receipt
@@ -378,5 +404,6 @@ Do not classify the gate complete on absent opt-in, skipped tests, owner-only/lo
 or missing metadata visibility. No production Phase1R/V2 install, identity provisioning, JAR
 deployment, AI/MCP/OAuth activation or pilot is authorized. The seven already-installed production
 prerequisites must not be rerun. The PR remains unmerged.
+
 
 

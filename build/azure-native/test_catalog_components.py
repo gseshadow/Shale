@@ -38,13 +38,41 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         self.assertIn(f"if ($LiveDigest -cne '{expected}')", launcher)
         self.assertNotIn('. $LiveBlocks[4]', launcher, 'This attempt may only compare components after setup')
         self.assertRegex(launcher, r'(?s)try \{\s*\. \$LiveBlocks\[2\].*?\. \$LiveBlocks\[3\].*?finally \{.*?\. \$LiveBlocks\[5\]')
+        self.assertIn('AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT', launcher)
+        self.assertLess(launcher.index('AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT'),
+                        launcher.index('Remove-Item -LiteralPath $ReaderValidationPath -ErrorAction Stop'))
 
     def test_validation_is_same_source_same_host_and_consumed_before_creation(self):
         launcher = self.launcher()
+        validation = self.block(1)
+        baseline = '5b88402940fc9950228eb5320bed9b37fc64e359'
+        self.assertIn(f"$ExecutableHead = '{baseline}'", validation)
+        self.assertIn(f"$ValidatedHead = '{baseline}'", launcher)
+        self.assertIn('$ValidatedSourceHead -cne $ReviewedPacketHead', validation)
+        self.assertIn('sourceHead=$ValidatedSourceHead', validation)
+        self.assertIn('codeHead=$ExecutableHead', validation)
+        self.assertNotRegex(validation, r'(?m)^\s*(mvn|.*select_tests\.py|.*New-Az)\b')
+        for block in (validation, launcher):
+            for guard in (
+                'work/azure-native/catalog-reader-windows-validation.json',
+                '$Reader.codeHead -cne $Baseline', '$Reader.sourceHead -cne $Baseline',
+                '$Reader.hostName -cne [Environment]::MachineName', "$Reader.result -cne 'PASS'",
+                "$Reader.scope -cne 'CATALOG_READER_DELTA_ONLY'", '$Reader.tests -ne 12',
+                '$Reader.failures -ne 0', '$Reader.errors -ne 0', '$Reader.skipped -ne 0',
+                '$Reader.launcherGuards -ne 5', '$Reader.azureAuthorized -isnot [bool]',
+                '$Reader.azureAuthorized -ne $false', 'readerValidationSha256',
+            ):
+                self.assertIn(guard, block)
+        self.assertIn('if (Test-Path -LiteralPath $ValidationPath) { throw', validation)
+        self.assertIn('Assert-ReaderValidation $ExecutableHead', validation)
+        self.assertIn('Assert-ReaderValidation $ValidatedHead', launcher)
+        self.assertIn("scope='CATALOG_COMPONENT_PACKET_ONLY'", validation)
+        self.assertIn('azureAuthorized=$false', validation)
         self.assertIn('$Validation.sourceHead -cne $CurrentHead', launcher)
         self.assertIn('$Validation.codeHead -cne $ValidatedHead', launcher)
         self.assertIn('$Validation.hostName -cne [Environment]::MachineName', launcher)
         self.assertLess(launcher.index('Remove-Item -LiteralPath $ValidationPath -ErrorAction Stop'), launcher.index('. $LiveBlocks[2]'))
+        self.assertLess(launcher.index('Remove-Item -LiteralPath $ReaderValidationPath -ErrorAction Stop'), launcher.index('. $LiveBlocks[2]'))
         self.assertIn('Test-Path -LiteralPath work/azure-native/resource-scope.json', launcher)
 
     def test_comparison_runs_after_setup_before_owner_secret_cleanup(self):
@@ -61,7 +89,24 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         self.assertIn('finally { Remove-Item Env:SHALE_AZURE_CATALOG_COMPONENT_OPT_IN', block)
         self.assertIn('Remove-Item work/azure-native/catalog-components.tsv', block)
         self.assertIn('Remove-Item shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AiCaseDataAzureSqlCatalogComponentTest.xml', block)
+        command = next(line for line in block.splitlines()
+                       if 'mvn ' in line and "'-Dtest=AiCaseDataAzureSqlCatalogComponentTest'" in line)
+        self.assertTrue(command.endswith(' *> $null'), 'Never forward native diagnostic streams')
+        self.assertNotIn('{ Get-Content work/azure-native/catalog-components.tsv }', block)
+        self.assertIn('$Lines.Count -ne 20', block)
+        self.assertIn('$Fields.Count -ne 7', block)
+        self.assertIn('$Fields[1] -cne $Names[$Index]', block)
+        self.assertIn("$Fields[6] -cne 'true'", block)
+        self.assertIn('$Fields[2] -cne $Fields[3]', block)
+        self.assertIn('$Fields[4] -cne $Fields[5]', block)
+        self.assertLess(block.index('$Fields.Count -ne 7'), block.index('$Lines | Write-Output'))
+        for category in ('OWNER_TARGET_PREFLIGHT', 'VERIFIER_TARGET_PREFLIGHT',
+                         'OWNER_COMPONENT_READ', 'VERIFIER_COMPONENT_READ', 'REPORT_WRITE'):
+            self.assertIn(category, block)
+        self.assertIn('if ($Messages -ccontains $SafeMessage)', block)
+        self.assertIn("throw \"Catalog component diagnostic failed; stage=$SafeCategory; discard fixture; no retry/adoption\"", block)
 
 
 if __name__ == '__main__':
     unittest.main()
+
