@@ -144,7 +144,8 @@ class AzureCatalogComponentsTest {
                     var owner=diagnosticSource("owner",scenario.getKey(),closed,parent);
                     var verifier=diagnosticSource("verifier",scenario.getKey(),closed,parent);
                     var failure=assertThrows(IllegalStateException.class,()->AiCaseDataAzureSqlCatalogComponentTest.compare(owner,verifier,"private database","private user",output),scenario.getKey());
-                    assertEquals("Catalog component diagnostic failed before a complete comparison; stage="+scenario.getValue()+"; discard fixture; no retry/adoption",failure.getMessage());
+                    String component=scenario.getValue().endsWith("COMPONENT_READ")?"; component=0:before_first_component":"";
+                    assertEquals("Catalog component diagnostic failed before a complete comparison; stage="+scenario.getValue()+component+"; discard fixture; no retry/adoption",failure.getMessage());
                     assertSanitized(failure);
                     assertFalse(Files.exists(output),"Failed comparisons must not leave stale or partial evidence");
                     assertEquals(scenario.getKey().equals("ownerOpen")?0:1,Collections.frequency(closed,"owner"));
@@ -152,6 +153,52 @@ class AzureCatalogComponentsTest {
                 }finally{if(Files.isDirectory(parent))Files.deleteIfExists(output);Files.deleteIfExists(parent);}
             }
         }finally{logger.setLevel(prior);}
+    }
+    @Test void everyOwnerAndVerifierComponentFailureUsesOnlyItsFixedTraversalSlot()throws Exception {
+        for(String role:List.of("owner","verifier"))for(int ordinal=1;ordinal<=19;ordinal++)
+            for(String operation:List.of("getResultSet","next","getInt","getString","getLong","wasNull","close","getMoreResults")) {
+                if(ordinal==1&&operation.equals("getMoreResults"))continue; // First execution has no known component.
+                assertDiagnosticComponent(role,ordinal,operation);
+            }
+    }
+    @Test void executeFailuresBeforeTheFirstComponentAreFixedAndSanitizedForBothIdentities()throws Exception {
+        for(String role:List.of("owner","verifier"))assertDiagnosticComponent(role,0,"execute");
+        var before=assertThrows(AzureCatalogComponents.ReadFailure.class,
+                ()->AzureCatalogComponents.read(connection(19,"valid",new ArrayList<>(),4,true,2,"getMoreResults")));
+        assertEquals("0:before_first_component",before.componentLabel());assertSanitized(before);
+        var after=assertThrows(AzureCatalogComponents.ReadFailure.class,
+                ()->AzureCatalogComponents.read(connection(19,"valid",new ArrayList<>(),0,false,0,"close")));
+        assertEquals("19:word_transitions",after.componentLabel());assertSanitized(after);
+    }
+    @Test void malformedEvidenceHasOnlyExpectedAllowlistedLabels() {
+        for(String mode:List.of("missing","extra","null","duplicate","order","name","update","zeroUpdate","lateUpdate","lateZeroUpdate")) {
+            int count=mode.equals("missing")?18:mode.equals("extra")?20:19;
+            var failure=assertThrows(AzureCatalogComponents.ReadFailure.class,
+                    ()->AzureCatalogComponents.read(connection(count,mode,new ArrayList<>(),4,true)));
+            int ordinal=List.of("update","zeroUpdate").contains(mode)?0:
+                    List.of("missing","extra","lateUpdate","lateZeroUpdate").contains(mode)?19:1;
+            assertEquals(ordinal==0?"0:before_first_component":ordinal+":"+AzureCatalogComponents.NAMES.get(ordinal-1),failure.componentLabel());
+            assertSanitized(failure);
+        }
+    }
+    private static void assertDiagnosticComponent(String role,int ordinal,String operation)throws Exception {
+        var parent=Files.createTempDirectory("catalog-component-");var output=parent.resolve("report.tsv");
+        var logger=java.util.logging.Logger.getLogger("com.microsoft.sqlserver.jdbc");var prior=logger.getLevel();
+        try {
+            logger.setLevel(java.util.logging.Level.OFF);
+            Files.writeString(output,"stale passing evidence");
+            String mode=role+"Read:"+ordinal+":"+operation;
+            var closed=new ArrayList<String>();
+            var failure=assertThrows(IllegalStateException.class,()->AiCaseDataAzureSqlCatalogComponentTest.compare(
+                    diagnosticSource("owner",mode,closed,parent),diagnosticSource("verifier",mode,closed,parent),
+                    "private database","private user",output),mode);
+            String label=ordinal==0?"0:before_first_component":ordinal+":"+AzureCatalogComponents.NAMES.get(ordinal-1);
+            assertEquals("Catalog component diagnostic failed before a complete comparison; stage="+role.toUpperCase(Locale.ROOT)+
+                    "_COMPONENT_READ; component="+label+"; discard fixture; no retry/adoption",failure.getMessage(),mode);
+            assertSanitized(failure);
+            assertFalse(Files.exists(output));
+            assertEquals(1,Collections.frequency(closed,"owner"));assertEquals(1,Collections.frequency(closed,"verifier"));
+        }finally{logger.setLevel(prior);Files.deleteIfExists(output);Files.deleteIfExists(parent);}
     }
     private static DataSource diagnosticSource(String role,String mode,List<String> closed,Path parent) {
         int[] opens={0},statements={0};
@@ -165,11 +212,15 @@ class AzureCatalogComponentsTest {
                 case "createStatement"->{
                     if(++statements[0]==1)yield targetStatement(role,mode);
                     if(mode.equals(role+"Read")||mode.equals(role+"ReadAndClose"))throw privateJdbcFailure();
+                    if(mode.startsWith(role+"Read:")) {
+                        var fault=mode.split(":");
+                        yield connection(19,"valid",new ArrayList<>(),0,false,Integer.parseInt(fault[1]),fault[2]).createStatement();
+                    }
                     yield connection(19,"valid",new ArrayList<>(),4,true).createStatement();
                 }
                 case "close"->{
                     closed.add(role);
-                    if(mode.equals(role+"Close")||mode.equals(role+"ReadAndClose"))throw privateJdbcFailure();
+                    if(mode.equals(role+"Close")||mode.equals(role+"ReadAndClose")||mode.startsWith(role+"Read:"))throw privateJdbcFailure();
                     if(mode.equals("report")&&role.equals("verifier")) {
                         Files.delete(parent);Files.writeString(parent,"private report obstruction");
                     }
@@ -207,6 +258,9 @@ class AzureCatalogComponentsTest {
         return connection(count,mode,closed,0,false);
     }
     private static Connection connection(int count,String mode,List<String> closed,int leading,boolean interleaved) {
+        return connection(count,mode,closed,leading,interleaved,-1,"");
+    }
+    private static Connection connection(int count,String mode,List<String> closed,int leading,boolean interleaved,int fault,String operation) {
         // State -1 is a real no-result observation, not a SELECT with empty rows.
         var states=new ArrayList<Integer>();
         for(int i=0;i<leading;i++)states.add(-1);
@@ -217,12 +271,18 @@ class AzureCatalogComponentsTest {
         }
         int[] state={0},executions={0},advances={0};
         java.util.function.IntSupplier index=()->state[0]<states.size()?states.get(state[0]):-1;
-        Statement statement=(Statement)Proxy.newProxyInstance(Statement.class.getClassLoader(),new Class<?>[]{Statement.class},(p,m,a)->switch(m.getName()) {
+        Statement statement=(Statement)Proxy.newProxyInstance(Statement.class.getClassLoader(),new Class<?>[]{Statement.class},(p,m,a)->{
+            if(m.getName().equals(operation)&&((operation.equals("execute")&&fault==0)||
+                    (operation.equals("getMoreResults")&&state[0]+2==fault)||
+                    (!operation.equals("getMoreResults")&&index.getAsInt()+1==fault)))throw privateJdbcFailure();
+            return switch(m.getName()) {
             case "setQueryTimeout"->{assertEquals(20,a[0],"Diagnostic must use the unchanged ordinary owner query limit");yield null;}
             case "execute"->{assertEquals(1,++executions[0],"Never retry or reexecute the diagnostic");assertTrue(AzureCatalogComponents.sql().equals(a[0]),"Execute only the checked-in diagnostic resource");yield !List.of("update","zeroUpdate").contains(mode)&&index.getAsInt()>=0;}
             case "getUpdateCount"->mode.equals("update")||(mode.equals("lateUpdate")&&state[0]>=states.size())?1:
                     mode.equals("zeroUpdate")||(mode.equals("lateZeroUpdate")&&state[0]>=states.size())?0:-1;
-            case "getResultSet"->{int[] visits={0};yield Proxy.newProxyInstance(ResultSet.class.getClassLoader(),new Class<?>[]{ResultSet.class},(rp,rm,ra)->switch(rm.getName()) {
+            case "getResultSet"->{int[] visits={0};yield Proxy.newProxyInstance(ResultSet.class.getClassLoader(),new Class<?>[]{ResultSet.class},(rp,rm,ra)->{
+                if(index.getAsInt()+1==fault&&rm.getName().equals(operation))throw privateJdbcFailure();
+                return switch(rm.getName()) {
                 case "next"->++visits[0]<=(mode.equals("duplicate")?2:1);
                 case "getInt"->mode.equals("order")?2:index.getAsInt()+1;
                 case "getString"->(int)ra[0]==4?"a".repeat(64):mode.equals("name")?"private SQL SID token":AzureCatalogComponents.NAMES.get(Math.min(index.getAsInt(),18));
@@ -230,7 +290,7 @@ class AzureCatalogComponentsTest {
                 case "wasNull"->mode.equals("null");
                 case "close"->{closed.add("result");yield null;}
                 default->throw new AssertionError("Unexpected result operation");
-            });}
+            };});}
             case "getMoreResults"->{
                 assertEquals(Statement.CLOSE_CURRENT_RESULT,a[0]);
                 assertTrue(++advances[0]<=500,"Terminal JDBC states must not spin indefinitely");
@@ -238,7 +298,7 @@ class AzureCatalogComponentsTest {
             }
             case "close"->{closed.add("statement");yield null;}
             default->throw new AssertionError("Unexpected statement operation");
-        });
+        };});
         return (Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(p,m,a)->{
             assertEquals("createStatement",m.getName(),"Diagnostic may not change transactions, sessions or authority");return statement;
         });

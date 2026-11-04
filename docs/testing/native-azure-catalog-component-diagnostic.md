@@ -1,5 +1,71 @@
 # Read-only Azure catalog component diagnostic
 
+## Fixed component failure context — 2026-11-04
+
+The latest owner-authorized disposable diagnostic completed owner setup, V2 installation
+(~36.9 seconds), cumulative verification and cleanup (`AZURE_NATIVE_CLEANUP CONFIRMED`).
+No `catalog-components.tsv` was created. The sanitized failure identified
+`stage=VERIFIER_COMPONENT_READ`. This is evidence only; no component difference, permission
+fix, acceptance, fixture adoption or further Azure attempt is authorized.
+
+This diagnostic delta preserves all five stages. Only `OWNER_COMPONENT_READ` and
+`VERIFIER_COMPONENT_READ` additionally report `component=<ordinal>:<fixed name>`.
+Names come exclusively from `AzureCatalogComponents.NAMES`, never JDBC evidence.
+Before a result slot is identifiable (including execute and leading traversal failure), the
+label is `0:before_first_component`. Once a result is exposed, its expected ordinal is
+tracked before obtaining/reading/closing it. While advancing after a valid result, the label
+is the next expected ordinal, capped at 19 for terminal checks and statement cleanup.
+Thus an advancement failure at `13:dependencies` identifies the expected traversal slot,
+not proof that the driver was executing that expression: JDBC may prefetch. Malformed or
+reordered metadata cannot supply the label and still fails closed. SQL is executed once;
+its expressions, ordering, traversal budget and resource closure remain unchanged.
+
+Failure sanitization occurs outside JDBC resource scopes, then again at the public comparison
+boundary. Driver/SQL/target/username/password/SID/token text, causes and suppressed close
+failures are discarded. The offline matrix injects failures for both identities at every
+component's result acquisition, next, ordinal/name/length reads, NULL check and close, and
+advancement to slots 2–19. Each primary failure is followed by a failing connection close.
+Separate checks cover execute/leading failures, terminal statement close, malformed evidence,
+all five stages, stale-report deletion and private-data canaries in rendered stack traces.
+
+Pre-edit review: repository prompt rules, tenancy/RLS, schema/audit, confinement V2 and Azure SQL
+attestation contracts; existing reader/stage/sanitization tests and five launcher guards.
+Audit compatibility: metadata-only diagnostics; no PHI/entity mutation, audit event or migration.
+No setup/executable SQL, 19 catalog expressions, V2 receipt/hash, grant, role, authority boundary,
+owner/verifier datasource, ordinary 20-second query or 600-second V2 timeout changes.
+Resource/one-IP firewall commands, cleanup and section 4 exclusion are unchanged.
+
+The runbook is unchanged. Its live sections 2/3/5 digest remains
+`32f1a91f1b1e7389af9b1513a11484e509ba299f23fb202eda5270bd3f6bce12`.
+Its historical executable/marker fences intentionally reject this Java delta; do not update
+pins, restore consumed markers or execute the launcher. A subsequent packet review and Azure
+authorization are separate work. The older Windows/marker protocols below are historical
+and do not authorize marker creation or a live run for this delta.
+
+### Required Windows tests for this delta
+
+At the exact handoff commit, in a clean JDK 21/Maven Windows checkout and fresh shell without
+`SHALE_AZURE_*` variables, run only these offline delta checks (no private candidate needed):
+
+```powershell
+mvn -B -ntp -pl shale-data -am '-Dtest=AzureCatalogComponentsTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
+python -m unittest discover -s build/azure-native -p test_catalog_components.py
+```
+
+Require fresh `TEST-com.shale.data.security.ai.AzureCatalogComponentsTest.xml`: 15 tests,
+zero failures/errors/skips; require five Python passes. Do not run the separately opted-in
+`AiCaseDataAzureSqlCatalogComponentTest`, setup, V2 installation or live launcher.
+Do not create/relabel any validation marker from these commands.
+
+Local supplemental verification: real dependency closure compiled with JDK 21 and cached
+JUnit 5.10.3; all 15 tests pass, zero failures/errors/skips. Five Python guards pass.
+The selector maps the three Java files to cases/security-data (data/server plus dependencies).
+Focused configured Maven, the selected affected batch and critical reactor were attempted
+offline; all stop before tests because Spring Boot BOM 4.1.1 is uncached and dependency
+transport is unavailable. Native Windows/Maven verification remains pending; this delta is
+unverified at that required scope. Git transport is unavailable; the narrow commit uses
+connected GitHub Git-data tools with the full parent tree preserved. No Azure was executed.
+
 ## Console credential and marker-boundary correction — 2026-11-04
 
 The owner-authorized disposable attempt stopped at the Windows `Get-Credential` dialog before

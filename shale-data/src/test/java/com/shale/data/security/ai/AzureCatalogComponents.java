@@ -28,31 +28,47 @@ final class AzureCatalogComponents {
         }
     }
     static List<Component> read(Connection connection)throws SQLException,IOException {
-        var rows=new ArrayList<Component>();
-        try(var statement=connection.createStatement()) {
-            statement.setQueryTimeout(AiCaseDataAzureSqlDisposableSetupTest.OWNER_QUERY_SECONDS);
-            boolean more=statement.execute(sql());
-            int nonResults=0;
-            while(true) {
-                if(more)try(var result=statement.getResultSet()) {
-                    int index=rows.size();
-                    if(index>=NAMES.size()||!result.next())throw refused();
-                    if(result.getInt(1)!=index+1||!NAMES.get(index).equals(result.getString(2)))throw refused();
-                    long bytes=result.getLong(3);
-                    if(result.wasNull())throw refused();
-                    rows.add(new Component(bytes,result.getString(4)));
-                    if(result.next())throw refused();
-                    nonResults=0;
+        int component=0; // execute/preamble failure cannot identify the first result.
+        try {
+            var rows=new ArrayList<Component>();
+            try(var statement=connection.createStatement()) {
+                statement.setQueryTimeout(AiCaseDataAzureSqlDisposableSetupTest.OWNER_QUERY_SECONDS);
+                boolean more=statement.execute(sql());
+                int nonResults=0;
+                while(true) {
+                    if(more) {
+                        component=Math.min(rows.size()+1,NAMES.size());
+                        try(var result=statement.getResultSet()) {
+                            int index=rows.size();
+                            if(index>=NAMES.size()||!result.next())throw refused();
+                            if(result.getInt(1)!=index+1||!NAMES.get(index).equals(result.getString(2)))throw refused();
+                            long bytes=result.getLong(3);
+                            if(result.wasNull())throw refused();
+                            rows.add(new Component(bytes,result.getString(4)));
+                            if(result.next())throw refused();
+                            nonResults=0;
+                        }
+                    }
+                    else {
+                        if(statement.getUpdateCount()!=-1)throw refused(); // No update counts, including zero.
+                        if(++nonResults>NON_RESULT_BUDGET)break;
+                    }
+                    // Advancement identifies only the next expected fixed slot, never driver text.
+                    if(!rows.isEmpty())component=Math.min(rows.size()+1,NAMES.size());
+                    more=statement.getMoreResults(Statement.CLOSE_CURRENT_RESULT);
                 }
-                else {
-                    if(statement.getUpdateCount()!=-1)throw refused(); // No update counts, including zero.
-                    if(++nonResults>NON_RESULT_BUDGET)break;
-                }
-                more=statement.getMoreResults(Statement.CLOSE_CURRENT_RESULT);
             }
+            if(rows.size()!=NAMES.size())throw refused();
+            return List.copyOf(rows);
+        } catch(Exception|AssertionError failure) {
+            // Outside JDBC resource scopes: discard causes and suppressed close failures too.
+            throw new ReadFailure(component);
         }
-        if(rows.size()!=NAMES.size())throw refused();
-        return List.copyOf(rows);
+    }
+    static final class ReadFailure extends IllegalStateException {
+        private final int component;
+        private ReadFailure(int component){super("Incomplete or invalid catalog component metadata; discard fixture; no retry/adoption");this.component=component;}
+        String componentLabel(){return component==0?"0:before_first_component":component+":"+NAMES.get(component-1);}
     }
     static List<String> report(List<Component> owner,List<Component> verifier) {
         if(owner.size()!=NAMES.size()||verifier.size()!=NAMES.size())throw refused();

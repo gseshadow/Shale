@@ -25,7 +25,7 @@ class AiCaseDataAzureSqlCatalogComponentTest {
         } catch(Exception|AssertionError failure) {
             // compare already sanitizes its own failures, including exact fixed component names.
             if(failure instanceof DiagnosticFailure safe)throw safe;
-            throw incomplete(stage);
+            throw incomplete(stage,failure);
         }
     }
     static void compare(DataSource ownerSource,DataSource verifierSource,String database,String verifierUser,Path output) {
@@ -57,13 +57,18 @@ class AiCaseDataAzureSqlCatalogComponentTest {
         } catch(Exception|AssertionError failure) {
             // Never expose driver text, SQL, targets, credentials, causes or suppressed close failures.
             try{Files.deleteIfExists(output);}catch(Exception ignored){/* Never emit cleanup details. */}
-            throw incomplete(stage);
+            throw incomplete(stage,failure);
         }
         var differences=AzureCatalogComponents.differences(owner,verifier);
         if(!differences.isEmpty())throw new DiagnosticFailure("Catalog components differ: "+String.join(",",differences)+"; stop and discard fixture");
         // All 19 equal rows are the result. This does not establish receipt equality or attestation success.
     }
-    private static DiagnosticFailure incomplete(Stage stage){return new DiagnosticFailure("Catalog component diagnostic failed before a complete comparison; stage="+stage.name()+"; discard fixture; no retry/adoption");}
+    private static DiagnosticFailure incomplete(Stage stage,Throwable failure){
+        String component="";
+        if(stage==Stage.OWNER_COMPONENT_READ||stage==Stage.VERIFIER_COMPONENT_READ)
+            component="; component="+(failure instanceof AzureCatalogComponents.ReadFailure read?read.componentLabel():"0:before_first_component");
+        return new DiagnosticFailure("Catalog component diagnostic failed before a complete comparison; stage="+stage.name()+component+"; discard fixture; no retry/adoption");
+    }
     private static final class DiagnosticFailure extends IllegalStateException {
         DiagnosticFailure(String message){super(message);}
     }
