@@ -1,8 +1,14 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
+**Current deployment decision:** the [production preflight](../production-mcp-deployment-preflight.md#current-decision--2026-11-04)
+and [final diagnostic evidence](../testing/native-azure-diagnostic-closeout.md) supersede earlier retry
+instructions and umbrella deployment classifications for a dormant JAR only. Native Azure acceptance
+is NOT fully passed. All AI/MCP/OAuth/readiness controls stay OFF; no production action is authorized
+by this documentation. The investigation is stopped by operator choice; #1929 stays draft/unmerged.
+
 **Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL locally verified at #1922 recorded scope; Phase 3A security contract COMPLETE; Phase 3B COMPLETE at pre-deployment/local acceptance scope; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); 3B.7 COMPLETE (local/adversarial acceptance, §10.32); deployment/live gates OPEN; transport and both handlers default OFF.
 
-**Last reviewed:** 2026-10-28 (Azure successor: operator-reported production Stage 0 platform PASS; authoritative local/adversarial acceptance PASS; production identity/catalog attestation OPEN; deployment and pilot NOT AUTHORIZED; defaults OFF)
+**Last reviewed:** 2026-11-04 (operator stopped Azure-specific diagnosis; disposable setup/V2 repeatedly PASS; native catalog/read-only acceptance OPEN; conditional dormant all-OFF release only; no production action or pilot authorization)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of
@@ -4434,3 +4440,50 @@ governed contained identities, dedicated secrets with controls OFF, reviewed JAR
 no-disclosure smoke, and later separately authorized pilot. No production object rewrite to match V1.
 Local V2 acceptance and native/disposable Azure gates must be reported separately. This task authorizes
 repository preparation and an unmerged PR only; no production connection/change or activation.
+
+### Native Azure identity/read-only preparation — 2026-10-29
+
+**OPERATOR ACTION REQUIRED.** Based on merged #1928, the existing native gate has a separate
+[disposable fixture/operator packet](../testing/native-azure-readonly-operator-runbook.md) and
+[pending evidence record](../testing/native-azure-readonly-acceptance.md). No Azure credentials or
+authorized disposable resource were supplied. The native test now checks five contained identities,
+V2 attestation, exact tokens, denied zero-row reads/impersonation/cross-database queries and identity
+substitution; owner setup reuses existing authoritative V2 fixture helpers under a distinct opt-in.
+No production code, SQL receipt/canonicalization, audit schema or capability default changes.
+Native read-only and disposable mutation/fault gates remain OPEN; production deployment and pilot
+remain unauthorized. Local #1928 acceptance and its historical-transient disposition are preserved.
+
+### Native Azure diagnostic closeout and dormant release boundary — 2026-11-04
+
+The operator reports repeated full disposable Azure setup success through owner connect/preflight,
+Stage 0, schema import, prerequisite migrations, Phase1R/V2 prerequisite, V2 install, contained users,
+deployment binding, cumulative verify, Stage 0 after and OFF check. Restricted catalog failure remains
+`VERIFIER_COMPONENT_READ; component=0:before_first_component; phase=BATCH_EXECUTE`.
+The unchanged 19-component batch passed locally with exactly six installer verifier grants and
+application-table SELECT denied. No verifier permission defect or justified permission change exists.
+The 5000-ms socket preemption of the 20-second query timeout / first response remains an inference,
+not a proven Azure root cause. Launcher REPORT_WRITE masking is fixed and Windows-validated.
+
+The tiny probe at `871919c263b650bd7dc805fef16cee7ddac35769` is Windows-validated (Python PASS,
+21 launcher scenarios PASS, `TINY_CATALOG_WINDOWS_VALIDATION PASS`) and was NOT executed in Azure.
+Only production `shale` was discovered; no suitable dedicated nonproduction server existed. The operator
+explicitly declined creating one and running the probe. Stop further Azure-specific diagnosis. Native
+catalog/read-only and disposable mutation/fault acceptance remain OPEN; #1929 is draft/unmerged.
+No production SQL/permission/deployment change or AI/MCP/OAuth enablement occurred.
+
+A compatible JAR may proceed under ordinary release gates with every AI/MCP/OAuth control, including
+readiness composition, OFF; no new AI SQL or native verifier pass is needed merely to ship dormant code.
+Existing conditional composition/OFF Boot tests support this distinction; readiness remains `disabled`.
+The minimum gate is exact reviewed artifact/build, known ordinary auth/session SQL/caller compatibility,
+effective OFF settings, rollback/release authorization and ordinary/OFF smoke. Unknown Stage A/B parity
+is not resolved by the completed legacy retirement. No architecture or attestation rule changes.
+
+Phase1R precedes V2 when SQL preparation is separately chosen. Phase3B.8 is the sole new confinement
+installer, but existing uninstalled Phase1R is also required; the seven earlier installed AI migrations
+must not be rerun. Phase1R affects ordinary RLS even with AI OFF, so compatible caller rollout may
+need to precede SQL. The smallest dormant release defers that SQL as well as activation. The
+[preflight](../production-mcp-deployment-preflight.md#current-decision--2026-11-04) owns the exact
+conditional SQL order; the [closeout decision table](../testing/native-azure-diagnostic-closeout.md#deployment-decision-table)
+separates completed evidence from production prerequisites. AI readiness/enablement and the one-client
+pilot remain blocked by native/live and all retained Category B approvals. No new probe, diagnostic,
+grant, timeout, migration or audit event/schema is introduced by this status-only update.

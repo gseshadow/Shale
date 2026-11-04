@@ -12,6 +12,7 @@ from unittest import mock
 SCRIPT = Path(__file__).with_name("select_tests.py")
 SPEC = importlib.util.spec_from_file_location("select_tests", SCRIPT)
 SELECTOR = importlib.util.module_from_spec(SPEC)
+sys.path.insert(0, str(SCRIPT.parent))
 SPEC.loader.exec_module(SELECTOR)
 RUNNER_SCRIPT = Path(__file__).with_name("run_selection.py")
 RUNNER_SPEC = importlib.util.spec_from_file_location("run_selection", RUNNER_SCRIPT)
@@ -153,7 +154,8 @@ class ChangeSelectorTest(unittest.TestCase):
         result = SELECTOR.select(fixture.read_text(encoding="utf-8").splitlines())
         test_argument = next(value for value in result["selected_maven_args"] if value.startswith("-Dtest="))
         self.assertIn(",", test_argument)
-        with mock.patch.object(SELECTOR.subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
+        with mock.patch.object(SELECTOR, "resolve_maven", return_value="/maven/bin/mvn"), mock.patch.object(
+                SELECTOR.subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
             SELECTOR.run_commands({**result, "python_command_args": []})
         selected_call = next(call for call in run.call_args_list if test_argument in call.args[0])
         self.assertIsInstance(selected_call.args[0], list)
@@ -192,12 +194,76 @@ class ChangeSelectorTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Windows-safe"):
             RUNNER.validate_maven_args(["-Dtest=" + "A" * RUNNER.WINDOWS_SAFE_COMMAND_LENGTH, "test"])
 
-    def test_runner_prefers_windows_maven_launcher(self):
+    def test_maven_resolution_respects_platform_and_fallback(self):
+        for platform, available, expected_calls in (
+                ("nt", "mvn.cmd", ["mvn.cmd"]),
+                ("nt", "mvn", ["mvn.cmd", "mvn"]),
+                ("posix", "mvn", ["mvn"]),
+                ("posix", "mvn.cmd", ["mvn", "mvn.cmd"])):
+            with self.subTest(platform=platform, available=available), mock.patch.object(
+                    RUNNER.os, "name", platform), mock.patch.object(
+                    RUNNER.shutil, "which", side_effect=lambda name: "/Maven path/" + name if name == available else None
+            ) as which:
+                self.assertEqual("/Maven path/" + available, SELECTOR.resolve_maven())
+                self.assertEqual([mock.call(name) for name in expected_calls], which.call_args_list)
+
+    def test_missing_maven_fails_before_any_command(self):
+        with mock.patch.object(RUNNER.shutil, "which", return_value=None), mock.patch.object(
+                SELECTOR.subprocess, "run") as run:
+            with self.assertRaisesRegex(FileNotFoundError, "Maven launcher"):
+                SELECTOR.run_commands(SELECTOR.select([]))
+            run.assert_not_called()
+
+    def test_windows_selector_runs_resolved_maven_with_exact_arguments(self):
+        batch = ["-pl", "shale-data,shale-core", "-Dtest=One,Two", "-Dlabel=a b", "test"]
+        plan = {"python_command_args": [], "selected_maven_batches": [batch],
+                "critical_command": "mvn test", "critical_maven_args": ["test"]}
         with mock.patch.object(RUNNER.os, "name", "nt"), mock.patch.object(
-                RUNNER.shutil, "which", side_effect=lambda name: "C:/Maven/bin/mvn.cmd" if name == "mvn.cmd" else None
-        ) as which:
-            self.assertEqual("C:/Maven/bin/mvn.cmd", RUNNER.resolve_maven())
-        self.assertEqual(mock.call("mvn.cmd"), which.call_args_list[0])
+                RUNNER.shutil, "which", return_value="C:/Program Files/Maven/bin/mvn.cmd"), mock.patch.object(
+                SELECTOR.subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
+            self.assertEqual(0, SELECTOR.run_commands(plan))
+        self.assertEqual([
+            mock.call(["C:/Program Files/Maven/bin/mvn.cmd", *batch], cwd=SELECTOR.ROOT, shell=False),
+            mock.call(["C:/Program Files/Maven/bin/mvn.cmd", "test"], cwd=SELECTOR.ROOT, shell=False),
+        ], run.call_args_list)
+
+    def test_selector_launches_path_maven_and_preserves_real_arguments(self):
+        batch = ["-pl", "shale-data,shale-core", "-Dtest=One,Two", "-Dlabel=a b", "test"]
+        plan = {"python_command_args": [], "selected_maven_batches": [batch],
+                "critical_command": "mvn test", "critical_maven_args": ["test"]}
+        with tempfile.TemporaryDirectory(prefix="maven path ") as directory:
+            recorder = Path(directory) / "record.py"
+            output = Path(directory) / "args.jsonl"
+            recorder.write_text(
+                f"#!{sys.executable}\n"
+                "import json, os, sys\n"
+                "with open(os.environ['ARG_RECORD'], 'a', encoding='utf-8') as output:\n"
+                "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            if os.name == "nt":
+                launcher = Path(directory) / "mvn.cmd"
+                launcher.write_text(f'@"{sys.executable}" "{recorder}" %*\n', encoding="utf-8")
+            else:
+                launcher = Path(directory) / "mvn"
+                launcher.write_bytes(recorder.read_bytes())
+                launcher.chmod(0o755)
+            with mock.patch.dict(os.environ, {"ARG_RECORD": str(output),
+                    "PATH": directory + os.pathsep + os.environ.get("PATH", "")}):
+                self.assertEqual(0, SELECTOR.run_commands(plan))
+            recorded = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([batch, ["test"]], recorded)
+
+    def test_windows_resolved_path_and_quoting_cannot_exceed_command_limit(self):
+        plan = {"python_command_args": [["python", "check.py"]],
+                "selected_maven_batches": [["-Dlabel=" + "a " * 3490, "test"]],
+                "critical_command": "mvn test", "critical_maven_args": ["test"]}
+        with mock.patch.object(RUNNER.os, "name", "nt"), mock.patch.object(
+                RUNNER.shutil, "which", return_value="C:/Program Files/Maven/bin/mvn.cmd"), mock.patch.object(
+                SELECTOR.subprocess, "run") as run:
+            with self.assertRaisesRegex(ValueError, "Windows-safe"):
+                SELECTOR.run_commands(plan)
+            run.assert_not_called()
 
     def test_selector_contract_suite_is_required_only_for_infrastructure_changes(self):
         self.assertTrue(SELECTOR.selector_tests_required(["build/test-selection/run_selection.py"]))

@@ -1,5 +1,61 @@
 # Production MCP deployment preflight
 
+## Current decision — 2026-11-04
+
+The [final evidence, SQL disposition and decision table](testing/native-azure-diagnostic-closeout.md)
+record the operator's decision to stop Azure-specific catalog diagnosis. Repeated full disposable Azure
+setup/V2 installation passed; native restricted catalog/read-only acceptance remains OPEN at
+`VERIFIER_COMPONENT_READ; component=0:before_first_component; phase=BATCH_EXECUTE`.
+No permission defect was established; no grant or timeout change is justified. Launcher and tiny-probe
+Windows validation passed, but the tiny probe did NOT run in Azure. No production change/deployment
+or AI/MCP/OAuth activation occurred. #1929 remains draft/unmerged. Do not execute/refresh the old
+fixture packet or resume diagnosis as this preflight's next step.
+
+**Minimum path: conditional GO for a dormant JAR; AI readiness/serving and pilot remain NO-GO.**
+A passing native catalog verifier is not required to upload/start a compatible JAR with **all** AI
+controls OFF, including `shale.ai.mcp.case-data-composition-enabled=false`. Existing conditional
+composition and `McpProductionOffBootTest` establish that OFF Boot creates no AI pool/attestation;
+readiness is `disabled`. This narrows earlier umbrella deployment-blocked statements for the dormant
+release only. No SQL-bound/readiness/activation gate is waived and no architectural contract changes.
+
+The minimum remaining release gate is reviewed exact source/build/artifact SHA-256, retained rollback
+JAR, ordinary auth/session SQL and installed-caller compatibility from existing change records,
+effective all-OFF App Service settings, normal release authorization and post-upload ordinary health/
+login/session/remembered-restore/no-disclosure smoke. A missing ordinary dependency is a STOP for
+that specific release; the seven installed AI migrations alone do not prove all JAR dependencies.
+No new AI SQL is required merely for this OFF release. Do not replay completed evidence or retirement.
+
+For separately chosen SQL preparation, the exact existing chain remains:
+`docs/sql/phase1r/preflight.sql` -> `docs/sql/phase1r/apply.sql` ->
+`docs/sql/phase1r/postcheck.sql` -> `docs/sql/ai-integration/phase3b8-confinement-prerequisite.sql` ->
+`docs/sql/ai-integration/phase3b8-confinement.sql` -> `docs/sql/ai-integration/verify.sql`.
+Phase1R plus V2 are the two unapplied change candidates in the recorded production baseline;
+Phase3B.8 is the sole new AI confinement installer, not the sole SQL change in that chain.
+Phase1R requires reviewed destination inputs and compatible ordinary callers; OFF flags do not
+neutralize its FILTERs. If caller rollout is still missing, release compatible dormant callers first.
+Do not turn unknown auth Stage A/B status into blanket migration/replay instructions.
+
+The seven already installed AI installers listed in Stage 1 MUST NOT be rerun. No additional migration
+was introduced by the diagnostics. If SQL-first is separately approved after those prerequisites:
+existing chain above -> verify SQL capabilities OFF -> compatible JAR with all controls OFF -> ordinary/
+OFF smoke -> stop. SQL preparation is not native acceptance or authorization for readiness/pilot.
+The smaller recommended release defers both Phase1R/V2 SQL and AI activation until their separate gates.
+
+Stages 0–7 below retain the detailed future SQL-bound/readiness/activation sequence and original
+operator evidence, not a requirement to perform all of them before a dormant JAR upload. All controls
+in the configuration table below, **including readiness**, remain false for the dormant release.
+AI identities, independent secrets, immutable binding, complete live attestation, native read-only and
+disposable mutation/fault acceptance, ingress/OAuth/operational/legal/SDK/security/tenant-owner approvals
+remain required for the later AI rollout. Native acceptance is not claimed or waived by shipping OFF.
+
+
+The archived native Azure investigation has a separate
+[disposable owner packet](testing/native-azure-readonly-operator-runbook.md) and
+[pending acceptance record](testing/native-azure-readonly-acceptance.md). The native JUnit selector
+explicitly refuses production targets and was scoped only to a fresh disposable fixture.
+It is not selected by this closeout. Future deployed production attestation remains separately governed. No production step below
+is authorized by preparation of this packet.
+
 This is a future governed sequence, not execution authorization. The production composition's
 [prior SQL Server local acceptance passed](testing/production-mcp-case-composition.md), including the
 inherited-verifier-authority fix. The [Azure SQL Database successor](testing/azure-sql-case-attestation.md)
@@ -112,8 +168,8 @@ it must not be retried as a repair. Physical column-ID gaps and reviewed SQL sto
 prevent its exact fingerprint even after Phase1R. Never rebuild tables, renumber IDs or rewrite modules
 to satisfy V1. Preserve its historical receipts, expected hash and failure evidence.
 
-The new [V2 contract](architecture/phase3b8-confinement-v2.md) requires fresh local acceptance before
-an operator receives an executable packet. The separately governed future sequence is:
+The [V2 contract](architecture/phase3b8-confinement-v2.md) has completed its recorded local acceptance;
+no repeat local campaign is requested here. The separately governed SQL-bound future sequence is:
 
 1. Retain the seven installed migrations; verify their current cumulative predecessor receipts.
 2. Phase1R preflight with independently reviewed destination inputs.
@@ -153,7 +209,8 @@ Keep governed contained AI, contained verifier and bootstrap identities, indepen
 exact live database token/SID proof, complete live attestation, secret-consumer separation,
 immutable deployment binding and an authorized disposable Azure SQL mutation/fault fixture as
 separate gates. No disposable Azure fixture is configured/authorized for this task; its mutation
-tests remain a deployment gate. Never use production for fault injection.
+tests remain an AI readiness/activation gate; the current dormant all-OFF release disposition above
+is separate. Never use production for fault injection.
 Provision exactly one AiCaseDataDeployment row with Id 1, case-read-v1, canonical issuer/resource and
 the actual existing JVM/SQL time-zone mapping. It is immutable; do not guess UTC or update a binding.
 Verify the real AI login's tokens, column permissions, six EXECUTEs, 42 denials, no ownership, cross-DB

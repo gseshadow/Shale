@@ -13,6 +13,8 @@ import subprocess
 import sys
 from typing import Iterable
 
+from run_selection import resolve_maven
+
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = Path(__file__).with_name("test-areas.json")
 CRITICAL_PATH = Path(__file__).with_name("critical-tests.txt")
@@ -353,11 +355,18 @@ def markdown(result: dict) -> str:
 
 
 def run_commands(result: dict) -> int:
+    maven = resolve_maven()
     command_specs = [
         *[(display_command(arguments), arguments) for arguments in result["python_command_args"]],
-        *[(display_command(["mvn", *args]), ["mvn", *args]) for args in result["selected_maven_batches"]],
-        (result["critical_command"], ["mvn", *result["critical_maven_args"]]),
+        *[(display_command(["mvn", *args]), [maven, *args]) for args in result["selected_maven_batches"]],
+        (result["critical_command"], [maven, *result["critical_maven_args"]]),
     ]
+    # Account for the resolved path and Windows quoting as well as the planner's
+    # existing batch limit. Refuse before executing any command from this plan.
+    if os.name == "nt" and any(
+            len(subprocess.list2cmdline(arguments)) > WINDOWS_SAFE_COMMAND_LENGTH
+            for _, arguments in command_specs if arguments[0] == maven):
+        raise ValueError("Resolved Maven command exceeds the Windows-safe command length limit.")
     for display, arguments in command_specs:
         print(f"+ {display}", flush=True)
         completed = subprocess.run(arguments, cwd=ROOT, shell=False)
@@ -400,7 +409,11 @@ def main(argv: list[str] | None = None) -> int:
     if result["selection_error"]:
         print(f"Selector policy error: {result['selection_error']}", file=sys.stderr)
         return 2
-    return run_commands(result) if args.run else 0
+    try:
+        return run_commands(result) if args.run else 0
+    except (OSError, ValueError) as error:
+        print(f"Selector execution failed: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
