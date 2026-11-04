@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "baseline": "fceac929e1f9cfcf6626f26d602c1f5bd15b1ce5",
+  "canonicalization": "UTF-8 LF; no BOM",
+  "jdbcVersion": "12.6.1.jre11",
+  "jdbcSha256": "3b1a70145dbaff98daa70022791e15becfb2b9534cc9e8cfaa1bdba6a3edeb8e",
+  "files": [
+    {
+      "path": "build/azure-native/invoke_tiny_catalog_probe.ps1",
+      "sha256": "3eba6325c64f426a8c8aae67f802575d0e4e46336c8f011927490ce4efc4ac2d"
+    },
+    {
+      "path": "build/azure-native/TinyCatalogProbe.java",
+      "sha256": "7f62921f843a0a75c008d65420a8125b75450cc368072d180b46ef5c088f5fec"
+    },
+    {
+      "path": "build/azure-native/TinyCatalogProbeOfflineTest.java",
+      "sha256": "89f9cf650ea53a9d94ddb43368a2572b075c16a8fea6be166bb6c9cc3bd62475"
+    },
+    {
+      "path": "build/azure-native/test_tiny_catalog_probe.py",
+      "sha256": "d7a14b5f6bf59cb619d6a92687dc46c2c6e940bd3db14e855da1b343bd3e7ef4"
+    },
+    {
+      "path": "build/azure-native/test_tiny_catalog_probe.ps1",
+      "sha256": "3f5519d518bd2206b916414f65ea0923d8edb9f56b262af8f9afe69eb57f8b4a"
+    },
+    {
+      "path": "shale-data/src/test/resources/ai/confinement-v2-catalog-components.sql",
+      "sha256": "f2b8aee3a420f9655ec047eaaa66e4299d3aee064476644c6132fe41f00a3dbf"
+    }
+  ]
+}

@@ -128,6 +128,16 @@ If an Azure-specific uncertainty must still be resolved, separately authorize **
 5. Drop the exact new database/user scope in finally and confirm absence. Do not run the old live
    launcher, restore its markers, or escalate permissions based on failure. Preparation is not approval.
 
+## Independent tiny-probe implementation
+
+The separately pinned [tiny synthetic probe packet](native-azure-tiny-catalog-probe.md)
+implements only the diagnostic design above, including the exact synthetic 19-component
+batch. It has standalone offline/native Windows tests and an independent authorization
+switch; it neither consumes nor regenerates full-fixture markers. The owner's reported
+Windows validation of `fceac929e1f9cfcf6626f26d602c1f5bd15b1ce5` is complete; native Windows
+validation of the new tiny-probe files remains separate. No Azure ran during preparation.
+The historical full-fixture pin/marker discussion below is not this probe's launch protocol.
+
 ## Verification and handoff
 
 Local checks: five real SQL Server tests pass; five Python catalog guards pass; network-disabled
