@@ -1,5 +1,118 @@
 # Read-only Azure catalog component diagnostic
 
+## Harness investigation — 2026-11-04
+
+**BLOCKED pending Windows validation of the revised reader. No further Azure run is authorized.**
+The owner reports that the fresh component attempt failed before a complete comparison and
+`AZURE_NATIVE_CLEANUP CONFIRMED`. The fixture was destroyed; this is diagnostic evidence only,
+not a component difference, receipt drift, acceptance, or permission to retry/adopt.
+
+Investigation baseline: PR #1929 head `56709de2584b9ebcd2cc43e67e80914b4085beef`.
+The original reader exits immediately on `execute=false` / update count `-1`; the original valid
+mock always returns `true`. The regression now models four leading no-result states plus one
+before each SELECT. It reproduces the gap under the proposed sequence, but does **not** establish
+the Azure cause: JDBC normally defines false/-1 as exhaustion, and inspection of the pinned
+12.6.1.jre11 driver's `SQLServerStatement$1NextResult.onDone` shows that NOCOUNT DML completions
+and intermediate non-DML completions are skipped internally. The old failure has no stage evidence.
+
+The reader tolerates 23 no-result advances per gap (four preamble statements plus 19 SETs in the
+unchanged resource), resetting after each valid result. It executes SQL once and always advances
+with CLOSE_CURRENT_RESULT, with at most 479 advances. Exhaustion without all 19 results still
+fails finitely. The allowance also applies after result 19 to detect trailing extra results or
+update counts. Zero/positive update counts, missing/extra/duplicated/reordered results, invalid
+names, NULL lengths and malformed lengths/digests still fail; result/statement closure is retained.
+
+Other paths shared the same generic failure: datasource construction/open, target validation,
+component reads, connection cleanup and report I/O. The failure now adds only one fixed `stage`:
+`OWNER_TARGET_PREFLIGHT`, `VERIFIER_TARGET_PREFLIGHT`, `OWNER_COMPONENT_READ`,
+`VERIFIER_COMPONENT_READ`, or `REPORT_WRITE`. Connection cleanup belongs to its identity's
+target/preflight category; primary read failures retain their category even if cleanup also fails.
+Thrown failures contain no driver messages, SQL text, targets, credentials, SIDs, tokens, causes
+or suppressed exceptions. Failed comparisons attempt to remove partial/stale TSV output.
+
+Pre-edit test impact: `AzureCatalogComponentsTest` covers traversal, exact expression identity,
+comparison and sanitization; the existing five Python launcher guards protect creation, cleanup,
+credential bytes and ordering. Existing focused safety/datasource/driver/V2-install/attestation/
+migration/Phase1R tests protect the surrounding contracts. The selector maps this Java delta to
+cases/security-data (core/data/server). No production source, SQL/resource, receipt, hash, grant,
+authority boundary, datasource setting, ordinary 20-second limit or 600-second V2 timeout changes.
+Catalog/reference metadata reads introduce no PHI/entity audit event or audit migration.
+
+The validation/live pins below remain historical and unchanged. They intentionally refuse this
+executable delta. Do not bypass fences, manufacture/reuse a validation marker or launch Azure.
+The owner's delta-only validation instruction supersedes the earlier broad Windows checklist:
+run only the focused diagnostic class and five launcher guards described below. No Azure setup,
+V2 installation, Phase1R rehearsal or unchanged timeout/datasource suite needs repeating for this
+delta. Configured Maven and native Windows results remain required; cached-JUnit checks alone
+cannot authorize a live run. Updating/reviewing a launcher baseline is separate work.
+
+Current local verification (Linux; no Azure connection):
+
+- JDK 21 `javac` plus cached JUnit 5.10.3 launcher, using the nine focused classes listed in
+  the historical Windows command: 48 executed/passed, zero failures/errors/skips. After adding
+  the combined primary-read/close failure assertion, the changed `AzureCatalogComponentsTest`
+  class was recompiled and rerun: 10/10 passed. This is supplemental, not Maven/Surefire validation.
+- The new leading/interleaved-state method run against the original reader fails with the
+  sanitized incomplete-metadata refusal; against the revised reader it passes.
+- `python -m unittest discover -s build/azure-native -p test_catalog_components.py`: 5 passed,
+  including a rerun after the runbook prose changes.
+- `python -m unittest discover -s build/sql-confinement -p test_checkout.py`: 11 passed.
+- `python build/sql-confinement/checkout_bytes.py`: 25 pinned files/index and both receipts PASS.
+- `python build/test-selection/select_tests.py --base 56709de2584b9ebcd2cc43e67e80914b4085beef --head HEAD`
+  checks the unchanged HEAD; explicit `--path` selection of the three uncommitted Java files
+  selects cases/security-data and core/data/server. Its affected Maven batch and critical
+  `mvn test` were attempted with the configured cache in offline mode; both fail before test
+  execution because Spring Boot BOM 4.1.1 is uncached. The focused configured Maven command also
+  fails resolving that BOM through the unavailable dependency network path.
+- `git diff --check`: PASS. Native Windows/PowerShell and required configured Maven suites remain
+  unverified. No Azure resource, fixture reuse, production access or acceptance is claimed.
+
+### Delta-only Windows validation and marker protocol
+
+Final delta review added separate leading-only/interleaved-only cases and explicit private-evidence
+canaries. JDK 21 compilation and the cached JUnit rerun pass all 12 diagnostic tests with zero
+failures/errors/skips. Both separate traversal regressions fail against the original reader.
+The five Python guards and 25 pinned-byte/index/receipt checks pass again. Configured Windows
+Maven remains pending; these supplemental checks do not repeat the passed setup/V2/Phase1R work.
+
+Use a clean checkout of the new reader commit reported in the handoff, with JDK 21/Maven in a
+fresh Windows shell containing no `SHALE_AZURE_*` variables. The only Maven test selector needed
+for this delta is:
+
+```powershell
+mvn -B -ntp -pl shale-data -am '-Dtest=AzureCatalogComponentsTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
+```
+
+Require a fresh `shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AzureCatalogComponentsTest.xml`:
+12 executed, zero failures/errors/skips. The leading-only and interleaved-only tests are separate;
+the combined-state test covers missing/extra/reordered results and initial/trailing zero/positive
+update counts. The category test checks all five exact allowlisted messages, synthetic SQL,
+JDBC target, username/password, SID, token and driver-message canaries, null cause and no suppressed
+exceptions, including a primary read failure followed by a failing close. The existing exact SQL
+expression comparison test remains part of this same class.
+
+Also run `python -m unittest discover -s build/azure-native -p test_catalog_components.py`:
+five passes, protecting the unchanged runbook command blocks, credentials, cleanup and ordering.
+Checkout code, resource bytes, SQL expressions, installer, receipts, grants, production source,
+V2/Phase1R helpers and timeouts have no diff, so their already-passed Windows/SQL rehearsals carry
+forward. No Azure opt-in or private candidate is needed for these two offline commands.
+
+After both pass, record test-only evidence at
+`work/azure-native/catalog-reader-windows-validation.json`, with `codeHead` and `sourceHead`
+both equal to the full new reader commit SHA, `hostName` equal to the validating Windows host,
+`result=PASS`, `scope=CATALOG_READER_DELTA_ONLY`, `tests=12`, `failures=0`, `errors=0`, `skipped=0`,
+`launcherGuards=5` and `azureAuthorized=false`. Do not write the live-consumed
+`catalog-diagnostic-validation.json` from this delta-only test sequence.
+
+For a subsequent separately reviewed packet, its executable baseline (`$ExecutableHead`,
+`$ValidatedHead` and eventual live marker `codeHead`) must be this new reader commit SHA,
+never the historical `5867337...` or `56709de...` baseline. Its live marker `sourceHead` must be
+the exact final reviewed packet commit, on the same `hostName`, with passing same-source packet
+checks. Do not relabel the test-only marker as a live marker. Updating pins, consuming a marker
+or launching remains separate, unapproved work. Passing Windows tests alone authorizes no Azure run.
+
+## Historical preparation and validation
+
 Prepared 2026-11-02 against reviewed packet `7a70ea76db26351632b647863a4d814182bc472b`.
 Diagnostic code baseline: `5867337464e2caf0eabdf5c8694061ab43d3c8a7`.
 Windows/Maven validation and the next fresh Azure attempt remain **PENDING**.

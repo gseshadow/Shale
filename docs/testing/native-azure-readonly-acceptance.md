@@ -1,5 +1,14 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+## Component attempt consumed; harness investigation — 2026-11-04
+
+Owner-reported: component diagnostic failed before a complete comparison; cleanup returned
+`AZURE_NATIVE_CLEANUP CONFIRMED`. The fixture was destroyed. No component difference, receipt
+drift or acceptance is established. The [reader investigation](native-azure-catalog-component-diagnostic.md#harness-investigation--2026-11-04)
+adds bounded no-result traversal and fixed sanitized failure categories. Its Windows/configured
+Maven validation remains pending. **Another Azure run is NOT AUTHORIZED.** Earlier executable
+validation and launcher pins do not cover this delta and must not be bypassed or reused.
+
 ## Current catalog-component diagnostic — 2026-11-02
 
 The timeout-only attempt below is consumed. The owner reports that the unchanged V2 installer

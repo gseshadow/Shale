@@ -1,5 +1,13 @@
 # Native Azure contained identity / read-only operator packet
 
+**2026-11-04: BLOCKED — no further Azure run pending Windows validation of the revised reader.**
+The fresh component attempt failed before a complete comparison; the owner confirmed
+`AZURE_NATIVE_CLEANUP CONFIRMED`. That fixture was destroyed and supplies diagnostic evidence only.
+See the [harness investigation](native-azure-catalog-component-diagnostic.md#harness-investigation--2026-11-04).
+The pinned validation/live fences below are historical and intentionally reject the revised
+executable inputs. Do not override them or reuse a validation marker. This investigation
+does not authorize a new live launcher.
+
 **CATALOG COMPONENT DIAGNOSTIC: WINDOWS VALIDATION PENDING.**
 This supersedes the consumed timeout-only launcher published at `7a70ea76db26351632b647863a4d814182bc472b`.
 The unchanged V2 installer has completed on Azure under its 600-second ceiling (owner report).

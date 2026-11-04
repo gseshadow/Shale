@@ -11,6 +11,10 @@ final class AzureCatalogComponents {
             "indexes","security_predicates","object_permissions","triggers","integration_role_owners",
             "tenant_filter_definition","runtime_verifier_permissions","execution_and_schema_owners","dependencies",
             "runtime_role_owner","verifier_role_owner","database_options","unicode_ranges","unicode_lower","word_transitions");
+    // Four preamble statements plus one SET per SELECT in the fixed resource.
+    // JDBC normally treats false/-1 as terminal. Tolerate exposed non-result states
+    // only within this finite budget per gap; never execute again or retry SQL.
+    static final int NON_RESULT_BUDGET=4+NAMES.size();
     record Component(long bytes,String sha256) {
         Component {
             if(bytes<0||sha256==null||!sha256.matches("[0-9A-Fa-f]{64}"))throw refused();
@@ -28,6 +32,7 @@ final class AzureCatalogComponents {
         try(var statement=connection.createStatement()) {
             statement.setQueryTimeout(AiCaseDataAzureSqlDisposableSetupTest.OWNER_QUERY_SECONDS);
             boolean more=statement.execute(sql());
+            int nonResults=0;
             while(true) {
                 if(more)try(var result=statement.getResultSet()) {
                     int index=rows.size();
@@ -37,9 +42,12 @@ final class AzureCatalogComponents {
                     if(result.wasNull())throw refused();
                     rows.add(new Component(bytes,result.getString(4)));
                     if(result.next())throw refused();
+                    nonResults=0;
                 }
-                else if(statement.getUpdateCount()==-1)break;
-                else throw refused(); // NOCOUNT: no update counts belong in this read-only batch.
+                else {
+                    if(statement.getUpdateCount()!=-1)throw refused(); // No update counts, including zero.
+                    if(++nonResults>NON_RESULT_BUDGET)break;
+                }
                 more=statement.getMoreResults(Statement.CLOSE_CURRENT_RESULT);
             }
         }
