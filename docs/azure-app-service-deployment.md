@@ -1,5 +1,27 @@
 # Shale Server Azure App Service Deployment Guide
 
+## Current dormant release decision — 2026-11-04
+
+The [deployment preflight](production-mcp-deployment-preflight.md#current-decision--2026-11-04)
+and [native diagnostic closeout](testing/native-azure-diagnostic-closeout.md) separate ordinary dormant
+JAR rollout from AI SQL/readiness/serving activation. Native Azure catalog/read-only acceptance is
+NOT fully passed; the operator has stopped further diagnosis. No production action occurred.
+
+For a compatible server JAR with **every** AI/MCP/OAuth switch OFF, including
+`shale.ai.mcp.case-data-composition-enabled=false`, no new AI SQL migration is required merely to
+upload/start it. The remaining gate is exact artifact/build and ordinary auth/session SQL compatibility,
+effective OFF configuration, release approval and ordinary/no-disclosure smoke. Preserve the existing
+seven installed AI migrations and completed legacy retirement; do not replay them. Missing ordinary
+SQL dependencies remain UNKNOWN until existing records resolve them, not automatically approved SQL.
+
+If SQL preparation is separately chosen, Phase1R preflight/apply/postcheck must precede V2 prerequisite,
+`phase3b8-confinement.sql` and cumulative `verify.sql`. Phase1R changes ordinary RLS even with AI OFF;
+compatible auth/desktop/job callers and reviewed destination inputs must precede it. Thus SQL-first is
+conditional, not the smallest dormant release or a universal order for an incompatible older fleet.
+Defer AI identities/secrets/binding/readiness activation and the one-client pilot until retained
+native/live and other activation gates close. Historical future sequences below are superseded by
+this scoped decision; no security/attestation check or architecture is changed.
+
 ## Current authentication/security reconciliation — 2026-10-21
 
 The [canonical API/MCP roadmap §2.5](architecture/ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)

@@ -1,5 +1,15 @@
 # Native Azure contained identity / read-only operator packet
 
+**ARCHIVED LIVE PACKET — operator stopped Azure-specific diagnosis on 2026-11-04.**
+Do not execute the full fixture launcher, refresh its markers, create a dedicated server or run the tiny
+probe as a continuation. See the [final evidence and deployment decision](native-azure-diagnostic-closeout.md).
+Full disposable setup/V2 repeatedly passed; restricted native BATCH_EXECUTE remains unresolved.
+Both the REPORT_WRITE launcher fix and the separately implemented tiny probe are Windows-validated;
+the tiny probe did NOT run in Azure. No grant/timeout/SQL change is justified by this investigation.
+Earlier future-run and pending-Windows text below is historical, not current authorization or a request
+to resume. Executable blocks/pins are preserved for evidence. Native acceptance is NOT fully passed;
+PR #1929 remains draft/unmerged. Dormant all-OFF JAR deployment is a separate release decision.
+
 **BATCH AUTHORITY REVIEW: do not repeat the full Azure fixture for this investigation.**
 The unchanged 19-component batch passes locally with only the existing verifier grants. A 5-second
 verifier socket bound can preempt the 20-second query timeout; the preserved Azure message does not

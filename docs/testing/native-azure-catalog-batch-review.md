@@ -1,5 +1,19 @@
 # Catalog batch authority and execution review
 
+**Final operator disposition — 2026-11-04: Azure-specific diagnosis stopped.**
+The [closeout and deployment decision](native-azure-diagnostic-closeout.md) supersedes all
+retry/readiness-to-run instructions below. Full disposable Azure setup repeatedly passed through V2,
+binding, cumulative verification and OFF check. The remaining failure is
+`VERIFIER_COMPONENT_READ; component=0:before_first_component; phase=BATCH_EXECUTE`.
+The unchanged batch passes locally with exactly six verifier grants and denied application SELECT;
+no permission defect/change is established or justified. The 5000-ms socket / 20-second query
+preemption hypothesis remains an inference only. Launcher and tiny-probe Windows validation passed;
+the tiny probe at `871919c263b650bd7dc805fef16cee7ddac35769` did NOT run in Azure.
+Only production `shale` was discovered; the operator declined a dedicated nonproduction server/probe.
+Native catalog/read-only and mutation/fault acceptance remain OPEN; #1929 stays draft/unmerged.
+No production SQL/permissions/deployment or AI/MCP/OAuth enablement occurred. Historical packets and
+pending-at-the-time Windows statements below retain their original dates/scopes; they are not next steps.
+
 Reviewed against executable `bec7ecbac86a2026bc16dac7a2e8963d7467dd4e` and packet
 `69f4adc08a77b0a01c3adbaed91985c90555d11c`. No Azure executed or authorized.
 

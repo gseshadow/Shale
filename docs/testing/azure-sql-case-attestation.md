@@ -1,5 +1,12 @@
 # Azure SQL Database attestation acceptance
 
+**Current closeout — 2026-11-04:** [final native evidence and deployment decision](native-azure-diagnostic-closeout.md).
+Repeated disposable setup/V2 installation succeeded; restricted native catalog/read-only acceptance
+remains OPEN at BATCH_EXECUTE. The operator stopped further Azure-specific diagnosis. No production
+SQL/deployment/activation occurred. A dormant all-OFF JAR (including readiness OFF) can be released
+under ordinary compatibility/release gates without claiming native acceptance; AI readiness/pilot stays
+blocked. The older executable native packet below is archived and must not be run as a continuation.
+
 Current native follow-up (2026-10-29): [pending record](native-azure-readonly-acceptance.md) and
 [exact disposable operator packet](native-azure-readonly-operator-runbook.md). The native JUnit gate
 now requires the disposable V2 fixture and refuses production; the older command/settings below
