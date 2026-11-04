@@ -1,9 +1,15 @@
 # Native Azure contained identity / read-only operator packet
 
-**2026-11-04: REVISED PACKET FOR OWNER REVIEW. AZURE NOT AUTHORIZED.**
+**2026-11-04: CONSOLE / CONSUMPTION FIX FOR OWNER REVIEW. DO NOT EXECUTE AZURE.**
+The authorized attempt stopped at the unusable Windows credential dialog before resource creation.
+The owner confirmed `Test-Path work/azure-native/resource-scope.json` returned `False`; no scope
+was created and no cleanup is required. Both validation markers were legitimately consumed.
+Do not restore, reuse or relabel either marker. Generate fresh reader evidence using the narrow
+[Windows regeneration protocol](native-azure-catalog-component-diagnostic.md#fresh-windows-evidence-after-consumption),
+then run section 1 on the final reviewed packet. This revision executes no Azure commands.
 The owner reports Windows reader-delta validation PASS for
 `5b88402940fc9950228eb5320bed9b37fc64e359`: 12 tests, zero failures/errors/skips and five launcher guards.
-Section 1 requires that same-host test-only marker and checks this exact final packet without
+Section 1 requires fresh same-host test-only reader evidence and checks this exact final packet without
 rerunning Maven, Azure setup, Phase1R or V2 rehearsals. The final live marker records the exact
 reviewed packet commit as `sourceHead`, and the validated reader commit as `codeHead`.
 Neither marker authorizes Azure. Do not execute the live launcher until separately authorized.
@@ -25,7 +31,7 @@ Set `$ReviewedPacketHead` to the **final commit SHA from the review handoff**, c
 commit cleanly, and execute this complete fence in a fresh Windows session. A terminating guard
 failure invalidates the sequence: stop, resolve the guard, then rerun the entire offline fence.
 Never paste downstream commands manually. Do not overwrite/relabel old validation markers.
-The reader marker must be the already-passed baseline evidence, not a newly fabricated marker.
+The reader marker must be fresh baseline evidence from the regeneration protocol, never restored consumed evidence.
 Only same-source packet guards, pinned-byte/receipt checks and same-host credential/fence checks
 run here. No Maven or database rehearsal is needed. Keep both markers local and private.
 
@@ -36,7 +42,8 @@ $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
     'docs/testing/native-azure-catalog-component-diagnostic.md',
-    'build/azure-native/test_catalog_components.py'
+    'build/azure-native/test_catalog_components.py',
+    'build/azure-native/test_runbook_launcher.ps1'
 )
 # Set this to the final packet SHA from the review handoff, never an inferred moving branch.
 if ($ReviewedPacketHead -cnotmatch '^[a-f0-9]{40}$') { throw 'Set the exact reviewed final packet commit first' }
@@ -83,6 +90,8 @@ if ($env:OS -cne 'Windows_NT') { throw 'Native Windows host required' }
 $PowerShellExe = (Get-Process -Id $PID).Path
 & $PowerShellExe -NoProfile -File build/azure-native/test_runbook_credentials.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Same-host offline PowerShell credential/fence checks failed; no manual continuation' }
+& $PowerShellExe -NoProfile -File build/azure-native/test_runbook_launcher.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Same-host offline launcher cancellation/ordering checks failed; no manual continuation' }
 git diff --check
 if ($LASTEXITCODE -ne 0) { throw 'Diff whitespace check failed' }
 $Candidate = (Resolve-Path (Read-Host 'Private authoritative-candidate.sql path')).Path
@@ -105,15 +114,17 @@ Write-Output 'CATALOG_DIAGNOSTIC_WINDOWS_VALIDATION PASS azureAuthorized=false'
 ```
 
 The live marker remains `azureAuthorized=false`. The original reader marker is hash-bound to it;
-both are rechecked and consumed before any future resource creation. A consumed/failed attempt
-requires a separately reviewed new evidence/attempt protocol; do not restore an earlier marker.
+both are rechecked and consumed only after all section 2 input/read-only preflight succeeds,
+immediately before the recovery record and first Azure resource mutation. A preflight cancellation
+or refusal preserves both markers and writes no scope. This packet supplies the fresh evidence
+protocol after the reported pre-creation stop; never restore an earlier marker.
 Keep the private schema local; its supplied digest never substitutes for checking actual bytes.
 
 ## Reviewed live launcher — mandatory
 
 **DO NOT RUN: separate explicit owner authorization is still required after packet review.**
 The launcher pins the diagnostic code, requires the same-host validation marker and unchanged
-source head, and consumes that marker before resource creation. It runs sections 2 and 3, then
+source head, and consumes both markers at the section 2 mutation boundary. It runs sections 2 and 3, then
 always section 5 once the new scope is recorded. Section 3 performs the unchanged probe/setup,
 then the separate read-only component test while the owner credential is still available.
 The full native attestation in section 4 is deliberately not selected for this diagnostic attempt.
@@ -130,7 +141,8 @@ $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
     'docs/testing/native-azure-catalog-component-diagnostic.md',
-    'build/azure-native/test_catalog_components.py'
+    'build/azure-native/test_catalog_components.py',
+    'build/azure-native/test_runbook_launcher.ps1'
 )
 git merge-base --is-ancestor $ValidatedHead HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Windows-validated executable baseline required' }
@@ -201,14 +213,14 @@ try {
     $LiveDigest = [BitConverter]::ToString($Digest.ComputeHash([Text.Encoding]::UTF8.GetBytes(($LiveSources -join "`n")))).Replace('-', '').ToLowerInvariant()
 }
 finally { $Digest.Dispose() }
-if ($LiveDigest -cne 'fcae9c725c01f9f5cc36fbd1a5847e6a0e0502d4e9c9aed6eab10d073ca613fb') { throw 'Reviewed live sections changed; STOP before resource creation' }
+if ($LiveDigest -cne '32f1a91f1b1e7389af9b1513a11484e509ba299f23fb202eda5270bd3f6bce12') { throw 'Reviewed live sections changed; STOP before resource creation' }
 # A future run requires separate owner authorization; packet validation never grants it.
 if ((Read-Host 'Only after separate explicit owner authorization, type AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT') -cne 'AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT') {
     throw 'Azure not authorized; STOP without mutation or manual continuation'
 }
-# Consume BOTH markers before the first live command; never recreate/relabel consumed evidence.
-Remove-Item -LiteralPath $ReaderValidationPath -ErrorAction Stop
-Remove-Item -LiteralPath $ValidationPath -ErrorAction Stop
+# Bind both markers across operator input; section 2 consumes them only at the mutation boundary.
+$LiveReaderDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $ReaderValidationPath).Hash
+$LiveMarkerDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $ValidationPath).Hash
 $ScopeWritten = $false
 $Nonce = $null
 try {
@@ -242,21 +254,45 @@ finally {
 
 Choose an authorized acceptance subscription and region. These are environment-specific inputs,
 not values derivable from the repository. The remaining names are generated and captured below.
-`$AdminCredential` is a secure `PSCredential`; its password never becomes a process argument or file.
+`$AdminCredential` is a secure `PSCredential`, entered through console-only `Read-Host -AsSecureString`.
+No password is echoed, written to disk, supplied in process arguments, Maven properties, SQLCMD
+variables, logs or Git. The local `Get-Credential` override below avoids the Windows dialog.
+Login/context selection, nonempty available region, credential entry, strict single IPv4 validation
+and the fresh-name collision check all precede consumption. Directory preparation also precedes it;
+only the non-secret recovery record separates consumption from the first Azure mutation.
+A failed/cancelled input leaves both markers intact and no resource scope. Run section 2 only
+through the reviewed launcher so terminating failures retain the existing `finally` cleanup.
 
 ```powershell
-Connect-AzAccount | Out-Null
+function Get-Credential {
+    param(
+        [string]$UserName,
+        [string]$Message
+    )
+    if ($Message) { Write-Host $Message }
+    if (-not $UserName) { $UserName = Read-Host 'Username' }
+    $SecurePassword = Read-Host "Password for $UserName" -AsSecureString
+    return [System.Management.Automation.PSCredential]::new($UserName,$SecurePassword)
+}
+$Login = Connect-AzAccount -ErrorAction Stop
+if ($null -eq $Login) { throw 'Azure login cancelled' }
 $SubscriptionId = Read-Host 'Authorized acceptance subscription ID'
-Set-AzContext -SubscriptionId $SubscriptionId | Out-Null
+if ([string]::IsNullOrWhiteSpace($SubscriptionId)) { throw 'An authorized acceptance subscription is required' }
+$Context = Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop
+if ($null -eq $Context -or $Context.Subscription.Id -cne $SubscriptionId) { throw 'Authorized subscription context selection failed' }
 $Location = Read-Host 'Authorized Azure region (for example westus2)'
+if ([string]::IsNullOrWhiteSpace($Location)) { throw 'An authorized Azure region is required' }
+if (@(Get-AzLocation -ErrorAction Stop | Where-Object Location -CEQ $Location).Count -ne 1) { throw 'Select an available Azure region' }
 $Nonce = [guid]::NewGuid().ToString('N')
 $ResourceGroup = "shale-attest-$Nonce"
 $ServerName = "shale-attest-$Nonce"
 $DatabaseName = "ShaleAzureReadOnly_$Nonce"
 $AdminCredential = Get-Credential -UserName 'azro_owner' -Message 'New disposable SQL server administrator; use a fresh strong password'
+if ($null -eq $AdminCredential -or $AdminCredential.Password.Length -eq 0) { throw 'Console credential entry cancelled or empty' }
 $ClientIp = Read-Host 'This workstation public IPv4 address (single address, no CIDR)'
 $ParsedIp = $null
-if (-not [System.Net.IPAddress]::TryParse($ClientIp, [ref]$ParsedIp) -or
+if ($ClientIp -cnotmatch '^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$' -or
+    -not [System.Net.IPAddress]::TryParse($ClientIp, [ref]$ParsedIp) -or
     $ParsedIp.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork -or
     $ClientIp -eq '0.0.0.0') { throw 'A single workstation IPv4 address is required' }
 # Persist non-secret cleanup scope BEFORE the first resource mutation, including partial failures.
@@ -264,6 +300,14 @@ if (@(Get-AzResourceGroup -ErrorAction Stop | Where-Object ResourceGroupName -CE
     throw 'Generated resource group already exists; never adopt it'
 }
 New-Item -ItemType Directory -Force -Path work/azure-native | Out-Null
+# All operator input and read-only preflight succeeded. Never restore consumed evidence.
+if ((Get-FileHash -Algorithm SHA256 -LiteralPath $ReaderValidationPath).Hash -cne $LiveReaderDigest -or
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $ValidationPath).Hash -cne $LiveMarkerDigest) {
+    throw 'Validation evidence changed during operator input; STOP before mutation'
+}
+Remove-Item -LiteralPath $ReaderValidationPath -ErrorAction Stop
+Remove-Item -LiteralPath $ValidationPath -ErrorAction Stop
+# Only the non-secret recovery record separates consumption from the first Azure mutation.
 @{ subscription=$SubscriptionId; resourceGroup=$ResourceGroup; server=$ServerName;
    database=$DatabaseName; nonce=$Nonce; createdResourceGroup=$true;
    createdFirewall=$true; productionAccess=$false } |

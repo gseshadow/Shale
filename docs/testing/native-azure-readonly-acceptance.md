@@ -1,6 +1,29 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
-## Current reviewed packet — 2026-11-04
+## Current console / consumption correction — 2026-11-04
+
+The owner-authorized attempt stopped before resource creation because the Windows credential
+dialog was unusable. The owner confirmed `Test-Path work/azure-native/resource-scope.json` was
+`False`; no scope exists and no cleanup is required. Both validation markers were legitimately
+consumed. Never restore, reuse or relabel them.
+
+The revised packet uses console-only secure credential entry and consumes both markers only
+after all operator inputs/read-only preflight, immediately before the recovery record and first
+resource mutation. Earlier cancellation/refusal leaves markers intact and writes no scope.
+[Fresh Windows evidence](native-azure-catalog-component-diagnostic.md#fresh-windows-evidence-after-consumption)
+requires the baseline reader class (12 tests, zero failures/errors/skips) and five baseline guards,
+then section 1 on the exact final packet, including both offline PowerShell tests.
+No Azure is executed or authorized by this revision. Both native acceptance gates remain OPEN.
+
+Executable baseline: `5b88402940fc9950228eb5320bed9b37fc64e359`.
+New sections 2/3/5 live SHA-256:
+`32f1a91f1b1e7389af9b1513a11484e509ba299f23fb202eda5270bd3f6bce12`.
+Protected SQL/catalog/receipt/hash/grant/authority/production inputs, section 3's five sanitized
+categories, 600-second V2 timeout, one-IP firewall, fresh scope and exact cleanup are unchanged.
+Full native attestation section 4 remains excluded. Five Python guards pass locally; native Windows
+PowerShell validation of this revision remains pending. No fresh marker is created by this work.
+
+## Historical reviewed packet — 2026-11-04
 
 **AZURE NOT AUTHORIZED. No new live attempt or native acceptance result.**
 Owner-reported Windows reader-delta PASS pins executable/validated/live `codeHead` to

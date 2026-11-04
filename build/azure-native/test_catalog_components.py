@@ -21,11 +21,17 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         section = self.text.split('## Reviewed live launcher', 1)[1]
         return re.search(r'(?s)```powershell\n(.*?)```', section).group(1)
 
-    def test_fresh_resource_and_exact_cleanup_blocks_are_unchanged(self):
-        for number, expected in [(2, '7e435b864701c75167ba00f0e28e0383ac2513fc1169eaeb4160efe90b3c2b9e'),
-                                 (5, '6bffe7d3773450cb4ef1e8e08110175ecc00abc79529c2165ac00b8970b672e2')]:
-            self.assertEqual(expected, hashlib.sha256(self.block(number).encode()).hexdigest(),
-                             'Resource creation/TLS/firewall/cleanup safeguards must remain exact')
+    def test_resource_mutations_and_cleanup_remain_exact(self):
+        creation = self.block(2)
+        mutations = '\n'.join(line for line in creation.splitlines() if line.startswith('New-Az'))
+        self.assertEqual('f6c64ea35acc0e82997be1c05318f9eed1efcc5d3b4343361ff957affb697fbd', hashlib.sha256(mutations.encode()).hexdigest(),
+                         'Preserve all resource/TLS/one-IP firewall commands exactly')
+        self.assertEqual('6bffe7d3773450cb4ef1e8e08110175ecc00abc79529c2165ac00b8970b672e2',
+                         hashlib.sha256(self.block(5).encode()).hexdigest())
+        self.assertIn('-AsSecureString', creation)
+        self.assertIn('[System.Management.Automation.PSCredential]::new($UserName,$SecurePassword)', creation)
+        self.assertNotIn('GetNetworkCredential', creation)
+        self.assertNotIn('SecureStringTo', creation)
 
     def test_runtime_credential_generation_remains_exact(self):
         block = re.search(r'(?s)# BEGIN OFFLINE-TESTED CONTAINED CREDENTIALS\n(.*?)# END OFFLINE-TESTED CONTAINED CREDENTIALS', self.text).group(1)
@@ -40,7 +46,7 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         self.assertRegex(launcher, r'(?s)try \{\s*\. \$LiveBlocks\[2\].*?\. \$LiveBlocks\[3\].*?finally \{.*?\. \$LiveBlocks\[5\]')
         self.assertIn('AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT', launcher)
         self.assertLess(launcher.index('AUTHORIZE ONE DISPOSABLE CATALOG ATTEMPT'),
-                        launcher.index('Remove-Item -LiteralPath $ReaderValidationPath -ErrorAction Stop'))
+                        launcher.index('. $LiveBlocks[2]'))
 
     def test_validation_is_same_source_same_host_and_consumed_before_creation(self):
         launcher = self.launcher()
@@ -71,8 +77,24 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         self.assertIn('$Validation.sourceHead -cne $CurrentHead', launcher)
         self.assertIn('$Validation.codeHead -cne $ValidatedHead', launcher)
         self.assertIn('$Validation.hostName -cne [Environment]::MachineName', launcher)
-        self.assertLess(launcher.index('Remove-Item -LiteralPath $ValidationPath -ErrorAction Stop'), launcher.index('. $LiveBlocks[2]'))
-        self.assertLess(launcher.index('Remove-Item -LiteralPath $ReaderValidationPath -ErrorAction Stop'), launcher.index('. $LiveBlocks[2]'))
+        creation = self.block(2)
+        reader = creation.index('Remove-Item -LiteralPath $ReaderValidationPath -ErrorAction Stop')
+        live = creation.index('Remove-Item -LiteralPath $ValidationPath -ErrorAction Stop')
+        for preflight in ('Connect-AzAccount', 'Set-AzContext', 'Get-AzLocation', 'Get-Credential -UserName',
+                          '[System.Net.IPAddress]::TryParse', 'Get-AzResourceGroup'):
+            self.assertLess(creation.index(preflight), reader)
+        self.assertLess(reader, live)
+        self.assertLess(live, creation.index('Set-Content -Encoding utf8 work/azure-native/resource-scope.json'))
+        self.assertLess(creation.index('$ScopeWritten = $true'), creation.index('New-AzResourceGroup'))
+        boundary = creation[live:creation.index('New-AzResourceGroup')]
+        self.assertNotRegex(boundary, r'Read-Host|Get-Az|Get-Credential')
+        for marker in ('$ReaderValidationPath', '$ValidationPath'):
+            removal = f'Remove-Item -LiteralPath {marker} -ErrorAction Stop'
+            self.assertEqual(1, creation.count(removal))
+            self.assertNotIn(removal, launcher)
+        for block in (validation, launcher):
+            self.assertIn("'build/azure-native/test_runbook_launcher.ps1'", block)
+        self.assertIn('-File build/azure-native/test_runbook_launcher.ps1', validation)
         self.assertIn('Test-Path -LiteralPath work/azure-native/resource-scope.json', launcher)
 
     def test_comparison_runs_after_setup_before_owner_secret_cleanup(self):
