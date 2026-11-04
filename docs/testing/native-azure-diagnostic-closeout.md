@@ -1,6 +1,13 @@
 # Native Azure catalog investigation closeout and deployment decision
 
-Operator decision recorded 2026-11-04. This is a documentation/status update to draft
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+the historical draft status is superseded.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
+Operator decision recorded 2026-11-04. This is a documentation/status update incorporated into merged
 PR [#1929](https://github.com/gseshadow/Shale/pull/1929), not deployment or SQL execution.
 It supersedes earlier requests to refresh diagnostic packets or run more Azure fixtures.
 **The Azure-specific investigation is stopped by operator choice. Native Azure catalog/read-only
@@ -72,7 +79,7 @@ Consequently, from this investigation/closeout:
 - the Azure-specific BATCH_EXECUTE cause remains unresolved by operator choice
 - the native Azure catalog/read-only gate must NOT be represented as fully passed
 
-PR #1929 remains draft, open and unmerged. The disposable mutation/fault acceptance gate also
+PR #1929 merged into codex/latest on 2026-11-04 at `1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The disposable mutation/fault acceptance gate also
 remains OPEN; successful setup does not close it. Closing the investigation is not closing either
 acceptance gate. Production identity/catalog/deployed parity, live OAuth/MCP, SDK prerelease,
 legal retention, operational/security/tenant-owner and pilot approvals retain their separate status.

@@ -1,10 +1,17 @@
 # Verified LF repair and clean Git stat metadata — 2026-10-30
 
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
 **BLOCKED pending operator validation.** The new stat-cache regression fails before the fix and
 passes locally afterward. The owner has already proved byte/receipt repair and the mandatory
 focused Maven suite on Windows. The corrected metadata completion step still needs Windows
 operator validation; the remaining mandatory non-Azure acceptance results remain separate.
-Keep #1929 draft and unmerged. Both native Azure gates remain OPEN. No Azure reconnection,
+The historical merge hold is superseded: #1929 merged into codex/latest on 2026-11-04. Both native Azure gates remain OPEN. No Azure reconnection,
 resource creation, production access or deployment occurred in this follow-up.
 
 ## Operator evidence retained

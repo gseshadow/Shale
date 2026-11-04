@@ -1,5 +1,12 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
 **Final operator disposition — 2026-11-04: Azure-specific diagnosis stopped.**
 The [closeout and deployment decision](native-azure-diagnostic-closeout.md) supersedes all
 retry/readiness-to-run instructions below. Full disposable Azure setup repeatedly passed through V2,
@@ -10,7 +17,7 @@ no permission defect/change is established or justified. The 5000-ms socket / 20
 preemption hypothesis remains an inference only. Launcher and tiny-probe Windows validation passed;
 the tiny probe at `871919c263b650bd7dc805fef16cee7ddac35769` did NOT run in Azure.
 Only production `shale` was discovered; the operator declined a dedicated nonproduction server/probe.
-Native catalog/read-only and mutation/fault acceptance remain OPEN; #1929 stays draft/unmerged.
+Native catalog/read-only and mutation/fault acceptance remain OPEN; #1929 merged into codex/latest on 2026-11-04; native acceptance remains OPEN.
 No production SQL/permissions/deployment or AI/MCP/OAuth enablement occurred. Historical packets and
 pending-at-the-time Windows statements below retain their original dates/scopes; they are not next steps.
 
@@ -252,8 +259,8 @@ setup phases returned. Owner reports mandatory `AZURE_NATIVE_CLEANUP CONFIRMED`;
 no fixture reuse or native read-only gate. The historical readiness below was consumed.
 [Current bounded diagnosis, rollback review and Windows prerequisites](native-azure-v2-install-followup.md)
 supersede earlier readiness statements. New executable changes require Windows owner
-validation and subsequent exact-packet review. Both native gates remain OPEN; keep
-#1929 draft/unmerged. No Azure or production access occurred in this investigation.
+validation and subsequent exact-packet review. Both native gates remain OPEN. The historical merge hold is superseded by
+#1929's 2026-11-04 merge. No Azure or production access occurred in this investigation.
 
 
 ## Windows owner validation and retry classification — 2026-11-02
@@ -284,7 +291,7 @@ secrets only; exact workstation IPv4 firewall; no failed-fixture reuse/adoption.
 TLS verification and all Java deadlines remain unchanged; V2 is explicit.
 
 This is readiness to attempt, not native acceptance. Native identity/read-only and
-disposable mutation/fault gates remain **OPEN**. PR #1929 stays **draft and unmerged**.
+disposable mutation/fault gates remain **OPEN**. PR #1929 merged into codex/latest on 2026-11-04 (historical merge hold superseded).
 Probe, setup or read-only failure stops downstream work and enters exact-scope cleanup.
 No Azure or production access, deployment or activation was performed by this agent.
 Local edition injection is SQL dispatch/receipt evidence, not native Azure metadata evidence.
@@ -312,7 +319,7 @@ access/change false). Never reuse it. The [catalog investigation and scoped iden
 records the Azure physical-incarnation binding and boxed receipt compatibility.
 At that point Windows owner validation was pending and another attempt was BLOCKED.
 The owner validation/readiness record above supersedes that blocker; both native gates
-remain OPEN and #1929 stays draft and unmerged. Earlier timeout evidence below
+remain OPEN and #1929 merged into codex/latest on 2026-11-04 (historical merge hold superseded). Earlier timeout evidence below
 remains historical and does not describe this latest failure.
 
 Earlier login follow-up (2026-11-02): the **second owner attempt failed at OWNER_CONNECT** on
@@ -330,7 +337,7 @@ the post-login 120000-ms guard, and adds a separate non-mutating owner probe to 
 [operator packet](native-azure-readonly-operator-runbook.md). Focused direct JDK/JUnit checks
 passed; Maven affected/critical verification was then blocked by dependency/network access.
 Both native Azure gates remain OPEN. This historical prerequisite block is superseded
-by the completed owner validation above; keep #1929 draft and unmerged.
+by the completed owner validation above; the historical merge hold is superseded by #1929's merge on 2026-11-04.
 
 The owner previously reported all non-Azure Windows security gates PASS: pinned refresh
 25/25, clean index, both receipts, focused Azure/V1/V2 contracts, Phase1R local SQL, critical

@@ -1,6 +1,13 @@
 # Windows operator portability follow-up — 2026-11-02
 
-PR #1929 remains draft and unmerged. **Owner validation of the new launcher/RNG fixes is
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
+PR #1929 merged into codex/latest on 2026-11-04 (historical draft status superseded). **Owner validation of the new launcher/RNG fixes is
 pending; both native Azure gates remain OPEN.** After owner validation, the next action is
 a fresh disposable Azure SQL retry with a new nonce. This task accessed neither Azure nor
 production and created no cloud resource.

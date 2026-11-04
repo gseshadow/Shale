@@ -1,5 +1,12 @@
 # Read-only Azure catalog component diagnostic
 
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
 **Final operator disposition — 2026-11-04: Azure-specific diagnosis stopped.**
 The [closeout and deployment decision](native-azure-diagnostic-closeout.md) supersedes all
 retry/readiness-to-run instructions below. Full disposable Azure setup repeatedly passed through V2,
@@ -10,7 +17,7 @@ no permission defect/change is established or justified. The 5000-ms socket / 20
 preemption hypothesis remains an inference only. Launcher and tiny-probe Windows validation passed;
 the tiny probe at `871919c263b650bd7dc805fef16cee7ddac35769` did NOT run in Azure.
 Only production `shale` was discovered; the operator declined a dedicated nonproduction server/probe.
-Native catalog/read-only and mutation/fault acceptance remain OPEN; #1929 stays draft/unmerged.
+Native catalog/read-only and mutation/fault acceptance remain OPEN; #1929 merged into codex/latest on 2026-11-04; native acceptance remains OPEN.
 No production SQL/permissions/deployment or AI/MCP/OAuth enablement occurred. Historical packets and
 pending-at-the-time Windows statements below retain their original dates/scopes; they are not next steps.
 

@@ -1,5 +1,11 @@
 # Shale Server Azure App Service Deployment Guide
 
+**Ordinary release compatibility review — 2026-11-04:** see the
+[dependency evidence table and exact dormant release gate](dormant-server-release-compatibility.md).
+The reviewed head is `1f12091aef3275721c1e35d6ba00a2ecb80c5173` (#1929 merged).
+Deployment remains BLOCKED on ordinary compatibility/configuration/artifact evidence; no SQL change
+is established as necessary. Stage B, Phase1R and Phase3B.8 remain deferred. No execution is authorized.
+
 ## Current dormant release decision — 2026-11-04
 
 The [deployment preflight](production-mcp-deployment-preflight.md#current-decision--2026-11-04)

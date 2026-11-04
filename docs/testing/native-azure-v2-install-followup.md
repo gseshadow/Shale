@@ -1,5 +1,12 @@
 # V2_INSTALL timeout investigation — 2026-11-02
 
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
 Current status: the unchanged V2 installer completed under 600 seconds in the subsequent owner
 attempt. The old timeout-only launcher is consumed. The next delta is the
 [read-only 19-component diagnostic](native-azure-catalog-component-diagnostic.md), pending its
@@ -119,7 +126,7 @@ superseded by the exact-baseline diagnostic readiness above. They do not authori
 additional attempts. Historical agent test skips are preserved as historical results;
 the Windows owner results above supply the previously missing complete-installer evidence.
 
-**BLOCKED for another live attempt.** PR #1929 remains draft and unmerged; both native
+**BLOCKED for another live attempt.** PR #1929 merged into codex/latest on 2026-11-04; both native
 identity/read-only and mutation/fault gates remain OPEN. No Azure or production connection,
 change, deployment or enablement occurred in this investigation. Windows owner validation
 of the executable changes and subsequent exact-packet review are pending. The previous

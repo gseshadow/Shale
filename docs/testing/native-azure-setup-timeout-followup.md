@@ -1,5 +1,12 @@
 # Azure setup timeout and Windows checkout follow-up — 2026-10-30
 
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
 The [2026-11-02 owner login investigation](native-azure-owner-login-followup.md) supersedes
 this record's 15-second owner budget and assumption that login automatically restores the
 configured 120000-ms socket guard. Its historical test results and unresolved Stage 0 failure
@@ -14,7 +21,7 @@ failed resource group. Current retry readiness remains BLOCKED; native gates sta
 and exact-byte checkout protection are implemented and focused checks pass. Mandatory Maven
 verification/package remain blocked by the unavailable Spring Boot 4.1.1 BOM. The historical
 five-second live read timeout is not reproduced or causally explained. This is not operator retry
-readiness or native Azure acceptance. Continue draft #1929; do not merge.
+readiness or native Azure acceptance. The historical merge hold is superseded by #1929's 2026-11-04 merge; no diagnostic continuation is selected.
 
 ## Operator evidence and exact failure location
 
@@ -132,4 +139,4 @@ Phase1R uses `mvn -B -ntp -o -pl shale-server -am -Dtest=Phase1RLocalSqlServerTe
 These dependency failures do not establish valid local completion. All mandatory checks must pass
 before changing classification to `OPERATOR RETRY READY`. A fresh owner run must then establish
 actual native setup/read-only evidence separately. Preserve #1928's accepted local results and
-`UNREPRODUCED HISTORICAL TRANSIENT` disposition. Do not merge #1929 or change production.
+`UNREPRODUCED HISTORICAL TRANSIENT` disposition. The historical merge hold is superseded by #1929's 2026-11-04 merge; do not change production.

@@ -4,7 +4,11 @@
 and [final diagnostic evidence](../testing/native-azure-diagnostic-closeout.md) supersede earlier retry
 instructions and umbrella deployment classifications for a dormant JAR only. Native Azure acceptance
 is NOT fully passed. All AI/MCP/OAuth/readiness controls stay OFF; no production action is authorized
-by this documentation. The investigation is stopped by operator choice; #1929 stays draft/unmerged.
+by this documentation. The investigation is stopped by operator choice; #1929 merged into codex/latest on 2026-11-04; native acceptance remains OPEN.
+
+The [ordinary dormant release review](../dormant-server-release-compatibility.md) resolves the source
+requirements separately from unknown production parity. Stage B is not a JAR prerequisite;
+Phase1R/V2 stay deferred, and no SQL execution follows from missing evidence.
 
 **Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL locally verified at #1922 recorded scope; Phase 3A security contract COMPLETE; Phase 3B COMPLETE at pre-deployment/local acceptance scope; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); 3B.7 COMPLETE (local/adversarial acceptance, §10.32); deployment/live gates OPEN; transport and both handlers default OFF.
 
@@ -4468,7 +4472,7 @@ The tiny probe at `871919c263b650bd7dc805fef16cee7ddac35769` is Windows-validate
 21 launcher scenarios PASS, `TINY_CATALOG_WINDOWS_VALIDATION PASS`) and was NOT executed in Azure.
 Only production `shale` was discovered; no suitable dedicated nonproduction server existed. The operator
 explicitly declined creating one and running the probe. Stop further Azure-specific diagnosis. Native
-catalog/read-only and disposable mutation/fault acceptance remain OPEN; #1929 is draft/unmerged.
+catalog/read-only and disposable mutation/fault acceptance remain OPEN; #1929 merged into codex/latest on 2026-11-04; native acceptance remains OPEN.
 No production SQL/permission/deployment change or AI/MCP/OAuth enablement occurred.
 
 A compatible JAR may proceed under ordinary release gates with every AI/MCP/OAuth control, including

@@ -1,6 +1,13 @@
 # Disposable owner login investigation — 2026-11-02
 
-PR #1929 remains draft and unmerged. No Azure or production access occurred in this
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
+PR #1929 merged into codex/latest on 2026-11-04 (historical draft status superseded). No Azure or production access occurred in this
 investigation. Native read-only and mutation/fault gates remain OPEN. The second owner
 fixture was deleted; it must never be reused. Maven verification of this follow-up remains
 blocked as recorded below; this is not authorization for another live attempt.

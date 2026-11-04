@@ -1,5 +1,11 @@
 # Production MCP deployment preflight
 
+**Ordinary release compatibility review — 2026-11-04:** see the
+[dependency evidence table and exact dormant release gate](dormant-server-release-compatibility.md).
+The reviewed head is `1f12091aef3275721c1e35d6ba00a2ecb80c5173` (#1929 merged).
+Deployment remains BLOCKED on ordinary compatibility/configuration/artifact evidence; no SQL change
+is established as necessary. Stage B, Phase1R and Phase3B.8 remain deferred. No execution is authorized.
+
 ## Current decision — 2026-11-04
 
 The [final evidence, SQL disposition and decision table](testing/native-azure-diagnostic-closeout.md)
@@ -8,7 +14,7 @@ setup/V2 installation passed; native restricted catalog/read-only acceptance rem
 `VERIFIER_COMPONENT_READ; component=0:before_first_component; phase=BATCH_EXECUTE`.
 No permission defect was established; no grant or timeout change is justified. Launcher and tiny-probe
 Windows validation passed, but the tiny probe did NOT run in Azure. No production change/deployment
-or AI/MCP/OAuth activation occurred. #1929 remains draft/unmerged. Do not execute/refresh the old
+or AI/MCP/OAuth activation occurred. #1929 merged into codex/latest on 2026-11-04; native acceptance remains OPEN. Do not execute/refresh the old
 fixture packet or resume diagnosis as this preflight's next step.
 
 **Minimum path: conditional GO for a dormant JAR; AI readiness/serving and pilot remain NO-GO.**

@@ -1,5 +1,12 @@
 # Existing Windows checkout diagnosis — 2026-10-30
 
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
 The subsequent [stat-cache completion follow-up](native-azure-index-stat-followup.md) records the
 owner's successful Windows byte/receipt repair and focused Maven suite, followed by the remaining
 `.M` issue and its native Git stat update. Retry readiness remains BLOCKED pending validation.
@@ -8,7 +15,7 @@ owner's successful Windows byte/receipt repair and focused Maven suite, followed
 and the guarded refresh/actual-byte preflight fixes that reproduction. Mandatory Maven suites
 and packaging cannot execute in this environment because Spring Boot 4.1.1 dependency resolution
 is restricted. Native Windows execution of the new refresh and the required owner Maven results
-are still pending. This is not `OPERATOR RETRY READY`. Keep #1929 draft and unmerged.
+are still pending. This is not `OPERATOR RETRY READY`. The historical merge hold is superseded: #1929 merged into codex/latest on 2026-11-04.
 
 ## New operator evidence
 

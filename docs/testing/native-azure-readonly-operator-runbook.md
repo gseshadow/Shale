@@ -1,5 +1,12 @@
 # Native Azure contained identity / read-only operator packet
 
+**Post-merge status — 2026-11-04:** #1929 merged at
+`1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
+[final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;
+earlier retry, pending-validation and merge-hold instructions below are historical.
+Native acceptance remains OPEN. See the [ordinary dormant release gate](../dormant-server-release-compatibility.md);
+no SQL, Azure, deployment or activation is authorized by this status correction.
+
 **ARCHIVED LIVE PACKET — operator stopped Azure-specific diagnosis on 2026-11-04.**
 Do not execute the full fixture launcher, refresh its markers, create a dedicated server or run the tiny
 probe as a continuation. See the [final evidence and deployment decision](native-azure-diagnostic-closeout.md).
@@ -8,7 +15,7 @@ Both the REPORT_WRITE launcher fix and the separately implemented tiny probe are
 the tiny probe did NOT run in Azure. No grant/timeout/SQL change is justified by this investigation.
 Earlier future-run and pending-Windows text below is historical, not current authorization or a request
 to resume. Executable blocks/pins are preserved for evidence. Native acceptance is NOT fully passed;
-PR #1929 remains draft/unmerged. Dormant all-OFF JAR deployment is a separate release decision.
+PR #1929 merged into codex/latest on 2026-11-04; native acceptance remains OPEN. Dormant all-OFF JAR deployment is a separate release decision.
 
 **BATCH AUTHORITY REVIEW: do not repeat the full Azure fixture for this investigation.**
 The unchanged 19-component batch passes locally with only the existing verifier grants. A 5-second
