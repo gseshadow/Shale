@@ -41,6 +41,8 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         launcher = self.launcher()
         self.assertIn('foreach ($Number in @(2,3,5))', launcher)
         expected = hashlib.sha256('\n'.join(self.block(n) for n in (2, 3, 5)).encode()).hexdigest()
+        self.assertEqual('32f1a91f1b1e7389af9b1513a11484e509ba299f23fb202eda5270bd3f6bce12', expected,
+                         'Sections 2/3/5 executable content must remain unchanged')
         self.assertIn(f"if ($LiveDigest -cne '{expected}')", launcher)
         self.assertNotIn('. $LiveBlocks[4]', launcher, 'This attempt may only compare components after setup')
         self.assertRegex(launcher, r'(?s)try \{\s*\. \$LiveBlocks\[2\].*?\. \$LiveBlocks\[3\].*?finally \{.*?\. \$LiveBlocks\[5\]')
@@ -51,7 +53,7 @@ class CatalogComponentLauncherTest(unittest.TestCase):
     def test_validation_is_same_source_same_host_and_consumed_before_creation(self):
         launcher = self.launcher()
         validation = self.block(1)
-        baseline = '5b88402940fc9950228eb5320bed9b37fc64e359'
+        baseline = '8d6bfa11b31a0334e16cc99c81cac3f35bfada48'
         self.assertIn(f"$ExecutableHead = '{baseline}'", validation)
         self.assertIn(f"$ValidatedHead = '{baseline}'", launcher)
         self.assertIn('$ValidatedSourceHead -cne $ReviewedPacketHead', validation)
@@ -63,13 +65,25 @@ class CatalogComponentLauncherTest(unittest.TestCase):
                 'work/azure-native/catalog-reader-windows-validation.json',
                 '$Reader.codeHead -cne $Baseline', '$Reader.sourceHead -cne $Baseline',
                 '$Reader.hostName -cne [Environment]::MachineName', "$Reader.result -cne 'PASS'",
-                "$Reader.scope -cne 'CATALOG_READER_DELTA_ONLY'", '$Reader.tests -ne 12',
+                "$Reader.scope -cne 'CATALOG_READER_DELTA_ONLY'", '$Reader.tests -ne 15',
+                "$Reader.validationMarker -cne 'COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS'",
+                "$Reader.reportSha256 -cnotmatch '^[a-f0-9]{64}$'",
                 '$Reader.failures -ne 0', '$Reader.errors -ne 0', '$Reader.skipped -ne 0',
                 '$Reader.launcherGuards -ne 5', '$Reader.azureAuthorized -isnot [bool]',
                 '$Reader.azureAuthorized -ne $false', 'readerValidationSha256',
             ):
                 self.assertIn(guard, block)
         self.assertIn('if (Test-Path -LiteralPath $ValidationPath) { throw', validation)
+        self.assertIn('if (Test-Path -LiteralPath $ReaderValidationPath) { throw', validation)
+        for evidence in ("$ReaderReport.testsuite.tests -cne '15'", "$ReaderReport.testsuite.failures -cne '0'",
+                         "$ReaderReport.testsuite.errors -cne '0'", "$ReaderReport.testsuite.skipped -cne '0'",
+                         '@($ReaderReport.testsuite.testcase).Count -ne 15', 'reportSha256=$ReportDigest',
+                         'codeHead=$ExecutableHead; sourceHead=$ExecutableHead',
+                         "validationMarker='COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS'"):
+            self.assertIn(evidence, validation)
+        self.assertLess(validation.index("$env:OS -cne 'Windows_NT'"), validation.index('Set-Content -Encoding utf8 -LiteralPath $ReaderValidationPath'))
+        self.assertNotIn('Set-Content -Encoding utf8 -LiteralPath $ReaderValidationPath', launcher)
+        self.assertNotIn('5b88402940fc9950228eb5320bed9b37fc64e359', validation + launcher)
         self.assertIn('Assert-ReaderValidation $ExecutableHead', validation)
         self.assertIn('Assert-ReaderValidation $ValidatedHead', launcher)
         self.assertIn("scope='CATALOG_COMPONENT_PACKET_ONLY'", validation)

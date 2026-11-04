@@ -1,6 +1,83 @@
 # Read-only Azure catalog component diagnostic
 
-## Fixed component failure context — 2026-11-04
+## Localization packet refresh — 2026-11-04
+
+Owner-reported native Windows validation is complete at executable baseline
+`8d6bfa11b31a0334e16cc99c81cac3f35bfada48`: `AzureCatalogComponentsTest` 15 tests,
+zero failures/errors/skips; five Python launcher guards; final
+`COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS`. This supersedes the pending Windows status
+in the historical localization notes below. No unrelated validation needs repeating.
+
+The packet pins (`$ExecutableHead` / `$ValidatedHead`) now select that exact commit.
+The final packet `sourceHead` is the exact new commit reported in the handoff; it is deliberately
+separate from executable `codeHead`. Only the runbook, this evidence document and five existing
+Python guards change. Java, production paths, setup/SQL, all 19 catalog expressions, V2 receipt/hash,
+grants/roles/authority boundaries, datasource configuration and 20-/600-second timeouts are unchanged.
+Sections 2, 3 and 5 executable fence bodies remain byte-identical, as do resource creation, the
+console-only credential flow, marker-consumption ordering, one-IP firewall, cleanup/finally and
+section 4 exclusion. Live digest remains
+`32f1a91f1b1e7389af9b1513a11484e509ba299f23fb202eda5270bd3f6bce12`.
+
+### Current minimal Windows packet validation
+
+On the same native Windows host that produced the reported localization PASS, preserve the
+original `shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AzureCatalogComponentsTest.xml`
+from that validation. Do not edit/copy/relabel a report from another head. In a fresh private shell
+without `SHALE_AZURE_*` variables, use a clean checkout of the exact final packet from this handoff.
+Retain the private candidate locally. Neither validation marker nor an unresolved resource-scope
+record may already exist; retain prior evidence separately, never restore consumed markers.
+
+Set `$ReviewedPacketHead` to the full final packet SHA, then execute **only the complete first
+PowerShell fence in runbook section 1**, in that same session. It verifies exact source ancestry,
+permitted packet-only changes and clean state. It checks the preserved Surefire suite name,
+15 test cases, zero failures/errors/skips and absence of failing/skipped child elements, and hashes
+the original report. It creates fresh test-only reader/localization evidence with:
+
+- `codeHead=sourceHead=8d6bfa11b31a0334e16cc99c81cac3f35bfada48`
+- same `hostName`, `result=PASS`, `scope=CATALOG_READER_DELTA_ONLY`
+- `tests=15`, `failures=errors=skipped=0`, `launcherGuards=5`
+- `validationMarker=COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS`, `reportSha256`
+- boolean `azureAuthorized=false`
+
+This newly recorded evidence describes the owner's completed localization validation, not a new
+Maven run. If the original report is unavailable, stop: only focused localization evidence must
+be recovered, never a broad Maven/setup/Phase1R/V2/timeout rehearsal. No old marker is relabelled.
+
+The fence then verifies pinned bytes/receipts, runs exactly five Python launcher guards and the
+existing PowerShell credential and mocked launcher fences in the same Windows PowerShell edition,
+checks the private authoritative candidate against its unchanged digest, and rechecks source and
+evidence integrity. Only after every check passes does it generate
+`work/azure-native/catalog-diagnostic-validation.json`, with:
+
+- `sourceHead=$ReviewedPacketHead` (exact final packet SHA from this handoff)
+- `codeHead=8d6bfa11b31a0334e16cc99c81cac3f35bfada48`
+- same `hostName`, `result=PASS`, `scope=CATALOG_COMPONENT_PACKET_ONLY`
+- `readerValidationSha256` binding the fresh test-only evidence, `launcherGuards=5`
+- boolean `azureAuthorized=false`
+
+Expected final output: `CATALOG_DIAGNOSTIC_WINDOWS_VALIDATION PASS azureAuthorized=false`.
+No Maven, selector/broad suite, setup, Phase1R, V2 installation, timeout test, Azure command or
+live launcher runs in section 1. A guard failure stops the sequence; never paste downstream
+commands manually. This editing task creates no validation marker and grants no Azure authority.
+
+The existing live launcher remains separately authorized work. Its preserved section 3 does not
+gain a new output parser: inspect only the sanitized component-localization failure in the private
+Surefire evidence after a separately authorized attempt; do not forward raw XML/driver output.
+The sole purpose of that future disposable diagnostic is to identify the fixed verifier ordinal/name
+causing `VERIFIER_COMPONENT_READ`. Do not change permissions or visibility before it is known.
+
+Pre-edit test impact: the existing five Python guards protect packet pins/evidence, credential bytes,
+resource commands, marker ordering, cleanup, section 4 exclusion and diagnostic output. Only the
+obsolete baseline/count expectations are updated; existing PowerShell fence scripts are unchanged.
+Architecture review carries forward the prompt rules, tenancy/RLS, schema/audit, confinement V2 and
+Azure SQL attestation contracts. Metadata/evidence only: no PHI/entity mutation or audit migration.
+Local Python guards: five passed. Static protected-section and full-tree delta checks pass.
+Native Windows execution of this refreshed packet's existing PowerShell fences remains pending
+on the owner host (PowerShell is unavailable here); the supplied localization PASS is preserved
+as owner-reported evidence. Git transport remains unavailable; commit/push uses connected GitHub
+Git-data tools. No Azure was executed or authorized.
+
+## Historical localization implementation — 2026-11-04
 
 The latest owner-authorized disposable diagnostic completed owner setup, V2 installation
 (~36.9 seconds), cumulative verification and cleanup (`AZURE_NATIVE_CLEANUP CONFIRMED`).
@@ -66,7 +143,7 @@ transport is unavailable. Native Windows/Maven verification remains pending; thi
 unverified at that required scope. Git transport is unavailable; the narrow commit uses
 connected GitHub Git-data tools with the full parent tree preserved. No Azure was executed.
 
-## Console credential and marker-boundary correction — 2026-11-04
+## Historical console credential and marker-boundary correction — 2026-11-04
 
 The owner-authorized disposable attempt stopped at the Windows `Get-Credential` dialog before
 resource creation. Owner-confirmed `Test-Path work/azure-native/resource-scope.json` returned
@@ -110,68 +187,13 @@ operator's exact Windows edition/host. No Maven or SQL code changed in this pack
 Git transport is unavailable in this environment; source and the narrow commit use connected
 GitHub Git-data tools, preserving the full parent tree.
 
-### Fresh Windows evidence after consumption
+### Superseded reader regeneration protocol
 
-This protocol supersedes the prior instruction to reuse existing reader evidence: both prior
-markers are consumed. Fresh evidence requires a fresh run, never copying/relabeling an old file.
-Use the same Windows host/PowerShell edition that will validate the final packet, with JDK 21,
-Maven, Git and Python, at `C:\Eclipse\Workspace\shale-parent` in a fresh private shell without
-`SHALE_AZURE_*` variables. Set `$ReviewedPacketHead` to the full final commit from this handoff.
-Keep the private schema local. Do not execute the live launcher or sections 2–5.
-
-First, regenerate only reader-delta evidence at the unchanged executable baseline:
-
-```powershell
-$ErrorActionPreference = 'Stop'
-$ReaderHead = '5b88402940fc9950228eb5320bed9b37fc64e359'
-if (@(Get-ChildItem Env: | Where-Object Name -Like 'SHALE_AZURE_*').Count -ne 0) { throw 'Fresh process required' }
-if ($env:OS -cne 'Windows_NT') { throw 'Native Windows host required' }
-if ($ReviewedPacketHead -cnotmatch '^[a-f0-9]{40}$') { throw 'Set exact final reviewed packet SHA first' }
-$ReaderPath = 'work/azure-native/catalog-reader-windows-validation.json'
-if ((Test-Path -LiteralPath $ReaderPath) -or
-    (Test-Path work/azure-native/catalog-diagnostic-validation.json) -or
-    (Test-Path work/azure-native/resource-scope.json)) { throw 'Existing marker/scope forbidden; never overwrite or restore consumed evidence' }
-$TrackedState = @(git status --porcelain --untracked-files=no)
-if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean tracked source required' }
-git checkout --detach $ReaderHead
-if ($LASTEXITCODE -ne 0) { throw 'Exact reader checkout failed' }
-mvn -B -ntp -pl shale-data -am '-Dtest=AzureCatalogComponentsTest' '-Dsurefire.failIfNoSpecifiedTests=false' clean test
-if ($LASTEXITCODE -ne 0) { throw 'Reader validation failed; STOP' }
-[xml]$ReaderReport = Get-Content -LiteralPath 'shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AzureCatalogComponentsTest.xml' -Raw
-if ([int]$ReaderReport.testsuite.tests -ne 12 -or
-    [int]$ReaderReport.testsuite.failures -ne 0 -or [int]$ReaderReport.testsuite.errors -ne 0 -or
-    [int]$ReaderReport.testsuite.skipped -ne 0) { throw 'Require fresh 12 tests, zero failures/errors/skips' }
-python -m unittest discover -s build/azure-native -p test_catalog_components.py
-if ($LASTEXITCODE -ne 0) { throw 'Require five baseline launcher guards; STOP' }
-$ReaderSource = (git rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or $ReaderSource -cne $ReaderHead) { throw 'Reader head changed; STOP' }
-$TrackedState = @(git status --porcelain --untracked-files=no)
-if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean reader source required' }
-New-Item -ItemType Directory -Force work/azure-native | Out-Null
-@{ codeHead=$ReaderHead; sourceHead=$ReaderHead; hostName=[Environment]::MachineName;
-   result='PASS'; scope='CATALOG_READER_DELTA_ONLY'; tests=12; failures=0; errors=0;
-   skipped=0; launcherGuards=5; azureAuthorized=$false } |
-    ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath $ReaderPath
-git checkout --detach $ReviewedPacketHead
-if ($LASTEXITCODE -ne 0) { throw 'Exact final packet checkout failed; STOP' }
-```
-
-Then execute **only the complete first PowerShell fence in runbook section 1**, in this same
-private session with `$ReviewedPacketHead` still set to the exact final SHA. It requires clean final
-source; checks permitted packet-only changes, 25 pinned files/index and both receipts; runs five
-updated Python guards, the unchanged `test_runbook_credentials.ps1`, and new
-`test_runbook_launcher.ps1` (18 scenarios) using the same PowerShell executable; and checks the
-private authoritative-candidate bytes against the unchanged supplied SHA-256. It hash-binds the
-new reader marker and writes a fresh live marker with `codeHead` equal to the reader baseline,
-`sourceHead` equal to the final packet SHA, same host, packet-only scope and
-`azureAuthorized=false`. The reader marker remains baseline-only (`sourceHead=codeHead=ReaderHead`).
-
-Those are the minimal Windows checks: one focused Maven class (12/0/0/0), five baseline Python
-guards, then the final packet's section 1 fence. No full Maven suite, Azure setup, V2 installation,
-Phase1R rehearsal, unchanged timeout/datasource suite or full native attestation section 4 is needed.
-A failure stops the sequence; never paste downstream commands manually. Passing creates fresh
-test evidence only and does not authorize Azure. This editing task creates no validation markers.
-
+The former 12-test baseline regeneration sequence is retired. Use only the current localization
+protocol above and runbook section 1: verify the preserved 15-test report at the validated
+`8d6bfa11b31a0334e16cc99c81cac3f35bfada48` baseline and create fresh evidence; no Maven rerun
+is required for final packet validation. The historical sections below are evidence, not commands
+to execute or authority to create markers or run Azure.
 
 ## Reviewed packet refresh — 2026-11-04
 
