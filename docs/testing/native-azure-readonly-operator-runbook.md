@@ -1,28 +1,27 @@
 # Native Azure contained identity / read-only operator packet
 
-**BEFORE-FIRST PHASE DELTA: Windows validation and separate packet refresh pending. DO NOT RUN AZURE.**
-The fixed phase diagnostic and allowlisted section 3 parser change executable inputs. The previous
-baseline pins below intentionally reject this delta. Use only the [offline delta tests](native-azure-catalog-component-diagnostic.md#required-offline-windows-validation); do not create/relabel markers or execute section 1/live fences yet.
-The updated sections 2/3/5 digest is `3b3a5eef6faff948959ca81714e93c5e35716cb39588f94061b3b07d89f5e03a`.
+**2026-11-04: BEFORE-FIRST PHASE BASELINE REFRESH. NO AZURE AUTHORIZATION.**
+The owner reports complete native Windows validation at
+`bec7ecbac86a2026bc16dac7a2e8963d7467dd4e`: 15 Java tests, zero failures/errors/skips;
+five Python guards; `RUNBOOK_DIAGNOSTICS PASS cases=204 azureExecuted=false`;
+`RUNBOOK_CREDENTIALS PASS rounds=2 identities=5 partialFailureCleanup=true`;
+`RUNBOOK_LAUNCHER PASS scenarios=18 azureExecuted=false`; and
+`BEFORE_FIRST_PHASE_WINDOWS_VALIDATION PASS`.
 
-**2026-11-04: LOCALIZATION BASELINE REFRESH. NO AZURE AUTHORIZATION.**
-The owner reports native Windows localization validation PASS at
-`8d6bfa11b31a0334e16cc99c81cac3f35bfada48`: 15 tests, zero failures/errors/skips,
-five Python guards, and `COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS`.
-The preceding disposable attempt passed owner setup, V2 installation (~36.9 seconds), cumulative
-verification and cleanup (`AZURE_NATIVE_CLEANUP CONFIRMED`), then localized the diagnostic failure
-to `VERIFIER_COMPONENT_READ`; no comparison TSV was created. This is evidence only.
+Section 1 verifies the preserved same-host 15-test report, creates fresh baseline-bound test-only
+evidence, runs five Python guards and the three existing PowerShell fences, and checks the private
+candidate digest. No Maven, Phase1R, V2, setup or timeout/datasource rehearsal is repeated.
+The fresh live marker binds executable `codeHead` to that validated commit and `sourceHead` to the
+exact final packet SHA from this handoff, with `azureAuthorized=false`. Neither marker authorizes
+Azure. Never restore, overwrite, reuse or relabel earlier/consumed markers. See the
+[current evidence protocol](native-azure-catalog-component-diagnostic.md#before-first-phase-packet-refresh--2026-11-04).
 
-Section 1 verifies the preserved 15-test report from that same-host validation and creates fresh
-reader/localization evidence bound to the validated executable `codeHead`. It then checks this exact
-final packet without rerunning Maven, setup, Phase1R, V2 or timeout/datasource rehearsals.
-The live marker records the exact reviewed packet commit as `sourceHead`, the validated localization
-commit as `codeHead`, and boolean `azureAuthorized=false`. Neither marker authorizes Azure.
-Do not restore, overwrite, reuse or relabel consumed/earlier markers. See the
-[current evidence protocol](native-azure-catalog-component-diagnostic.md#localization-packet-refresh--2026-11-04).
-Do not execute the live launcher until separately authorized. Both native acceptance gates remain OPEN.
-The sole purpose of any separately authorized next disposable diagnostic is to identify the fixed
-verifier component ordinal/name. Full native attestation section 4 remains excluded.
+The latest disposable attempt passed setup, V2 installation and cumulative verification and cleaned
+up with `AZURE_NATIVE_CLEANUP CONFIRMED`. Its verifier failure was
+`component=0:before_first_component`. This is evidence only. The sole purpose of a future separately
+authorized attempt is to distinguish `STATEMENT_CREATE`, `QUERY_TIMEOUT_SETUP`, `BATCH_EXECUTE`
+or `BEFORE_FIRST_RESULT`. Full native attestation section 4 remains excluded. Both native gates
+remain OPEN. Do not execute the live launcher without separate explicit owner authorization.
 
 Run from `C:\Eclipse\Workspace\shale-parent` in a fresh private Windows PowerShell 5.1
 (.NET Framework 4.8) or PowerShell 7 session with JDK 21, Maven, Git, Python, and the
@@ -40,13 +39,13 @@ Never paste downstream commands manually. Do not overwrite/relabel old validatio
 Preserve the original 15-test Surefire XML from the owner's completed validation at the executable
 baseline on this Windows host. This fence verifies it and creates a new test-only marker; it does
 not relabel an old marker or rerun tests. If that original report is unavailable, stop and recover
-fresh localization-only evidence with the focused class; never substitute a report from another head.
+fresh before-first phase evidence with the focused class; never substitute a report from another head.
 Only same-source packet guards, pinned-byte/receipt checks and same-host credential/fence checks
 run here. No Maven or database rehearsal is needed. Keep both markers local and private.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ExecutableHead = '8d6bfa11b31a0334e16cc99c81cac3f35bfada48'
+$ExecutableHead = 'bec7ecbac86a2026bc16dac7a2e8963d7467dd4e'
 $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
@@ -89,7 +88,7 @@ New-Item -ItemType Directory -Force work/azure-native | Out-Null
 @{ codeHead=$ExecutableHead; sourceHead=$ExecutableHead; hostName=[Environment]::MachineName;
    result='PASS'; scope='CATALOG_READER_DELTA_ONLY'; tests=15; failures=0; errors=0;
    skipped=0; launcherGuards=5; reportSha256=$ReportDigest;
-   validationMarker='COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS'; azureAuthorized=$false } |
+   validationMarker='BEFORE_FIRST_PHASE_WINDOWS_VALIDATION PASS'; azureAuthorized=$false } |
     ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath $ReaderValidationPath
 function Assert-ReaderValidation([string]$Baseline) {
     if (-not (Test-Path -LiteralPath $ReaderValidationPath -PathType Leaf)) { throw 'Passed Windows reader marker required; no reuse of earlier markers' }
@@ -97,7 +96,7 @@ function Assert-ReaderValidation([string]$Baseline) {
     if ($Reader.codeHead -cne $Baseline -or $Reader.sourceHead -cne $Baseline -or
         $Reader.hostName -cne [Environment]::MachineName -or $Reader.result -cne 'PASS' -or
         $Reader.scope -cne 'CATALOG_READER_DELTA_ONLY' -or
-        $Reader.validationMarker -cne 'COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS' -or
+        $Reader.validationMarker -cne 'BEFORE_FIRST_PHASE_WINDOWS_VALIDATION PASS' -or
         $Reader.reportSha256 -cnotmatch '^[a-f0-9]{64}$' -or
         ($Reader.tests -isnot [int] -and $Reader.tests -isnot [long]) -or $Reader.tests -ne 15 -or
         ($Reader.failures -isnot [int] -and $Reader.failures -isnot [long]) -or $Reader.failures -ne 0 -or
@@ -118,10 +117,18 @@ python -m unittest discover -s build/azure-native -p test_catalog_components.py
 if ($LASTEXITCODE -ne 0) { throw 'Catalog diagnostic launcher guards failed; no manual continuation' }
 # Run the credential/fence check in this exact PowerShell edition and Windows host.
 $PowerShellExe = (Get-Process -Id $PID).Path
-& $PowerShellExe -NoProfile -File build/azure-native/test_runbook_credentials.ps1
-if ($LASTEXITCODE -ne 0) { throw 'Same-host offline PowerShell credential/fence checks failed; no manual continuation' }
-& $PowerShellExe -NoProfile -File build/azure-native/test_runbook_launcher.ps1
-if ($LASTEXITCODE -ne 0) { throw 'Same-host offline launcher cancellation/ordering checks failed; no manual continuation' }
+$DiagnosticResult = @(& $PowerShellExe -NoProfile -File build/azure-native/test_runbook_diagnostics.ps1)
+if ($LASTEXITCODE -ne 0 -or $DiagnosticResult.Count -ne 1 -or
+    $DiagnosticResult[0] -cne 'RUNBOOK_DIAGNOSTICS PASS cases=204 azureExecuted=false') { throw 'Same-host 204-case diagnostic parser fence failed; no manual continuation' }
+Write-Output 'RUNBOOK_DIAGNOSTICS PASS cases=204 azureExecuted=false'
+$CredentialResult = @(& $PowerShellExe -NoProfile -File build/azure-native/test_runbook_credentials.ps1)
+if ($LASTEXITCODE -ne 0 -or $CredentialResult.Count -ne 1 -or
+    $CredentialResult[0] -cne 'RUNBOOK_CREDENTIALS PASS rounds=2 identities=5 partialFailureCleanup=true') { throw 'Same-host credential fence failed; no manual continuation' }
+Write-Output 'RUNBOOK_CREDENTIALS PASS rounds=2 identities=5 partialFailureCleanup=true'
+$LauncherResult = @(& $PowerShellExe -NoProfile -File build/azure-native/test_runbook_launcher.ps1)
+if ($LASTEXITCODE -ne 0 -or $LauncherResult.Count -ne 1 -or
+    $LauncherResult[0] -cne 'RUNBOOK_LAUNCHER PASS scenarios=18 azureExecuted=false') { throw 'Same-host 18-scenario launcher fence failed; no manual continuation' }
+Write-Output 'RUNBOOK_LAUNCHER PASS scenarios=18 azureExecuted=false'
 git diff --check
 if ($LASTEXITCODE -ne 0) { throw 'Diff whitespace check failed' }
 $Candidate = (Resolve-Path (Read-Host 'Private authoritative-candidate.sql path')).Path
@@ -139,7 +146,7 @@ if ($LASTEXITCODE -ne 0 -or $TrackedState.Count -ne 0) { throw 'Clean final pack
 New-Item -ItemType Directory -Force work/azure-native | Out-Null
 @{ codeHead=$ExecutableHead; sourceHead=$ValidatedSourceHead; hostName=[Environment]::MachineName;
    result='PASS'; scope='CATALOG_COMPONENT_PACKET_ONLY'; readerValidationSha256=$ReaderDigest;
-   launcherGuards=5; azureAuthorized=$false } |
+   launcherGuards=5; diagnosticCases=204; credentialRounds=2; credentialIdentities=5; launcherScenarios=18; azureAuthorized=$false } |
     ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath $ValidationPath
 Write-Output 'CATALOG_DIAGNOSTIC_WINDOWS_VALIDATION PASS azureAuthorized=false'
 ```
@@ -167,7 +174,7 @@ never reuse the fixture or automatically retry. Cleanup failure remains BLOCKED 
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ValidatedHead = '8d6bfa11b31a0334e16cc99c81cac3f35bfada48'
+$ValidatedHead = 'bec7ecbac86a2026bc16dac7a2e8963d7467dd4e'
 $AllowedEvidence = @(
     'docs/testing/native-azure-readonly-operator-runbook.md',
     'docs/testing/native-azure-readonly-acceptance.md',
@@ -194,7 +201,7 @@ function Assert-ReaderValidation([string]$Baseline) {
     if ($Reader.codeHead -cne $Baseline -or $Reader.sourceHead -cne $Baseline -or
         $Reader.hostName -cne [Environment]::MachineName -or $Reader.result -cne 'PASS' -or
         $Reader.scope -cne 'CATALOG_READER_DELTA_ONLY' -or
-        $Reader.validationMarker -cne 'COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS' -or
+        $Reader.validationMarker -cne 'BEFORE_FIRST_PHASE_WINDOWS_VALIDATION PASS' -or
         $Reader.reportSha256 -cnotmatch '^[a-f0-9]{64}$' -or
         ($Reader.tests -isnot [int] -and $Reader.tests -isnot [long]) -or $Reader.tests -ne 15 -or
         ($Reader.failures -isnot [int] -and $Reader.failures -isnot [long]) -or $Reader.failures -ne 0 -or
@@ -212,6 +219,8 @@ if ($LASTEXITCODE -ne 0 -or $Validation.result -cne 'PASS' -or
     $Validation.codeHead -cne $ValidatedHead -or $Validation.sourceHead -cne $CurrentHead -or
     $Validation.hostName -cne [Environment]::MachineName -or
     $Validation.scope -cne 'CATALOG_COMPONENT_PACKET_ONLY' -or
+    $Validation.diagnosticCases -ne 204 -or $Validation.credentialRounds -ne 2 -or
+    $Validation.credentialIdentities -ne 5 -or $Validation.launcherScenarios -ne 18 -or
     $Validation.launcherGuards -ne 5 -or $Validation.azureAuthorized -isnot [bool] -or
     $Validation.azureAuthorized -ne $false -or
     $Validation.readerValidationSha256 -cne (Get-FileHash -Algorithm SHA256 -LiteralPath $ReaderValidationPath).Hash.ToLowerInvariant()) { throw 'Same-host validation of this exact source required' }

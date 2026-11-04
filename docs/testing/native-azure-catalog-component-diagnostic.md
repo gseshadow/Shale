@@ -1,6 +1,81 @@
 # Read-only Azure catalog component diagnostic
 
-## Before-first operation diagnostic — 2026-11-04
+## Before-first phase packet refresh — 2026-11-04
+
+The owner reports complete native Windows validation at executable baseline
+`bec7ecbac86a2026bc16dac7a2e8963d7467dd4e`: 15 Java tests, zero failures/errors/skips;
+five Python catalog guards; `RUNBOOK_DIAGNOSTICS PASS cases=204 azureExecuted=false`;
+`RUNBOOK_CREDENTIALS PASS rounds=2 identities=5 partialFailureCleanup=true`;
+`RUNBOOK_LAUNCHER PASS scenarios=18 azureExecuted=false`; final
+`BEFORE_FIRST_PHASE_WINDOWS_VALIDATION PASS`. This supersedes the pending Windows status below.
+
+Both packet executable pins now select that exact commit. Only the runbook, this evidence
+document and the existing five Python guards change. All Java, SQL/catalog expressions and order,
+receipts/hashes, grants/roles/authority boundaries, datasource configuration, ordinary 20-second
+query timeout, 600-second V2 timeout and production paths are unchanged. Sections 2/3/4/5 executable
+fence bodies are exact, including resource/firewall behavior, console-only credentials, marker
+consumption and cleanup/finally. Live sections 2/3/5 digest remains
+`3b3a5eef6faff948959ca81714e93c5e35716cb39588f94061b3b07d89f5e03a`.
+
+### Current minimal Windows packet validation
+
+On the same native Windows host that produced the reported PASS, preserve the original
+`shale-data/target/surefire-reports/TEST-com.shale.data.security.ai.AzureCatalogComponentsTest.xml`
+from that validation. Use a clean checkout of the exact final packet `sourceHead` from this
+handoff, in a fresh private PowerShell session without `SHALE_AZURE_*` variables. Keep the private
+candidate local. Neither validation marker nor an unresolved resource-scope record may exist;
+retain prior evidence separately, never overwrite, restore or relabel earlier/consumed markers.
+
+Set `$ReviewedPacketHead` to the full final packet SHA from the handoff and execute **only the
+complete first PowerShell fence in runbook section 1**. It verifies exact source/pins, permitted
+packet-only changes and clean state; checks the preserved suite name, 15 cases, zero failures/
+errors/skips and no failing/skipped child elements; and hashes the original report. It creates
+fresh test-only reader/phase evidence with:
+
+- `codeHead=sourceHead=bec7ecbac86a2026bc16dac7a2e8963d7467dd4e`
+- same `hostName`, `result=PASS`, `scope=CATALOG_READER_DELTA_ONLY`
+- `tests=15`, `failures=errors=skipped=0`, `launcherGuards=5`, `reportSha256`
+- `validationMarker=BEFORE_FIRST_PHASE_WINDOWS_VALIDATION PASS`, `azureAuthorized=false`
+
+This records the owner's completed validation; it does not run Maven or relabel an old marker.
+If the original report is unavailable, stop and recover only focused phase-validation evidence.
+Do not rerun unrelated Phase1R/V2/setup/timeout/datasource or broad Maven tests.
+
+The final packet fence verifies pinned bytes/receipts, runs the five Python guards, then runs the
+three unchanged PowerShell scripts in the current host's exact PowerShell edition. It requires
+zero exit status and exact single-line output for the 204-case diagnostic parser, two-round/
+five-identity credential fence and 18-scenario launcher fence. It verifies the private candidate
+against its unchanged digest and rechecks source/report/reader-evidence integrity.
+
+Only after all checks pass does it generate the fresh local live marker
+`work/azure-native/catalog-diagnostic-validation.json` with:
+
+- `sourceHead=$ReviewedPacketHead` (exact final packet SHA from this handoff)
+- `codeHead=bec7ecbac86a2026bc16dac7a2e8963d7467dd4e`
+- same `hostName`, `result=PASS`, `scope=CATALOG_COMPONENT_PACKET_ONLY`
+- `readerValidationSha256`, `launcherGuards=5`, `diagnosticCases=204`
+- `credentialRounds=2`, `credentialIdentities=5`, `launcherScenarios=18`
+- boolean `azureAuthorized=false`
+
+Expected final output: `CATALOG_DIAGNOSTIC_WINDOWS_VALIDATION PASS azureAuthorized=false`.
+The launcher rechecks these fields and the exact packet head; marker-consumption ordering is
+unchanged. Neither marker grants Azure permission. Do not execute the live launcher without
+separate explicit owner authorization. The sole purpose of a future disposable attempt is to
+distinguish the verifier's zero-component failure phase: `STATEMENT_CREATE`, `QUERY_TIMEOUT_SETUP`,
+`BATCH_EXECUTE` or `BEFORE_FIRST_RESULT`. Section 4 remains excluded; both native gates stay OPEN.
+
+Pre-edit review: existing packet pins/evidence protocol, five Python guards and the unchanged
+PowerShell diagnostic/credential/launcher fences; repository prompt rules and prior relevant
+tenancy/RLS, schema/audit, confinement V2 and Azure attestation reviews carry forward.
+Metadata/evidence only: no PHI/entity mutation, audit event or migration. Local Python guards:
+five passed. Protected-section, full-tree and narrow whitespace checks pass. The owner's native
+phase-delta PASS is preserved as reported evidence; Windows execution of this final refreshed
+packet remains pending on the owner host (PowerShell is unavailable here). No Maven or database
+rehearsal was repeated. Git-data tools preserve the full parent tree. This task executes no Azure,
+creates no validation marker and grants no Azure authorization.
+
+
+## Historical before-first operation diagnostic — 2026-11-04
 
 The latest separately authorized disposable attempt passed setup, V2 installation and cumulative
 verification, failed at `VERIFIER_COMPONENT_READ; component=0:before_first_component`, and cleaned

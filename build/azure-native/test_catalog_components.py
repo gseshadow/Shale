@@ -53,7 +53,7 @@ class CatalogComponentLauncherTest(unittest.TestCase):
     def test_validation_is_same_source_same_host_and_consumed_before_creation(self):
         launcher = self.launcher()
         validation = self.block(1)
-        baseline = '8d6bfa11b31a0334e16cc99c81cac3f35bfada48'
+        baseline = 'bec7ecbac86a2026bc16dac7a2e8963d7467dd4e'
         self.assertIn(f"$ExecutableHead = '{baseline}'", validation)
         self.assertIn(f"$ValidatedHead = '{baseline}'", launcher)
         self.assertIn('$ValidatedSourceHead -cne $ReviewedPacketHead', validation)
@@ -66,7 +66,7 @@ class CatalogComponentLauncherTest(unittest.TestCase):
                 '$Reader.codeHead -cne $Baseline', '$Reader.sourceHead -cne $Baseline',
                 '$Reader.hostName -cne [Environment]::MachineName', "$Reader.result -cne 'PASS'",
                 "$Reader.scope -cne 'CATALOG_READER_DELTA_ONLY'", '$Reader.tests -ne 15',
-                "$Reader.validationMarker -cne 'COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS'",
+                "$Reader.validationMarker -cne 'BEFORE_FIRST_PHASE_WINDOWS_VALIDATION PASS'",
                 "$Reader.reportSha256 -cnotmatch '^[a-f0-9]{64}$'",
                 '$Reader.failures -ne 0', '$Reader.errors -ne 0', '$Reader.skipped -ne 0',
                 '$Reader.launcherGuards -ne 5', '$Reader.azureAuthorized -isnot [bool]',
@@ -79,7 +79,7 @@ class CatalogComponentLauncherTest(unittest.TestCase):
                          "$ReaderReport.testsuite.errors -cne '0'", "$ReaderReport.testsuite.skipped -cne '0'",
                          '@($ReaderReport.testsuite.testcase).Count -ne 15', 'reportSha256=$ReportDigest',
                          'codeHead=$ExecutableHead; sourceHead=$ExecutableHead',
-                         "validationMarker='COMPONENT_LOCALIZATION_WINDOWS_VALIDATION PASS'"):
+                         "validationMarker='BEFORE_FIRST_PHASE_WINDOWS_VALIDATION PASS'"):
             self.assertIn(evidence, validation)
         self.assertLess(validation.index("$env:OS -cne 'Windows_NT'"), validation.index('Set-Content -Encoding utf8 -LiteralPath $ReaderValidationPath'))
         self.assertNotIn('Set-Content -Encoding utf8 -LiteralPath $ReaderValidationPath', launcher)
@@ -109,6 +109,17 @@ class CatalogComponentLauncherTest(unittest.TestCase):
         for block in (validation, launcher):
             self.assertIn("'build/azure-native/test_runbook_launcher.ps1'", block)
         self.assertIn('-File build/azure-native/test_runbook_launcher.ps1', validation)
+        for fence in ('test_runbook_diagnostics.ps1','test_runbook_credentials.ps1'):
+            self.assertIn('-File build/azure-native/' + fence, validation)
+        for expected in ('RUNBOOK_DIAGNOSTICS PASS cases=204 azureExecuted=false',
+                         'RUNBOOK_CREDENTIALS PASS rounds=2 identities=5 partialFailureCleanup=true',
+                         'RUNBOOK_LAUNCHER PASS scenarios=18 azureExecuted=false'):
+            self.assertIn("-cne '" + expected + "'", validation)
+        for field, count in (('diagnosticCases',204),('credentialRounds',2),('credentialIdentities',5),('launcherScenarios',18)):
+            self.assertIn(f'{field}={count}', validation)
+            self.assertIn(f'$Validation.{field} -ne {count}', launcher)
+        self.assertNotIn('8d6bfa11b31a0334e16cc99c81cac3f35bfada48', validation + launcher)
+
         self.assertIn('Test-Path -LiteralPath work/azure-native/resource-scope.json', launcher)
 
     def test_comparison_runs_after_setup_before_owner_secret_cleanup(self):
