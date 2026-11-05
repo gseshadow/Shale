@@ -54,7 +54,7 @@ command-line `-P`. The corrected invocation omits both `-X` and `-X1` and retain
 The child environment explicitly removes `SQLCMDINI` before password injection/process start.
 A guard rejects all colon-prefixed sqlcmd commands, shell escapes and bare editor/control commands
 in the raw input file before the password prompt. Static tests also reject those constructs in the
-unchanged catalog.sql. No input needs the shell/startup protection formerly supplied by `-X1`.
+reviewed catalog.sql. No input needs the shell/startup protection formerly supplied by `-X1`.
 Password lifetime, sanitization, connection bounds and no-retry behavior are preserved.
 
 There is no `-P`, `-C`, integrated/Entra authentication, SQLCMD substitution, include, startup script,
@@ -143,6 +143,93 @@ initially remain UNKNOWN with their observed digest until independent existing-r
 them. Hash equality alone is not approval to adopt a newly observed catalog as its own baseline.
 Missing/error/duplicate/malformed/truncated output, missing visibility or absent fact is UNKNOWN/STOP.
 A visible missing/incompatible prerequisite is FAIL. Neither condition authorizes a repair.
+
+## B.1 Bounded localization of the two reported failures
+
+The two reported six-count failures do **not** establish a cause. This refinement adds 67
+fixed facts alongside the unchanged `SESSION_RLS` and `RUNTIME_NONBYPASS` statements.
+It changes no successful fact or review digest, and does not resolve or investigate the three
+review-only UNKNOWNs. For this handoff use **only sequence A / Mode Sql**, once, with the
+same secure ODBC launcher. Do not run sequences C or D, Azure inventory, application procedures,
+installers, repair, Phase1R or Phase3B.8. No production/Azure execution occurred during development.
+
+The exact names are enumerated in `contract.json` under `localizedSqlFacts`. The SQL collector
+accepts only fixed SQL fact names, requires all localized facts when SQL_COMPLETE is present,
+and requires `hash: "-"` for every localized fact. Malformed, duplicate, unexpected or incomplete
+completed output is discarded as SQL_TRANSPORT UNKNOWN; no raw output or errors are printed.
+The TLS/ODBC invocation, child-only SQLCMDPASSWORD handling, time bounds and no-retry behavior
+are unchanged. The legacy Azure/decision modes are unchanged and outside this refinement.
+
+For each prefix formed by `SESSION_RLS_` + **USERSESSIONS** or **SESSIONAUDIT** + `_` +
+**FILTER**, **BLOCK_AFTER_INSERT** or **BLOCK_AFTER_UPDATE**, eight suffixes are emitted:
+
+| Suffix | PASS means / FAIL identifies |
+| --- | --- |
+| PRESENT | A predicate cohort exists for that target/slot; missing target or empty cohort fails. |
+| POLICY_SCHEMA | All cohort predicates use exactly sec.TenantFilter. |
+| POLICY_OWNER | sec schema and effective policy owner are dbo. |
+| ENABLED | Every cohort policy is enabled. |
+| SCHEMA_BOUND | Every cohort policy is schema-bound. |
+| TYPE_OPERATION | Every cohort matches the aggregate's exact type and operation description, including its literal FILTER operation comparison. NULL operation fails this literal comparison. |
+| FUNCTION_DEFINITION | Every binding expression matches the aggregate's existing bracket/space-normalized sec.fn_FilterByTenant(ShaleClientId) comparison. No function body is read or newly accepted by this fact. |
+| EXTRA_PREDICATES | There is at most one predicate in this cohort; findingCount counts excess predicates. |
+
+FILTER cohorts select predicates by FILTER type; block cohorts select by the named operation,
+independently of type. Thus a wrong type within a block slot fails TYPE_OPERATION. A predicate
+with a wrong operation can leave its expected cohort absent and appear in another cohort or
+UNEXPECTED_PREDICATES. No arbitrary pairing of a missing slot with a different predicate is inferred.
+When a cohort is empty, its six property checks are UNKNOWN, PRESENT is FAIL, and its extras
+count is zero. An unavailable binding expression is UNKNOWN. A known incompatible property
+takes FAIL precedence over unknown properties within that same fact.
+
+Each target also has `SESSION_RLS_USERSESSIONS_FILTER_OPERATION_NULL` or
+`SESSION_RLS_SESSIONAUDIT_FILTER_OPERATION_NULL`, and the corresponding
+`SESSION_RLS_USERSESSIONS_UNEXPECTED_PREDICATES` or
+`SESSION_RLS_SESSIONAUDIT_UNEXPECTED_PREDICATES`.
+FILTER_OPERATION_NULL is PASS when FILTER predicates exist and all operation descriptions are NULL;
+absent FILTER is UNKNOWN. It makes the native NULL FILTER operation representation visible as a
+sanitized fact, separately from the unchanged aggregate's literal comparison. It does not declare
+the aggregate PASS. UNEXPECTED_PREDICATES counts bindings outside canonical FILTER/NULL and
+BLOCK/AFTER INSERT or AFTER UPDATE shapes. Duplicates are counted by the per-cohort extras checks.
+RLS dimensions overlap: do not sum these findingCounts to reconstruct the aggregate.
+
+The 15 runtime names have prefix `RUNTIME_NONBYPASS_` and these exact suffixes:
+
+```text
+DB_OWNER
+SHALEADMINS
+CONTROL_DATABASE
+ALTER_ANY_USER
+ALTER_ANY_ROLE
+ALTER_ANY_SCHEMA
+ALTER_ANY_SECURITY_POLICY
+IMPERSONATE_DBO
+ALTER_DBO_SCHEMA
+RUNTIME_ROLE_REQUIRED
+OWNER_PRINCIPALS
+FIXED_DATABASE_ROLES
+IMPERSONATE_SCOPED_PRINCIPALS
+PROTECTED_OBJECT_AUTHORITY
+ELEVATED_OBJECT_EXECUTE
+```
+
+They run inside the existing shale_runtime impersonation, using the same membership functions,
+owner/fixed-role token joins, scoped-principal exclusions and protected/elevated snapshots as the
+aggregate. PROTECTED_OBJECT_AUTHORITY preserves the aggregate's full @AuthObjects scope (all
+non-system U/V/P/FN/IF/TF objects), rather than narrowing it to named authentication tables.
+ELEVATED_OBJECT_EXECUTE preserves its module snapshot and V1/V2 exclusions. Scoped impersonation
+preserves the original inclusion of dbo, so that category can overlap IMPERSONATE_DBO.
+PASS requires forbidden authority/membership to be absent; RUNTIME_ROLE_REQUIRED instead requires
+membership in shale_runtime_role. Missing ShaleAdmins is treated as zero membership, as before.
+NULL permission/membership results are UNKNOWN, never PASS. Empty scoped inventories have zero
+findings, matching the original aggregate. Multi-object categories emit only summed findings and
+unknown counts; known failures take precedence over UNKNOWN. No discovered names, identifiers,
+definitions or hashes leave these checks. These are authority categories, not an object inventory.
+
+Offline validation uses synthetic in-memory catalog rows, fixed-name/transport rejection tests,
+and a byte-preservation guard over all original SQL statements. It never connects to SQL or Azure.
+The final bounded operator run remains necessary to establish the production causes. No result
+from this refinement authorizes a repair or changes the aggregate acceptance gates.
 
 ## C. Separate read-only Azure/App Service sequence
 

@@ -68,8 +68,15 @@ if($Mode -eq 'Sql') {
             if([string]::IsNullOrWhiteSpace($line)){continue}
             if($line.Trim() -cnotmatch '^FACT\|([A-Z][A-Z0-9_]{0,63})\|(PASS|FAIL|UNKNOWN)\|([0-9]{1,9})\|(-|[A-Fa-f0-9]{64})$'){throw 'Unexpected output.'}
             $name=$Matches[1];$state=$Matches[2];$count=[long]$Matches[3];$hash=$Matches[4]
+            if($name -cnotin (@($contract.requiredSqlFacts)+@($contract.localizedSqlFacts)+@('SQL_COMPLETE'))){throw 'Unexpected fact name.'}
+            if($name -cin @($contract.localizedSqlFacts) -and $hash -cne '-'){throw 'Unexpected diagnostic hash.'}
             if($seen.ContainsKey($name)){throw 'Duplicate fact.'}; $seen[$name]=$true
             Fact $name $state $count $hash
+        }
+        if($seen.ContainsKey('SQL_COMPLETE')) {
+            foreach($name in @($contract.requiredSqlFacts)+@($contract.localizedSqlFacts)) {
+                if(-not $seen.ContainsKey($name)){throw 'Missing SQL fact.'}
+            }
         }
         if(-not $seen.ContainsKey('SQL_COMPLETE')){Fact 'SQL_TRANSPORT' 'UNKNOWN' 1}
     } catch {
