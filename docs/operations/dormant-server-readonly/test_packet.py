@@ -151,17 +151,18 @@ class PacketSafetyTests(unittest.TestCase):
         self.assertIn('ABS(11-',self.sql)
         self.assertIn("N'AFTER INSERT'",self.sql)
         self.assertIn("N'AFTER UPDATE'",self.sql)
-        self.assertIn("N'sec.fn_filterbytenant(shaleclientid)'",self.sql)
+        self.assertIn("N'sec.fn_filterbytenant('",self.sql)
         self.assertIn('SESSION_CATALOG_REVIEW|UNKNOWN',self.sql)
         self.assertIn('ORDINARY_API_REVIEW|UNKNOWN',self.sql)
         self.assertIn('STRICT_PREDICATE_REVIEW|UNKNOWN',self.sql)
         self.assertNotRegex(self.sql,r'(?i)\bFROM\s+dbo\.\w+')
 
-    def test_localization_preserves_every_original_sql_byte(self):
-        original=re.sub(r'-- BEGIN LOCALIZED SESSION_RLS.*?-- END LOCALIZED SESSION_RLS\n\n','',self.sql,flags=re.S)
-        original=re.sub(r'-- BEGIN LOCALIZED RUNTIME_NONBYPASS.*?-- END LOCALIZED RUNTIME_NONBYPASS\n','',original,flags=re.S)
-        self.assertEqual('a24a67dbaa6ccf19de39334bb950538993d6425871d932b17eaa37eef9052ca3',
-                         hashlib.sha256(original.encode()).hexdigest())
+    def test_reconciliation_preserves_unaffected_catalog_and_auth_checks(self):
+        regions=[self.sql[:self.sql.index(';WITH Depths(n)')],
+          self.sql[self.sql.index("SELECT @Findings=COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.DesktopRememberCredentials')"):self.sql.index('-- Reviewed ordinary-runtime elevated EXECUTE')],
+          self.sql[self.sql.index("EXECUTE AS USER=N'shale_app'"):self.sql.index("EXECUTE AS USER=N'shale_runtime'")]]
+        self.assertEqual(['9271e81fa54bab07338f4cf70bcc6adf28783beda65e199904532cf71be73cd6', '02585a1059820f1eeae346924d5c136bf5d9ab0d37676c6eabf3bcd0b9e422c9', '7ba21c59144e38bcc3e2cf5fb100fe311acf953fbd7beabb2c7d60cbc4226451'],
+          [hashlib.sha256(r.encode()).hexdigest() for r in regions])
 
     def test_exact_localized_fact_names_and_output_allowlist(self):
         expected={f'SESSION_RLS_{table}_{slot}_{metric}'
@@ -199,7 +200,7 @@ class PacketSafetyTests(unittest.TestCase):
                     'FACT|RUNTIME_NONBYPASS_DB_OWNER|FAIL|1|'+'A'*64):
             self.assertFalse(accepted(raw),raw)
 
-    def rls_fixture(self, mutation=None):
+    def rls_fixture(self, mutation=None, aggregate=False):
         # Run the actual relational diagnostic core against synthetic catalog rows.
         # SQLite adapts only dialect functions; no SQL Server/ODBC connection exists.
         db=sqlite3.connect(':memory:')
@@ -207,34 +208,53 @@ class PacketSafetyTests(unittest.TestCase):
         db.execute("ATTACH DATABASE ':memory:' AS sys")
         db.executescript('''
           CREATE TABLE sys.security_predicates(security_predicate_id,object_id,target_object_id,
-            predicate_type_desc,operation_desc,predicate_definition);
+            predicate_type_desc,operation_desc,predicate_definition,operation);
           CREATE TABLE sys.security_policies(object_id,schema_id,name,principal_id,is_enabled,is_schema_bound);
           CREATE TABLE sys.schemas(schema_id,name,principal_id);
           INSERT INTO sys.schemas VALUES(1,'sec',1);
           INSERT INTO sys.security_policies VALUES(10,1,'TenantFilter',NULL,1,1);
         ''')
+        db.create_function('NCHAR',1,chr)
+        db.create_function('REPLICATE',2,lambda s,n:s*n)
         db.create_function('OBJECT_ID',1,lambda n:{'dbo.UserSessions':20,'dbo.SessionSecurityAuditLog':21}.get(n))
         db.create_function('DATABASE_PRINCIPAL_ID',1,lambda n:1 if n=='dbo' else None)
         for target in (20,21):
             for i,(kind,op) in enumerate([('FILTER',None),('BLOCK','AFTER INSERT'),('BLOCK','AFTER UPDATE')]):
-                db.execute('INSERT INTO sys.security_predicates VALUES(?,?,?,?,?,?)',
-                  (target*10+i,10,target,kind,op,'[sec].[fn_FilterByTenant]([ShaleClientId])'))
+                db.execute('INSERT INTO sys.security_predicates VALUES(?,?,?,?,?,?,?)',
+                  (target*10+i,10,target,kind,op,'[sec].[fn_FilterByTenant]([ShaleClientId])',None if kind=='FILTER' else i))
         if mutation:db.executescript(mutation)
         core=self.sql.split('-- BEGIN LOCALIZED SESSION_RLS',1)[1]
-        core=core[core.index(';WITH Expected'):core.index("SELECT CONVERT(varchar(300),CONCAT('FACT|',FactName")]
+        core=core[core.index(';WITH Depths'):core.index("SELECT CONVERT(varchar(300),CONCAT('FACT|',FactName")]
+        if aggregate:
+            core=self.sql[self.sql.index(';WITH Depths'):self.sql.index("SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS|'")]
+            core=core.replace('SELECT @Findings=','SELECT ')
         core=re.sub(r'--[^\n]*','',core).replace('COUNT_BIG','COUNT')
         core=re.sub(r"\bN'","'",core)
-        core=core.replace('AS (SELECT * FROM (VALUES','AS (VALUES')
+        core=core.replace('AS (SELECT * FROM (VALUES','AS (VALUES').replace('AS (SELECT * FROM(VALUES','AS (VALUES')
         core=core.replace(')v(i,t,k,o)),', '),').replace(')v(i,n,m)),', '),')
+        core=core.replace(')v(n)),', '),')
+        i=core.index('Expected(')
+        core=core[:i].replace('+','||')+core[i:]
+        core=core.replace("FROM(VALUES('UserSessions'),('SessionSecurityAuditLog'))t(n)",
+          "FROM(SELECT 'UserSessions' n UNION ALL SELECT 'SessionSecurityAuditLog')t")
+        core=core.replace("CROSS JOIN(VALUES('FILTER',NULL),('BLOCK','AFTER INSERT'),('BLOCK','AFTER UPDATE'))p(k,o)",
+          "CROSS JOIN(SELECT 'FILTER' k,NULL o UNION ALL SELECT 'BLOCK','AFTER INSERT' UNION ALL SELECT 'BLOCK','AFTER UPDATE')p")
         core=core.replace("'dbo.'+e.T","'dbo.'||e.T")
+        if aggregate:
+            count=db.execute(core).fetchone()[0]
+            if aggregate=='status':
+                line=next(line for line in self.sql.splitlines() if "FACT|SESSION_RLS|" in line)
+                status=re.search(r'CASE WHEN EXISTS.*? END',line).group()
+                status=re.sub(r"\bN'","'",status)
+                return db.execute('SELECT '+status,{'Findings':count}).fetchone()[0]
+            return count
         return {name:(unknown,bad) for name,unknown,bad in db.execute(core+'SELECT FactName,UnknownCount,FindingCount FROM Results')}
 
     def test_rls_faults_are_localized_without_guessing_slot_assignment(self):
         clean=self.rls_fixture()
         self.assertEqual(48,len(clean))
-        self.assertEqual({'SESSION_RLS_USERSESSIONS_FILTER_TYPE_OPERATION',
-                          'SESSION_RLS_SESSIONAUDIT_FILTER_TYPE_OPERATION'},
-                         {n for n,(u,b) in clean.items() if b})
+        self.assertEqual({(0,0)},set(clean.values()))
+        self.assertEqual(0,self.rls_fixture(aggregate=True))
         fixtures=[
           ('PRESENT','DELETE FROM sys.security_predicates WHERE security_predicate_id=201;'),
           ('POLICY_SCHEMA',"UPDATE sys.security_policies SET name='synthetic_wrong';"),
@@ -243,7 +263,7 @@ class PacketSafetyTests(unittest.TestCase):
           ('SCHEMA_BOUND','UPDATE sys.security_policies SET is_schema_bound=0;'),
           ('TYPE_OPERATION',"UPDATE sys.security_predicates SET predicate_type_desc='FILTER' WHERE security_predicate_id=201;"),
           ('FUNCTION_DEFINITION',"UPDATE sys.security_predicates SET predicate_definition='synthetic_wrong' WHERE security_predicate_id=201;"),
-          ('EXTRA_PREDICATES',"INSERT INTO sys.security_predicates SELECT 999,object_id,target_object_id,predicate_type_desc,operation_desc,predicate_definition FROM sys.security_predicates WHERE security_predicate_id=201;")]
+          ('EXTRA_PREDICATES',"INSERT INTO sys.security_predicates SELECT 999,object_id,target_object_id,predicate_type_desc,operation_desc,predicate_definition,operation FROM sys.security_predicates WHERE security_predicate_id=201;")]
         for metric,mutation in fixtures:
             with self.subTest(metric=metric):
                 result=self.rls_fixture(mutation)
@@ -252,6 +272,83 @@ class PacketSafetyTests(unittest.TestCase):
         self.assertEqual((1,0),missing['SESSION_RLS_USERSESSIONS_BLOCK_AFTER_INSERT_ENABLED'])
         invisible=self.rls_fixture('UPDATE sys.security_predicates SET predicate_definition=NULL WHERE security_predicate_id=201;')
         self.assertEqual((1,0),invisible['SESSION_RLS_USERSESSIONS_BLOCK_AFTER_INSERT_FUNCTION_DEFINITION'])
+        self.assertEqual('UNKNOWN',self.rls_fixture('UPDATE sys.security_predicates SET predicate_definition=NULL WHERE security_predicate_id=201;',aggregate='status'))
+        self.assertEqual('PASS',self.rls_fixture(aggregate='status'))
+        self.assertEqual('FAIL',self.rls_fixture("UPDATE sys.security_predicates SET predicate_definition='synthetic_wrong';",aggregate='status'))
+
+    def test_filter_null_operations_and_aggregate_local_agreement(self):
+        for column,value in [('operation',"1"),('operation_desc',"'FILTER'")]:
+            mutation=f'UPDATE sys.security_predicates SET {column}={value} WHERE security_predicate_id=200;'
+            with self.subTest(column=column):
+                self.assertEqual((0,1),self.rls_fixture(mutation)['SESSION_RLS_USERSESSIONS_FILTER_TYPE_OPERATION'])
+                self.assertEqual(1,self.rls_fixture(mutation,aggregate=True))
+
+    def test_balanced_definition_representations_and_identity_boundaries(self):
+        rule=self.contract['predicateDefinitionRepresentation']
+        self.assertEqual((8,8),(rule['outerParenthesesMax'],rule['argumentParenthesesMax']))
+        for outer in range(9):
+            for arg in range(9):
+                definition='('*outer+'[sec]. [fn_FilterByTenant]('+'('*arg+'[ShaleClientId]'+')'*arg+')'+')'*outer
+                mutation="UPDATE sys.security_predicates SET predicate_definition='"+definition+"';"
+                with self.subTest(outer=outer,arg=arg):
+                    self.assertEqual({(0,0)},set(self.rls_fixture(mutation).values()))
+                    self.assertEqual(0,self.rls_fixture(mutation,aggregate=True))
+        whitespace="UPDATE sys.security_predicates SET predicate_definition=' ( [sec].\t[fn_FilterByTenant] ( ( [ShaleClientId] ) ) )\r\n';"
+        self.assertEqual({(0,0)},set(self.rls_fixture(whitespace).values()))
+        self.assertEqual(0,self.rls_fixture(whitespace,aggregate=True))
+        for definition in ('sec.fn_FilterByTenantOrGlobal(ShaleClientId)',
+                'other.fn_FilterByTenant(ShaleClientId)','sec.fn_FilterByTenant(UserId)',
+                'sec.fn_FilterByTenant(ShaleClientId,UserId)',
+                'sec.fn_FilterByTenantShaleClientId()', # Flattening all parentheses would accept this.
+                'sec.fn_FilterByTenant(ShaleClientId)+1','(sec.fn_FilterByTenant(ShaleClientId)',
+                'sec.fn_FilterByTenant(ShaleClientId))',
+                '('*9+'sec.fn_FilterByTenant(ShaleClientId)'+')'*9):
+            mutation="UPDATE sys.security_predicates SET predicate_definition='"+definition+"';"
+            with self.subTest(definition=definition):
+                result=self.rls_fixture(mutation)
+                self.assertEqual(6,sum(b for n,(u,b) in result.items() if n.endswith('_FUNCTION_DEFINITION')))
+                self.assertEqual(6,self.rls_fixture(mutation,aggregate=True))
+
+    def test_empty_elevated_runtime_contract_and_sanitized_results(self):
+        self.assertEqual([],self.contract['runtimeElevatedExecuteAllowlist'])
+        line=next(line for line in self.sql.splitlines() if "FACT|RUNTIME_NONBYPASS_ELEVATED_OBJECT_EXECUTE|" in line)
+        status=re.search(r'CASE WHEN q.bad.*?END',line).group()
+        count=re.search(r"END,'\|',(.*?),'\|-",line).group(1)
+        scope=line[line.index(' FROM ('):].removesuffix(';')
+        scope=scope.replace("OPENJSON(@Elevated) WITH(n nvarchar(517) '$.n')",'elevated ')
+        scope=scope.replace('COUNT_BIG','COUNT')
+        db=sqlite3.connect(':memory:');self.addCleanup(db.close)
+        permissions={f'synthetic_{i}':0 for i in range(6)}
+        db.create_function('HAS_PERMS_BY_NAME',3,lambda n,scope,permission:permissions[n])
+        query="WITH elevated(n) AS(VALUES "+','.join("('"+n+"')" for n in permissions)+') SELECT '+status+','+count+scope
+        def run(visibility=0):return db.execute(query,{'ElevatedVisibilityUnknown':visibility}).fetchone()
+        self.assertEqual(('PASS',0),run())
+        permissions.update({n:1 for n in permissions})
+        self.assertEqual(('FAIL',6),run())
+        self.assertEqual(('FAIL',7),run(1))
+        permissions.update({n:0 for n in permissions})
+        permissions['synthetic_0']=None
+        self.assertEqual(('UNKNOWN',1),run())
+        permissions['synthetic_0']=0
+        self.assertEqual(('UNKNOWN',1),run(1))
+        self.assertIn('SET @Unknown=@Unknown+@ElevatedVisibilityUnknown;',self.sql)
+        self.assertNotRegex(line,r'OBJECT_NAME|OBJECT_SCHEMA_NAME|ERROR_MESSAGE')
+
+    def test_repository_resolvers_grant_bootstrap_only(self):
+        sources={'phase3b1.sql':['ResolveAiClientV1','ResolveAiCredentialV1'],
+          'phase3b2c1.sql':['ResolveAiOAuthCodeV1'],'phase3b2c2.sql':['ResolveAiRefreshV1'],
+          'phase3b2d.sql':['ResolveAiAccessV1'],'revocation.sql':['ResolveAiRevocationV1']}
+        for path,names in sources.items():
+            source=(ROOT/'docs/sql/ai-integration'/path).read_text()
+            for name in names:
+                with self.subTest(module=name):
+                    self.assertRegex(source,rf'GRANT EXECUTE ON OBJECT::dbo\.{name} TO AiIntegrationBootstrap;')
+                    body=source[source.index('CREATE PROCEDURE dbo.'+name):].split("');",1)[0]
+                    self.assertIn('EXECUTE AS OWNER',body)
+                    self.assertNotRegex(source,rf'(?i)GRANT EXECUTE ON OBJECT::dbo\.{name} TO (?:shale_runtime|shale_runtime_role)\b')
+        private=(ROOT/'docs/sql/ai-integration/phase3b7-confinement.sql').read_text()
+        self.assertIn('CREATE PROCEDURE dbo.AiDataLocateAccessOwnerV1',private)
+        self.assertNotRegex(private,r'GRANT EXECUTE ON OBJECT::dbo\.AiDataLocateAccessOwnerV1\b')
 
     def test_runtime_diagnostics_stay_inside_impersonation_and_use_original_scopes(self):
         start=self.sql.index('-- BEGIN LOCALIZED RUNTIME_NONBYPASS')

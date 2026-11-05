@@ -231,5 +231,18 @@
     "RUNTIME_NONBYPASS_IMPERSONATE_SCOPED_PRINCIPALS",
     "RUNTIME_NONBYPASS_PROTECTED_OBJECT_AUTHORITY",
     "RUNTIME_NONBYPASS_ELEVATED_OBJECT_EXECUTE"
-  ]
+  ],
+  "runtimeElevatedExecuteAllowlist": [],
+  "predicateDefinitionRepresentation": {
+    "outerParenthesesMax": 8,
+    "argumentParenthesesMax": 8,
+    "remove": [
+      "identifier brackets",
+      "space",
+      "tab",
+      "CR",
+      "LF"
+    ],
+    "canonical": "sec.fn_filterbytenant(shaleclientid)"
+  }
 }

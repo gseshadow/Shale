@@ -118,22 +118,28 @@ SELECT @Findings=COUNT_BIG(*) FROM Expected e WHERE NOT EXISTS(SELECT 1 FROM sys
  AND (SELECT STRING_AGG(CONVERT(nvarchar(max),COL_NAME(k.referenced_object_id,k.referenced_column_id)),N',') WITHIN GROUP(ORDER BY k.constraint_column_id) FROM sys.foreign_key_columns k WHERE k.constraint_object_id=f.object_id)=e.RCols);
 SELECT CONVERT(varchar(300),CONCAT('FACT|REMEMBER_KEYS|',CASE WHEN @Findings=0 THEN 'PASS' ELSE 'FAIL' END,'|',@Findings,'|','-'));
 
-;WITH Expected(T,Kind,Operation) AS(SELECT t.n,p.k,p.o FROM(VALUES(N'UserSessions'),(N'SessionSecurityAuditLog'))t(n) CROSS JOIN(VALUES(N'FILTER',N'FILTER'),(N'BLOCK',N'AFTER INSERT'),(N'BLOCK',N'AFTER UPDATE'))p(k,o))
+;WITH Depths(n) AS (SELECT * FROM(VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8))v(n)),
+DefinitionForms(d) AS (SELECT REPLICATE(N'(',o.n)+N'sec.fn_filterbytenant('+REPLICATE(N'(',a.n)
+ +N'shaleclientid'+REPLICATE(N')',a.n)+N')'+REPLICATE(N')',o.n) FROM Depths o CROSS JOIN Depths a),
+Expected(T,Kind,Operation) AS(SELECT t.n,p.k,p.o FROM(VALUES(N'UserSessions'),(N'SessionSecurityAuditLog'))t(n) CROSS JOIN(VALUES(N'FILTER',NULL),(N'BLOCK',N'AFTER INSERT'),(N'BLOCK',N'AFTER UPDATE'))p(k,o))
 SELECT @Findings=(SELECT COUNT_BIG(*) FROM Expected e WHERE NOT EXISTS(SELECT 1 FROM sys.security_predicates p JOIN sys.security_policies s ON s.object_id=p.object_id JOIN sys.schemas sc ON sc.schema_id=s.schema_id
- WHERE p.target_object_id=OBJECT_ID(N'dbo.'+e.T) AND p.predicate_type_desc=e.Kind AND p.operation_desc=e.Operation
+ WHERE p.target_object_id=OBJECT_ID(N'dbo.'+e.T) AND p.predicate_type_desc=e.Kind AND ((e.Kind=N'FILTER' AND p.operation IS NULL AND p.operation_desc IS NULL) OR (e.Kind=N'BLOCK' AND p.operation_desc=e.Operation))
  AND s.name=N'TenantFilter' AND sc.name=N'sec' AND sc.principal_id=DATABASE_PRINCIPAL_ID(N'dbo') AND COALESCE(s.principal_id,sc.principal_id)=DATABASE_PRINCIPAL_ID(N'dbo') AND s.is_enabled=1 AND s.is_schema_bound=1
- AND LOWER(REPLACE(REPLACE(REPLACE(p.predicate_definition,N'[',N''),N']',N''),N' ',N''))=N'sec.fn_filterbytenant(shaleclientid)'))
+ AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p.predicate_definition,N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N'')) IN(SELECT d FROM DefinitionForms)))
  +ABS(6-(SELECT COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id IN(OBJECT_ID(N'dbo.UserSessions'),OBJECT_ID(N'dbo.SessionSecurityAuditLog'))));
-SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS|',CASE WHEN @Findings=0 THEN 'PASS' ELSE 'FAIL' END,'|',@Findings,'|','-'));
+SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS|',CASE WHEN EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id IN(OBJECT_ID(N'dbo.UserSessions'),OBJECT_ID(N'dbo.SessionSecurityAuditLog')) AND predicate_definition IS NULL) THEN 'UNKNOWN' WHEN @Findings=0 THEN 'PASS' ELSE 'FAIL' END,'|',@Findings,'|','-'));
 
 -- BEGIN LOCALIZED SESSION_RLS (fixed contract labels only)
 -- Cohorts: FILTER predicates by type; BLOCK slots by operation, independently of type.
 -- A missing cohort cannot be attributed to an arbitrary predicate in another slot.
-;WITH Expected(Slot,T,Kind,Operation) AS (SELECT * FROM (VALUES
- (0,N'UserSessions',N'FILTER',N'FILTER'),
+;WITH Depths(n) AS (SELECT * FROM(VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8))v(n)),
+DefinitionForms(d) AS (SELECT REPLICATE(N'(',o.n)+N'sec.fn_filterbytenant('+REPLICATE(N'(',a.n)
+ +N'shaleclientid'+REPLICATE(N')',a.n)+N')'+REPLICATE(N')',o.n) FROM Depths o CROSS JOIN Depths a),
+Expected(Slot,T,Kind,Operation) AS (SELECT * FROM (VALUES
+ (0,N'UserSessions',N'FILTER',NULL),
  (1,N'UserSessions',N'BLOCK',N'AFTER INSERT'),
  (2,N'UserSessions',N'BLOCK',N'AFTER UPDATE'),
- (3,N'SessionSecurityAuditLog',N'FILTER',N'FILTER'),
+ (3,N'SessionSecurityAuditLog',N'FILTER',NULL),
  (4,N'SessionSecurityAuditLog',N'BLOCK',N'AFTER INSERT'),
  (5,N'SessionSecurityAuditLog',N'BLOCK',N'AFTER UPDATE'))v(i,t,k,o)),
 Facts(Slot,FactName,Metric) AS (SELECT * FROM (VALUES
@@ -194,16 +200,17 @@ Observed AS (
    (sc.principal_id<>DATABASE_PRINCIPAL_ID(N'dbo') OR COALESCE(s.principal_id,sc.principal_id)<>DATABASE_PRINCIPAL_ID(N'dbo')) THEN 1 ELSE 0 END),0) AS OwnerBad,
  COALESCE(SUM(CASE WHEN s.is_enabled<>1 THEN 1 ELSE 0 END),0) AS EnabledBad,
  COALESCE(SUM(CASE WHEN s.is_schema_bound<>1 THEN 1 ELSE 0 END),0) AS BoundBad,
- -- Deliberately retain the aggregate's literal comparison, including FILTER operation.
+ -- FILTER has no operation: both catalog operation fields must be NULL.
  COALESCE(SUM(CASE WHEN p.security_predicate_id IS NOT NULL AND
-   (p.predicate_type_desc<>e.Kind OR p.operation_desc<>e.Operation OR p.operation_desc IS NULL) THEN 1 ELSE 0 END),0) AS ShapeBad,
+   (p.predicate_type_desc<>e.Kind OR (e.Kind=N'FILTER' AND (p.operation IS NOT NULL OR p.operation_desc IS NOT NULL)) OR (e.Kind=N'BLOCK' AND (p.operation_desc<>e.Operation OR p.operation_desc IS NULL))) THEN 1 ELSE 0 END),0) AS ShapeBad,
  COALESCE(SUM(CASE WHEN p.predicate_definition IS NOT NULL AND
-   LOWER(REPLACE(REPLACE(REPLACE(p.predicate_definition,N'[',N''),N']',N''),N' ',N''))<>N'sec.fn_filterbytenant(shaleclientid)' THEN 1 ELSE 0 END),0) AS DefinitionBad,
+   df.d IS NULL THEN 1 ELSE 0 END),0) AS DefinitionBad,
  COALESCE(SUM(CASE WHEN p.security_predicate_id IS NOT NULL AND p.predicate_definition IS NULL THEN 1 ELSE 0 END),0) AS DefinitionUnknown
  FROM Expected e LEFT JOIN sys.security_predicates p ON p.target_object_id=OBJECT_ID(N'dbo.'+e.T)
  AND ((e.Kind=N'FILTER' AND p.predicate_type_desc=N'FILTER') OR (e.Kind=N'BLOCK' AND p.operation_desc=e.Operation))
  LEFT JOIN sys.security_policies s ON s.object_id=p.object_id
  LEFT JOIN sys.schemas sc ON sc.schema_id=s.schema_id
+ LEFT JOIN DefinitionForms df ON LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p.predicate_definition,N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N''))=df.d
  GROUP BY e.Slot,e.T
 ), Results AS (
  SELECT f.FactName,
@@ -218,10 +225,10 @@ Observed AS (
 SELECT CONVERT(varchar(300),CONCAT('FACT|',FactName,'|',
  CASE WHEN FindingCount>0 THEN 'FAIL' WHEN UnknownCount>0 THEN 'UNKNOWN' ELSE 'PASS' END,
  '|',FindingCount+UnknownCount,'|-')) FROM Results ORDER BY FactName;
-SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS_USERSESSIONS_FILTER_OPERATION_NULL|',CASE WHEN q.n IS NULL THEN 'UNKNOWN' WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',COALESCE(q.n,1),'|-')) FROM (SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.UserSessions') AND predicate_type_desc=N'FILTER') THEN NULL WHEN EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.UserSessions') AND predicate_type_desc=N'FILTER' AND operation_desc IS NOT NULL) THEN 1 ELSE 0 END)q(n);
-SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS_USERSESSIONS_UNEXPECTED_PREDICATES|',CASE WHEN q.n IS NULL THEN 'UNKNOWN' WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',COALESCE(q.n,1),'|-')) FROM (SELECT COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.UserSessions') AND NOT ((predicate_type_desc=N'FILTER' AND operation_desc IS NULL) OR (predicate_type_desc=N'BLOCK' AND COALESCE(operation_desc,N'') IN(N'AFTER INSERT',N'AFTER UPDATE'))))q(n);
-SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS_SESSIONAUDIT_FILTER_OPERATION_NULL|',CASE WHEN q.n IS NULL THEN 'UNKNOWN' WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',COALESCE(q.n,1),'|-')) FROM (SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.SessionSecurityAuditLog') AND predicate_type_desc=N'FILTER') THEN NULL WHEN EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.SessionSecurityAuditLog') AND predicate_type_desc=N'FILTER' AND operation_desc IS NOT NULL) THEN 1 ELSE 0 END)q(n);
-SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS_SESSIONAUDIT_UNEXPECTED_PREDICATES|',CASE WHEN q.n IS NULL THEN 'UNKNOWN' WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',COALESCE(q.n,1),'|-')) FROM (SELECT COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.SessionSecurityAuditLog') AND NOT ((predicate_type_desc=N'FILTER' AND operation_desc IS NULL) OR (predicate_type_desc=N'BLOCK' AND COALESCE(operation_desc,N'') IN(N'AFTER INSERT',N'AFTER UPDATE'))))q(n);
+SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS_USERSESSIONS_FILTER_OPERATION_NULL|',CASE WHEN q.n IS NULL THEN 'UNKNOWN' WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',COALESCE(q.n,1),'|-')) FROM (SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.UserSessions') AND predicate_type_desc=N'FILTER') THEN NULL WHEN EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.UserSessions') AND predicate_type_desc=N'FILTER' AND (operation IS NOT NULL OR operation_desc IS NOT NULL)) THEN 1 ELSE 0 END)q(n);
+SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS_USERSESSIONS_UNEXPECTED_PREDICATES|',CASE WHEN q.n IS NULL THEN 'UNKNOWN' WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',COALESCE(q.n,1),'|-')) FROM (SELECT COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.UserSessions') AND NOT ((predicate_type_desc=N'FILTER' AND operation IS NULL AND operation_desc IS NULL) OR (predicate_type_desc=N'BLOCK' AND COALESCE(operation_desc,N'') IN(N'AFTER INSERT',N'AFTER UPDATE'))))q(n);
+SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS_SESSIONAUDIT_FILTER_OPERATION_NULL|',CASE WHEN q.n IS NULL THEN 'UNKNOWN' WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',COALESCE(q.n,1),'|-')) FROM (SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.SessionSecurityAuditLog') AND predicate_type_desc=N'FILTER') THEN NULL WHEN EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.SessionSecurityAuditLog') AND predicate_type_desc=N'FILTER' AND (operation IS NOT NULL OR operation_desc IS NOT NULL)) THEN 1 ELSE 0 END)q(n);
+SELECT CONVERT(varchar(300),CONCAT('FACT|SESSION_RLS_SESSIONAUDIT_UNEXPECTED_PREDICATES|',CASE WHEN q.n IS NULL THEN 'UNKNOWN' WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',COALESCE(q.n,1),'|-')) FROM (SELECT COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.SessionSecurityAuditLog') AND NOT ((predicate_type_desc=N'FILTER' AND operation IS NULL AND operation_desc IS NULL) OR (predicate_type_desc=N'BLOCK' AND COALESCE(operation_desc,N'') IN(N'AFTER INSERT',N'AFTER UPDATE'))))q(n);
 -- END LOCALIZED SESSION_RLS
 
 SELECT @Findings=COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.DesktopRememberCredentials');
@@ -276,6 +283,9 @@ SELECT @Json=@Json+(SELECT USER_NAME(grantee_principal_id) AS Grantee,USER_NAME(
 SELECT @Json=@Json+(SELECT USER_NAME(role_principal_id) AS RoleName,USER_NAME(member_principal_id) AS MemberName FROM sys.database_role_members ORDER BY role_principal_id,member_principal_id FOR JSON PATH);
 SELECT CONVERT(varchar(300),CONCAT('FACT|ORDINARY_API_REVIEW|UNKNOWN|1|',CONVERT(varchar(64),HASHBYTES('SHA2_256',@Json),2)));
 
+-- Reviewed ordinary-runtime elevated EXECUTE allowlist is EMPTY; see reconciliation.md.
+-- AI bootstrap resolvers and the private Case helper are not ordinary-runtime authorities.
+-- Do not exempt a module merely because it is signed or executes as owner.
 -- Snapshot only non-secret catalog names before impersonation; do not print them.
 DECLARE @Owners nvarchar(max)=(SELECT id FROM(SELECT principal_id AS id FROM sys.schemas WHERE principal_id IS NOT NULL UNION SELECT principal_id FROM sys.objects WHERE principal_id IS NOT NULL)v FOR JSON PATH);
 DECLARE @Principals nvarchar(max)=(SELECT name AS n FROM sys.database_principals WHERE type IN('S','E','X') FOR JSON PATH);
@@ -287,6 +297,7 @@ DECLARE @AuthObjects nvarchar(max)=(SELECT QUOTENAME(SCHEMA_NAME(schema_id))+N'.
 DECLARE @AuthColumns nvarchar(max)=(SELECT QUOTENAME(OBJECT_SCHEMA_NAME(c.object_id))+N'.'+QUOTENAME(OBJECT_NAME(c.object_id)) AS o,c.name AS n FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF') FOR JSON PATH);
 DECLARE @GrantOptions nvarchar(max)=(SELECT grantee_principal_id AS id FROM sys.database_permissions WHERE state='W' FOR JSON PATH);
 DECLARE @Elevated nvarchar(max)=(SELECT QUOTENAME(OBJECT_SCHEMA_NAME(o.object_id))+N'.'+QUOTENAME(o.name) AS n FROM sys.objects o JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE o.is_ms_shipped=0 AND (m.execute_as_principal_id IS NOT NULL OR m.definition IS NULL OR EXISTS(SELECT 1 FROM sys.crypt_properties cp WHERE cp.class=1 AND cp.major_id=o.object_id)) AND o.object_id NOT IN(COALESCE(OBJECT_ID(N'dbo.LookupAuthenticationCredentialV1'),-1),COALESCE(OBJECT_ID(N'dbo.ResolveDesktopRememberCredentialV2'),-1)) FOR JSON PATH);
+DECLARE @ElevatedVisibilityUnknown bigint=(SELECT COUNT_BIG(*) FROM sys.objects o JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE o.is_ms_shipped=0 AND m.definition IS NULL);
 -- Session impersonation only, as in existing postchecks; never EXEC a procedure.
 -- Failure to impersonate aborts sqlcmd; the collector returns UNKNOWN, never PASS.
 EXECUTE AS USER=N'shale_app';
@@ -339,6 +350,7 @@ BEGIN TRY
  SELECT @Unknown=@Unknown+COALESCE(SUM(CASE WHEN p IS NULL THEN 1 ELSE 0 END),0),@Findings=@Findings+COALESCE(SUM(CASE WHEN p<>0 THEN 1 ELSE 0 END),0)
  FROM(SELECT HAS_PERMS_BY_NAME(o.n,'OBJECT',v.a) AS p FROM OPENJSON(@AuthObjects) WITH(n nvarchar(517) '$.n')o CROSS JOIN(VALUES(N'ALTER'),(N'CONTROL'))v(a)
  UNION ALL SELECT HAS_PERMS_BY_NAME(o.n,'OBJECT','EXECUTE') FROM OPENJSON(@Elevated) WITH(n nvarchar(517) '$.n')o)q;
+ SET @Unknown=@Unknown+@ElevatedVisibilityUnknown;
  SELECT CONVERT(varchar(300),CONCAT('FACT|RUNTIME_NONBYPASS|',CASE WHEN @Unknown>0 THEN 'UNKNOWN' WHEN @Findings>0 OR USER_NAME()=N'dbo' THEN 'FAIL' ELSE 'PASS' END,'|',@Unknown+@Findings,'|-'));
 -- BEGIN LOCALIZED RUNTIME_NONBYPASS (same impersonation and snapshots)
 SELECT CONVERT(varchar(300),CONCAT('FACT|',v.n,'|',CASE WHEN v.p IS NULL THEN 'UNKNOWN' WHEN v.p<>v.required THEN 'FAIL' ELSE 'PASS' END,'|',CASE WHEN v.p=v.required THEN 0 ELSE 1 END,'|-'))
@@ -357,7 +369,7 @@ SELECT CONVERT(varchar(300),CONCAT('FACT|RUNTIME_NONBYPASS_OWNER_PRINCIPALS|',CA
 SELECT CONVERT(varchar(300),CONCAT('FACT|RUNTIME_NONBYPASS_FIXED_DATABASE_ROLES|',CASE WHEN q.n=0 THEN 'PASS' ELSE 'FAIL' END,'|',q.n,'|-')) FROM (SELECT COUNT_BIG(*) FROM sys.user_token t JOIN OPENJSON(@FixedRoles) WITH(id int '$.id')o ON o.id=t.principal_id)q(n);
 SELECT CONVERT(varchar(300),CONCAT('FACT|RUNTIME_NONBYPASS_IMPERSONATE_SCOPED_PRINCIPALS|',CASE WHEN q.bad>0 THEN 'FAIL' WHEN q.unknowns>0 THEN 'UNKNOWN' ELSE 'PASS' END,'|',q.bad+q.unknowns,'|-')) FROM (SELECT COALESCE(SUM(CASE WHEN p<>0 THEN 1 ELSE 0 END),0) AS bad,COALESCE(SUM(CASE WHEN p IS NULL THEN 1 ELSE 0 END),0) AS unknowns FROM (SELECT HAS_PERMS_BY_NAME(p.n,'USER','IMPERSONATE') AS p FROM OPENJSON(@Principals) WITH(n nvarchar(128) '$.n')p WHERE p.n<>USER_NAME())v)q;
 SELECT CONVERT(varchar(300),CONCAT('FACT|RUNTIME_NONBYPASS_PROTECTED_OBJECT_AUTHORITY|',CASE WHEN q.bad>0 THEN 'FAIL' WHEN q.unknowns>0 THEN 'UNKNOWN' ELSE 'PASS' END,'|',q.bad+q.unknowns,'|-')) FROM (SELECT COALESCE(SUM(CASE WHEN p<>0 THEN 1 ELSE 0 END),0) AS bad,COALESCE(SUM(CASE WHEN p IS NULL THEN 1 ELSE 0 END),0) AS unknowns FROM (SELECT HAS_PERMS_BY_NAME(o.n,'OBJECT',v.a) AS p FROM OPENJSON(@AuthObjects) WITH(n nvarchar(517) '$.n')o CROSS JOIN(VALUES(N'ALTER'),(N'CONTROL'))v(a))v)q;
-SELECT CONVERT(varchar(300),CONCAT('FACT|RUNTIME_NONBYPASS_ELEVATED_OBJECT_EXECUTE|',CASE WHEN q.bad>0 THEN 'FAIL' WHEN q.unknowns>0 THEN 'UNKNOWN' ELSE 'PASS' END,'|',q.bad+q.unknowns,'|-')) FROM (SELECT COALESCE(SUM(CASE WHEN p<>0 THEN 1 ELSE 0 END),0) AS bad,COALESCE(SUM(CASE WHEN p IS NULL THEN 1 ELSE 0 END),0) AS unknowns FROM (SELECT HAS_PERMS_BY_NAME(o.n,'OBJECT','EXECUTE') AS p FROM OPENJSON(@Elevated) WITH(n nvarchar(517) '$.n')o)v)q;
+SELECT CONVERT(varchar(300),CONCAT('FACT|RUNTIME_NONBYPASS_ELEVATED_OBJECT_EXECUTE|',CASE WHEN q.bad>0 THEN 'FAIL' WHEN q.unknowns+@ElevatedVisibilityUnknown>0 THEN 'UNKNOWN' ELSE 'PASS' END,'|',q.bad+q.unknowns+@ElevatedVisibilityUnknown,'|-')) FROM (SELECT COALESCE(SUM(CASE WHEN p<>0 THEN 1 ELSE 0 END),0) AS bad,COALESCE(SUM(CASE WHEN p IS NULL THEN 1 ELSE 0 END),0) AS unknowns FROM (SELECT HAS_PERMS_BY_NAME(o.n,'OBJECT','EXECUTE') AS p FROM OPENJSON(@Elevated) WITH(n nvarchar(517) '$.n')o)v)q;
 -- END LOCALIZED RUNTIME_NONBYPASS
  REVERT;
 END TRY BEGIN CATCH REVERT; THROW; END CATCH;

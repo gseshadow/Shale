@@ -1,6 +1,9 @@
 # Dormant production compatibility: one read-only operator packet
 
-**PREPARED, NOT EXECUTED.** Candidate source is
+**OFFLINE RECONCILIATION; NO FURTHER EXECUTION AUTHORIZED.** The operator reported a run
+of packet commit `160a05c3a369a73cbeec24c7c41c186893989541`. See [the source reconciliation](reconciliation.md)
+for confirmed verifier defects and remaining uncertainty. The revised packet has not been run against production.
+Candidate source is
 `600723b92fe34731e1d6d25e598fc9e3cbfc2770` on `codex/latest` (runtime code unchanged
 from `1f12091aef3275721c1e35d6ba00a2ecb80c5173`). Use the exact packet commit in the
 handoff, a clean checkout and a trusted Microsoft ODBC sqlcmd installation. This packet performs
@@ -170,8 +173,8 @@ For each prefix formed by `SESSION_RLS_` + **USERSESSIONS** or **SESSIONAUDIT** 
 | POLICY_OWNER | sec schema and effective policy owner are dbo. |
 | ENABLED | Every cohort policy is enabled. |
 | SCHEMA_BOUND | Every cohort policy is schema-bound. |
-| TYPE_OPERATION | Every cohort matches the aggregate's exact type and operation description, including its literal FILTER operation comparison. NULL operation fails this literal comparison. |
-| FUNCTION_DEFINITION | Every binding expression matches the aggregate's existing bracket/space-normalized sec.fn_FilterByTenant(ShaleClientId) comparison. No function body is read or newly accepted by this fact. |
+| TYPE_OPERATION | Every cohort matches the aggregate's exact type and operation description, FILTER requires operation IS NULL and operation_desc IS NULL; BLOCK requires its exact AFTER INSERT/AFTER UPDATE description. |
+| FUNCTION_DEFINITION | Every binding expression matches the aggregate's exact balanced representation contract for sec.fn_FilterByTenant(ShaleClientId), described below. No function body is read or newly accepted by this fact. |
 | EXTRA_PREDICATES | There is at most one predicate in this cohort; findingCount counts excess predicates. |
 
 FILTER cohorts select predicates by FILTER type; block cohorts select by the named operation,
@@ -186,10 +189,9 @@ Each target also has `SESSION_RLS_USERSESSIONS_FILTER_OPERATION_NULL` or
 `SESSION_RLS_SESSIONAUDIT_FILTER_OPERATION_NULL`, and the corresponding
 `SESSION_RLS_USERSESSIONS_UNEXPECTED_PREDICATES` or
 `SESSION_RLS_SESSIONAUDIT_UNEXPECTED_PREDICATES`.
-FILTER_OPERATION_NULL is PASS when FILTER predicates exist and all operation descriptions are NULL;
-absent FILTER is UNKNOWN. It makes the native NULL FILTER operation representation visible as a
-sanitized fact, separately from the unchanged aggregate's literal comparison. It does not declare
-the aggregate PASS. UNEXPECTED_PREDICATES counts bindings outside canonical FILTER/NULL and
+FILTER_OPERATION_NULL is PASS when FILTER predicates exist and both operation fields are NULL;
+absent FILTER is UNKNOWN. This agrees with the corrected aggregate/localized FILTER rule.
+It does not independently declare the aggregate PASS. UNEXPECTED_PREDICATES counts bindings outside canonical FILTER/NULL and
 BLOCK/AFTER INSERT or AFTER UPDATE shapes. Duplicates are counted by the per-cohort extras checks.
 RLS dimensions overlap: do not sum these findingCounts to reconstruct the aggregate.
 
@@ -226,10 +228,19 @@ findings, matching the original aggregate. Multi-object categories emit only sum
 unknown counts; known failures take precedence over UNKNOWN. No discovered names, identifiers,
 definitions or hashes leave these checks. These are authority categories, not an object inventory.
 
+Binding comparison removes brackets, spaces, tabs, CR and LF and lowercases, then permits
+0–8 balanced outer wrappers and 0–8 balanced wrappers around the sole ShaleClientId argument.
+The exact grammar and rejection cases are in [reconciliation.md](reconciliation.md). No function body
+is normalized or approved by this check. The reported six definition failures remain conditional.
+
+The source-reviewed ordinary elevated EXECUTE allowlist is empty. The six AI resolvers are granted
+to AiIntegrationBootstrap, and the Case owner helper is private; neither creates an ordinary-runtime
+exception. Missing module-definition visibility yields UNKNOWN. The six observed authorities remain
+unresolved; their count does not identify them or establish an exploit. No broad exception is added.
+
 Offline validation uses synthetic in-memory catalog rows, fixed-name/transport rejection tests,
-and a byte-preservation guard over all original SQL statements. It never connects to SQL or Azure.
-The final bounded operator run remains necessary to establish the production causes. No result
-from this refinement authorizes a repair or changes the aggregate acceptance gates.
+source-grant checks, and byte pins over unaffected catalog/auth sections. It never connects to SQL Server
+or Azure. No further production/Azure check or repair is authorized by this reconciliation.
 
 ## C. Separate read-only Azure/App Service sequence
 
@@ -356,7 +367,7 @@ Only local offline safety/source checks are appropriate for authoring this packe
 check source hashes, complete fact coverage and absence of SQL mutations/application execution/data
 reads, unsafe Azure verbs and raw secret output. No production, Azure, sqlcmd, PowerShell collector,
 SQL fixture, build, health/login/session smoke or packet mode was executed during preparation.
-Executed preparation checks: twelve offline guards PASS, including negative controls for `-X`, `-X1`
+Historical preparation checks: twelve offline guards PASS, including negative controls for `-X`, `-X1`
 and `-X 1` with the child-password mechanism, unsafe input and ambiguous discovery; current selector finds no affected Maven area
 and no full-suite escalation. Native PowerShell parsing/ODBC execution and Azure/SCM behavior remain unexecuted; static checks do
 not certify those runtime outcomes. Any first operator error is UNKNOWN/STOP, not permission repair,
