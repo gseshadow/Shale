@@ -75,6 +75,53 @@ class PacketSafetyTests(unittest.TestCase):
         self.assertNotIn('SkipCertificateCheck',self.ps)
         self.assertNotIn('trustServerCertificate=true',self.ps)
 
+    def assert_password_environment_is_usable(self, source):
+        arguments=re.search(r"(?m)^\s*\$start\.Arguments='([^']*)'",source).group(1)
+        # Case matters: -x disables substitution; -X/-X1 suppress SQLCMDPASSWORD.
+        self.assertRegex(arguments,r'(?:^|\s)-x(?:\s|$)')
+        self.assertNotRegex(arguments,r'(?:^|\s)-X\S*')
+        self.assertNotRegex(arguments,r'(?:^|\s)-P(?:\s|$)')
+        self.assertIn("$start.EnvironmentVariables['SQLCMDPASSWORD']",source)
+        self.assertLess(source.index("$start.EnvironmentVariables.Remove('SQLCMDINI')"),source.index('[void]$p.Start()'))
+        self.assertIn("[void]$p.Start(); $start.EnvironmentVariables.Remove('SQLCMDPASSWORD')",source)
+
+    def test_child_password_transport_does_not_disable_its_environment(self):
+        self.assert_password_environment_is_usable(self.ps)
+
+    def test_password_environment_guard_rejects_original_conflict(self):
+        for switch in ('-X','-X1','-X 1'):
+            with self.subTest(switch=switch),self.assertRaises(AssertionError):
+                self.assert_password_environment_is_usable(self.ps.replace('-x -i','-x '+switch+' -i',1))
+
+    def test_input_guard_rejects_sqlcmd_commands_before_password_prompt(self):
+        pattern=re.search(r"\$unsafeSqlcmd='([^']+)'",self.ps).group(1)
+        self.assertIsNone(re.search(pattern,self.sql),'The reviewed SQL must have no sqlcmd metacommands.')
+        for command in (':r other.sql',':connect other-server',':setvar X Y',':out output.txt',
+                        ':error error.txt','!! whoami','ED','EDIT','EXIT','QUIT','RESET','LIST','HELP',
+                        '/* comment\n  :r hidden.sql\n*/','/* !! hidden command */'):
+            with self.subTest(command=command):self.assertIsNotNone(re.search(pattern,command))
+        self.assertIn('[IO.File]::ReadAllText($script) -match $unsafeSqlcmd',self.ps)
+        self.assertLess(self.ps.index('$unsafeSqlcmd='),self.ps.index('$secure=Read-Host'))
+
+    def test_explicit_single_binary_avoids_path_arrays_and_rejects_go_help(self):
+        self.assertNotIn('Get-Command',self.ps)
+        self.assertNotIn("$SqlcmdPath='sqlcmd.exe'",self.ps)
+        self.assertIn('[IO.Path]::IsPathRooted($SqlcmdPath)',self.ps)
+        self.assertIn('Get-Item -LiteralPath $SqlcmdPath',self.ps)
+        self.assertIn('$candidates.Count -ne 1',self.ps)
+        self.assertIn('$exe=[string]$candidates[0].FullName',self.ps)
+        banner,go=re.search(r"\$help -notmatch '([^']+)' -or \$help -match '([^']+)'",self.ps).groups()
+        accepted=lambda text:bool(re.search(banner,text)) and not re.search(go,text)
+        self.assertTrue(accepted('Microsoft (R) SQL Server Command Line Tool\nVersion 18.4.0001.1 NT'))
+        for text in ('Usage:\n  sqlcmd [command]\nVersion: 1.10.0',
+                     'sqlcmd\n -? (usage)', 'go-sqlcmd version 1.10.0',
+                     'Microsoft (R) SQL Server Command Line Tool\ngo-mssqldb'):
+            with self.subTest(help=text):self.assertFalse(accepted(text))
+        self.assertLess(self.ps.index('$help=(& $exe'),self.ps.index('$secure=Read-Host'))
+        readme=(PACKET/'README.md').read_text()
+        self.assertNotIn('(Get-Command sqlcmd.exe',readme)
+        self.assertIn(r'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\180\Tools\Binn\SQLCMD.EXE',readme)
+
     def test_only_read_azure_operations_and_get_without_credential_fallback(self):
         for args in re.findall(r'AzJson @\(([^\n]*)\)',self.ps):
             self.assertTrue(any(x in args for x in ["'webapp','show'","'webapp','config','show'","'webapp','config','appsettings','list'","'account','get-access-token'"]),args)

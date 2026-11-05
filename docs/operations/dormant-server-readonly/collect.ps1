@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][ValidateSet('Sql','Azure','Decide')][string]$Mode,
-    [string]$SqlcmdPath='sqlcmd.exe',
+    [string]$SqlcmdPath,
     [string]$AppResourceId,
     [string]$SqlResult,
     [string]$AzureResult,
@@ -32,17 +32,26 @@ if($Mode -eq 'Sql') {
     if($env:SQLCMDINI -or $env:SQLCMDPASSWORD){Fact 'SQL_TRANSPORT' 'UNKNOWN' 1; Emit; exit 2}
     $secure=$null; $bstr=[IntPtr]::Zero; $p=$null
     try {
-        $exe=(Get-Command $SqlcmdPath -CommandType Application -ErrorAction Stop).Source
+        # Require one explicit file: PATH discovery can return multiple ODBC/Go installations.
+        if([string]::IsNullOrWhiteSpace($SqlcmdPath) -or -not [IO.Path]::IsPathRooted($SqlcmdPath) -or
+           [IO.Path]::GetPathRoot($SqlcmdPath) -notmatch '[/\\]$'){throw 'Explicit absolute ODBC sqlcmd path required.'}
+        $candidates=@(Get-Item -LiteralPath $SqlcmdPath -ErrorAction Stop)
+        if($candidates.Count -ne 1 -or $candidates[0].PSIsContainer -or $candidates[0].PSProvider.Name -ne 'FileSystem'){throw 'One ODBC sqlcmd file required.'}
+        $exe=[string]$candidates[0].FullName
         $help=(& $exe '-?' 2>$null | Out-String)
-        if($help -notmatch 'Microsoft.*SQL Server Command Line Tool' -or $help -match '(?i)go-sqlcmd'){throw 'Microsoft ODBC sqlcmd required.'}
+        if($help -notmatch '(?im)^Microsoft \(R\) SQL Server Command Line Tool\b' -or $help -match '(?i)go-sqlcmd|go-mssqldb'){throw 'Microsoft ODBC sqlcmd required.'}
         $script=Join-Path $PSScriptRoot 'catalog.sql'
         if($script -match '["\r\n]'){throw 'Unsafe path.'}
+        # -X suppresses SQLCMDPASSWORD too. Replace its shell/startup protection with a
+        # fixed reviewed input guard and explicit child SQLCMDINI removal below; keep -x.
+        $unsafeSqlcmd='(?im)^\s*(?::|!!|(?:ED|EDIT|EXIT|QUIT|RESET|LIST|HELP)(?:\s|$))|!!'
+        if([IO.File]::ReadAllText($script) -match $unsafeSqlcmd){throw 'Unsafe sqlcmd input.'}
         $secure=Read-Host 'SQL password for brian (not retained or printed)' -AsSecureString
         $bstr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
         $start=New-Object Diagnostics.ProcessStartInfo
         $start.FileName=$exe; $start.UseShellExecute=$false
         # Microsoft ODBC sqlcmd only: validated TLS, no -C, -P, integrated or interactive Entra login.
-        $start.Arguments='-S "tcp:shale.database.windows.net,1433" -d "Shale" -U "brian" -N -b -V 16 -l 5 -t 30 -h -1 -W -w 512 -x -X1 -i "'+$script+'"'
+        $start.Arguments='-S "tcp:shale.database.windows.net,1433" -d "Shale" -U "brian" -N -b -V 16 -l 5 -t 30 -h -1 -W -w 512 -x -i "'+$script+'"'
         $start.RedirectStandardOutput=$true; $start.RedirectStandardError=$true
         $start.EnvironmentVariables.Remove('SQLCMDINI')
         $start.EnvironmentVariables['SQLCMDPASSWORD']=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)

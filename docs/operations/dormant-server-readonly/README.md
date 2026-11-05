@@ -23,7 +23,7 @@ trusted PowerShell console, after checking out the exact packet commit reported 
 $ErrorActionPreference = 'Stop'
 $packet = (Resolve-Path 'docs\operations\dormant-server-readonly').Path
 $collector = Join-Path $packet 'collect.ps1'
-$sqlcmd = (Get-Command sqlcmd.exe -CommandType Application).Source
+$sqlcmd = 'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\180\Tools\Binn\SQLCMD.EXE'
 if ($env:SQLCMDINI -or $env:SQLCMDPASSWORD) { throw 'STOP: use a clean console without SQLCMDINI/SQLCMDPASSWORD.' }
 New-Item -ItemType Directory -Path 'work\dormant-readonly' -Force | Out-Null
 & $collector -Mode Sql -SqlcmdPath $sqlcmd |
@@ -32,13 +32,30 @@ if ($LASTEXITCODE -ne 0) { throw 'STOP: SQL_TRANSPORT UNKNOWN; no retry or permi
 Get-Content -LiteralPath 'work\dormant-readonly\sql.json'
 ```
 
-The collector first checks sqlcmd's nonconnecting `-?` identity. Its **one connected invocation** is
+The collector requires one explicit absolute executable file, then checks its nonconnecting `-?`
+identity for the Microsoft ODBC banner and rejects Go. It does not discover executables through PATH:
+multiple installed sqlcmd binaries therefore cannot turn `.Source` into an array and fail parameter
+binding. If ODBC is installed elsewhere, supply that one trusted absolute file path; no automatic
+selection, retry or fallback occurs. Missing/invalid/Go selection stops before the password prompt.
+Its **one connected invocation** is
 exactly the following argument sequence; the collector supplies `SQLCMDPASSWORD` **only to that child**
 after a masked SecureString prompt. Do not run this line separately or set a global password variable:
 
 ```text
-sqlcmd.exe -S "tcp:shale.database.windows.net,1433" -d "Shale" -U "brian" -N -b -V 16 -l 5 -t 30 -h -1 -W -w 512 -x -X1 -i "<absolute packet path>\catalog.sql"
+sqlcmd.exe -S "tcp:shale.database.windows.net,1433" -d "Shale" -U "brian" -N -b -V 16 -l 5 -t 30 -h -1 -W -w 512 -x -i "<absolute packet path>\catalog.sql"
 ```
+
+**Local launcher correction:** the earlier `SQLCMDPASSWORD` plus `-X1` combination disabled the
+environment mechanism needed for authentication. Its reported `SQL_TRANSPORT UNKNOWN` is a launcher
+failure, not production compatibility evidence. Per the
+[official Microsoft sqlcmd contract](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility?view=sql-server-ver17#-x1),
+`-X` suppresses environment variables; Microsoft documents `SQLCMDPASSWORD` as the alternative to
+command-line `-P`. The corrected invocation omits both `-X` and `-X1` and retains lowercase `-x`.
+The child environment explicitly removes `SQLCMDINI` before password injection/process start.
+A guard rejects all colon-prefixed sqlcmd commands, shell escapes and bare editor/control commands
+in the raw input file before the password prompt. Static tests also reject those constructs in the
+unchanged catalog.sql. No input needs the shell/startup protection formerly supplied by `-X1`.
+Password lifetime, sanitization, connection bounds and no-retry behavior are preserved.
 
 There is no `-P`, `-C`, integrated/Entra authentication, SQLCMD substitution, include, startup script,
 application RPC, application-table SELECT or application row count. The collector captures stdout/stderr
@@ -252,7 +269,8 @@ Only local offline safety/source checks are appropriate for authoring this packe
 check source hashes, complete fact coverage and absence of SQL mutations/application execution/data
 reads, unsafe Azure verbs and raw secret output. No production, Azure, sqlcmd, PowerShell collector,
 SQL fixture, build, health/login/session smoke or packet mode was executed during preparation.
-Executed preparation checks: eight offline guards PASS; current selector finds no affected Maven area
+Executed preparation checks: twelve offline guards PASS, including negative controls for `-X`, `-X1`
+and `-X 1` with the child-password mechanism, unsafe input and ambiguous discovery; current selector finds no affected Maven area
 and no full-suite escalation. Native PowerShell parsing/ODBC execution and Azure/SCM behavior remain unexecuted; static checks do
 not certify those runtime outcomes. Any first operator error is UNKNOWN/STOP, not permission repair,
 automatic retry, installer execution or capability activation.
