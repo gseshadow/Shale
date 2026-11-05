@@ -1,5 +1,9 @@
 # Dormant server ordinary release compatibility — 2026-11-04
 
+The [prepared read-only operator packet](operations/dormant-server-readonly/README.md) supplies the
+bounded SQL/Azure inventory and fail-closed evidence decision for the remaining UNKNOWNs. It has
+not been executed and does not authorize production access, changes or deployment.
+
 ## Decision and evidence boundary
 
 **Production dormant JAR deployment: BLOCKED on ordinary compatibility evidence and artifact/configuration validation.**
