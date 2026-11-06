@@ -488,3 +488,62 @@ ReferenceNull Windows 5.1 investigation (PR #1934 follow-up, 2026-11-06)
   parse, remain ASCII and retain the prior production SQL/acceptance invariants.
   Production script and role-contract.json are byte-identical to PR head 76315c23.
   Package hashes and git diff whitespace checks PASS. Windows 5.1 rerun remains open.
+
+
+Recovery-output Windows 5.1 regression (PR #1934 follow-up)
+- Operator 5.1.26100.9818 report at 5e9c6c6e: main package tests passed, verification
+  suite stopped at the remaining literal recovery-message regex. Reviewed the full
+  failing suite, neighboring captured-output assertions, launchers, production catch,
+  repository rules and Azure SQL attestation/confinement guidance before editing.
+- The first error/recovery assertion in the unchanged matrix is DisposeFailure for
+  AiCaseDataCatalogVerifier. Locally reproduced the identical old assertion failure
+  at that scenario with Windows-style CRLF message wrapping. Bounded observation:
+  started=TRUE, committed=TRUE, transaction=ABSENT, recovery=COMMITTED_USERS_REMAIN,
+  message=MATCH. The old text matcher fails while actual selected recovery is correct.
+  The original Windows run exposed no scenario/state, so its exact rendered output
+  is not claimed as observed; the corrected diagnostic identifies it on that host.
+- Previous follow-up fixed only ReferenceNull text and left recovery/checkpoint/count
+  assertions host-rendering-dependent. Replace that entire error-assertion model:
+  intercept Write-Error only inside the synthetic worker, observe the actual rollback
+  variable AFTER original branch selection and its actual unformatted message input,
+  classify only exact approved recovery texts, and emit a bounded JSON stdout record.
+  Forward the original message/action to the real Write-Error cmdlet. Never export
+  rollback text, exception objects, connection details or arbitrary observed values.
+- Every ordinary failing case requires typed TRUE commit-started/committed flags,
+  ABSENT transaction, exact COMMITTED_USERS_REMAIN text including keep-controls-OFF,
+  matching full message composition, POST_INSTALL_VERIFY, CONTINUE and exit=1.
+  Checkpoints and numeric permission evidence now use the bounded record too. Only
+  leak checks and deliberate old-matcher reproduction inspect formatted error output.
+  No alternate recovery text, unknown commit, incorrect emitted message or wrong
+  checkpoint is accepted as correct committed recovery.
+- Persistent regression cases wrap recovery words across CRLF in the first failure
+  (DisposeFailure) and ReferenceNull. The original literal matcher must fail while
+  exact recovery-state assertions pass. Negative fixtures exercise the actual catch
+  with unconfirmed commit and an incorrect emitted message, requiring rejection by
+  the positive committed-recovery predicate. Their expected negative result is not
+  a recovery approval. Scratch mutation checks also reject committed flags paired
+  with NO_MUTATION recovery and an incorrect message with otherwise correct flags.
+- Optional offline diagnostic: Test-ShaleAiIdentityVerification.ps1
+  -RecoveryDiagnostics emits scenario and bounded recovery-state fields, with fixture
+  and layout labels. Unknown/invalid/missing records fail closed without raw output.
+  A failure includes only validated bounded fields and the scenario. Main package
+  invocation remains unchanged; no production mode or credential is needed.
+- Production Provision-ShaleAiIdentities.ps1 and role-contract.json are unchanged;
+  original recovery, rollback/commit uncertainty, accounts/grants, security checks,
+  all 324 edges, TLS and OFF gates are untouched. Child fake SQL/connection boundaries,
+  AST I/O guard, stream draining, 30-second timeout and process disposal remain.
+  This correction adds no network/SQL/Azure/secret path, sensitive read, business
+  mutation, application audit event or audit schema requirement. Capabilities stay OFF.
+- Actual corrected Windows 5.1 execution and the original Windows renderer remain
+  UNVERIFIED here. Run the offline package test there; no production access is needed.
+- Final offline validation on PowerShell 7.4.6/Linux: full package suite PASS,
+  including persistent wrapped recovery and negative recovery fixtures. The optional
+  diagnostic smoke test reports DisposeFailure with exact committed recovery despite
+  wrapping. Scratch actual-catch mutations reject unknown commit, NO_MUTATION with
+  committed flags and a wrong emitted message. No raw errors are exported.
+- All three scripts parse and remain ASCII; production SQL/condition invariants and
+  the production script/contract bytes are unchanged from 5e9c6c6e. Hash manifest and
+  git diff checks PASS. Selector maps no application area/full-suite escalation.
+- Required Maven critical-reactor attempt: mvn -o -B with the existing scratch local
+  repository was BLOCKED by uncached Spring Boot dependencies 4.1.1. No Java tests or
+  dependency network access ran. Corrected Windows 5.1 execution remains UNVERIFIED.

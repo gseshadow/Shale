@@ -157,3 +157,19 @@ Offline ReferenceNull test failure on Windows 5.1
   Retain only safe AV event metadata: rule/event identifier, timestamp, executable
   identity, destination category/port and blocked/attempted status. No script dumps,
   credentials, raw exceptions, packet payloads, TLS decryption or antivirus bypass.
+
+
+Offline recovery-status assertion on Windows 5.1
+- Do not investigate this synthetic test failure with production Verify/Preflight.
+  Update the reviewed package and run its offline package tests. For bounded detail:
+    powershell.exe -NoProfile -File .\Test-ShaleAiIdentityVerification.ps1 -RecoveryDiagnostics
+- Output includes only scenario, typed commit flags, transaction presence, recovery
+  code, message/action/stage checks, fixture and layout. COMMITTED_USERS_REMAIN means
+  the exact original recovery status was selected in the synthetic catch; it does
+  not describe live accounts. Uncommitted/WrongMessage are deliberate negative
+  fixtures that must be rejected by the ordinary committed-recovery predicate.
+- The first recovery assertion is DisposeFailure for the catalog fixture. A local
+  CRLF-wrapping regression reproduces the old literal assertion failure there with
+  correct recovery state. Actual Windows scenario/rendering was not captured by the
+  old test. The new bounded diagnostic separates state errors from presentation.
+- No production catch or permission check was changed. Keep AI/MCP/OAuth OFF.
