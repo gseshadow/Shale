@@ -18,8 +18,25 @@ $outer=@($ast.EndBlock.Statements | Where-Object {$_ -is [System.Management.Auto
 Require ($outer.Count -eq 1) 'Missing sanitized orchestration boundary.'
 # Use the actual production catch, including exit status and bounded output.
 $failure=$outer[0].CatchClauses[0].Body.Extent.Text
+# Console.WriteLine bypasses host-specific Write-Error wrapping. Only allowlisted
+# checkpoint labels, integer coordinates and fixed evidence states can be emitted.
+$referenceDiagnostic=@'
+if($Scenario -eq 'ReferenceNull'){
+    $checkpoint='OTHER'
+    if($script:verificationStep -cin @('CONNECT','IDENTITY_QUERY','IDENTITY_ROW_ASSERT','INDEPENDENT_IDENTITY_QUERY','IDENTITY_ASSERT','TOKEN_QUERY','TOKEN_ASSERT','DATABASE_PERMISSIONS','DATABASE_REQUIRED','SYSTEM_PERMISSIONS','SYSTEM_REQUIRED','OBJECT_INVENTORY','OBJECT_PERMISSIONS','OBJECT_REQUIRED','COLUMN_INVENTORY','COLUMN_QUERY','COLUMN_ASSERT','EXECUTE_SET','CONNECTION_DISPOSE','COMPLETE')){$checkpoint=$script:verificationStep}
+    $rows='UNKNOWN';$want='UNKNOWN';$read='UNKNOWN';$update='UNKNOWN'
+    $bits=[regex]::Match($script:verificationEvidence,'^ASSERT rows=([0-9]+) wantRead=([01])(?: read=(NULL|ZERO|ONE|OTHER) update=(NULL|ZERO|ONE|OTHER))?$')
+    if($bits.Success){
+        $rows=$bits.Groups[1].Value;$want=$bits.Groups[2].Value
+        if($bits.Groups[3].Success){$read=$bits.Groups[3].Value;$update=$bits.Groups[4].Value}
+    }
+    $fixture='INVALID';if($script:referenceNullFixtureValid){$fixture='VALID'}
+    [Console]::Out.WriteLine(('OFFLINE_REFERENCE_NULL checkpoint={0} object={1} column={2} rows={3} wantRead={4} read={5} update={6} fixture={7}' -f $checkpoint,[int]$script:verificationObject,[int]$script:verificationColumn,$rows,$want,$read,$update,$fixture))
+}
+'@
+$failure=$failure.Insert(1,"`n"+$referenceDiagnostic+"`n")
 $stubs=@'
-param([string]$Scenario,[string]$Role)
+param([string]$Scenario,[string]$Role,[ValidateSet('Host','Wrapped')][string]$ErrorLayout='Host')
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Data
@@ -30,7 +47,16 @@ $bootstrapExec=@('ResolveAiClientV1','ResolveAiCredentialV1','ResolveAiOAuthCode
 $referenceTables=@('AiCaseDataDeployment','AiDataUnicodeRange','AiDataUnicodeLower','AiDataWordTransition')
 $identity=@{Name='SYNTHETIC-SENSITIVE-IDENTITY';Role=$Role}
 if($Scenario -eq 'DisposeFailure'){$identity.Name='shale_prod_ai_catalog_verifier'}
-$script:disposed=$false
+$script:disposed=$false;$script:referenceNullFixtureValid=$false
+# Exercise a wrapped host message without changing the production catch or state.
+if($ErrorLayout -ceq 'Wrapped'){
+    $ErrorView='NormalView'
+    function Write-Error {
+        param([string]$Message,$ErrorAction)
+        $Message=$Message.Replace('wantRead=1 read=NULL',"wantRead=1`r`nread=NULL")
+        Microsoft.PowerShell.Utility\Write-Error -Message $Message -ErrorAction $ErrorAction
+    }
+}
 function New-Connection {
     $fake=[pscustomobject]@{Credential=$null}
     $fake | Add-Member -MemberType ScriptMethod -Name Open -Value {if($Scenario -eq 'OpenFailure'){throw 'SYNTHETIC-SENSITIVE-OPEN'}}
@@ -111,7 +137,14 @@ function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transacti
             if($Scenario -eq 'ReferenceRead'){$read=0}
             if($Scenario -eq 'ReferenceNull'){$read=[DBNull]::Value}
         }
-        return Table @('CanRead','CanUpdate') @(,@($read,$update))
+        $result=Table @('CanRead','CanUpdate') @(,@($read,$update))
+        if($Scenario -eq 'ReferenceNull' -and $Parameters.o -match '\[AiCaseDataDeployment\]'){
+            $script:referenceNullFixtureValid=$result -is [System.Data.DataTable] -and
+                $result.Rows.Count -eq 1 -and $result.Columns.Count -eq 2 -and
+                $result.Rows[0].IsNull('CanRead') -and $result.Rows[0]['CanRead'] -is [DBNull] -and
+                $result.Rows[0]['CanUpdate'] -is [int] -and $result.Rows[0]['CanUpdate'] -eq 0
+        }
+        return ,$result
     }
     throw 'SYNTHETIC-SENSITIVE-UNEXPECTED-SQL'
 }
@@ -131,7 +164,24 @@ $scratch=Join-Path $PSScriptRoot ('../identity-checkpoint-tests-'+[guid]::NewGui
 [void][IO.Directory]::CreateDirectory($scratch)
 try {
     $worker=Join-Path $scratch 'verification.ps1'
-    [IO.File]::WriteAllText($worker,$stubs+"`n"+$helpers+"`n"+$invoke.Replace('CATCH_BODY',$failure))
+    $workerSource=$stubs+"`n"+$helpers+"`n"+$invoke.Replace('CATCH_BODY',$failure)
+    $workerTokens=$null;$workerErrors=$null
+    $workerAst=[System.Management.Automation.Language.Parser]::ParseInput($workerSource,[ref]$workerTokens,[ref]$workerErrors)
+    Require ($workerErrors.Count -eq 0) 'Offline worker parser failure.'
+    # Fail before launching if extraction accidentally includes real I/O helpers or
+    # the production entrypoint. This is a regression guard, not an OS sandbox.
+    $allowedCommands=@('Set-StrictMode','Add-Type','Add-Member','Table','Read-Sql','New-Connection','Set-VerificationStep','Same-Set','Permission-List','Permission-Bit','Verify-Login','Where-Object','ForEach-Object','Sort-Object','ConvertTo-SecureString','Write-Error','Microsoft.PowerShell.Utility\Write-Error')
+    foreach($command in $workerAst.FindAll({param($n) $n -is [System.Management.Automation.Language.CommandAst]},$true)){
+        Require ($command.GetCommandName() -cin $allowedCommands) 'Offline worker contains an unreviewed command; no child launched.'
+    }
+    $allowedTypes=@('string','string[]','int','object','object[]','pscustomobject','System.Data.DataTable','DBNull','securestring','System.Data.SqlClient.SqlException','System.Data.SqlClient.SqlCredential','guid','regex','Console')
+    foreach($type in $workerAst.FindAll({param($n) $n -is [System.Management.Automation.Language.TypeExpressionAst]},$true)){
+        Require ($type.TypeName.FullName -cin $allowedTypes) 'Offline worker contains an unreviewed type; no child launched.'
+    }
+    foreach($boundary in @('New-Connection','Read-Sql')){
+        Require (@($workerAst.FindAll({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $boundary},$true)).Count -eq 1) 'Offline boundary must have exactly one fake definition.'
+    }
+    [IO.File]::WriteAllText($worker,$workerSource)
     $cases=@(
         @('Success','COMPLETE'),@('DisposeFailure','CONNECTION_DISPOSE'),@('OpenFailure','CONNECT'),@('ProofQuery','IDENTITY_QUERY'),
         @('ProofMissing','IDENTITY_ROW_ASSERT'),@('OwnSession','IDENTITY_ASSERT'),@('Independent','IDENTITY_ASSERT'),
@@ -140,7 +190,7 @@ try {
         @('SystemMissing','SYSTEM_REQUIRED'),@('ObjectQuery','OBJECT_PERMISSIONS'),@('ObjectUnexpected','OBJECT_PERMISSIONS'),
         @('ObjectMissing','OBJECT_REQUIRED'),@('ObjectDuplicate','OBJECT_REQUIRED'),@('ColumnInventory','COLUMN_INVENTORY'),
         @('ColumnQuery','COLUMN_QUERY'),@('ColumnRead','COLUMN_ASSERT'),@('ColumnUpdate','COLUMN_ASSERT'),
-        @('ReferenceRead','COLUMN_ASSERT'),@('ReferenceNull','COLUMN_ASSERT'),@('ExecuteSet','EXECUTE_SET')
+        @('ReferenceRead','COLUMN_ASSERT'),@('ReferenceNull','COLUMN_ASSERT'),@('ReferenceNull','COLUMN_ASSERT','Wrapped'),@('ExecuteSet','EXECUTE_SET')
     )
     foreach($role in @('AiCaseDataCatalogVerifier','AiCaseDataRuntime','AiIntegrationBootstrap')){
         foreach($case in $cases){
@@ -148,7 +198,8 @@ try {
             if($case[0] -eq 'ExecuteSet' -and $role -ne 'AiCaseDataRuntime'){continue}
             $start=[Diagnostics.ProcessStartInfo]::new()
             $start.FileName=(Get-Process -Id $PID).Path
-            $start.Arguments='-NoProfile -NonInteractive -File "'+$worker+'" -Scenario '+$case[0]+' -Role '+$role
+            $layout='Host';if($case.Count -eq 3){$layout=$case[2]}
+            $start.Arguments='-NoProfile -NonInteractive -File "'+$worker+'" -Scenario '+$case[0]+' -Role '+$role+' -ErrorLayout '+$layout
             $start.UseShellExecute=$false;$start.RedirectStandardOutput=$true;$start.RedirectStandardError=$true
             $process=[Diagnostics.Process]::new();$process.StartInfo=$start
             try {
@@ -159,6 +210,16 @@ try {
                 if($case[0] -eq 'Success'){
                     Require ($process.ExitCode -eq 0 -and $captured -match 'Verified contained login') ('Synthetic complete verification failed: '+$role)
                 } else {
+                    if($case[0] -eq 'ReferenceNull'){
+                        # Parse stdout only. Never append raw captured output to a failure.
+                        $record=[regex]::Match($stdout.Result,'(?m)^OFFLINE_REFERENCE_NULL checkpoint=([A-Z_]+) object=([0-9]+) column=([0-9]+) rows=([0-9]+|UNKNOWN) wantRead=([01]|UNKNOWN) read=(NULL|ZERO|ONE|OTHER|UNKNOWN) update=(NULL|ZERO|ONE|OTHER|UNKNOWN) fixture=(VALID|INVALID)\r?$')
+                        Require $record.Success 'ReferenceNull bounded diagnostic record missing; raw output suppressed.'
+                        $bounded=$record.Value.TrimEnd([char]13)
+                        if($layout -ceq 'Wrapped'){
+                            Require ($captured -notmatch 'object=2 column=1 ASSERT rows=1 wantRead=1 read=NULL update=ZERO') 'Wrapped regression must reproduce the original literal-space matcher failure.'
+                        }
+                        Require ($bounded -ceq 'OFFLINE_REFERENCE_NULL checkpoint=COLUMN_ASSERT object=2 column=1 rows=1 wantRead=1 read=NULL update=ZERO fixture=VALID') ('NULL required column evidence must fail at its exact coordinate. '+$bounded)
+                    }
                     Require ($process.ExitCode -eq 1) ('Security finding must fail closed: '+$case[0]+'/'+$role)
                     Require ($captured -match ('checkpoint='+$case[1]+'\b')) ('Wrong failing checkpoint: '+$case[0]+'/'+$role)
                     Require ($captured -match 'Commit completed; verification failed. Users remain. No destructive cleanup.') 'Post-commit recovery status changed.'
@@ -166,11 +227,10 @@ try {
                     if($case[0] -eq 'ObjectUnexpected'){Require ($captured -match 'unexpected=1') 'Unexpected permission count missing.'}
                     if($case[0] -eq 'ObjectDuplicate'){Require ($captured -match 'missing=0 duplicates=1') 'Duplicate-row shape must remain a failing assertion, with safe counts.'}
                     if($case[0] -eq 'ObjectQuery'){Require ($captured -match 'column=0 QUERY') 'Query failure confused with permission assertion.'}
-                    if($case[0] -eq 'ReferenceNull'){Require ($captured -match 'object=2 column=1 ASSERT rows=1 wantRead=1 read=NULL update=ZERO') 'NULL required column evidence must fail at its exact coordinate.'}
                 }
             } finally {if(!$process.HasExited){$process.Kill()};$process.Dispose()}
         }
     }
 } finally {Remove-Item -LiteralPath $scratch -Recurse -Force}
-'PASS: offline real verification helpers, three identity paths, fail-closed checkpoint selection, permission/column findings and post-commit redaction.'
+'PASS: offline real verification helpers, three identity paths, fail-closed checkpoints, ReferenceNull typed fixture/unformatted evidence/wrapped-output regression, reviewed fake I/O boundaries and redaction.'
 'NOT RUN: real SQL permission semantics, Azure access or Windows PowerShell 5.1 unless run on that host.'

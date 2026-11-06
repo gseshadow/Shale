@@ -136,3 +136,24 @@ application read, business mutation or application audit row/schema is introduce
 Retain existing secret-safe administrative/access auditing and external change records;
 never put password-bearing SQL or secret material into audit evidence. No AI/MCP/OAuth
 activation, Azure reconfiguration, provisioning retry or SQL/Key Vault repair is authorized.
+
+
+Offline ReferenceNull test failure on Windows 5.1
+- This is a synthetic test failure, not a production SQL finding. Do not invoke
+  Verify/Preflight or retrieve passwords to investigate it. Rerun only the offline
+  Test-ShaleAiIdentityPackage.ps1 on the approved host after reviewing this update.
+- The test now asserts unformatted child state and the typed DBNull fixture, rather
+  than requiring all diagnostic fields on one human-rendered error line. If it fails,
+  share only the bounded OFFLINE_REFERENCE_NULL record (checkpoint, ordinals, counts,
+  fixed bit states and fixture validity), shell version and package checksum.
+- The exact original Windows trigger is unknown because its child fields were hidden.
+  A wrapped correct message reproduces the old assertion failure offline; this is
+  not a claim that the original Windows output wrapped or that production passed.
+- Verification children contain fake connection/SQL boundaries and no production
+  entrypoint, SQL connection constructor, network request or Azure/secret retrieval.
+  The AST guard is not an OS network sandbox. Linux tracing observed no INET connect
+  or send calls; it cannot attribute a Windows antivirus notification or certify
+  host/security-component traffic. Keep the alert open until reviewed separately.
+  Retain only safe AV event metadata: rule/event identifier, timestamp, executable
+  identity, destination category/port and blocked/attempted status. No script dumps,
+  credentials, raw exceptions, packet payloads, TLS decryption or antivirus bypass.

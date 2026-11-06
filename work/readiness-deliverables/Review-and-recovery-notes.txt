@@ -417,3 +417,74 @@ PR publication status
   including operational references and existing secret names, to public gseshadow/Shale
   as a draft PR targeting codex/latest. This approval covers publication only; all
   production prohibitions and OFF controls remain unchanged.
+
+
+ReferenceNull Windows 5.1 investigation (PR #1934 follow-up, 2026-11-06)
+- Operator host Windows PowerShell 5.1.26100.9818 passed the existing package tests
+  but failed the new ReferenceNull parent assertion. No actual bounded child fields
+  were exposed. The expected values were not observed evidence; line wrapping on
+  that host is unknown. No production discrepancy can be inferred from this test.
+- Pre-edit test impact: reviewed the complete verification suite, its DataTable
+  helper, Read-Sql fixture, real Permission-Bit/Verify-Login helpers, parent capture,
+  all neighboring assertions and both package child-process launchers. Reviewed
+  repository rules and Azure SQL attestation/confinement contracts. No application,
+  production verification predicate, SQL batch, allowlist or credential path changes.
+- Original fixture under PowerShell 7.4.6: one pipeline item, a DataTable with one
+  row/two columns; CanRead is System.DBNull and IsNull=true, CanUpdate is Int32(0).
+  Unary-comma table returns preserve the table rather than enumerating its rows.
+  Direct DBNull assignment is not ConvertFrom-Json array enumeration. Production
+  Permission-Bit accepts both DBNull and null as NULL, while required SELECT still
+  fails unless equal to 1. There is no demonstrated production DBNull logic defect.
+- Demonstrated test defect: a literal-space regex inspected human-rendered Write-Error
+  output. Inserting CRLF between correct fields reproduces the same assertion failure
+  without changing the fixture, checkpoint, coordinates or fail-closed rejection.
+  This explains a possible Windows trigger, not proof of its actual rendered output.
+- Correct only the test: capture allowlisted checkpoint labels, integer coordinates,
+  rows/read requirement and fixed bit states through an unformatted stdout record
+  before the original production catch runs. Validate the actual DataTable/DBNull/
+  Int32 fixture. Require the exact original values plus fixture=VALID; do not accept
+  an alternate checkpoint, NULL policy or weaker permission result. A mismatch now
+  exposes only this bounded record, never raw captured errors or sensitive markers.
+  A second ReferenceNull case explicitly wraps the human error; the old regex fails
+  while the unchanged exact state assertion passes. Replacing DBNull with ZERO in
+  a scratch fixture is rejected and reports read=ZERO/update=ZERO/fixture=INVALID.
+- Child-process review: launch the current host executable directly with -NoProfile
+  -NonInteractive -File; no shell, profile, prompt or secret argument. Only five real
+  pure/verification helpers and the sanitized catch are extracted. New-Connection
+  is a PSCustomObject with fake Open/Dispose ScriptMethods; Read-Sql supplies in-memory
+  DataTables. No real SqlConnection, SqlConnectionStringBuilder, ExecuteReader,
+  ExecuteNonQuery, DNS/HTTP/socket request, Azure module or Key Vault call exists in
+  that worker. SqlCredential is constructed only with an ephemeral synthetic password
+  and cannot open a connection. The production script entrypoint is parsed, not run.
+  An AST command/type allowlist and unique fake-boundary checks now reject accidental
+  inclusion of unreviewed I/O before child launch. This guard is not an OS sandbox.
+- Both streams are drained asynchronously; each child is bounded to 30 seconds,
+  killed on timeout and disposed; scratch files are removed. Failure redaction and
+  exit=1 checks remain, with the real catch still reporting committed users remain.
+- Network observation: a complete corrected focused suite was traced on Linux with
+  strace -f -e trace=network and PowerShell telemetry opt-out. It passed. Zero INET
+  connect/send calls and zero send calls of any family were observed. The runtime
+  created 74 INET socket descriptors and made 318 local AF_UNIX IPC connect calls;
+  creating a descriptor is not an outbound connection. This is observed Linux-host
+  behavior, not evidence about the Windows antivirus event. Host/runtime/security
+  components are outside script mocks and can have their own network behavior.
+  The antivirus notification's cause remains UNESTABLISHED; do not dismiss it as a
+  false positive, disable antivirus, export raw errors or capture sensitive traffic.
+- Corrected offline verification suite PASS on PowerShell 7.4.6/Linux. Actual corrected
+  Windows 5.1 execution remains UNVERIFIED; rerun the offline package test there.
+  If it fails, retain only its bounded ReferenceNull record, shell version and package
+  hash. No production Verify/Preflight, SQL account change or Azure/Key Vault access
+  is authorized as a response to an offline test failure. All capabilities stay OFF.
+- Audit: test-only synthetic fixtures/output and local process checks add no business
+  or protected-data reads/mutations, application audit events or schema requirements.
+- Required critical reactor attempted offline with JAVA_HOME=/workspace/.tools/jdk-21,
+  /workspace/.tools/apache-maven-3.9.11/bin/mvn -o -B
+  -Dmaven.repo.local=/workspace/Shale/work/investigation/m2 test. BLOCKED because the
+  Spring Boot dependencies 4.1.1 POM is absent locally. No Java tests or dependency
+  network requests ran. No Maven application area is changed by this correction.
+- Final validation: full Test-ShaleAiIdentityPackage.ps1 PASS on 7.4.6/Linux,
+  including the corrected suite. Scratch mutation checks reject both a ZERO-for-DBNull
+  fixture and an injected networking type (before launching a child). All three scripts
+  parse, remain ASCII and retain the prior production SQL/acceptance invariants.
+  Production script and role-contract.json are byte-identical to PR head 76315c23.
+  Package hashes and git diff whitespace checks PASS. Windows 5.1 rerun remains open.
