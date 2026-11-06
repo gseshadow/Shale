@@ -1,0 +1,132 @@
+OBJECT PERMISSION DUPLICATE INVESTIGATION - READ ONLY
+2026-11-06. Baseline: codex/latest 2553dc4b.
+
+Disposition
+Operator-supplied evidence: Runtime PASS; previous catalog DATABASE failure
+resolved; CATALOG / OBJECT_REQUIRED / object 13 / column 0 / actual 8 / allowed 2 /
+missing 0 / duplicates 6. Bootstrap is not yet verified. These are supplied
+observations, not production measurements repeated by this investigation.
+
+Confirmed source behavior: Permission-List reads only permission_name and maps each
+DataRow once. Read-Sql loads one DataTable and returns it with unary comma. The
+caller captures permission names in @(). Same-Set sorts and compares the complete
+lists; it does NOT implement mathematical set equality: repeated names fail.
+The reported checkpoint establishes that all eight projected names were allowed,
+that both required names were present, and that six occurrences repeated names.
+It does not establish which names repeated or whether their subentities differed.
+For CATALOG, allowed=2 identifies a verifier reference-table allowlist (VIEW
+DEFINITION and SELECT); do not guess which table occupies ordinal 13 in production.
+
+sys.fn_my_permissions returns entity_name, subentity_name and permission_name.
+An OBJECT request can include column/subentity permission rows. Projecting only
+the name can collapse distinctions in those rows. The permission hierarchy can
+explain effective rights inherited from database/schema/object grants, but it does
+not by itself establish the cause or multiplicity of these eight rows. Multiple
+grant paths are not proof that SQL emitted identical permission tuples.
+Reference for return shape and examples:
+https://learn.microsoft.com/en-us/sql/relational-databases/system-functions/sys-fn-my-permissions-transact-sql
+
+No verifier correction is justified from the aggregate output alone. No allowlist,
+role-contract, original verifier, SID/effective-authority restriction, column check,
+or acceptance behavior is changed. Duplicate evidence is never normalized away.
+SQL users/roles/grants/credentials/Azure configuration remain unchanged. No Provision,
+production SQL, production secret retrieval, AI/MCP/OAuth activation or deployment
+was executed by this task. This diagnostic cannot establish complete readiness.
+
+Operator procedure
+1. Review the draft/source revision and trusted SHA256SUMS.txt. Preserve LF bytes;
+   checksum integrity is not a signature or authorization. Use a fresh dedicated
+   approved operator shell, Windows PowerShell 5.1/.NET Framework 4.7.2+ or supported
+   PowerShell 7.4+, with compatible installed Az.Accounts/Az.KeyVault modules.
+2. First run offline, from this package directory:
+     powershell.exe -NoProfile -File .\Test-ShaleObjectPermissions.ps1
+     powershell.exe -NoProfile -File .\Test-ShaleCatalogDatabasePermissions.ps1
+     powershell.exe -NoProfile -File .\Test-ShaleAiIdentityPackage.ps1
+   Resolve any failure without production credentials. PowerShell 7/Linux tests do
+   not prove Windows PowerShell 5.1/.NET or live Azure SQL semantics.
+3. Preserve the existing security/catalog change freeze and controls OFF. Confirm
+   approved Azure tenant/subscription context outside the script. Maintain the
+   existing telemetry review: no transcripts, tracing, debugger/raw error export,
+   credential/parameter capture or SQL batch dumps. Stop if these assurances fail.
+4. Run ONLY the separate read-only diagnostic, not Provision or full Verify:
+     $p=@{TenantId='<approved-tenant-guid>';
+       SubscriptionId='<approved-subscription-guid>';
+       AllApplicationControlsOffConfirmed=$true;
+       SecretSafeTelemetryReviewed=$true}
+     & .\Diagnose-ShaleObjectPermissions.ps1 -Mode Diagnose -ObjectOrdinal 13 @p
+     $diagnosticExit=$LASTEXITCODE
+   Default Review is offline. The diagnostic prompts securely for brian's existing
+   SQL password and retrieves only the existing catalog-verifier secret. It uses
+   actual contained authentication, TLS verification, independent SID/own-session
+   checks, exact token/membership and SID-reuse guards from the prior diagnostic.
+   No impersonation, new login, interactive Azure authentication or repair exists.
+5. Retain source/package hash, shell version, diagnostic exit and structured output.
+   TARGET intentionally identifies the selected schema/object/object_id and ordinal;
+   SQL_ROW emits only permission and entity/subentity metadata, never row values.
+   No application table SELECT or procedure execution occurs, even for reference
+   tables. Do not export raw exceptions, connection/credential objects or SIDs.
+   End the dedicated shell; do not auto-retry a failed collection.
+
+Count and provenance interpretation
+- The inventory query and database ordering exactly match Verify. Ordinal is
+  one-based and meaningful only for that inventory snapshot. Missing ordinal stops.
+  Repeated inventory comparison detects sampled drift; concurrent changes between
+  samples are not excluded. Confirm the TARGET against the original failing run's
+  catalog/change record; an old ordinal alone cannot prove historical identity.
+- SQL computes COUNT_BIG(*) OVER() over the same fn_my_permissions invocation as
+  its detail rows, before DataTable.Load. SqlResultCount is repeated on each row;
+  it is not summed. An empty result is reported as zero. Separate SQL window counts
+  retain permission-name and complete entity/subentity/name tuple multiplicities.
+  There is no SQL DISTINCT/GROUP BY, join or PowerShell filtering of the result.
+- SUMMARY compares sqlResultCount, dataTableCount and processedCount. Processing
+  uses exactly Permission-List's Rows | ForEach-Object {$_.Permission} projection.
+  SQL_ROW compares SQL multiplicities with counts from DataTable/projected names.
+  A count disagreement stays visible and produces exit 2, never acceptance.
+- If all counts are 8 and SQL permission multiplicities account for six repeated
+  names, SQL returned those name repetitions. Full tuple multiplicity >1 shows
+  actual repeated identical fn result rows. Full tuple multiplicity 1 with different
+  subentities shows distinct SQL metadata rows whose names collide in the verifier's
+  exact-list projection. That is a comparison-model candidate, not permission to
+  deduplicate or discard column evidence. A hierarchy explanation alone is neither
+  acceptance nor proof that repeated identical rows are harmless.
+- If SQL count differs from DataTable or processed counts, investigate result
+  loading/enumeration on that exact operator host. Synthetic Linux reproduction
+  retains 8 -> 8 -> 8; it does not establish production/Windows behavior.
+- GRANT_EDGE preserves applicable USER/CATALOG_ROLE/PUBLIC database, target-schema,
+  object and column edges, class/major/minor IDs, G/W/D/R state and grantorIsDbo.
+  W is grant option, D deny, R column revoke; none is converted to a plain grant.
+  BUILTIN_HIERARCHY retains the live DATABASE/SCHEMA/OBJECT/COLUMN same-scope covering
+  permission and parent-scope mapping. Compare these paths with grant edges and
+  SQL subentities. These are candidate provenance inputs, not a claim that one
+  unique path caused a row. Unresolved/contradictory evidence remains open.
+- ROLE_CONTRACT compares the catalog role's six pinned edges, states, minor IDs
+  and grantor. Actual permissions, applicable grants, identity/token proof and full
+  inventory are sampled twice. Effective/grant/inventory drift stops collection.
+  This is not an atomic snapshot or a replacement for the verifier's complete
+  preflight/ownership/public-authority/SID-separation/column checks.
+- Exit 0: evidence collected without exact-list/count/role mismatch only. Exit 2:
+  evidence collected with a mismatch (duplicates always count). Exit 1: collection,
+  authentication, guard, drift, validation or cleanup failed; only a fixed checkpoint
+  is emitted. Every SUMMARY says NOT_VERIFIED, controls OFF, mutation NONE.
+
+Next decision
+Return the structured TARGET, SQL_ROW, SUMMARY, GRANT_EDGE, BUILTIN_HIERARCHY and
+ROLE_CONTRACT evidence for review. A future correction must distinguish object and
+subentity evidence explicitly and preserve all approved allowlists, column access
+checks, authority closure, identity/SID checks and fail-closed behavior. Unexpected
+rights, identical duplicates, unexplained rows and count disagreement remain STOPs.
+No automatic deduplication or production permission change is authorized. Bootstrap
+and complete Verify remain unverified; do not rerun Provision.
+
+Test-impact inventory and audit compatibility
+Reviewed before edits: architecture/codex-prompt-rules.md, database-schema.md,
+tenancy-and-rls.md, docs/architecture/azure-sql-case-attestation.md, production MCP
+readiness/preflight, existing packet/recovery/operator notes and previous catalog
+review; Permission-List, Read-Sql, Same-Set, Verify-Login and neighboring fixtures in
+all three existing offline suites. The new diagnostic maps to the new offline
+suite; package suite now includes it. Existing verifier/diagnostic suites remain
+unchanged and protect original authentication, allowlists and redaction behavior.
+No Java/application contract changes. New SQL reads only own-session/security/object
+metadata and one existing secret GET. No protected data read or business/admin
+mutation occurs; no application audit event or schema migration is introduced.
+Preserve existing secret-safe host/SQL/Key Vault auditing and external change record.
