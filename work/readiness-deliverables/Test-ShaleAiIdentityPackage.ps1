@@ -24,12 +24,14 @@ function Import-Module {throw 'TEST: Azure modules must not load during offline 
 function Get-AzContext {throw 'TEST: Azure context must not be inspected during offline checks.'}
 function Get-AzKeyVaultSecret {throw 'TEST: Key Vault must never be called during offline checks.'}
 function Get-AzAccessToken {throw 'TEST: token acquisition must never be called during offline checks.'}
-function Get-Credential {throw 'TEST: credential prompt must not occur during offline default/guard checks.'}
+function Get-Credential {throw 'TEST: GUI credential prompting is forbidden.'}
+function Read-Host {throw 'TEST: console prompt must not occur during offline default/guard checks.'}
 $review=@(& $scriptPath)
 Require ($review.Count -eq 5) 'Default Review must return the offline banner and exactly three identity mappings.'
 Require ($review[0] -like 'OFFLINE REVIEW ONLY:*') 'Default mode is no longer offline.'
 $sqlReview=@(& $scriptPath -AdminAuthentication Sql)
 Require ($sqlReview.Count -eq 5 -and $sqlReview[0] -like 'OFFLINE REVIEW ONLY:*') 'SQL option must preserve offline Review without a prompt.'
+Require (@($ast.FindAll({param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Get-Credential'},$true)).Count -eq 0) 'GUI credential prompting is forbidden in every mode.'
 Require ($ast.ParamBlock.Parameters.Name.VariablePath.UserPath -notcontains 'Credential') 'Credentials must originate inside the secure prompt.'
 Require ($ast.ParamBlock.Parameters.Name.VariablePath.UserPath -notcontains 'Password') 'Password arguments are forbidden.'
 function Expect-Stop([hashtable]$Arguments,[string]$ExpectedMessage){
@@ -123,16 +125,16 @@ try{
 } finally {$synthetic=$null;$credential=$null;$secure.Dispose()}
 # Test both authentication paths using synthetic credentials and CLOSED connections.
 # These helpers never call Open; no prompt, Azure module or external service is used.
-$script:promptCount=0;$script:tokenCount=0;$script:promptCase='Valid'
-function Get-Credential {
-    param($UserName,$Message,$ErrorAction)
+$script:promptCount=0;$script:tokenCount=0;$script:promptCase='Valid';$script:promptPassword=$null
+function Read-Host {
+    param($Prompt,[switch]$AsSecureString,$ErrorAction)
     $script:promptCount++
-    Require ($UserName -ceq 'brian') 'SQL prompt must identify the approved administrator.'
+    Require ($Prompt -cmatch 'brian' -and $AsSecureString -and $ErrorAction -eq 'Stop') 'SQL password must use the console SecureString prompt for the fixed administrator.'
     if($script:promptCase -eq 'Cancelled'){return $null}
-    $name='brian';if($script:promptCase -eq 'WrongLogin'){$name='unapproved'}
-    $password=[securestring]::new()
-    if($script:promptCase -ne 'Empty'){foreach($ch in ([guid]::NewGuid().ToString('N')).ToCharArray()){$password.AppendChar($ch)}}
-    return [pscredential]::new($name,$password)
+    if($script:promptCase -eq 'Interrupted'){throw [OperationCanceledException]::new('SYNTHETIC-SENSITIVE-PROMPT-CANCEL')}
+    $script:promptPassword=[securestring]::new()
+    if($script:promptCase -ne 'Empty'){foreach($ch in ([guid]::NewGuid().ToString('N')).ToCharArray()){$script:promptPassword.AppendChar($ch)}}
+    return $script:promptPassword
 }
 function Get-AzAccessToken {
     param($ResourceUrl,$TenantId,$ErrorAction)
@@ -147,19 +149,32 @@ try{
     $output=@(Set-AdminAuthentication $c Sql 'offline-tenant')
     Require ($output.Count -eq 0) 'Authentication must emit no credential or token objects.'
     Require ($c.State -eq [System.Data.ConnectionState]::Closed -and $c.Credential.UserId -ceq 'brian') 'SQL authentication must set only the closed connection credential.'
+    Require ([object]::ReferenceEquals($c.Credential.Password,$script:promptPassword)) 'SQL credential must retain the prompted SecureString without plaintext conversion.'
     Require ($c.Credential.Password.IsReadOnly() -and !$c.AccessToken -and $script:tokenCount -eq 0) 'SQL mode must use read-only SecureString and never acquire an Entra token.'
     $settings=[System.Data.SqlClient.SqlConnectionStringBuilder]::new($c.ConnectionString)
     Require (!$settings['Password'] -and !$settings['User ID'] -and !$settings['Integrated Security']) 'SQL credentials must stay outside the connection string.'
 } finally {if($c.Credential){$c.Credential.Password.Dispose()};$c.Dispose()}
-foreach($case in @('Cancelled','WrongLogin','Empty','PlainToken')){
-    $script:promptCase=$case;$c=New-Connection;$stopped=$false
+foreach($case in @('Cancelled','Interrupted','Empty','PlainToken')){
+    $script:promptCase=$case;$script:promptPassword=$null;$c=New-Connection;$stopped=$false
     try{
         $method='Sql';if($case -eq 'PlainToken'){$method='Entra'}
         try{Set-AdminAuthentication $c $method 'offline-tenant'}catch{$stopped=$true}
         Require $stopped ('Authentication must stop for synthetic case: '+$case)
         Require (!$c.Credential -and !$c.AccessToken -and $c.State -eq [System.Data.ConnectionState]::Closed) 'Rejected authentication must leave the connection unauthenticated and closed.'
     } finally {$c.Dispose()}
+    if($case -eq 'Empty'){
+        $disposed=$false
+        try{$copy=$script:promptPassword.Copy();$copy.Dispose()}catch [ObjectDisposedException]{$disposed=$true}
+        Require $disposed 'Rejected empty password must be disposed.'
+    }
 }
+# Failed credential assignment must also release the prompted password.
+$script:promptCase='Valid';$script:promptPassword=$null;$stopped=$false
+try{Set-AdminAuthentication ([pscustomobject]@{}) Sql 'offline-tenant'}catch{$stopped=$true}
+Require $stopped 'Credential assignment failure must stop.'
+$disposed=$false
+try{$copy=$script:promptPassword.Copy();$copy.Dispose()}catch [ObjectDisposedException]{$disposed=$true}
+Require $disposed 'Failed credential assignment must dispose the password.'
 $script:promptCase='Valid';$before=$script:promptCount;$c=New-Connection
 try{
     $output=@(Set-AdminAuthentication $c Entra 'offline-tenant')
@@ -194,12 +209,16 @@ function Get-AzAccessToken {
     if($AdminAuthentication -eq 'Sql'){throw 'SYNTHETIC-SENSITIVE-UNEXPECTED-TOKEN'}
     throw 'SYNTHETIC-SENSITIVE-TOKEN-FAILURE'
 }
-function Get-Credential {
-    param($UserName,$Message,$ErrorAction)
+function Get-Credential {throw 'SYNTHETIC-SENSITIVE-FORBIDDEN-GUI'}
+function Read-Host {
+    param($Prompt,[switch]$AsSecureString,$ErrorAction)
     if($AdminAuthentication -eq 'Entra'){throw 'SYNTHETIC-SENSITIVE-UNEXPECTED-PROMPT'}
     if($Scenario -eq 'PromptFailure'){throw 'SYNTHETIC-SENSITIVE-PROMPT-FAILURE'}
-    $password=ConvertTo-SecureString ([guid]::NewGuid().ToString('N')) -AsPlainText -Force
-    return [pscredential]::new('brian',$password)
+    if(!$AsSecureString){throw 'SYNTHETIC-SENSITIVE-INSECURE-PROMPT'}
+    if($Scenario -eq 'PromptCancelled'){return $null}
+    if($Scenario -eq 'PromptInterrupted'){throw [OperationCanceledException]::new('SYNTHETIC-SENSITIVE-CANCEL')}
+    if($Scenario -eq 'PromptEmpty'){return [securestring]::new()}
+    return ConvertTo-SecureString ([guid]::NewGuid().ToString('N')) -AsPlainText -Force
 }
 function New-Connection {
     $fake=[pscustomobject]@{Credential=$null;AccessToken=''}
@@ -213,7 +232,7 @@ $scratch=Join-Path $PSScriptRoot ('../identity-offline-tests-'+[guid]::NewGuid()
 try{
     $worker=Join-Path $scratch 'sanitized-boundary.ps1'
     [IO.File]::WriteAllText($worker,$stubs+"`n"+$helpers+"`n"+$outerTry[0].Extent.Text)
-    foreach($case in @(@('Sql','OpenFailure','ADMIN_CONNECT'),@('Sql','PromptFailure','ADMIN_CONNECT'),@('Entra','TokenFailure','ADMIN_CONNECT'),@('Sql','ContextFailure','AZURE_CONTEXT'))){
+    foreach($case in @(@('Sql','OpenFailure','ADMIN_CONNECT'),@('Sql','PromptFailure','ADMIN_CONNECT'),@('Sql','PromptCancelled','ADMIN_CONNECT'),@('Sql','PromptInterrupted','ADMIN_CONNECT'),@('Sql','PromptEmpty','ADMIN_CONNECT'),@('Entra','TokenFailure','ADMIN_CONNECT'),@('Sql','ContextFailure','AZURE_CONTEXT'))){
         $start=[Diagnostics.ProcessStartInfo]::new()
         $start.FileName=(Get-Process -Id $PID).Path
         $start.Arguments='-NoProfile -NonInteractive -File "'+$worker+'" -AdminAuthentication '+$case[0]+' -Scenario '+$case[1]
@@ -230,7 +249,7 @@ try{
         } finally {if(!$process.HasExited){$process.Kill()};$process.Dispose()}
     }
 } finally {Remove-Item -LiteralPath $scratch -Recurse -Force}
-'PASS: parser, 5.1 syntax review, offline defaults, authorization/telemetry guards, package hashes/role counts, TLS construction, prompted SqlCredential, cancellation/invalid credentials, Entra token path and no authentication output.'
+'PASS: parser, 5.1 syntax review, offline defaults, authorization/telemetry guards, package hashes/role counts, TLS construction, console-only SqlCredential, cancellation/empty-password rejection and disposal, Entra token path and no authentication output.'
 'PASS: isolated orchestration failures (SQL open/prompt, Entra token, Azure context) exit nonzero with sanitized stage/recovery output.'
 'PASS: production/test JSON loaders retain all 324 entries under Windows PowerShell 5.1 array-object and PowerShell 7 enumerated output.'
 'Host: PowerShell '+$PSVersionTable.PSVersion+'; '+[Environment]::OSVersion.Platform

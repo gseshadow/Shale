@@ -241,10 +241,10 @@ SQL administrator authentication revision (2026-11-06)
   Entra token then opens SQL; it never offers the established SQL login brian. This
   establishes an authentication-path mismatch, not a proven underlying SQL/TLS error.
   No production connection or secret retrieval was attempted to diagnose it here.
-- AdminAuthentication defaults to Entra; Sql explicitly prompts with Get-Credential
-  for brian and assigns a read-only SecureString through SqlCredential. The password
-  never enters a connection string or managed plaintext conversion. Cancel, empty or
-  wrong-login credentials stop. The prompt buffer and connection password are disposed.
+- AdminAuthentication defaults to Entra; Sql explicitly prompts with Read-Host -AsSecureString
+  for the fixed administrator brian and assigns a read-only SecureString through SqlCredential. The password
+  never enters a connection string or managed plaintext conversion. Cancellation, interruption or an empty
+  password stops. The password is disposed on failure or after connection cleanup.
   No mode fallback, account creation, permission repair or TLS bypass is added.
 - Both modes preserve the approved Azure context, exact server/database/dbo evidence,
   role contract, effective permissions, SID checks, transaction, explicit provisioning
@@ -252,7 +252,7 @@ SQL administrator authentication revision (2026-11-06)
   AZURE_CONTEXT; authentication/open failures remain sanitized under ADMIN_CONNECT.
 - Test impact: Test-ShaleAiIdentityPackage.ps1 covers both offline Review selections,
   telemetry before the SQL prompt, closed SQL/Entra authentication construction,
-  cancellation/empty/wrong login, plaintext-token rejection and zero helper output.
+  cancellation/interruption/empty password, plaintext-token rejection and zero helper output.
   Isolated child-shell tests extract the original orchestration and authentication
   helpers, substituting fake Azure/prompt/connection boundaries. SQL open/prompt,
   Entra token and Azure-context failures exit 1 with stage/recovery status only;
@@ -308,3 +308,31 @@ Windows PowerShell JSON array correction (PR #1932 follow-up)
   operator host; a Linux simulation does not establish a Windows runtime pass.
   No production SQL, secret retrieval, account creation or capability activation.
   AI/MCP controls remain OFF.
+
+Console-only SQL administrator password revision (offline only)
+- Windows PowerShell 5.1 Get-Credential can open an inaccessible GUI. SQL mode now
+  uses Read-Host -AsSecureString in the console; brian is fixed in SqlCredential.
+  The password stays a SecureString, becomes read-only and transfers to connection
+  cleanup. Empty/cancelled input fails closed; failed assignment disposes the buffer.
+  No administrator password argument, plaintext conversion, log or file is added.
+- Test impact: existing default/guard prompt blockers now also block Read-Host.
+  AST checks forbid Get-Credential; prompt stubs require AsSecureString and brian.
+  Closed-connection tests cover success, null cancellation, thrown interruption,
+  empty rejection, assignment failure, SecureString ownership/disposal and Entra.
+  Isolated orchestration tests cover sanitized cancellation/interruption/empty
+  failures, with a fake Open boundary and no possibility of a SQL connection.
+- All SQL, TLS validation, authorization, role-contract and application-OFF gates
+  are preserved. Audit compatibility is unchanged: no business mutation or schema
+  change is introduced; administrative passwords must never enter audit evidence.
+- Actual Windows PowerShell 5.1 host execution and Ctrl+C console behavior remain
+  UNVERIFIED here. Run the offline test there and validate the console on an approved
+  host before separately authorized production access. No production connection,
+  secret retrieval, SQL user creation or MCP activation was performed.
+- Revision validation: Test-ShaleAiIdentityPackage.ps1 PASS on PowerShell 7.4.6/Linux.
+  PSScriptAnalyzer 1.24.0 PSUseCompatibleSyntax/Commands/Types PASS for both scripts
+  against the Windows 5.1/.NET Framework profile listed above. All production code
+  outside the SQL authentication branch is byte-identical to codex/latest a927d77e.
+  Package hashes and git diff whitespace checks PASS. Selector maps no Maven area.
+- Required local critical reactor attempt: mvn -Dmaven.repo.local=/workspace/work/m2
+  test could not resolve Spring Boot 4.1.1 from Maven Central (network unreachable).
+  The Java reactor remains unverified; no application source or dependency changed.
