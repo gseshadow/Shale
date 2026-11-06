@@ -1,0 +1,230 @@
+SHALE PRODUCTION SQL IDENTITY PROVISIONING — PREPARED, NOT EXECUTED
+
+Scope and review
+- Server shale.database.windows.net; database Shale; vault shale-prod-secrets.
+- Only CREATE USER WITH PASSWORD and ALTER ROLE ADD MEMBER for the three fixed
+  mappings. No server logins, master users, role/grant repairs, password changes,
+  Azure configuration, deployment, binding rows, or feature activation.
+- Production SQL provisioning requires separate authorization. No production SQL,
+  Azure authentication, Key Vault retrieval, or account creation was performed here.
+- Default -Mode Review is entirely offline. It validates the adjacent contract hash.
+- Source/security review, PowerShell 7.4.6 Parser.ParseFile (zero errors), offline
+  default/authorization/telemetry guard tests, closed connection construction and
+  credential API tests PASS on Linux. Windows PowerShell 5.1 execution, installed Az
+  module integration, rollback behavior and Azure SQL execution remain UNVERIFIED.
+  This is not production-tested. Validate on Windows and an authorized disposable SQL
+  environment before production execution. No SQL was executed during package tests.
+
+Contract resolution
+- Runtime/catalog must be independent type S / authentication_type 2 contained users.
+- Bootstrap is supported as a NEW dedicated contained SQL user: phase3b1.sql creates
+  AiIntegrationBootstrap, not a login/user; OAuthCodeBootstrapConfiguration uses a
+  separate SQLServerDataSource with URL, username and password. A contained SQL login
+  to the explicit database fits that password datasource. V2 does not itself convert
+  bootstrap or any existing identity. No existing identity is converted by this packet.
+- Bootstrap approved EXECUTEs: ResolveAiClientV1, ResolveAiCredentialV1 (phase3b1),
+  ResolveAiOAuthCodeV1 (phase3b2c1), ResolveAiRefreshV1 (phase3b2c2),
+  ResolveAiRevocationV1 (revocation), ResolveAiAccessV1 (phase3b2d).
+  Later bootstrap table DENYs are retained, including phase3b2b/phase3b2c1/phase3b3.
+- Runtime: six AiData* public procedure EXECUTEs, 30 objects x 6 data/control DENYs,
+  and 42 legacy/private EXECUTE DENYs = 228 exact permission edges.
+- Verifier: database VIEW DEFINITION; SELECT on sys.sql_expression_dependencies;
+  SELECT on AiCaseDataDeployment, AiDataUnicodeRange, AiDataUnicodeLower,
+  AiDataWordTransition = 6 edges. No application EXECUTE.
+- Bootstrap: 14 objects x 6 DENYs plus six resolver EXECUTEs = 90 edges.
+- Each user: exactly its role plus implicit public; only optional plain direct CONNECT;
+  no other direct permissions, grant options, grant provenance, ownership, SID reuse,
+  nested roles or unexpected effective database/object/column authority.
+- Hash-pinned role-contract.json records source expectations, not a live-derived baseline.
+  A role mismatch stops; never edit expectations to bless production drift.
+
+1. Offline release review (no production authorization needed)
+[ ] Independently review the script, adjacent role-contract.json, sources and checksums.
+[ ] Use Windows PowerShell 5.1/.NET Framework 4.7.2+ or PowerShell 7.4+, with approved
+    compatible Az.Accounts/Az.KeyVault versions. The script uses built-in
+    System.Data.SqlClient, including SqlCredential, SqlConnection.AccessToken and
+    SqlConnectionStringBuilder. No downloaded driver assembly path is accepted.
+    Require Az.Accounts returning SecureString access tokens; older plaintext-token
+    implementations fail closed. Validate module versions on the chosen operator host.
+[ ] Parse without executing (PowerShell):
+    $tok=$null; $err=$null
+    [void][System.Management.Automation.Language.Parser]::ParseFile(
+      (Resolve-Path ./Provision-ShaleAiIdentities.ps1),[ref]$tok,[ref]$err)
+    if($err.Count){throw 'Parser validation failed'}
+[ ] Run offline only:
+    ./Provision-ShaleAiIdentities.ps1 -Mode Review
+[ ] Test missing/disabled/duplicate secrets, wrong Azure context, wrong target,
+    existing wrong-auth/extra-role/direct-grant users, nested roles/public grants,
+    ordinary/SID collisions, timeout/rollback and commit uncertainty on mocks or a
+    separately authorized disposable environment. Production target is hard-coded;
+    any disposable adaptation must be a separate reviewed test copy.
+
+2. Separately authorized read-only preflight
+[ ] Confirm completed Stage B, Phase 1R and Phase 3B.8 V2 acceptance from existing
+    change records. Do not rerun installers or completed acceptance investigations.
+    The user's latest installation confirmation supersedes stale preflight prose.
+[ ] Confirm shale-api (resource group Shale) effective AI/MCP/OAuth switches ALL OFF,
+    including case-data-composition/readiness, ai.enabled, mcp.enabled, both tool flags,
+    oauth composition/authorization/exchange. Confirm SQL global and tenant capabilities
+    OFF. Script checks SQL state and requires explicit external application confirmation;
+    it does not read or change App Service settings.
+[ ] Resolve ordinary auth/runtime consumers to shale_app and shale_runtime. Script
+    checks those catalog SIDs; actual ordinary-pool/deployment binding remains a later
+    live attestation gate. If deployed consumers differ, STOP for reviewed mapping.
+[ ] Use an approved dedicated operator process and already approved Azure context:
+    tenant/subscription explicit; dbo SQL visibility and Key Vault secret GET rights.
+    Key Vault Secrets Officer does not by itself grant SQL access. Script does not login
+    interactively, select another subscription, grant RBAC, or change firewall settings.
+[ ] Establish an exclusive administrative change window; the application lock only
+    coordinates this script's instances, not other administrators/configuration writers.
+[ ] Define nonsecret parameters locally:
+    $p=@{TenantId='<approved-tenant-guid>';SubscriptionId='<approved-subscription-guid>';
+      AllApplicationControlsOffConfirmed=$true}
+    ./Provision-ShaleAiIdentities.ps1 -Mode Preflight @p
+    if(!$?){throw 'STOP'}
+    Expected initial result: all three users ABSENT. Existing exact users are accepted
+    structurally; any other state stops. Preflight does not fetch passwords or prove
+    missing users' live permissions. Output contains no passwords or credential hashes.
+
+3. Secret handling and separately authorized mutation
+[ ] Verify three independent existing secret consumers/versions; no secret reuse with
+    ordinary identities, other databases, or pools. Do not copy secret values into files,
+    shell arguments, SQLCMD, environment variables, console, tickets or evidence.
+[ ] Review client/server telemetry BEFORE secret retrieval: transcripts, Set-PSDebug,
+    verbose/debug capture, command/parameter logging, SqlClient traces, APM, SQL auditing,
+    Extended Events and error collection must not retain secret values or unredacted
+    password-bearing dynamic DDL. Do not disable/change logging automatically. If this
+    cannot be established, STOP for an approved secret-safe provisioning channel.
+    Bound RPC parameters avoid client SQL text interpolation; SQL CREATE USER requires
+    an escaped literal inside server memory. This cannot guarantee external redaction.
+    SecureString/BSTR buffers are disposed/zeroed, but .NET managed strings and SQL memory
+    cannot be reliably erased. No passwords/hashes are intentionally persisted by script.
+[ ] Obtain separate production authorization naming exactly these three identities.
+    An authorization-reference parameter records operator intent; it is not an approval.
+[ ] After approval only:
+    $names=@('shale_prod_ai_case_runtime','shale_prod_ai_catalog_verifier',
+      'shale_prod_ai_oauth_bootstrap')
+    ./Provision-ShaleAiIdentities.ps1 -Mode Provision @p -SecretSafeTelemetryReviewed `
+      -AuthorizationReference '<approved-change-reference>' -AuthorizedUsers $names
+    if(!$?){throw 'STOP; follow recovery below'}
+    All secrets are fetched before mutation, used only in memory, checked for equality,
+    and kept in-memory at the versions retrieved for this run. Existing users are never
+    password-reset or membership-repaired; login mismatch stops before new mutations.
+    New users and membership additions commit in one transaction, after rechecks.
+
+4. Post-installation read-only verification
+[ ] Provision automatically verifies all actual password logins after commit. Each must
+    match independent dbo catalog SID/type/authentication/id, original authenticated
+    name, own-session authenticating_database_id and original_security_id, exact token,
+    effective database/application object/column permissions and six EXECUTEs where
+    applicable. No resolver/business procedure is invoked and no PHI is read.
+[ ] Independently rerun under authorized read-only access if needed:
+    ./Provision-ShaleAiIdentities.ps1 -Mode Verify @p -SecretSafeTelemetryReviewed
+    if(!$?){throw 'STOP'}
+[ ] Retain nonsecret status/checksums, authorization record and confirmed OFF state.
+    End the dedicated process. Preserve existing shale_app/shale_runtime identities,
+    grants and all ordinary secrets. Script checks unrelated principal/SID/grant/role
+    metadata before/after, rather than changing it.
+[ ] STOP. Identity verification is not complete V2 live attestation or readiness approval.
+    Retain immutable database/issuer/resource/time-zone binding, exact source/catalog/
+    module receipts, secret-consumer separation, live ordinary-pool SID evidence and all
+    retained native/disposable acceptance gates for their separately governed work.
+    This packet does not replace AiCaseDataAttestation, add binding rows, run native fault
+    tests, expose endpoints, change JDBC configuration or activate OAuth/MCP/AI.
+
+Stop and recovery
+- Any finding, incomplete metadata, NULL required evidence, absent/invalid secret,
+  unexpected existing identity, wrong credentials, changed catalog or nonzero exit:
+  STOP and keep ALL controls OFF. Never grant broad rights to make a check pass.
+- Before commit: the script attempts rollback of its uncommitted transaction only.
+  Verify rollback read-only; it never drops pre-existing users or revokes any grants.
+- COMMIT timeout/disconnect: outcome UNKNOWN even if the client did not receive success.
+  Do not retry automatically. Reconnect in Preflight, reconcile all three users, exact
+  memberships and SIDs; use Verify only after determining committed state. A later
+  separately authorized rerun is idempotent only for existing exact, working identities.
+- Post-commit verification failure: committed users remain; preserve evidence, stop and
+  diagnose read-only. Remediation/rotation/revoke/drop needs its own reviewed authorization.
+- Rollback cannot be confirmed: close the process, have DBA determine transaction and
+  lock state, then reconcile read-only. No automatic destructive cleanup or SQL repair.
+- Do not export raw exception records, $Error, command/connection/credential objects,
+  server batch text or traces during diagnosis. Retain bounded stage/error status only.
+
+Authoritative source pins (GitHub gseshadow/Shale)
+- b184a327ab0c125b93e3797e24d0cfaad01e4f25:
+  docs/architecture/azure-sql-case-attestation.md
+  docs/architecture/phase3b8-confinement-v2.md
+  docs/production-mcp-deployment-preflight.md
+  docs/sql/ai-integration/phase3b1.sql, phase3b2b.sql, phase3b2c1.sql,
+  phase3b2c2.sql, revocation.sql, phase3b2d.sql, phase3b3.sql
+  shale-server/src/main/java/com/shale/server/oauth/OAuthCodeBootstrapConfiguration.java
+  shale-data/src/main/java/com/shale/data/security/ai/AiCaseDataAttestation.java
+- 600723b92fe34731e1d6d25e598fc9e3cbfc2770:
+  docs/sql/ai-integration/phase3b8-confinement.sql
+- Local checkout fb543e22100b3f2ca2426437dd91d05c26c4b2d1 predates these contracts;
+  the PR is based on b184a327 and changes only this readiness package.
+  No source-derived production state is claimed.
+
+Windows PowerShell 5.1 compatibility review
+- #requires -Version 5.1; syntax uses features available in 5.1, including ::new(),
+  Get-FileHash, ConvertFrom-Json, SecureString and the 5.1 comparison operators.
+  No PowerShell 7 ternary, pipeline-chain, null-coalescing or null-conditional syntax.
+- System.Data.SqlClient replaces Microsoft.Data.SqlClient/7.4-specific setup.
+  Framework 4.7.2+ and compatible Az module versions are explicit operator prerequisites.
+  A compatible Az.Accounts must expose Get-AzAccessToken.Token as SecureString; the
+  script rejects plaintext tokens instead of emitting or accepting them.
+- Script/test are ASCII; nested .gitattributes pins LF package bytes even when
+  core.autocrlf=true on Windows, preserving the contract digest and all checksums.
+- Run Test-ShaleAiIdentityPackage.ps1 using powershell.exe -NoProfile -File and
+  pwsh.exe -NoProfile -File on Windows. A PowerShell 7 parse and static 5.1 API review
+  are not a claim that the actual 5.1/.NET Framework/Az environment has been exercised.
+
+Security and audit review for PR publication
+- Only source, role/secret names, exact nonsecret permission edges, review notes, offline
+  tests and SHA-256 file digests are included. No password/token/secret values, secret
+  exports, token caches, runtime evidence, connection credentials or credential hashes.
+- Passwords have no script parameter and never enter command-line arguments, SQLCMD,
+  environment variables or file writes. Retrieval returns SecureString; password DDL
+  uses bound RPC parameters and server-memory-only literal escaping. Output is bounded
+  and raw exceptions/commands/parameters are not intentionally printed.
+- Server/client telemetry redaction and exclusivity of deployed secret consumers cannot
+  be proven offline. The script requires SecretSafeTelemetryReviewed before fetching
+  secrets; unknown external capture is a STOP, not an unconditional no-logging claim.
+- Provision requires a non-whitespace authorization reference and exactly the three
+  approved names, plus explicit all-OFF and secret-safe telemetry confirmations.
+  A PR merge or supplied reference cannot create production authorization.
+- No migration/receipt replay, bootstrap model conversion, arbitrary SQL input, role
+  repair, password reset or feature activation. Built-in SQL text creates only contained
+  users and adds exact role memberships in one transaction. Existing principals/grants
+  are compared before/after; no destructive cleanup follows a committed change.
+- This operator security-DDL package creates no PHI/business reads or application audit
+  rows. Retain external change authorization and secret-safe administrative SQL auditing;
+  do not invent application audit actors, alter audit schema, or log password-bearing DDL.
+
+Verification still requiring separately authorized environment/production access
+- Actual Windows 5.1 host and Az/Framework integration; disposable SQL create/rollback/
+  timeout/commit-uncertainty behavior; production contained authentication and own-session
+  DMV visibility; exact live grants/tokens/effective permissions/SID separation; actual
+  Key Vault availability, independent secret values/consumers; effective all-OFF App
+  Service/database state; full V2 live attestation and immutable binding. None executed.
+
+PR validation record (2026-11-06; no production access)
+- Parser: System.Management.Automation.Language.Parser.ParseFile, PowerShell 7.4.6,
+  zero syntax errors. Runtime downloaded only into scratch work/, publisher SHA-256
+  verified; no runtime/dependency binary is included in this package.
+- Test-ShaleAiIdentityPackage.ps1 PASS: offline default mode with Azure boundary traps,
+  missing/whitespace authorization, wrong/duplicate identity lists, telemetry gate,
+  package hashes/contract counts, 5.1-compatible AST syntax, closed connection/TLS
+  settings, SecureString roundtrip and SqlCredential construction with ephemeral
+  synthetic data. No connection Open(), Azure module import or secret fetch in tests.
+- Fixed builder dictionary adaptation using canonical connection-string indexer keys;
+  the offline test protects exact target, TLS, no pooling and no embedded credentials.
+- All 324 role edges compared independently with the pinned V2/predecessor installers:
+  exact match. No role expectation was regenerated from a production database.
+- Gitleaks 8.21.2 offline directory scan with redaction: zero leaks. A separate manual
+  review of new files confirms only secret names and runtime variable references;
+  no passwords, tokens, credentials, runtime exports or credential hashes are included.
+- Test-impact review: existing AiCaseDataAttestationTest and OAuthConfigurationTest
+  inspect application identity semantics; no application Java/resources, migration SQL,
+  existing packet, or test expectation is modified. New tests cover this operator script.
+  Repository selector and Git diff checks are recorded in the PR. Maven application
+  tests are not needed for a package-only change when no application area is selected.
