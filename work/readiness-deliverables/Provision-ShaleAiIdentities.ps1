@@ -106,19 +106,21 @@ function Convert-InMemory([securestring]$Value) {
 }
 function Set-AdminAuthentication($Connection,[string]$Authentication,[string]$Tenant) {
     if ($Authentication -eq 'Sql') {
-        $prompt=$null;$password=$null;$assigned=$false
+        $password=$null;$assigned=$false
         try {
-            $prompt=Get-Credential -UserName 'brian' -Message 'Approved Shale SQL administrator (SQL Server Authentication)' -ErrorAction Stop
-            if (!$prompt -or $prompt.UserName -cne 'brian' -or !$prompt.Password -or $prompt.Password.Length -lt 1) {
-                throw 'STOP: approved SQL administrator credential required.'
+            # Read-Host stays in the console on Windows PowerShell 5.1.
+            # The approved username is fixed; never accept credentials as arguments.
+            $password=Read-Host -Prompt 'SQL administrator password for brian' -AsSecureString -ErrorAction Stop
+            if ($null -eq $password -or $password.Length -lt 1) {
+                throw 'STOP: approved SQL administrator password required.'
             }
             # SqlCredential keeps the password out of the connection string and managed plaintext.
-            $password=$prompt.Password.Copy();$password.MakeReadOnly()
+            $password.MakeReadOnly()
             $Connection.Credential=[System.Data.SqlClient.SqlCredential]::new('brian',$password)
             $assigned=$true
         } finally {
-            if ($prompt) {$prompt.Password.Dispose()};$prompt=$null
-            if ($password -and !$assigned) {$password.Dispose()};$password=$null
+            # Ownership transfers to the connection; outer finally disposes its password.
+            if ($null -ne $password -and !$assigned) {$password.Dispose()};$password=$null
         }
     } elseif ($Authentication -eq 'Entra') {
         $token=$null

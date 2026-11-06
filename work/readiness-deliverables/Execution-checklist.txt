@@ -10,6 +10,10 @@ PREPARATION ONLY. No production connections or changes performed.
    Parser and offline checks PASS on PowerShell 7.4.6/Linux. Windows PowerShell 5.1
    and Azure/SQL integration remain UNVERIFIED; validate on the actual Windows host.
    Run powershell.exe -NoProfile -File .\Test-ShaleAiIdentityPackage.ps1 there.
+   Updated offline tests stub Read-Host and reject GUI prompting, cancellation,
+   interruption and empty passwords; verify disposal and sanitized failures.
+   On the approved Windows host, separately verify Ctrl+C ends the console prompt
+   without continuing to SQL Open; automated Linux checks cannot prove host UI behavior.
    PSScriptAnalyzer 1.24.0 compatibility checks PASS for Windows 5.1 syntax,
    commands and types against its Windows/.NET Framework profile (offline/Linux).
    Linux checks do not establish actual Windows 5.1/.NET Framework execution.
@@ -39,8 +43,11 @@ PREPARATION ONLY. No production connections or changes performed.
      SecretSafeTelemetryReviewed=$true}
    ./Provision-ShaleAiIdentities.ps1 -Mode Preflight @p
    if(!$?){throw 'STOP'}
-   SQL mode securely prompts for brian using Get-Credential in the script. Cancel,
-   an empty password or a different login stops. No Key Vault secrets are fetched.
+   SQL mode prompts only in the console using Read-Host -AsSecureString for the
+   fixed administrator brian. Enter only the password at that prompt; Ctrl+C/cancel
+   or an empty password stops. No GUI dialog or username input is used. No Key Vault
+   secrets are fetched. The SecureString goes directly to SqlCredential; it is never
+   displayed, logged, saved, converted to plaintext or passed as a command argument.
    Missing users are reported; unexpected identities/grants stop. TLS validation stays
    enabled (Encrypt=True; TrustServerCertificate=False). Never bypass a TLS failure.
    To use Microsoft Entra instead, set $p.AdminAuthentication='Entra' (also the default).
