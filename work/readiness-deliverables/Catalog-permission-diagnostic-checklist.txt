@@ -1,0 +1,117 @@
+CATALOG DATABASE PERMISSION DIAGNOSTIC - READ ONLY
+
+Purpose and boundary
+Identify the exact effective DATABASE permissions outside the existing four-name
+allowlist, absent allowlist entries and occurrence counts. This diagnostic does not
+approve permissions, repair accounts or certify complete identity/catalog readiness.
+Bootstrap remains unverified. AI/MCP/OAuth/readiness controls remain OFF.
+
+Reviewed source: codex/latest b0af7cfad26bc7d7531fa3d63398a65374d66dc2.
+Provision-ShaleAiIdentities.ps1 and role-contract.json are unchanged. The latter is
+pinned to SHA256 a9e6c03c7093c5a411c0644a5733c3c3805cca2d00c2bb42fa7ef06f7d2603bb.
+The diagnostic copies the original identity/SID/own-session/token predicates;
+offline tests enforce parity. Administrator authentication is console-only SQL
+password authentication as brian. The catalog connection uses SqlCredential and
+actual contained authentication as shale_prod_ai_catalog_verifier. No impersonation,
+interactive Azure login, secret creation/rotation, SQL mutations or business calls.
+
+1. Review the draft PR/package and obtain its trusted SHA256SUMS.txt from that
+   reviewed revision. Validate all listed file hashes. Checksums detect byte drift;
+   they are not a signature or authorization. Preserve LF bytes on Windows checkout.
+   Never execute Provision or the disposable/native/mutation acceptance campaigns.
+2. On the approved Windows operator host, use Windows PowerShell 5.1 with .NET
+   Framework 4.7.2+ or supported PowerShell 7.4+ and compatible installed Az.Accounts
+   and Az.KeyVault modules. Run ONLY the offline checks first, from this directory:
+     powershell.exe -NoProfile -File .\Test-ShaleCatalogDatabasePermissions.ps1
+     powershell.exe -NoProfile -File .\Test-ShaleAiIdentityPackage.ps1
+   Each must pass. The new test's permission names/hierarchy are SYNTHETIC fixtures,
+   not production observations. Linux/PowerShell 7 tests do not establish Windows
+   5.1 runtime compatibility. Resolve an offline failure without production secrets.
+3. Confirm the existing approved Azure tenant/subscription context externally.
+   Do not configure new access, identities, OAuth or app settings. Confirm controls
+   OFF through existing operator evidence, outside this metadata-only script.
+   Confirm client/server telemetry cannot capture passwords, tokens, parameters,
+   raw exceptions or returned objects. No transcript, tracing, verbose Azure output,
+   shell recording, debugger dump, raw $Error export or SQL batch capture. If these
+   assurances are unavailable, stop before retrieving credentials.
+4. Maintain the existing security/catalog change freeze. In a fresh dedicated shell:
+     $p=@{TenantId='<approved-tenant-guid>';
+       SubscriptionId='<approved-subscription-guid>';
+       AllApplicationControlsOffConfirmed=$true;
+       SecretSafeTelemetryReviewed=$true}
+     & .\Diagnose-ShaleCatalogDatabasePermissions.ps1 -Mode Diagnose @p
+     $diagnosticExit=$LASTEXITCODE
+   The script prompts in the console for brian's password, then retrieves ONLY
+   shale-ai-catalog-verifier-password from shale-prod-secrets. It never accepts
+   passwords in arguments, environment variables, files or connection strings.
+   Default invocation without -Mode Diagnose is offline Review.
+5. Retain only the package/source hash, shell version, exit code, fixed checkpoint
+   and structured JSON records. Exact built-in DATABASE permission names, counts,
+   grant states, fixed USER/CATALOG_ROLE/PUBLIC labels, hierarchy paths and the
+   grantorIsDbo boolean are intentionally permitted diagnostic evidence. No arbitrary
+   principal/object names, SIDs, secret values or raw exceptions are emitted.
+   End the dedicated process afterward. Do not auto-retry after failure.
+
+Output and interpretation
+- APPROVED_PRESENT and UNEXPECTED preserve occurrence counts. ALLOWLIST_ABSENT has
+  occurrences=0. Absence is informational unless required by the unchanged verifier;
+  the diagnostic uses exit 2 for any allowlist absence, excess or duplicates so an
+  operator must review the complete difference, without changing acceptance rules.
+- SUMMARY always says acceptance=NOT_VERIFIED and controls=OFF. Exit 0 means only
+  no database-list/role-edge difference was collected, not full verification/pass.
+  Exit 2 means evidence was collected and a mismatch exists. Exit 1 means evidence
+  acquisition, authentication, validation, drift or cleanup failed. DIAGNOSTIC_STOP
+  contains only a fixed checkpoint and mutation=NONE/controls=OFF. Never infer a
+  permission is safe from successful collection or a hierarchy explanation.
+- ROLE_CONTRACT compares all catalog-role permission edges, minor IDs and grantor
+  against its six pinned edges. It reports a boolean without exposing object names.
+- PROVENANCE enumerates every matching database grant/deny along the effective
+  permission's same-class covering chain. DIRECT uses a user edge; INHERITED uses
+  the verified catalog role or public. The _HIERARCHY suffix means a covering grant
+  implies the reported permission. Paths run from effective child toward covering
+  ancestor. GRANT_WITH_GRANT_OPTION is retained, never normalized to plain GRANT.
+  DENY is reported as contrary evidence, never counted as a grant route. Multiple
+  routes are retained; the diagnostic does not choose a supposedly unique cause.
+- HIERARCHY records the live engine's transitive DATABASE covering chain.
+  UNRESOLVED means no granting edge was found in that chain. Do not conclude an
+  unexplained permission is harmless/platform-provided. Fixed-role/server/ownership
+  explanations outside this model require separate review; the exact contained
+  token disallows extra/fixed/nested roles. No server hierarchy is assumed applicable
+  to this contained user and no server permission probe is used.
+- Grant and effective-permission reads are repeated, as are identity/token proofs.
+  Grant/effective disagreements stop at DRIFT; repeated identity failures retain
+  their original checkpoint. These are sampled checks, not an atomic snapshot;
+  the operator change freeze is still required. The role-contract comparison is a
+  separate sampled read. Do not infer that intermittent or concurrent changes were
+  excluded merely because the two samples match.
+
+Resolution review (no correction is part of this packet)
+For each unexpected name, compare matching direct/inherited edges and covering
+paths to the pinned role contract. Unauthorized grants require a separately
+reviewed correction. Derived authority requires a separate security/contract review
+of the full Azure SQL permission closure. Unresolved/contradictory provenance stays
+open. No allowlist expansion, suppression, permission/credential change or activation
+is authorized. After separately approved correction, rerun the unchanged full Verify
+sequence, including bootstrap; this diagnostic never substitutes for it.
+
+Audit compatibility and test impact
+Only own-session identity, security catalog, role contract, built-in hierarchy and
+effective permission metadata are read, plus one existing Key Vault secret GET.
+There are no protected application reads or business procedures, SQL mutations or
+application audit inserts/schema changes. Preserve existing secret-safe host, SQL
+and Key Vault access auditing; use the existing external change record.
+Existing package/verification tests were inspected before implementation. Their
+contracts remain unchanged; new offline tests cover this separate diagnostic and
+assert original authentication-predicate parity. No application Java/API/UI symbols,
+SQL installer, receipt, migration or acceptance allowlist changed.
+
+Local validation, 2026-11-06 (PowerShell 7.4.6 on Linux)
+- pwsh -NoProfile -File ./Test-ShaleCatalogDatabasePermissions.ps1: 36 synthetic
+  orchestration/report/redaction cases PASS, plus parser/5.1 syntax, original
+  authentication/allowlist parity and closed-connection TLS checks.
+- pwsh -NoProfile -File ./Test-ShaleAiIdentityPackage.ps1: PASS, including existing
+  verification/recovery/redaction tests and all package hashes.
+- Repository selector: no affected Maven modules; local critical mvn test: 228
+  tests, zero failures/errors/skips. git diff --check: PASS.
+- Windows PowerShell 5.1, installed Windows Az modules and live Azure/SQL semantics
+  remain UNVERIFIED. No production connection/secret retrieval occurred here.
