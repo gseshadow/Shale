@@ -36,13 +36,15 @@ $proof=$original.Substring($start,$end-$start).Replace('$Identity.Name',"'shale_
 Require ($source.Replace("`r`n","`n").Contains($proof.Replace("`r`n","`n"))) 'Contained identity/SID/session/token proof changed.'
 $originalTokens=$null;$originalErrors=$null
 $originalAst=[System.Management.Automation.Language.Parser]::ParseInput($original,[ref]$originalTokens,[ref]$originalErrors)
+# This compares only the historical base list; derived acceptance is verified
+# separately by Test-ShaleAiIdentityVerification.ps1 under live-hierarchy mocks.
 $originalAllowed=$originalAst.Find({param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -ceq '$dbAllowed'},$true)
 $diagnosticAllowed=$ast.Find({param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -ceq '$dbAllowed'},$true)
 & {
     . ([scriptblock]::Create($originalAllowed.Extent.Text))
     $reference=@($dbAllowed)+@('VIEW DEFINITION')
     . ([scriptblock]::Create($diagnosticAllowed.Extent.Text))
-    Require ((@($reference | Sort-Object) -join "`n") -ceq (@($dbAllowed | Sort-Object) -join "`n")) 'Approved database allowlist changed.'
+    Require ((@($reference | Sort-Object) -join "`n") -ceq (@($dbAllowed | Sort-Object) -join "`n")) 'Historical diagnostic/base database allowlist changed.'
 }
 
 # Load only pure helpers and construct a CLOSED connection to inspect TLS options.

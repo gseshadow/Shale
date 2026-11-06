@@ -115,3 +115,12 @@ Local validation, 2026-11-06 (PowerShell 7.4.6 on Linux)
   tests, zero failures/errors/skips. git diff --check: PASS.
 - Windows PowerShell 5.1, installed Windows Az modules and live Azure/SQL semantics
   remain UNVERIFIED. No production connection/secret retrieval occurred here.
+
+Conditional verifier correction proposal (2026-11-06)
+See Catalog-derived-permission-review.txt for the supplied live finding, security
+assessment, exact database-only exception and pending acceptance. The diagnostic
+keeps its original comparison and exit semantics; it should still show the two
+UNEXPECTED names/exit 2 for those observations. Its offline base-allowlist parity
+check does not model the verifier's new conditional derivation proof. Run both
+offline suites before separately authorized verification; never grant the absent
+optional encryption-key permissions to make the diagnostic list match.

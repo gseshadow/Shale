@@ -1,0 +1,132 @@
+CATALOG DATABASE DERIVED PERMISSIONS - SECURITY REVIEW / CORRECTION PROPOSAL
+2026-11-06. Draft for security/contract review; production acceptance remains OPEN.
+
+Evidence and disposition
+The operator reports APPROVED_PRESENT CONNECT and VIEW DEFINITION; UNEXPECTED
+VIEW PERFORMANCE DEFINITION and VIEW SECURITY DEFINITION; ALLOWLIST_ABSENT both
+column encryption/master-key definition permissions; matching role contract, no
+duplicates, diagnostic exit 2. Both unexpected names were traced to the approved
+AiCaseDataCatalogVerifier database VIEW DEFINITION grant via the live built-in
+hierarchy. These are supplied observations, not independently rerun production
+measurements. Exit 2 identified a verifier-model mismatch; it is not readiness.
+
+Microsoft's database permission table explicitly lists VIEW DEFINITION as the
+covering database permission for both names. Its metadata visibility guidance
+explains their use at the applicable metadata scope. References reviewed:
+https://learn.microsoft.com/en-us/sql/t-sql/statements/grant-database-permissions-transact-sql?view=sql-server-ver17
+https://learn.microsoft.com/en-us/sql/relational-databases/security/metadata-visibility-configuration?view=sql-server-ver17
+https://learn.microsoft.com/en-us/sql/relational-databases/system-functions/sys-fn-builtin-permissions-transact-sql?view=sql-server-ver17
+
+Security assessment
+- VIEW PERFORMANCE DEFINITION permits performance-related definition metadata at
+  database scope. Catalog information can reveal structure and implementation
+  details useful for reconnaissance. It is not VIEW DATABASE PERFORMANCE STATE,
+  VIEW DATABASE STATE, SHOWPLAN, SELECT on application tables, or authority to
+  execute business procedures; none of those permissions is accepted by this fix.
+  Do not infer access to every DMV or runtime query/plan surface from this name;
+  each surface retains its documented permission requirements.
+- VIEW SECURITY DEFINITION permits security-related definition metadata. This can
+  reveal principals, permission relationships and security configuration, including
+  facts that help an attacker map defenses. This visibility is sensitive even
+  without business-row access. It grants no right to change grants, impersonate,
+  alter policy, bypass RLS, or read credential secrets/password hashes. No
+  stronger credential/cryptographic authority is added.
+- The existing database VIEW DEFINITION already authorizes broad definition
+  visibility, including source that may contain sensitive embedded literals. The
+  two effective children expose subsets of that approved metadata authority; the
+  proposed verifier change does not create new database authority. This conclusion
+  depends on the exact existing role/token/direct/public restrictions and the
+  demonstrated hierarchy, not on names alone. Catalog output and credentials
+  remain restricted operational material under existing secret-safe handling.
+- Retain VIEW DEFINITION: complete definition/dependency attestation relies on it.
+  Removing it or substituting the narrower children could hide required catalog
+  evidence. The review establishes no need to change the approved role design.
+  If the owner no longer accepts this broad metadata visibility, redesign and
+  re-attest separately; do not add DENYs to silence this diagnostic.
+
+Proposed implementation boundary
+Provision-ShaleAiIdentities.ps1 adds Get-CatalogDatabaseDerivedPermissions only to
+Verify-Login's AiCaseDataCatalogVerifier DATABASE check, after the unchanged actual
+contained-authentication and exact token checks. It re-reads ALL catalog-role
+permission edges through the already-authorized admin connection and compares
+against all six pinned entries, including state, class, securable, zero minor ID
+and dbo grantor. The exact plain database VIEW DEFINITION grant must occur once.
+The pinned JSON digest and all 324 role-contract edges remain unchanged.
+
+The helper requires exactly one live DATABASE hierarchy row for each named child,
+with covering_permission_name exactly VIEW DEFINITION. Missing, duplicate, NULL,
+wrong-scope, cyclic, changed-parent or query-failure evidence stops. There is no
+recursive acceptance of other children, CONTROL ancestry, server-level inference,
+or blanket acceptance based on an effective VIEW DEFINITION name. Only these two
+names are conditionally added to this identity's DATABASE evidence allowance.
+The other identities, SYSTEM/OBJECT/COLUMN permissions and exact EXECUTE closures
+remain unchanged. Explicit child grants would change the role contract or violate
+the existing direct/public checks and remain rejected. Database duplicate evidence
+now explicitly stops, complementing existing duplicate-sensitive object checks.
+
+CONNECT remains required for all identities; VIEW DEFINITION remains required for
+the catalog identity. Both named children are tolerated only after the derivation
+proof, without making their presence a new requirement. The two encryption-key
+permissions remain optional allowances under the existing public/effective evidence
+contract. Zero, one or both may be absent; no grant, role edit or mandatory-set
+expansion is justified by ALLOWLIST_ABSENT. Any unrelated permission still stops.
+
+Scope and acceptance issues
+- This proposal corrects the exact DATABASE mismatch only. No OBJECT exception is
+  inferred from database output; SYSTEM/OBJECT allowlists and column checks remain
+  strict. A later object-scope finding needs its own bounded hierarchy/provenance
+  evidence and review. Full Verify, including bootstrap, is still unverified here.
+- Security/contract owner review of metadata exposure and this change is pending.
+  No general Azure permission closure or production security acceptance is claimed.
+- Windows PowerShell 5.1/.NET/Az compatibility and live SQL execution of this
+  revision remain UNVERIFIED. Run offline package and diagnostic tests on the
+  approved Windows host. Any subsequent actual-login verification requires its
+  own production read authorization; this task executes no production SQL.
+- Role/hierarchy reads are sampled, not an atomic security snapshot. Preserve the
+  existing catalog/security change freeze and all complete pre/postflight checks.
+- The separate diagnostic deliberately retains its original four-name comparison
+  and exit 2 for this supplied finding. It collects evidence, never accepts a
+  correction or substitutes for full Verify. Its baseline is historical, not the
+  corrected conditional verifier allowance.
+- No migration, runtime Java attestation, receipt, deployment, grant, credential,
+  AI/MCP/OAuth flag or tenant opt-in is changed. This package is not activation or
+  deployment approval. Existing downstream readiness gates remain open.
+
+Test impact and audit compatibility
+Pre-edit inventory: inspected the complete package suite, verification helpers,
+fake SQL fixtures, structured recovery/redaction assertions, diagnostic parity
+checks, pinned role contract, Azure attestation architecture and operator runbooks.
+Verification helper changes map to Test-ShaleAiIdentityVerification.ps1; unchanged
+identity proof/base-allowlist parity is checked by the diagnostic suite; package
+parser/default/guard/TLS/hash/role-count tests protect packaging and credential
+boundaries. New tests cover each/both derived names, optional encryption presence
+and absence, unrelated authority, duplicate permissions, role drift/state/grantor/
+minor-ID changes and unavailable/malformed hierarchy. Existing rejection, SID,
+token, object/column, recovery, disposal and redaction cases remain required.
+
+Added SQL is read-only security metadata, through the existing admin connection.
+No protected application read or business/admin mutation is introduced, so no
+application audit event or schema migration is needed. Preserve existing secret-
+safe SQL/host/Key Vault access auditing and the external change-review record.
+Offline tests replace every SQL/connection/Azure boundary with synthetic fixtures.
+
+Executed validation (PowerShell 7.4.6/Linux; 2026-11-06)
+- pwsh -NoProfile -File work/readiness-deliverables/Test-ShaleAiIdentityVerification.ps1:
+  PASS, real helpers/catch with synthetic SQL, role and hierarchy fixtures only.
+- pwsh -NoProfile -File work/readiness-deliverables/Test-ShaleAiIdentityPackage.ps1:
+  PASS, including the final expanded verification suite and package hashes.
+- pwsh -NoProfile -File work/readiness-deliverables/Test-ShaleCatalogDatabasePermissions.ps1:
+  PASS, all 36 synthetic diagnostic scenarios and authentication/base-list parity.
+  PowerShell used work/tools/pwsh/pwsh with task-local XDG cache/config/data paths
+  and POWERSHELL_TELEMETRY_OPTOUT=1. No Azure module, secret or SQL boundary ran.
+- python build/test-selection/select_tests.py --base origin/codex/latest --head HEAD:
+  PASS; no affected application/Maven area or full-suite escalation.
+- /workspace/.tools/bin/mvn -B -ntp test: PASS, 228 tests, zero failures/errors/skips,
+  all seven modules successful. Used the configured proxy/CA-trusting Maven wrapper.
+- Existing-script preservation check: removing only the new helper, its call and
+  database duplicate refusal reproduces the base verifier byte-for-byte. Unchanged
+  role-contract.json, diagnostic and packet runner bytes verified against base.
+- git diff --check: PASS. SHA256SUMS.txt regenerated for all package entries and
+  independently checked after the documentation update. No workflow added.
+These checks establish offline behavior only; the open acceptance issues above
+remain. No production SQL, grant/credential change or activation was executed.

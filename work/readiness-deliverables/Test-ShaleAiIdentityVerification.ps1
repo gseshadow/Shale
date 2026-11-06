@@ -9,7 +9,7 @@ $tokens=$null;$errors=$null
 $ast=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'Provision-ShaleAiIdentities.ps1'),[ref]$tokens,[ref]$errors)
 Require ($errors.Count -eq 0) 'Provisioning parser failure.'
 $helpers=''
-foreach($name in @('Same-Set','Set-VerificationStep','Permission-Bit','Permission-List','Verify-Login')){
+foreach($name in @('Edge-Key','Get-CatalogDatabaseDerivedPermissions','Same-Set','Set-VerificationStep','Permission-Bit','Permission-List','Verify-Login')){
     $definition=$ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true)
     Require ($null -ne $definition) ('Missing verification helper: '+$name)
     $helpers+=$definition.Extent.Text+"`n"
@@ -46,6 +46,10 @@ $script:verificationStep='';$script:verificationIdentity='';$script:verification
 $runtimeExec=@('AiDataAuthenticateV1','AiDataSearchCasesV1','AiDataGetCaseOverviewV1','AiDataRecordCaseFailureV1','AiDataFinishCaseQuotaV1','AiDataAuthorizeCaseHandoffV1')
 $bootstrapExec=@('ResolveAiClientV1','ResolveAiCredentialV1','ResolveAiOAuthCodeV1','ResolveAiRefreshV1','ResolveAiRevocationV1','ResolveAiAccessV1')
 $referenceTables=@('AiCaseDataDeployment','AiDataUnicodeRange','AiDataUnicodeLower','AiDataWordTransition')
+$expected=@([pscustomobject]@{Role='AiCaseDataCatalogVerifier';Class=0;Securable='';Permission='VIEW DEFINITION';State='G'})
+foreach($name in @('sys.sql_expression_dependencies','dbo.AiCaseDataDeployment','dbo.AiDataUnicodeRange','dbo.AiDataUnicodeLower','dbo.AiDataWordTransition')){
+    $expected+=[pscustomobject]@{Role='AiCaseDataCatalogVerifier';Class=1;Securable=$name;Permission='SELECT';State='G'}
+}
 $identity=@{Name='SYNTHETIC-SENSITIVE-IDENTITY';Role=$Role}
 if($Scenario -eq 'DisposeFailure'){$identity.Name='shale_prod_ai_catalog_verifier'}
 $script:disposed=$false;$script:referenceNullFixtureValid=$false
@@ -80,7 +84,7 @@ function Write-Error {
     if(!$script:verificationEvidence){$evidence='NONE'}
     elseif($script:verificationEvidence -ceq 'QUERY' -or $script:verificationEvidence -cmatch '^ASSERT (actual=[0-9]{1,10} allowed=[0-9]{1,10} (unexpected|missing)=[0-9]{1,10} duplicates=[0-9]{1,10}|rows=[0-9]{1,10} wantRead=[01]( read=(NULL|ZERO|ONE|OTHER) update=(NULL|ZERO|ONE|OTHER))?)$'){$evidence=$script:verificationEvidence}
     $scenarioLabel='OTHER'
-    if($Scenario -cin @('Success','DisposeFailure','OpenFailure','ProofQuery','ProofMissing','OwnSession','Independent','Token','DatabaseQuery','DatabaseUnexpected','DatabaseMissing','SystemQuery','SystemUnexpected','SystemMissing','ObjectQuery','ObjectUnexpected','ObjectMissing','ObjectDuplicate','ColumnInventory','ColumnQuery','ColumnRead','ColumnUpdate','ReferenceRead','ReferenceNull','ExecuteSet')){$scenarioLabel=$Scenario}
+    if($Scenario -cin @('MissingParentDerived','ObjectDerived','DerivedBoth','DerivedPerformance','DerivedSecurity','OptionalBoth','OptionalOne','RestrictedDerived','DatabaseDuplicate','UnrelatedDerived','RoleMissing','RoleExtra','RoleGrantOption','RoleDeny','RoleGrantor','RoleColumn','RoleDuplicate','HierarchyQuery','HierarchyMissing','HierarchyPartial','HierarchyDuplicate','HierarchyWrongParent','HierarchyWrongScope','HierarchyNull','HierarchyCycle','Success','DisposeFailure','OpenFailure','ProofQuery','ProofMissing','OwnSession','Independent','Token','DatabaseQuery','DatabaseUnexpected','DatabaseMissing','SystemQuery','SystemUnexpected','SystemMissing','ObjectQuery','ObjectUnexpected','ObjectMissing','ObjectDuplicate','ColumnInventory','ColumnQuery','ColumnRead','ColumnUpdate','ReferenceRead','ReferenceNull','ExecuteSet')){$scenarioLabel=$Scenario}
     $observation=[ordered]@{scenario=$scenarioLabel;started=(Recovery-Bool $commitStarted);committed=(Recovery-Bool $committed);transaction=$transactionState;recovery=$recovery;message=$messageState;action=$action;stage=$phase;checkpoint=$checkpoint;object=[int]$script:verificationObject;column=[int]$script:verificationColumn;evidence=$evidence}
     [Console]::Out.WriteLine(('OFFLINE_VERIFY '+(ConvertTo-Json -InputObject $observation -Compress)))
     if($ErrorLayout -ceq 'Wrapped'){
@@ -103,6 +107,33 @@ function Table([string[]]$Columns,$Rows) {
     return ,$t
 }
 function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transaction=$null) {
+    if($Sql -match "WHERE r.name=N'AiCaseDataCatalogVerifier'"){
+        $rows=@();foreach($edge in $expected){$rows+=,@($edge.Role,$edge.Class,$edge.Securable,$edge.Permission,$edge.State,0,1)}
+        switch($Scenario){
+            'RoleMissing' {$rows=$rows[1..5]}
+            'RoleExtra' {$rows+=,@('AiCaseDataCatalogVerifier',0,'','VIEW SECURITY DEFINITION','G',0,1)}
+            'RoleGrantOption' {$rows[0][4]='W'}
+            'RoleDeny' {$rows[0][4]='D'}
+            'RoleGrantor' {$rows[0][6]=2}
+            'RoleColumn' {$rows[1][5]=1}
+            'RoleDuplicate' {$rows+=,@($rows[0])}
+        }
+        return Table @('Role','Class','Securable','Permission','State','MinorId','Grantor') $rows
+    }
+    if($Sql -match 'fn_builtin_permissions'){
+        if($Scenario -eq 'HierarchyQuery'){throw 'SYNTHETIC-SENSITIVE-HIERARCHY'}
+        $rows=@(@('DATABASE','VIEW PERFORMANCE DEFINITION','VIEW DEFINITION'),@('DATABASE','VIEW SECURITY DEFINITION','VIEW DEFINITION'))
+        switch($Scenario){
+            'HierarchyMissing' {$rows=@()}
+            'HierarchyPartial' {$rows=@(,$rows[0])}
+            'HierarchyDuplicate' {$rows=@($rows[0],$rows[0])}
+            'HierarchyWrongParent' {$rows[1][2]='CONTROL'}
+            'HierarchyWrongScope' {$rows[1][0]='OBJECT'}
+            'HierarchyNull' {$rows[1][2]=[DBNull]::Value}
+            'HierarchyCycle' {$rows[1][2]='VIEW SECURITY DEFINITION'}
+        }
+        return Table @('ClassName','PermissionName','CoveringPermissionName') $rows
+    }
     if($Sql -match 'dm_exec_sessions'){
         if($Scenario -eq 'ProofQuery'){throw 'SYNTHETIC-SENSITIVE-PROOF'}
         $rows=@();if($Scenario -ne 'ProofMissing'){
@@ -124,8 +155,16 @@ function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transacti
         if($Parameters.scope -eq 'DATABASE'){
             if($Scenario -eq 'DatabaseQuery'){throw 'SYNTHETIC-SENSITIVE-DATABASE'}
             $perms=@('CONNECT');if($Role -eq 'AiCaseDataCatalogVerifier'){$perms+='VIEW DEFINITION'}
+            if($Scenario -cin @('DerivedBoth','RestrictedDerived')){$perms+=@('VIEW PERFORMANCE DEFINITION','VIEW SECURITY DEFINITION')}
+            if($Scenario -eq 'DerivedPerformance'){$perms+='VIEW PERFORMANCE DEFINITION'}
+            if($Scenario -eq 'DerivedSecurity'){$perms+='VIEW SECURITY DEFINITION'}
+            if($Scenario -cin @('OptionalBoth','OptionalOne')){$perms+='VIEW ANY COLUMN ENCRYPTION KEY DEFINITION'}
+            if($Scenario -eq 'OptionalBoth'){$perms+='VIEW ANY COLUMN MASTER KEY DEFINITION'}
+            if($Scenario -eq 'DatabaseDuplicate'){$perms+='CONNECT'}
+            if($Scenario -eq 'UnrelatedDerived'){$perms+='VIEW DATABASE STATE'}
             if($Scenario -eq 'DatabaseUnexpected'){$perms+='CONTROL'}
             if($Scenario -eq 'DatabaseMissing'){$perms=@('CONNECT')}
+            if($Scenario -eq 'MissingParentDerived'){$perms=@('CONNECT','VIEW PERFORMANCE DEFINITION','VIEW SECURITY DEFINITION')}
         } elseif($Parameters.n -eq 'sys.sql_expression_dependencies'){
             if($Scenario -eq 'SystemQuery'){throw 'SYNTHETIC-SENSITIVE-SYSTEM'}
             $perms=@('SELECT','VIEW DEFINITION')
@@ -141,6 +180,7 @@ function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transacti
             if($Role -eq 'AiCaseDataRuntime' -and $Parameters.n -match '\[AiData'){$perms=@('EXECUTE')}
             if($Role -eq 'AiIntegrationBootstrap' -and $Parameters.n -match '\[ResolveAi'){$perms=@('EXECUTE')}
             if($Scenario -eq 'ObjectUnexpected'){$perms+='CONTROL'}
+            if($Scenario -eq 'ObjectDerived'){$perms+='VIEW SECURITY DEFINITION'}
             if($Scenario -eq 'ObjectMissing'){$perms=@()}
             if($Scenario -eq 'ObjectDuplicate'){$perms+='VIEW DEFINITION'}
         }
@@ -203,7 +243,7 @@ try {
     Require ($workerErrors.Count -eq 0) 'Offline worker parser failure.'
     # Fail before launching if extraction accidentally includes real I/O helpers or
     # the production entrypoint. This is a regression guard, not an OS sandbox.
-    $allowedCommands=@('Recovery-Bool','ConvertTo-Json','Set-StrictMode','Add-Type','Add-Member','Table','Read-Sql','New-Connection','Set-VerificationStep','Same-Set','Permission-List','Permission-Bit','Verify-Login','Where-Object','ForEach-Object','Sort-Object','ConvertTo-SecureString','Write-Error','Microsoft.PowerShell.Utility\Write-Error')
+    $allowedCommands=@('Edge-Key','Get-CatalogDatabaseDerivedPermissions','Recovery-Bool','ConvertTo-Json','Set-StrictMode','Add-Type','Add-Member','Table','Read-Sql','New-Connection','Set-VerificationStep','Same-Set','Permission-List','Permission-Bit','Verify-Login','Where-Object','ForEach-Object','Sort-Object','ConvertTo-SecureString','Write-Error','Microsoft.PowerShell.Utility\Write-Error')
     foreach($command in $workerAst.FindAll({param($n) $n -is [System.Management.Automation.Language.CommandAst]},$true)){
         Require ($command.GetCommandName() -cin $allowedCommands) 'Offline worker contains an unreviewed command; no child launched.'
     }
@@ -216,6 +256,30 @@ try {
     }
     [IO.File]::WriteAllText($worker,$workerSource)
     $cases=@(
+        @('MissingParentDerived','DATABASE_REQUIRED'),@('ObjectDerived','OBJECT_PERMISSIONS'),
+        @('DerivedBoth','COMPLETE'),
+        @('DerivedPerformance','COMPLETE'),
+        @('DerivedSecurity','COMPLETE'),
+        @('OptionalBoth','COMPLETE'),
+        @('OptionalOne','COMPLETE'),
+        @('RestrictedDerived','DATABASE_PERMISSIONS'),
+        @('DatabaseDuplicate','DATABASE_PERMISSIONS'),
+        @('UnrelatedDerived','DATABASE_PERMISSIONS'),
+        @('RoleMissing','DATABASE_PERMISSIONS'),
+        @('RoleExtra','DATABASE_PERMISSIONS'),
+        @('RoleGrantOption','DATABASE_PERMISSIONS'),
+        @('RoleDeny','DATABASE_PERMISSIONS'),
+        @('RoleGrantor','DATABASE_PERMISSIONS'),
+        @('RoleColumn','DATABASE_PERMISSIONS'),
+        @('RoleDuplicate','DATABASE_PERMISSIONS'),
+        @('HierarchyQuery','DATABASE_PERMISSIONS'),
+        @('HierarchyMissing','DATABASE_PERMISSIONS'),
+        @('HierarchyPartial','DATABASE_PERMISSIONS'),
+        @('HierarchyDuplicate','DATABASE_PERMISSIONS'),
+        @('HierarchyWrongParent','DATABASE_PERMISSIONS'),
+        @('HierarchyWrongScope','DATABASE_PERMISSIONS'),
+        @('HierarchyNull','DATABASE_PERMISSIONS'),
+        @('HierarchyCycle','DATABASE_PERMISSIONS'),
         @('Success','COMPLETE'),@('DisposeFailure','CONNECTION_DISPOSE'),@('DisposeFailure','CONNECTION_DISPOSE','Wrapped'),@('OpenFailure','CONNECT'),@('OpenFailure','CONNECT','Host','Uncommitted'),@('OpenFailure','CONNECT','Host','WrongMessage'),@('ProofQuery','IDENTITY_QUERY'),
         @('ProofMissing','IDENTITY_ROW_ASSERT'),@('OwnSession','IDENTITY_ASSERT'),@('Independent','IDENTITY_ASSERT'),
         @('Token','TOKEN_ASSERT'),@('DatabaseQuery','DATABASE_PERMISSIONS'),@('DatabaseUnexpected','DATABASE_PERMISSIONS'),
@@ -227,7 +291,8 @@ try {
     )
     foreach($role in @('AiCaseDataCatalogVerifier','AiCaseDataRuntime','AiIntegrationBootstrap')){
         foreach($case in $cases){
-            if($role -ne 'AiCaseDataCatalogVerifier' -and $case[0] -notin @('Success','OpenFailure','ColumnRead','ColumnUpdate','ObjectUnexpected','ExecuteSet')){continue}
+            if($case[0] -eq 'RestrictedDerived' -and $role -eq 'AiCaseDataCatalogVerifier'){continue}
+            if($role -ne 'AiCaseDataCatalogVerifier' -and $case[0] -notin @('RestrictedDerived','OptionalBoth','OptionalOne','Success','OpenFailure','ColumnRead','ColumnUpdate','ObjectUnexpected','ExecuteSet')){continue}
             if($case[0] -eq 'ExecuteSet' -and $role -ne 'AiCaseDataRuntime'){continue}
             $start=[Diagnostics.ProcessStartInfo]::new()
             $start.FileName=(Get-Process -Id $PID).Path
@@ -241,7 +306,7 @@ try {
                 $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
                 Require ($process.WaitForExit(30000)) 'Verification child timed out.'
                 $captured=$stdout.Result+$stderr.Result
-                if($case[0] -eq 'Success'){
+                if($case[1] -eq 'COMPLETE'){
                     Require ($process.ExitCode -eq 0 -and $captured -match 'Verified contained login') ('Synthetic complete verification failed: '+$role)
                 } else {
                     $label=$case[0]+'/'+$role+'/'+$layout+'/'+$recoveryFixture

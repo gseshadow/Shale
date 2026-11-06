@@ -6,6 +6,9 @@ For this investigation use Post-commit-diagnostic.txt and Verify mode ONLY. Do n
 repeat section 4, rotate secrets, change Azure/SQL authority or activate any control.
 The historical provisioning procedure below is not new execution authorization.
 
+Read Catalog-derived-permission-review.txt for the pending narrowly scoped
+database permission correction. All production access remains separately governed.
+
 1. Review before any production access
    Review Provision-ShaleAiIdentities.ps1, role-contract.json, SHA256SUMS.txt and
    Review-and-recovery-notes.txt. Default -Mode Review is offline.
