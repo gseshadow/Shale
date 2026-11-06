@@ -1,3 +1,9 @@
+CURRENT CORRECTION (2026-11-06): see Object-permission-verifier-correction.txt.
+Operator-supplied full tuples confirm the name-projection defect. The correction
+is prepared for offline/Windows review; complete three-identity Verify is pending.
+No Provision, production mutation or AI/MCP/OAuth activation is authorized here.
+The investigation below is retained as historical evidence.
+
 SHALE SQL IDENTITY POST-COMMIT INVESTIGATION - READ ONLY
 Source reviewed: codex/latest d8db3a41b3f8cebb82d72fa5eaebb78dd5145630.
 

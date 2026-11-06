@@ -259,16 +259,65 @@ function Permission-Bit($Value) {
     if($Value -is [int] -and $Value -eq 1){return 'ONE'}
     return 'OTHER'
 }
-function Permission-List($Connection,[string]$Name,[string]$Scope,[string[]]$Allowed) {
+# Retain every effective OBJECT tuple. Only object rows feed the exact required list.
+# Column evidence is an additional assertion, never a substitute for an object grant.
+function Object-PermissionEvidence($Table,[string]$Name,[string]$EntityName,[string[]]$Allowed,$Admin,[string]$Role) {
+    if($Table -isnot [System.Data.DataTable]){throw 'STOP: object permission table unavailable.'}
+    $objects=@();$columns=@();$seen=@();$processed=0;$sqlCount=0
+    foreach($row in $Table.Rows){
+        $processed++
+        if($row.EntityName -isnot [string] -or ($row.EntityName -cne $EntityName -and $row.EntityName -cne $Name) -or
+           $row.SubentityName -isnot [string] -or $row.Permission -isnot [string]){throw 'STOP: invalid object permission tuple.'}
+        if(($row.SqlResultCount -isnot [long] -and $row.SqlResultCount -isnot [int]) -or
+           $row.SqlResultCount -ne $Table.Rows.Count){throw 'STOP: SQL object permission count differs.'}
+        $sqlCount=$row.SqlResultCount
+        $duplicate=@($seen | Where-Object {$_.EntityName -ceq $row.EntityName -and $_.SubentityName -ceq $row.SubentityName -and $_.Permission -ceq $row.Permission}).Count
+        $unexpected=[int]($row.Permission -cnotin $Allowed)
+        $script:verificationEvidence='ASSERT actual={0} allowed={1} unexpected={2} duplicates={3}' -f $Table.Rows.Count,$Allowed.Count,$unexpected,$duplicate
+        if($duplicate){throw 'STOP: identical object permission tuples.'}
+        if($unexpected){throw 'STOP: unexpected effective object permission.'}
+        $seen+=,$row
+        if($row.SubentityName -ceq ''){$objects+=$row.Permission}else{$columns+=,$row}
+    }
+    if($processed -ne $Table.Rows.Count -or $processed -ne $sqlCount){throw 'STOP: processed object permission count differs.'}
+    if($columns.Count){
+        if($Role -cne 'AiCaseDataCatalogVerifier' -or $EntityName -cnotin @($referenceTables | ForEach-Object {'dbo.'+$_}) -or
+           'SELECT' -cnotin $Allowed -or @($objects | Where-Object {$_ -ceq 'SELECT'}).Count -ne 1 -or
+           @($columns | Where-Object {$_.Permission -cne 'SELECT'}).Count){throw 'STOP: unauthorized column permission evidence.'}
+        # Reuse the exact six-edge/state/minor-id/grantor guard; no new role exception.
+        $null=Get-CatalogDatabaseDerivedPermissions $Admin
+        $inventory=Read-Sql $Admin 'SELECT name Name FROM sys.columns WHERE object_id=OBJECT_ID(@name) ORDER BY column_id;' @{name=$Name}
+        foreach($column in $columns){
+            if(@($inventory.Rows | Where-Object {$_.Name -ceq $column.SubentityName}).Count -ne 1){throw 'STOP: unknown column permission evidence.'}
+        }
+    }
+    return [pscustomobject]@{Table=$Table;SqlCount=$sqlCount;DataTableCount=$Table.Rows.Count;ProcessedCount=$processed;ObjectPermissions=$objects;ColumnPermissions=$columns}
+}
+function Permission-List($Connection,[string]$Name,[string]$Scope,[string[]]$Allowed,$Admin=$null,[string]$Role='',[string]$EntityName='') {
     $securable=$Name;if($Scope -ceq 'DATABASE'){$securable=[DBNull]::Value}
     $script:verificationEvidence='QUERY'
-    try{$t=Read-Sql $Connection 'SELECT permission_name Permission FROM sys.fn_my_permissions(@n,@scope);' @{n=$securable;scope=$Scope}}
+    if($Scope -ceq 'OBJECT'){$script:verificationObjectEvidence=$null}
+    try{
+        if($Scope -ceq 'OBJECT'){
+            $t=Read-Sql $Connection @'
+SELECT entity_name EntityName,subentity_name SubentityName,permission_name Permission,
+ COUNT_BIG(*) OVER() SqlResultCount
+FROM sys.fn_my_permissions(@n,@scope);
+'@ @{n=$securable;scope=$Scope}
+        } else {$t=Read-Sql $Connection 'SELECT permission_name Permission FROM sys.fn_my_permissions(@n,@scope);' @{n=$securable;scope=$Scope}}
+    }
     catch {
         # Accepted attestation permits invisible objects only when their allowlist is empty.
         $ex=$_.Exception
         while($ex.InnerException){$ex=$ex.InnerException}
         if($Scope -eq 'OBJECT' -and $Allowed.Count -eq 0 -and $ex -is [System.Data.SqlClient.SqlException] -and $ex.Number -eq 15151){return @()}
         throw 'STOP: effective permission evidence unavailable.'
+    }
+    if($Scope -ceq 'OBJECT'){
+        # Keep raw tuple evidence even when a subsequent assertion stops verification.
+        $script:verificationObjectEvidence=[pscustomobject]@{Table=$t}
+        $script:verificationObjectEvidence=Object-PermissionEvidence $t $Name $EntityName $Allowed $Admin $Role
+        return $script:verificationObjectEvidence.ObjectPermissions
     }
     $actual=@($t.Rows | ForEach-Object {$_.Permission})
     $unexpected=@($actual | Where-Object {$_ -cnotin $Allowed}).Count
@@ -352,7 +401,7 @@ FROM sys.database_principals p WHERE p.principal_id=USER_ID();
         if('CONNECT' -cnotin $dbPerms -or ($Identity.Role -ceq 'AiCaseDataCatalogVerifier' -and 'VIEW DEFINITION' -cnotin $dbPerms)){throw 'STOP: required database permission missing.'}
         if($Identity.Role -ceq 'AiCaseDataCatalogVerifier'){
             Set-VerificationStep SYSTEM_PERMISSIONS
-            $systemPerms=@(Permission-List $c 'sys.sql_expression_dependencies' 'OBJECT' @('SELECT','VIEW DEFINITION'))
+            $systemPerms=@(Permission-List $c 'sys.sql_expression_dependencies' 'OBJECT' @('SELECT','VIEW DEFINITION') $Admin $Identity.Role 'sys.sql_expression_dependencies')
             Set-VerificationStep SYSTEM_REQUIRED
             if('SELECT' -cnotin $systemPerms){throw 'STOP: dependency catalog SELECT missing.'}
         }
@@ -373,7 +422,7 @@ WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT',
                 $allowed=@('VIEW DEFINITION');if($o.SchemaName -ceq 'dbo' -and $o.ObjectName -cin $referenceTables){$allowed+='SELECT'}
             }
             Set-VerificationStep OBJECT_PERMISSIONS
-            $perms=@(Permission-List $c $o.QualifiedName 'OBJECT' $allowed)
+            $perms=@(Permission-List $c $o.QualifiedName 'OBJECT' $allowed $Admin $Identity.Role ($o.SchemaName+'.'+$o.ObjectName))
             if('EXECUTE' -cin $perms){$execFound+=$o.ObjectName}
             Set-VerificationStep OBJECT_REQUIRED
             $script:verificationEvidence='ASSERT actual={0} allowed={1} missing={2} duplicates={3}' -f $perms.Count,$allowed.Count,@($allowed | Where-Object {$_ -cnotin $perms}).Count,($perms.Count-@($perms | Sort-Object -Unique).Count)

@@ -9,7 +9,7 @@ $tokens=$null;$errors=$null
 $ast=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'Provision-ShaleAiIdentities.ps1'),[ref]$tokens,[ref]$errors)
 Require ($errors.Count -eq 0) 'Provisioning parser failure.'
 $helpers=''
-foreach($name in @('Edge-Key','Get-CatalogDatabaseDerivedPermissions','Same-Set','Set-VerificationStep','Permission-Bit','Permission-List','Verify-Login')){
+foreach($name in @('Edge-Key','Get-CatalogDatabaseDerivedPermissions','Same-Set','Set-VerificationStep','Permission-Bit','Permission-List','Object-PermissionEvidence','Verify-Login')){
     $definition=$ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true)
     Require ($null -ne $definition) ('Missing verification helper: '+$name)
     $helpers+=$definition.Extent.Text+"`n"
@@ -52,7 +52,7 @@ foreach($name in @('sys.sql_expression_dependencies','dbo.AiCaseDataDeployment',
 }
 $identity=@{Name='SYNTHETIC-SENSITIVE-IDENTITY';Role=$Role}
 if($Scenario -eq 'DisposeFailure'){$identity.Name='shale_prod_ai_catalog_verifier'}
-$script:disposed=$false;$script:referenceNullFixtureValid=$false
+$script:disposed=$false;$script:referenceNullFixtureValid=$false;$script:referenceColumnChecks=0
 # Observe the actual selected recovery variable and unformatted Write-Error input.
 # Never emit the message/exception itself; unknown values become bounded OTHER.
 function Recovery-Bool($Value){
@@ -154,7 +154,7 @@ function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transacti
     if($Sql -match 'fn_my_permissions'){
         if($Parameters.scope -eq 'DATABASE'){
             if($Scenario -eq 'DatabaseQuery'){throw 'SYNTHETIC-SENSITIVE-DATABASE'}
-            $perms=@('CONNECT');if($Role -eq 'AiCaseDataCatalogVerifier'){$perms+='VIEW DEFINITION'}
+            $perms=@('CONNECT');if($identity.Role -eq 'AiCaseDataCatalogVerifier'){$perms+='VIEW DEFINITION'}
             if($Scenario -cin @('DerivedBoth','RestrictedDerived')){$perms+=@('VIEW PERFORMANCE DEFINITION','VIEW SECURITY DEFINITION')}
             if($Scenario -eq 'DerivedPerformance'){$perms+='VIEW PERFORMANCE DEFINITION'}
             if($Scenario -eq 'DerivedSecurity'){$perms+='VIEW SECURITY DEFINITION'}
@@ -173,16 +173,25 @@ function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transacti
         } else {
             if($Scenario -eq 'ObjectQuery'){throw 'SYNTHETIC-SENSITIVE-OBJECT'}
             $perms=@()
-            if($Role -eq 'AiCaseDataCatalogVerifier'){
+            if($identity.Role -eq 'AiCaseDataCatalogVerifier'){
                 $perms=@('VIEW DEFINITION')
                 if($Parameters.n -match '\[AiCaseDataDeployment\]'){$perms+='SELECT'}
             }
-            if($Role -eq 'AiCaseDataRuntime' -and $Parameters.n -match '\[AiData'){$perms=@('EXECUTE')}
-            if($Role -eq 'AiIntegrationBootstrap' -and $Parameters.n -match '\[ResolveAi'){$perms=@('EXECUTE')}
+            if($identity.Role -eq 'AiCaseDataRuntime' -and $Parameters.n -match '\[AiData'){$perms=@('EXECUTE')}
+            if($identity.Role -eq 'AiIntegrationBootstrap' -and $Parameters.n -match '\[ResolveAi'){$perms=@('EXECUTE')}
             if($Scenario -eq 'ObjectUnexpected'){$perms+='CONTROL'}
             if($Scenario -eq 'ObjectDerived'){$perms+='VIEW SECURITY DEFINITION'}
             if($Scenario -eq 'ObjectMissing'){$perms=@()}
             if($Scenario -eq 'ObjectDuplicate'){$perms+='VIEW DEFINITION'}
+        }
+        if($Parameters.scope -eq 'OBJECT'){
+            $entity=$Parameters.n.Replace('[','').Replace(']','')
+            $rows=@();foreach($perm in $perms){$rows+=,@($entity,'',$perm,$perms.Count)}
+            if($Scenario -eq 'ProductionEight' -and $entity -ceq 'dbo.AiCaseDataDeployment'){
+                $rows=@(@($entity,'','SELECT',8),@($entity,'','VIEW DEFINITION',8))
+                foreach($index in 1..6){$rows+=,@($entity,('SyntheticColumn'+$index),'SELECT',8)}
+            }
+            return Table @('EntityName','SubentityName','Permission','SqlResultCount') $rows
         }
         $rows=@();foreach($perm in $perms){$rows+=,@($perm)}
         return Table @('Permission') $rows
@@ -198,12 +207,17 @@ function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transacti
     }
     if($Sql -match 'FROM sys.columns'){
         if($Scenario -eq 'ColumnInventory'){throw 'SYNTHETIC-SENSITIVE-COLUMNS'}
+        if($Scenario -eq 'ProductionEight'){
+            $rows=@();foreach($index in 1..6){$rows+=,@(('SyntheticColumn'+$index))}
+            return Table @('Name') $rows
+        }
         return Table @('Name') @(,@('SYNTHETIC-SENSITIVE-COLUMN'))
     }
     if($Sql -match 'HAS_PERMS_BY_NAME'){
         if($Scenario -eq 'ColumnQuery'){throw 'SYNTHETIC-SENSITIVE-COLUMN-QUERY'}
         $read=0;$update=0
-        if($Role -eq 'AiCaseDataCatalogVerifier' -and $Parameters.o -match '\[AiCaseDataDeployment\]'){$read=1}
+        if($Scenario -eq 'ProductionEight' -and $Parameters.o -ceq '[dbo].[AiCaseDataDeployment]'){$script:referenceColumnChecks++}
+        if($identity.Role -eq 'AiCaseDataCatalogVerifier' -and $Parameters.o -match '\[AiCaseDataDeployment\]'){$read=1}
         if($Scenario -eq 'ColumnRead'){$read=1}
         if($Scenario -eq 'ColumnUpdate'){$update=1}
         if($Parameters.o -match '\[AiCaseDataDeployment\]'){
@@ -226,7 +240,10 @@ $invoke=@'
 $password=ConvertTo-SecureString ([guid]::NewGuid().ToString('N')) -AsPlainText -Force
 $password.MakeReadOnly()
 try {
-    try {Verify-Login $identity $password 'FAKE-ADMIN'}
+    try {
+        Verify-Login $identity $password 'FAKE-ADMIN'
+        if($Scenario -eq 'ProductionEight' -and $script:referenceColumnChecks -ne 6){throw 'Offline production-shape regression skipped an independent column check.'}
+    }
     catch CATCH_BODY
 } finally {
     $password.Dispose()
@@ -243,11 +260,11 @@ try {
     Require ($workerErrors.Count -eq 0) 'Offline worker parser failure.'
     # Fail before launching if extraction accidentally includes real I/O helpers or
     # the production entrypoint. This is a regression guard, not an OS sandbox.
-    $allowedCommands=@('Edge-Key','Get-CatalogDatabaseDerivedPermissions','Recovery-Bool','ConvertTo-Json','Set-StrictMode','Add-Type','Add-Member','Table','Read-Sql','New-Connection','Set-VerificationStep','Same-Set','Permission-List','Permission-Bit','Verify-Login','Where-Object','ForEach-Object','Sort-Object','ConvertTo-SecureString','Write-Error','Microsoft.PowerShell.Utility\Write-Error')
+    $allowedCommands=@('Edge-Key','Get-CatalogDatabaseDerivedPermissions','Recovery-Bool','ConvertTo-Json','Set-StrictMode','Add-Type','Add-Member','Table','Read-Sql','New-Connection','Set-VerificationStep','Same-Set','Permission-List','Object-PermissionEvidence','Permission-Bit','Verify-Login','Where-Object','ForEach-Object','Sort-Object','ConvertTo-SecureString','Write-Error','Microsoft.PowerShell.Utility\Write-Error')
     foreach($command in $workerAst.FindAll({param($n) $n -is [System.Management.Automation.Language.CommandAst]},$true)){
         Require ($command.GetCommandName() -cin $allowedCommands) 'Offline worker contains an unreviewed command; no child launched.'
     }
-    $allowedTypes=@('bool','ordered','string','string[]','int','object','object[]','pscustomobject','System.Data.DataTable','DBNull','securestring','System.Data.SqlClient.SqlException','System.Data.SqlClient.SqlCredential','guid','regex','Console')
+    $allowedTypes=@('bool','ordered','string','string[]','int','long','object','object[]','pscustomobject','System.Data.DataTable','DBNull','securestring','System.Data.SqlClient.SqlException','System.Data.SqlClient.SqlCredential','guid','regex','Console')
     foreach($type in $workerAst.FindAll({param($n) $n -is [System.Management.Automation.Language.TypeExpressionAst]},$true)){
         Require ($type.TypeName.FullName -cin $allowedTypes) 'Offline worker contains an unreviewed type; no child launched.'
     }
@@ -280,12 +297,12 @@ try {
         @('HierarchyWrongScope','DATABASE_PERMISSIONS'),
         @('HierarchyNull','DATABASE_PERMISSIONS'),
         @('HierarchyCycle','DATABASE_PERMISSIONS'),
-        @('Success','COMPLETE'),@('DisposeFailure','CONNECTION_DISPOSE'),@('DisposeFailure','CONNECTION_DISPOSE','Wrapped'),@('OpenFailure','CONNECT'),@('OpenFailure','CONNECT','Host','Uncommitted'),@('OpenFailure','CONNECT','Host','WrongMessage'),@('ProofQuery','IDENTITY_QUERY'),
+        @('ProductionEight','COMPLETE'),@('Success','COMPLETE'),@('DisposeFailure','CONNECTION_DISPOSE'),@('DisposeFailure','CONNECTION_DISPOSE','Wrapped'),@('OpenFailure','CONNECT'),@('OpenFailure','CONNECT','Host','Uncommitted'),@('OpenFailure','CONNECT','Host','WrongMessage'),@('ProofQuery','IDENTITY_QUERY'),
         @('ProofMissing','IDENTITY_ROW_ASSERT'),@('OwnSession','IDENTITY_ASSERT'),@('Independent','IDENTITY_ASSERT'),
         @('Token','TOKEN_ASSERT'),@('DatabaseQuery','DATABASE_PERMISSIONS'),@('DatabaseUnexpected','DATABASE_PERMISSIONS'),
         @('DatabaseMissing','DATABASE_REQUIRED'),@('SystemQuery','SYSTEM_PERMISSIONS'),@('SystemUnexpected','SYSTEM_PERMISSIONS'),
         @('SystemMissing','SYSTEM_REQUIRED'),@('ObjectQuery','OBJECT_PERMISSIONS'),@('ObjectUnexpected','OBJECT_PERMISSIONS'),
-        @('ObjectMissing','OBJECT_REQUIRED'),@('ObjectDuplicate','OBJECT_REQUIRED'),@('ColumnInventory','COLUMN_INVENTORY'),
+        @('ObjectMissing','OBJECT_REQUIRED'),@('ObjectDuplicate','OBJECT_PERMISSIONS'),@('ColumnInventory','COLUMN_INVENTORY'),
         @('ColumnQuery','COLUMN_QUERY'),@('ColumnRead','COLUMN_ASSERT'),@('ColumnUpdate','COLUMN_ASSERT'),
         @('ReferenceRead','COLUMN_ASSERT'),@('ReferenceNull','COLUMN_ASSERT'),@('ReferenceNull','COLUMN_ASSERT','Wrapped'),@('ExecuteSet','EXECUTE_SET')
     )
@@ -343,10 +360,10 @@ try {
                         Require ($bounded -ceq 'OFFLINE_REFERENCE_NULL checkpoint=COLUMN_ASSERT object=2 column=1 rows=1 wantRead=1 read=NULL update=ZERO fixture=VALID') ('NULL required column evidence must fail at its exact coordinate. '+$bounded)
                     }
                     Require ($process.ExitCode -eq 1) ('Security finding must fail closed: '+$case[0]+'/'+$role)
-                    Require ($observed.checkpoint -ceq $case[1]) ('Wrong failing checkpoint: '+$case[0]+'/'+$role)
+                    Require ($observed.checkpoint -ceq $case[1]) ('Wrong failing checkpoint: '+$case[0]+'/'+$role+' observed='+$observed.checkpoint)
                     Require ($captured -notmatch 'SYNTHETIC-SENSITIVE') ('Sensitive diagnostic escaped: '+$case[0])
                     if($case[0] -eq 'ObjectUnexpected'){Require ($observed.evidence -cmatch '^ASSERT actual=[0-9]+ allowed=[0-9]+ unexpected=1 duplicates=[0-9]+$') 'Unexpected permission count missing.'}
-                    if($case[0] -eq 'ObjectDuplicate'){Require ($observed.evidence -cmatch '^ASSERT actual=[0-9]+ allowed=[0-9]+ missing=0 duplicates=1$') 'Duplicate-row shape must remain a failing assertion, with safe counts.'}
+                    if($case[0] -eq 'ObjectDuplicate'){Require ($observed.evidence -cmatch '^ASSERT actual=[0-9]+ allowed=[0-9]+ unexpected=0 duplicates=1$') 'Duplicate-row shape must remain a failing assertion, with safe counts.'}
                     if($case[0] -eq 'ObjectQuery'){Require ($observed.column -eq 0 -and $observed.evidence -ceq 'QUERY') 'Query failure confused with permission assertion.'}
                 }
             } finally {if(!$process.HasExited){$process.Kill()};$process.Dispose()}
