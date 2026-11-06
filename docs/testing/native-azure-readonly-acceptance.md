@@ -1,5 +1,13 @@
 # Native Azure identity / read-only acceptance — 2026-10-29
 
+**Production reconciliation — 2026-11-06:** the operator confirms Stage B and Phase 1R production
+deployment/postchecks and ordinary desktop/API smoke PASS. See the
+[current readiness assessment](../production-mcp-integration-readiness.md). Those results do not close
+native restricted catalog/read-only or disposable Azure mutation/fault acceptance; both remain OPEN.
+Repeated disposable V2 setup success is not production V2 installation. The November 4 diagnostic
+stop remains in force; no archived packet/probe/local campaign is selected for replay.
+
+
 **Post-merge status — 2026-11-04:** #1929 merged at
 `1f12091aef3275721c1e35d6ba00a2ecb80c5173`. The
 [final diagnostic closeout](native-azure-diagnostic-closeout.md) stops further Azure diagnosis;

@@ -1,6 +1,14 @@
 # Phase 1R targeted read candidate
 
-**Local candidate; production activation BLOCKED.** The owning evidence and deployment gates are in the
+**Production installed; POSTCHECK PASS — operator confirmation, 2026-11-06.**
+Stage B fence/effective-read postchecks and desktop/API smoke also passed. Existing function provenance,
+inventory hash, pool-reuse and authoritative local Case/RLS evidence remain accepted; no new investigation
+or provenance collection is required. See the [current readiness assessment](../../production-mcp-integration-readiness.md).
+Do not rerun PREFLIGHT/APPLY, rewrite the receipt or invoke rollback as routine readiness work.
+The instructions below retain their original candidate/local and governed recovery scopes, not a new
+production execution request. Historical missing-artifact/Windows-pending statements are superseded
+at the scope accepted in that assessment. No SQL bytes or receipt identities change.
+The original candidate evidence is in the
 [Case-read runbook](../../testing/case-read-local-security-verification.md#phase-1r-candidate--2026-10-21).
 This is not the June broad proposal. No functions, grants, data, table definitions or indexes change.
 

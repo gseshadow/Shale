@@ -1,5 +1,18 @@
 # Shale Server Azure App Service Deployment Guide
 
+## Current production reconciliation — 2026-11-06
+
+See the [current MCP readiness assessment](production-mcp-integration-readiness.md).
+The operator confirms Stage B installed with fence/effective-read postchecks PASS and Phase 1R
+installed with POSTCHECK PASS; desktop/API login, remembered login, Cases, directory, statuses and
+authorized updates passed smoke. Existing provenance/inventory/pool/local Case evidence stays accepted.
+Older pending/deferred Stage B/Phase 1R and SQL-first sequences below are historical: do not replay
+their installers, earlier AI migrations or retirement. Production V2 is still unconfirmed; its future
+SQL path starts at the V2 prerequisite, not Phase 1R APPLY. No deployment/activation is authorized here.
+Native acceptance remains open and diagnosis stopped. A dormant all-OFF release keeps its separate
+artifact/rollback/settings/authorization gates; the smoke does not identify a new executable hash.
+
+
 **Ordinary release compatibility review — 2026-11-04:** see the
 [dependency evidence table and exact dormant release gate](dormant-server-release-compatibility.md).
 The reviewed head is `1f12091aef3275721c1e35d6ba00a2ecb80c5173` (#1929 merged).

@@ -6,13 +6,21 @@ instructions and umbrella deployment classifications for a dormant JAR only. Nat
 is NOT fully passed. All AI/MCP/OAuth/readiness controls stay OFF; no production action is authorized
 by this documentation. The investigation is stopped by operator choice; #1929 merged into codex/latest on 2026-11-04; native acceptance remains OPEN.
 
-The [ordinary dormant release review](../dormant-server-release-compatibility.md) resolves the source
-requirements separately from unknown production parity. Stage B is not a JAR prerequisite;
-Phase1R/V2 stay deferred, and no SQL execution follows from missing evidence.
+**Production reconciliation — 2026-11-06:** the [current readiness assessment](../production-mcp-integration-readiness.md)
+records operator-confirmed Stage B installation/fence/effective-read PASS, Phase 1R three-FILTER
+installation/POSTCHECK PASS and successful desktop/API smoke for login, remembered login, Cases,
+directory, statuses and authorized updates. Function provenance, inventory hash, pool-reuse and
+authoritative local Case/RLS evidence remain accepted. Older pending Stage B/Phase 1R instructions
+are historical; no replay or new investigation is required. V2 local acceptance is complete; production
+V2 remains unconfirmed. Native catalog/read-only and disposable mutation/fault gates remain OPEN,
+and Azure diagnosis stays stopped. Next: offline review of a V2-only SQL change packet, without execution.
+The [ordinary dormant release review](../dormant-server-release-compatibility.md) retains independent
+artifact/configuration/rollback/release gates; all AI controls remain OFF and no deployment or activation
+is authorized by these confirmations.
 
-**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R merged with synthetic local validation; Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL locally verified at #1922 recorded scope; Phase 3A security contract COMPLETE; Phase 3B COMPLETE at pre-deployment/local acceptance scope; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); 3B.7 COMPLETE (local/adversarial acceptance, §10.32); deployment/live gates OPEN; transport and both handlers default OFF.
+**Status:** Phase 0 assessment COMPLETE; broader architecture/contract review IN PROGRESS; selected Case REST/OpenAPI foundation COMPLETE; Phase 1R production deployment and POSTCHECK PASS (operator-confirmed November 6); Phase 1S shared minimized Case boundary COMPLETE (source/synthetic proof); authoritative Case SQL locally verified at #1922 recorded scope; Phase 3A security contract COMPLETE; Phase 3B COMPLETE at pre-deployment/local acceptance scope; Phase 3B.1 COMPLETE (source/synthetic proof); 3B.2 COMPLETE (source/local synthetic proof); 3B.3 COMPLETE (source/local synthetic proof); 3B.4 COMPLETE (source/local protocol/client verification, §10.25); 3B.5 COMPLETE (source/local synthetic protocol/client verification, §10.26); 3B.6 COMPLETE (source/local synthetic protocol/client verification, §10.27); 3B.7 COMPLETE (local/adversarial acceptance, §10.32); deployment/live gates OPEN; transport and both handlers default OFF.
 
-**Last reviewed:** 2026-11-04 (operator stopped Azure-specific diagnosis; disposable setup/V2 repeatedly PASS; native catalog/read-only acceptance OPEN; conditional dormant all-OFF release only; no production action or pilot authorization)
+**Last reviewed:** 2026-11-06 (operator-confirmed Stage B/Phase 1R production deployment and listed ordinary smoke PASS; accepted V2 local evidence retained; production V2 unconfirmed; native acceptance OPEN; no new production action or pilot authorization)
 
 **Repository baseline:** Phase 3A inspected live `origin/codex/latest`, commit
 `216cf082f0223460217c8cf24199df946fbb87e0`, the merge of

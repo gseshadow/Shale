@@ -1,5 +1,32 @@
 # Production MCP deployment preflight
 
+## Current decision — 2026-11-06
+
+The [updated readiness assessment](production-mcp-integration-readiness.md) reconciles baseline
+`600723b92fe34731e1d6d25e598fc9e3cbfc2770` with the operator's November 6 production confirmations.
+**Stage B installed; fence/effective-read postchecks PASS. Phase 1R installed; POSTCHECK PASS.**
+Desktop/API login, remembered login, Cases, user directory, statuses and authorized-update smoke PASS.
+Existing function provenance, inventory hash, pool-reuse and authoritative local Case/RLS acceptance
+remain accepted. Do not repeat these investigations or rerun installed migrations.
+
+**Production MCP readiness/activation and pilot remain NO-GO.** V2 has accepted local evidence and
+repeated disposable Azure setup/install success, but production V2 installation is not confirmed.
+Native restricted catalog/read-only and disposable mutation/fault acceptance remain OPEN. The Azure
+diagnosis remains stopped; no permission/timeout repair is justified. All controls stay OFF.
+
+The single next bounded step is offline preparation/review of a V2-only production SQL change packet:
+accepted installed-change records -> V2 read-only prerequisite -> separately authorized V2 installer
+-> cumulative verification -> capabilities OFF -> STOP. No execution is authorized here.
+Phase 1R and Stage B are completed prerequisites, not steps in that future packet.
+Restricted identities/secrets/binding, complete live attestation, exact artifact/configuration/rollback
+evidence, native/live acceptance and operational/legal/SDK/security/tenant approvals remain governed
+gates. An ordinary all-OFF JAR remains independent of AI SQL/native acceptance under its own release gates.
+
+The November 4 decisions below are historical wherever they call Stage B/Phase 1R pending, deferred
+or unknown, or propose Phase 1R installation. Their diagnostic evidence and other unclosed gates
+retain their scope. Follow the November 6 assessment instead of replaying those older sequences.
+
+
 **Ordinary release compatibility review — 2026-11-04:** see the
 [dependency evidence table and exact dormant release gate](dormant-server-release-compatibility.md).
 The reviewed head is `1f12091aef3275721c1e35d6ba00a2ecb80c5173` (#1929 merged).
@@ -168,7 +195,7 @@ predates the three FILTERs and refuses their presence; reconcile uncertain state
 
 **DO NOT RUN — FUTURE SQL CHANGE.** The operator reports the following seven migrations already
 installed: phase3b1.sql, phase3b2b.sql, phase3b2c1.sql, phase3b2c2.sql, revocation.sql,
-phase3b2d.sql and phase3b3.sql. **Do not rerun any of them.** Phase1R and confinement remain uninstalled.
+phase3b2d.sql and phase3b3.sql. **Do not rerun any of them.** Phase1R is now installed with POSTCHECK PASS (November 6 operator report); production V2 confinement remains unconfirmed/uninstalled in the last established baseline.
 Historical phase3b7-confinement.sql correctly refused the production representation before installation;
 it must not be retried as a repair. Physical column-ID gaps and reviewed SQL storage representation
 prevent its exact fingerprint even after Phase1R. Never rebuild tables, renumber IDs or rewrite modules
@@ -177,19 +204,15 @@ to satisfy V1. Preserve its historical receipts, expected hash and failure evide
 The [V2 contract](architecture/phase3b8-confinement-v2.md) has completed its recorded local acceptance;
 no repeat local campaign is requested here. The separately governed SQL-bound future sequence is:
 
-1. Retain the seven installed migrations; verify their current cumulative predecessor receipts.
-2. Phase1R preflight with independently reviewed destination inputs.
-3. Phase1R apply.
-4. Phase1R postcheck: three exact FILTERs, no unrelated changes, Shale.Phase1R.v1 receipt.
-5. Read-only phase3b8-confinement-prerequisite.sql; stop on any finding/error.
-6. phase3b8-confinement.sql in a fresh dbo/autocommit/NULL-context session; stop on failure.
-7. Cumulative verify.sql. V2 receipts select only V2; a failure cannot fall back to V1.
-8. Separately provision dedicated contained AI runtime, verifier and bootstrap identities.
-9. Configure dedicated App Service secrets and explicit `shale.ai.data.contract-version=V2`, all controls OFF.
-10. Build/package/deploy the reviewed server JAR under separate release authorization.
-11. Separately enable readiness-only composition and require fresh live attestation.
-12. Run no-disclosure smoke with every disclosure/OAuth/tenant capability OFF.
-13. Obtain later separate authorization for a monitored pilot.
+1. Retain the seven installed migrations and accepted production Phase1R POSTCHECK/receipt and review inputs. Do not rerun any installer or Phase1R PREFLIGHT/APPLY.
+2. Read-only phase3b8-confinement-prerequisite.sql; stop on any finding/error.
+3. Separately authorized phase3b8-confinement.sql in a fresh dbo/autocommit/NULL-context session; stop on failure.
+4. Cumulative verify.sql. V2 receipts select only V2; a failure cannot fall back to V1. Confirm SQL global/tenant capabilities OFF; stop at the SQL preparation boundary.
+5. Later, separately govern dedicated contained AI runtime/verifier and bootstrap identities, independent secrets, immutable binding, explicit V2 configuration, and complete live attestation.
+6. Retain native Azure catalog/read-only and disposable mutation/fault gates; the stopped diagnostic campaign is not resumed by SQL preparation.
+7. Build/package/deploy the reviewed server JAR only under separate release authorization and exact artifact/rollback/effective-OFF gates.
+8. Separately authorize readiness-only composition only after its retained gates; require fresh live attestation and no-disclosure smoke with every disclosure/OAuth/tenant capability OFF.
+9. Obtain all retained live/operational/legal/SDK/security/operator/tenant-owner approvals and separate monitored-pilot authorization before activation.
 
 All SQLCMD invocations in the eventual operator packet require validated TLS, `-N -b -V 16`,
 interactive password, no `-C`/`-P`, and immediate exit-code checks. No script may continue after
