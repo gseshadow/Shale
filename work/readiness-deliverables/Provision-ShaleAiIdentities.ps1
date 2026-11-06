@@ -248,8 +248,20 @@ SELECT
 '@ @{} $Transaction
     return ($t.Rows[0].Principals+'|'+$t.Rows[0].Memberships+'|'+$t.Rows[0].Permissions)
 }
+# Diagnostic coordinates are internal ordinals, never catalog names or exception text.
+function Set-VerificationStep([ValidateSet('CONNECT','IDENTITY_QUERY','IDENTITY_ROW_ASSERT','INDEPENDENT_IDENTITY_QUERY','IDENTITY_ASSERT','TOKEN_QUERY','TOKEN_ASSERT','DATABASE_PERMISSIONS','DATABASE_REQUIRED','SYSTEM_PERMISSIONS','SYSTEM_REQUIRED','OBJECT_INVENTORY','OBJECT_PERMISSIONS','OBJECT_REQUIRED','COLUMN_INVENTORY','COLUMN_QUERY','COLUMN_ASSERT','EXECUTE_SET','CONNECTION_DISPOSE','COMPLETE')][string]$Step) {
+    $script:verificationStep=$Step
+    $script:verificationEvidence=''
+}
+function Permission-Bit($Value) {
+    if($Value -is [DBNull] -or $null -eq $Value){return 'NULL'}
+    if($Value -is [int] -and $Value -eq 0){return 'ZERO'}
+    if($Value -is [int] -and $Value -eq 1){return 'ONE'}
+    return 'OTHER'
+}
 function Permission-List($Connection,[string]$Name,[string]$Scope,[string[]]$Allowed) {
     $securable=$Name;if($Scope -ceq 'DATABASE'){$securable=[DBNull]::Value}
+    $script:verificationEvidence='QUERY'
     try{$t=Read-Sql $Connection 'SELECT permission_name Permission FROM sys.fn_my_permissions(@n,@scope);' @{n=$securable;scope=$Scope}}
     catch {
         # Accepted attestation permits invisible objects only when their allowlist is empty.
@@ -259,14 +271,25 @@ function Permission-List($Connection,[string]$Name,[string]$Scope,[string[]]$All
         throw 'STOP: effective permission evidence unavailable.'
     }
     $actual=@($t.Rows | ForEach-Object {$_.Permission})
+    $unexpected=@($actual | Where-Object {$_ -cnotin $Allowed}).Count
+    $script:verificationEvidence='ASSERT actual={0} allowed={1} unexpected={2} duplicates={3}' -f $actual.Count,$Allowed.Count,$unexpected,($actual.Count-@($actual | Sort-Object -Unique).Count)
     foreach($p in $actual){if($p -cnotin $Allowed){throw 'STOP: unexpected effective permission.'}}
     return $actual
 }
 function Verify-Login($Identity,[securestring]$Password,$Admin) {
+    $script:verificationIdentity=switch -CaseSensitive ($Identity.Role) {
+        'AiCaseDataRuntime' {'RUNTIME'}
+        'AiCaseDataCatalogVerifier' {'CATALOG'}
+        'AiIntegrationBootstrap' {'BOOTSTRAP'}
+        default {'UNKNOWN'}
+    }
+    $script:verificationObject=0;$script:verificationColumn=0
+    Set-VerificationStep CONNECT
     $c=New-Connection
     try {
         $c.Credential=[System.Data.SqlClient.SqlCredential]::new($Identity.Name,$Password)
         $c.Open()
+        Set-VerificationStep IDENTITY_QUERY
         $proof=Read-Sql $c @'
 SELECT p.principal_id Id,p.name Name,p.type Type,p.authentication_type Auth,CONVERT(varchar(170),p.sid,2) Sid,
  ORIGINAL_LOGIN() OriginalName,DB_NAME() DbName,CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) ServerName,
@@ -274,24 +297,34 @@ SELECT p.principal_id Id,p.name Name,p.type Type,p.authentication_type Auth,CONV
  (SELECT COUNT(*) FROM sys.dm_exec_sessions s WHERE s.session_id=@@SPID AND s.authenticating_database_id=DB_ID() AND s.original_security_id=p.sid) OwnSession
 FROM sys.database_principals p WHERE p.principal_id=USER_ID();
 '@
+        Set-VerificationStep IDENTITY_ROW_ASSERT
         if($proof.Rows.Count -ne 1){throw 'STOP: identity evidence missing.'};$p=$proof.Rows[0]
+        Set-VerificationStep INDEPENDENT_IDENTITY_QUERY
         $independent=Read-Sql $Admin 'SELECT principal_id Id,type Type,authentication_type Auth,CONVERT(varchar(170),sid,2) Sid FROM sys.database_principals WHERE name=@name;' @{name=$Identity.Name}
+        Set-VerificationStep IDENTITY_ASSERT
         if($independent.Rows.Count -ne 1 -or $p.Id -le 4 -or $p.Name -cne $Identity.Name -or $p.OriginalName -cne $Identity.Name -or
            $p.Type -cne 'S' -or $p.Auth -ne 2 -or $p.OwnSession -ne 1 -or $p.Edition -ne 5 -or $p.DbName -cne $database -or
            $p.ServerName -notin @('shale','shale.database.windows.net') -or $p.Sid -cne $independent.Rows[0].Sid -or
            $p.Id -ne $independent.Rows[0].Id -or $p.Type -cne $independent.Rows[0].Type -or $p.Auth -ne $independent.Rows[0].Auth){throw 'STOP: actual contained authentication proof failed.'}
+        Set-VerificationStep TOKEN_QUERY
         $tokens=Read-Sql $c 'SELECT name Name,type Type FROM sys.user_token;'
+        Set-VerificationStep TOKEN_ASSERT
         if(!(Same-Set @($Identity.Name,'public',$Identity.Role) @($tokens.Rows.Name)) -or
            @($tokens.Rows | Where-Object {$_.Name -ceq $Identity.Name -and $_.Type -cne 'SQL USER'}).Count){throw 'STOP: unexpected effective user token.'}
         $dbAllowed=@('CONNECT','VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION')
         if($Identity.Role -ceq 'AiCaseDataCatalogVerifier'){$dbAllowed+= 'VIEW DEFINITION'}
+        Set-VerificationStep DATABASE_PERMISSIONS
         $dbPerms=@(Permission-List $c '' 'DATABASE' $dbAllowed)
+        Set-VerificationStep DATABASE_REQUIRED
         if('CONNECT' -cnotin $dbPerms -or ($Identity.Role -ceq 'AiCaseDataCatalogVerifier' -and 'VIEW DEFINITION' -cnotin $dbPerms)){throw 'STOP: required database permission missing.'}
         if($Identity.Role -ceq 'AiCaseDataCatalogVerifier'){
+            Set-VerificationStep SYSTEM_PERMISSIONS
             $systemPerms=@(Permission-List $c 'sys.sql_expression_dependencies' 'OBJECT' @('SELECT','VIEW DEFINITION'))
+            Set-VerificationStep SYSTEM_REQUIRED
             if('SELECT' -cnotin $systemPerms){throw 'STOP: dependency catalog SELECT missing.'}
         }
         # Inventory through dbo, then probe with the actual restricted login; no protected data reads.
+        Set-VerificationStep OBJECT_INVENTORY
         $objects=Read-Sql $Admin @'
 SELECT s.name SchemaName,o.name ObjectName,QUOTENAME(s.name)+N'.'+QUOTENAME(o.name) QualifiedName,o.object_id Id
 FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id
@@ -299,19 +332,29 @@ WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT',
 '@
         $execFound=@()
         foreach($o in $objects.Rows){
+            $script:verificationObject++;$script:verificationColumn=0
             $allowed=@()
             if($Identity.Role -ceq 'AiCaseDataRuntime' -and $o.SchemaName -ceq 'dbo' -and $o.ObjectName -cin $runtimeExec){$allowed=@('EXECUTE')}
             if($Identity.Role -ceq 'AiIntegrationBootstrap' -and $o.SchemaName -ceq 'dbo' -and $o.ObjectName -cin $bootstrapExec){$allowed=@('EXECUTE')}
             if($Identity.Role -ceq 'AiCaseDataCatalogVerifier'){
                 $allowed=@('VIEW DEFINITION');if($o.SchemaName -ceq 'dbo' -and $o.ObjectName -cin $referenceTables){$allowed+='SELECT'}
             }
+            Set-VerificationStep OBJECT_PERMISSIONS
             $perms=@(Permission-List $c $o.QualifiedName 'OBJECT' $allowed)
             if('EXECUTE' -cin $perms){$execFound+=$o.ObjectName}
+            Set-VerificationStep OBJECT_REQUIRED
+            $script:verificationEvidence='ASSERT actual={0} allowed={1} missing={2} duplicates={3}' -f $perms.Count,$allowed.Count,@($allowed | Where-Object {$_ -cnotin $perms}).Count,($perms.Count-@($perms | Sort-Object -Unique).Count)
             if(!(Same-Set $allowed $perms)){throw 'STOP: required object authority missing.'}
-            $columns=Read-Sql $Admin 'SELECT name Name FROM sys.columns WHERE object_id=CONVERT(int,@id);' @{id=[string]$o.Id}
+            Set-VerificationStep COLUMN_INVENTORY
+            $columns=Read-Sql $Admin 'SELECT name Name FROM sys.columns WHERE object_id=CONVERT(int,@id) ORDER BY column_id;' @{id=[string]$o.Id}
             foreach($col in $columns.Rows){
+                $script:verificationColumn++
+                Set-VerificationStep COLUMN_QUERY
                 $check=Read-Sql $c "SELECT HAS_PERMS_BY_NAME(@o,'OBJECT','SELECT',@c,'COLUMN') CanRead,HAS_PERMS_BY_NAME(@o,'OBJECT','UPDATE',@c,'COLUMN') CanUpdate;" @{o=$o.QualifiedName;c=$col.Name}
                 $wantRead=$Identity.Role -ceq 'AiCaseDataCatalogVerifier' -and $o.SchemaName -ceq 'dbo' -and $o.ObjectName -cin $referenceTables
+                Set-VerificationStep COLUMN_ASSERT
+                $script:verificationEvidence='ASSERT rows={0} wantRead={1}' -f $check.Rows.Count,[int]$wantRead
+                if($check.Rows.Count -eq 1){$script:verificationEvidence+=' read={0} update={1}' -f (Permission-Bit $check.Rows[0].CanRead),(Permission-Bit $check.Rows[0].CanUpdate)}
                 if($check.Rows.Count -ne 1 -or $check.Rows[0].CanUpdate -eq 1 -or
                    (!$wantRead -and $check.Rows[0].CanRead -eq 1) -or ($wantRead -and $check.Rows[0].CanRead -ne 1)){throw 'STOP: unexpected/missing column authority.'}
                 # NULL for invisible objects is not used as a standalone proof. Complete dbo grant
@@ -320,10 +363,19 @@ WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT',
         }
         $wanted=@();if($Identity.Role -ceq 'AiCaseDataRuntime'){$wanted=$runtimeExec}
         if($Identity.Role -ceq 'AiIntegrationBootstrap'){$wanted=$bootstrapExec}
+        Set-VerificationStep EXECUTE_SET
         if(!(Same-Set $wanted $execFound)){throw 'STOP: exact EXECUTE set mismatch.'}
+        Set-VerificationStep COMPLETE
         'Verified contained login and permission closure: '+$Identity.Name
-    } finally {$c.Dispose()}
+    } finally {
+        # Success is emitted before Dispose; expose that distinct failure boundary.
+        # Preserve a prior body checkpoint if cleanup follows an earlier failure.
+        if($script:verificationStep -ceq 'COMPLETE'){Set-VerificationStep CONNECTION_DISPOSE}
+        $c.Dispose()
+        if($script:verificationStep -ceq 'CONNECTION_DISPOSE'){Set-VerificationStep COMPLETE}
+    }
 }
+$script:verificationStep='';$script:verificationIdentity='';$script:verificationObject=0;$script:verificationColumn=0;$script:verificationEvidence=''
 $admin=$null;$transaction=$null;$commitStarted=$false;$committed=$false;$stage='AZURE_CONTEXT'
 $passwords=@{}
 try {
@@ -412,6 +464,9 @@ EXEC sys.sp_executesql @ddl;SET @ddl=NULL;
         catch{$rollback='Rollback unconfirmed; reconnect read-only and reconcile before any retry.'}
     } elseif($commitStarted -and !$committed){$rollback='COMMIT OUTCOME UNKNOWN. Reconnect read-only; do not retry, rotate, drop, or revoke.'}
     elseif($committed){$rollback='Commit completed; verification failed. Users remain. No destructive cleanup. Keep controls OFF.'}
+    if($script:verificationStep -and $script:verificationStep -cne 'COMPLETE'){
+        $rollback+=' Verification identity={0} checkpoint={1} object={2} column={3} {4}.' -f $script:verificationIdentity,$script:verificationStep,$script:verificationObject,$script:verificationColumn,$script:verificationEvidence
+    }
     # Only a bounded stage label and recovery status are emitted; raw exception records are suppressed.
     Write-Error -Message ('STOP at '+$stage+'. '+$rollback+' See execution checklist.') -ErrorAction Continue
     exit 1

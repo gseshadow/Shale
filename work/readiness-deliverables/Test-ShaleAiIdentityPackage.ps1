@@ -198,6 +198,7 @@ $ErrorActionPreference='Stop'
 $TenantId='offline-tenant';$SubscriptionId='offline-subscription'
 $admin=$null;$transaction=$null;$commitStarted=$false;$committed=$false
 $stage='AZURE_CONTEXT';$passwords=@{}
+$script:verificationStep='';$script:verificationIdentity='';$script:verificationObject=0;$script:verificationColumn=0;$script:verificationEvidence=''
 function Import-Module {param($Name)}
 function Get-AzContext {
     if($Scenario -eq 'ContextFailure'){throw 'SYNTHETIC-SENSITIVE-CONTEXT'}
@@ -254,3 +255,5 @@ try{
 'PASS: production/test JSON loaders retain all 324 entries under Windows PowerShell 5.1 array-object and PowerShell 7 enumerated output.'
 'Host: PowerShell '+$PSVersionTable.PSVersion+'; '+[Environment]::OSVersion.Platform
 'NOT RUN: Windows PowerShell 5.1 host unless this command is run there; Azure/SQL integration or production checks.'
+
+& (Join-Path $PSScriptRoot 'Test-ShaleAiIdentityVerification.ps1')

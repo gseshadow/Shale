@@ -336,3 +336,214 @@ Console-only SQL administrator password revision (offline only)
 - Required local critical reactor attempt: mvn -Dmaven.repo.local=/workspace/work/m2
   test could not resolve Spring Boot 4.1.1 from Maven Central (network unreachable).
   The Java reactor remains unverified; no application source or dependency changed.
+
+
+Post-commit verification investigation (2026-11-06; offline review)
+- Operator-reported production provisioning was separately authorized and committed.
+  Runtime passed complete login/permission closure. A subsequent SSMS query confirmed
+  all three contained SQL users and their exact roles. Catalog and bootstrap remain
+  incomplete. Runtime connection disposal is also a possible stop after its success
+  line; CONNECTION_DISPOSE now distinguishes it from catalog start. These are operator
+  reports, not new production observations here.
+- Reviewed codex/latest d8db3a41, repository prompt rules, database schema, tenancy/RLS,
+  Azure SQL case-attestation contract, confinement V2 contract, production deployment
+  preflight/readiness and the entire identity package/related application attestation.
+- Pre-edit test-impact inventory: Permission-List, Verify-Login, Same-Set and the
+  sanitized outer catch are covered by Test-ShaleAiIdentityPackage.ps1 helper/guard/
+  child-process tests. AiCaseDataAttestationTest covers application routing/refusal;
+  OAuthConfigurationTest covers bootstrap configuration. Those Java contracts are not
+  changed. New Test-ShaleAiIdentityVerification.ps1 extracts real verification helpers
+  and actual outer catch, uses fake SQL/connection boundaries and synthetic credentials,
+  and verifies fail-closed checkpoints/redaction for all three identity paths.
+- Original catch loses the exact inner failure checkpoint: a demonstrated diagnostic
+  defect. Available evidence does NOT establish an incorrect acceptance predicate or
+  actual security discrepancy. No speculative permission or result normalization fix.
+- Fixed checkpoint labels, identity labels, ordinals and bounded numeric/bit evidence
+  now accompany the sanitized failure. Query errors remain separate from permission
+  assertions. Object equality still rejects duplicate rows; diagnostics show counts.
+  All original acceptance predicates, 324 contract edges, embedded contract digest,
+  15151/empty-allowlist rule, TLS, authentication and OFF gates remain unchanged.
+  Only the column inventory SQL adds ORDER BY column_id for reproducible coordinates.
+- Post-commit-diagnostic.txt is the narrow read-only procedure. Use Verify only; no
+  Provision retry, migration replay, account/role repair, secret rotation, Azure
+  configuration, readiness, AI/MCP/OAuth activation or native fault tests. Existing
+  Verify already retrieves the three existing Key Vault passwords securely in memory.
+  It performs metadata/permission queries and actual contained logins, not protected
+  application data reads or resolver executions. Fail-fast order is unchanged.
+- Audit compatibility: catalog reads and existing secret GETs require no application
+  audit row, actor invention or schema change. Retain existing secret-safe external
+  administrative/access audit; never log passwords, tokens, SQL parameters or errors.
+- Actual Windows 5.1 host behavior and SQL/Azure permission semantics remain UNVERIFIED.
+  A local synthetic pass cannot certify production. Keep every capability OFF.
+
+Post-commit diagnostic validation (offline; production cause still unresolved)
+- XDG_CACHE_HOME/XDG_CONFIG_HOME/XDG_DATA_HOME directed to scratch work/investigation.
+  work/investigation/powershell/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleAiIdentityPackage.ps1: PASS on 7.4.6/Linux,
+  including the integrated verification checkpoint suite. Publisher SHA-256 for the
+  scratch-only PowerShell runtime matched; no dependency/runtime binary is published.
+- New suite exercises synthetic complete verification for runtime/catalog/bootstrap,
+  query failures, missing/mismatched contained identity, extra token, database/system/
+  object unexpected or missing permissions, duplicate object permission rows, column
+  query/inventory failure, forbidden read/update, missing/NULL reference SELECT and
+  incomplete EXECUTE closure and post-success connection-disposal failure. Real
+  production helpers/catch execute; all I/O is fake.
+  Failure cases retain nonzero exit and committed-users-remain status, suppressing
+  synthetic sensitive identity/object/column/exception markers.
+- Independent AST comparison against d8db3a41: every original condition clause and
+  throw/refusal preserved verbatim; identity mappings, six-EXECUTE lists, four reference
+  tables, contract digest and all literal SQL preserved except column ORDER BY.
+  All three PowerShell scripts parse and remain ASCII. Actual 5.1 execution is open.
+- git diff --check: PASS. Repository selector maps this operator-package change to
+  no application/Maven affected area and recommends no full-suite escalation.
+- Required critical reactor attempted with JAVA_HOME=/workspace/.tools/jdk-21 and
+  /workspace/.tools/apache-maven-3.9.11/bin/mvn -B
+  -Dmaven.repo.local=/workspace/Shale/work/investigation/m2 test. BLOCKED resolving
+  org.springframework.boot:spring-boot-dependencies:4.1.1 from Maven Central:
+  network unreachable. No Java tests ran; application reactor remains UNVERIFIED.
+- No production connection, credential retrieval, SQL mutation, Azure modification
+  or capability activation was performed during this investigation. No acceptance
+  predicate fix or production security verdict is claimed; use the bounded Verify
+  procedure on the approved host to establish the exact failing checkpoint.
+
+PR publication status
+- Draft PR publication to the verified source repository gseshadow/Shale, base
+  codex/latest, was blocked by automatic approval review. The reviewer requires
+  explicit approval for publication of operational details and existing secret names
+  to this public repository, despite those names already existing at the verified
+  source baseline. No alternate publication path was attempted after the rejection.
+  The complete tested local patch is retained for review; no PR was opened.
+- The user subsequently explicitly approved publishing the reviewed eight-file patch,
+  including operational references and existing secret names, to public gseshadow/Shale
+  as a draft PR targeting codex/latest. This approval covers publication only; all
+  production prohibitions and OFF controls remain unchanged.
+
+
+ReferenceNull Windows 5.1 investigation (PR #1934 follow-up, 2026-11-06)
+- Operator host Windows PowerShell 5.1.26100.9818 passed the existing package tests
+  but failed the new ReferenceNull parent assertion. No actual bounded child fields
+  were exposed. The expected values were not observed evidence; line wrapping on
+  that host is unknown. No production discrepancy can be inferred from this test.
+- Pre-edit test impact: reviewed the complete verification suite, its DataTable
+  helper, Read-Sql fixture, real Permission-Bit/Verify-Login helpers, parent capture,
+  all neighboring assertions and both package child-process launchers. Reviewed
+  repository rules and Azure SQL attestation/confinement contracts. No application,
+  production verification predicate, SQL batch, allowlist or credential path changes.
+- Original fixture under PowerShell 7.4.6: one pipeline item, a DataTable with one
+  row/two columns; CanRead is System.DBNull and IsNull=true, CanUpdate is Int32(0).
+  Unary-comma table returns preserve the table rather than enumerating its rows.
+  Direct DBNull assignment is not ConvertFrom-Json array enumeration. Production
+  Permission-Bit accepts both DBNull and null as NULL, while required SELECT still
+  fails unless equal to 1. There is no demonstrated production DBNull logic defect.
+- Demonstrated test defect: a literal-space regex inspected human-rendered Write-Error
+  output. Inserting CRLF between correct fields reproduces the same assertion failure
+  without changing the fixture, checkpoint, coordinates or fail-closed rejection.
+  This explains a possible Windows trigger, not proof of its actual rendered output.
+- Correct only the test: capture allowlisted checkpoint labels, integer coordinates,
+  rows/read requirement and fixed bit states through an unformatted stdout record
+  before the original production catch runs. Validate the actual DataTable/DBNull/
+  Int32 fixture. Require the exact original values plus fixture=VALID; do not accept
+  an alternate checkpoint, NULL policy or weaker permission result. A mismatch now
+  exposes only this bounded record, never raw captured errors or sensitive markers.
+  A second ReferenceNull case explicitly wraps the human error; the old regex fails
+  while the unchanged exact state assertion passes. Replacing DBNull with ZERO in
+  a scratch fixture is rejected and reports read=ZERO/update=ZERO/fixture=INVALID.
+- Child-process review: launch the current host executable directly with -NoProfile
+  -NonInteractive -File; no shell, profile, prompt or secret argument. Only five real
+  pure/verification helpers and the sanitized catch are extracted. New-Connection
+  is a PSCustomObject with fake Open/Dispose ScriptMethods; Read-Sql supplies in-memory
+  DataTables. No real SqlConnection, SqlConnectionStringBuilder, ExecuteReader,
+  ExecuteNonQuery, DNS/HTTP/socket request, Azure module or Key Vault call exists in
+  that worker. SqlCredential is constructed only with an ephemeral synthetic password
+  and cannot open a connection. The production script entrypoint is parsed, not run.
+  An AST command/type allowlist and unique fake-boundary checks now reject accidental
+  inclusion of unreviewed I/O before child launch. This guard is not an OS sandbox.
+- Both streams are drained asynchronously; each child is bounded to 30 seconds,
+  killed on timeout and disposed; scratch files are removed. Failure redaction and
+  exit=1 checks remain, with the real catch still reporting committed users remain.
+- Network observation: a complete corrected focused suite was traced on Linux with
+  strace -f -e trace=network and PowerShell telemetry opt-out. It passed. Zero INET
+  connect/send calls and zero send calls of any family were observed. The runtime
+  created 74 INET socket descriptors and made 318 local AF_UNIX IPC connect calls;
+  creating a descriptor is not an outbound connection. This is observed Linux-host
+  behavior, not evidence about the Windows antivirus event. Host/runtime/security
+  components are outside script mocks and can have their own network behavior.
+  The antivirus notification's cause remains UNESTABLISHED; do not dismiss it as a
+  false positive, disable antivirus, export raw errors or capture sensitive traffic.
+- Corrected offline verification suite PASS on PowerShell 7.4.6/Linux. Actual corrected
+  Windows 5.1 execution remains UNVERIFIED; rerun the offline package test there.
+  If it fails, retain only its bounded ReferenceNull record, shell version and package
+  hash. No production Verify/Preflight, SQL account change or Azure/Key Vault access
+  is authorized as a response to an offline test failure. All capabilities stay OFF.
+- Audit: test-only synthetic fixtures/output and local process checks add no business
+  or protected-data reads/mutations, application audit events or schema requirements.
+- Required critical reactor attempted offline with JAVA_HOME=/workspace/.tools/jdk-21,
+  /workspace/.tools/apache-maven-3.9.11/bin/mvn -o -B
+  -Dmaven.repo.local=/workspace/Shale/work/investigation/m2 test. BLOCKED because the
+  Spring Boot dependencies 4.1.1 POM is absent locally. No Java tests or dependency
+  network requests ran. No Maven application area is changed by this correction.
+- Final validation: full Test-ShaleAiIdentityPackage.ps1 PASS on 7.4.6/Linux,
+  including the corrected suite. Scratch mutation checks reject both a ZERO-for-DBNull
+  fixture and an injected networking type (before launching a child). All three scripts
+  parse, remain ASCII and retain the prior production SQL/acceptance invariants.
+  Production script and role-contract.json are byte-identical to PR head 76315c23.
+  Package hashes and git diff whitespace checks PASS. Windows 5.1 rerun remains open.
+
+
+Recovery-output Windows 5.1 regression (PR #1934 follow-up)
+- Operator 5.1.26100.9818 report at 5e9c6c6e: main package tests passed, verification
+  suite stopped at the remaining literal recovery-message regex. Reviewed the full
+  failing suite, neighboring captured-output assertions, launchers, production catch,
+  repository rules and Azure SQL attestation/confinement guidance before editing.
+- The first error/recovery assertion in the unchanged matrix is DisposeFailure for
+  AiCaseDataCatalogVerifier. Locally reproduced the identical old assertion failure
+  at that scenario with Windows-style CRLF message wrapping. Bounded observation:
+  started=TRUE, committed=TRUE, transaction=ABSENT, recovery=COMMITTED_USERS_REMAIN,
+  message=MATCH. The old text matcher fails while actual selected recovery is correct.
+  The original Windows run exposed no scenario/state, so its exact rendered output
+  is not claimed as observed; the corrected diagnostic identifies it on that host.
+- Previous follow-up fixed only ReferenceNull text and left recovery/checkpoint/count
+  assertions host-rendering-dependent. Replace that entire error-assertion model:
+  intercept Write-Error only inside the synthetic worker, observe the actual rollback
+  variable AFTER original branch selection and its actual unformatted message input,
+  classify only exact approved recovery texts, and emit a bounded JSON stdout record.
+  Forward the original message/action to the real Write-Error cmdlet. Never export
+  rollback text, exception objects, connection details or arbitrary observed values.
+- Every ordinary failing case requires typed TRUE commit-started/committed flags,
+  ABSENT transaction, exact COMMITTED_USERS_REMAIN text including keep-controls-OFF,
+  matching full message composition, POST_INSTALL_VERIFY, CONTINUE and exit=1.
+  Checkpoints and numeric permission evidence now use the bounded record too. Only
+  leak checks and deliberate old-matcher reproduction inspect formatted error output.
+  No alternate recovery text, unknown commit, incorrect emitted message or wrong
+  checkpoint is accepted as correct committed recovery.
+- Persistent regression cases wrap recovery words across CRLF in the first failure
+  (DisposeFailure) and ReferenceNull. The original literal matcher must fail while
+  exact recovery-state assertions pass. Negative fixtures exercise the actual catch
+  with unconfirmed commit and an incorrect emitted message, requiring rejection by
+  the positive committed-recovery predicate. Their expected negative result is not
+  a recovery approval. Scratch mutation checks also reject committed flags paired
+  with NO_MUTATION recovery and an incorrect message with otherwise correct flags.
+- Optional offline diagnostic: Test-ShaleAiIdentityVerification.ps1
+  -RecoveryDiagnostics emits scenario and bounded recovery-state fields, with fixture
+  and layout labels. Unknown/invalid/missing records fail closed without raw output.
+  A failure includes only validated bounded fields and the scenario. Main package
+  invocation remains unchanged; no production mode or credential is needed.
+- Production Provision-ShaleAiIdentities.ps1 and role-contract.json are unchanged;
+  original recovery, rollback/commit uncertainty, accounts/grants, security checks,
+  all 324 edges, TLS and OFF gates are untouched. Child fake SQL/connection boundaries,
+  AST I/O guard, stream draining, 30-second timeout and process disposal remain.
+  This correction adds no network/SQL/Azure/secret path, sensitive read, business
+  mutation, application audit event or audit schema requirement. Capabilities stay OFF.
+- Actual corrected Windows 5.1 execution and the original Windows renderer remain
+  UNVERIFIED here. Run the offline package test there; no production access is needed.
+- Final offline validation on PowerShell 7.4.6/Linux: full package suite PASS,
+  including persistent wrapped recovery and negative recovery fixtures. The optional
+  diagnostic smoke test reports DisposeFailure with exact committed recovery despite
+  wrapping. Scratch actual-catch mutations reject unknown commit, NO_MUTATION with
+  committed flags and a wrong emitted message. No raw errors are exported.
+- All three scripts parse and remain ASCII; production SQL/condition invariants and
+  the production script/contract bytes are unchanged from 5e9c6c6e. Hash manifest and
+  git diff checks PASS. Selector maps no application area/full-suite escalation.
+- Required Maven critical-reactor attempt: mvn -o -B with the existing scratch local
+  repository was BLOCKED by uncached Spring Boot dependencies 4.1.1. No Java tests or
+  dependency network access ran. Corrected Windows 5.1 execution remains UNVERIFIED.

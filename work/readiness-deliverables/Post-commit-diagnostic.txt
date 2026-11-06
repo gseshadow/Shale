@@ -1,0 +1,175 @@
+SHALE SQL IDENTITY POST-COMMIT INVESTIGATION - READ ONLY
+Source reviewed: codex/latest d8db3a41b3f8cebb82d72fa5eaebb78dd5145630.
+
+Finding and limits
+- Operator reports committed provisioning, runtime full verification PASS, then
+  POST_INSTALL_VERIFY failure. The fixed identity order makes catalog verifier the
+  next sequence. However, success is printed before connection disposal: runtime
+  Dispose could also have thrown before catalog began. Bootstrap has not completed
+  verification. Do not infer a pass or assume the failed identity from stage alone.
+- SQL_USER/DATABASE authentication and exact direct role memberships are necessary
+  but do not establish actual contained login, own-session evidence, original name,
+  exact effective token, effective permission closure or column authority.
+- A definite observability defect is established: the original outer catch discarded
+  every inner verification location. Neither a security discrepancy nor a defective
+  acceptance predicate can be established from that output alone.
+- Permission-List checks for unexpected effective rights; separate checks require
+  database CONNECT, catalog VIEW DEFINITION, dependency-catalog SELECT and exact
+  application-object permission equality. Same-Set compares sorted lists including
+  multiplicity, not mathematical sets. Duplicate permission rows could therefore
+  cause a mismatch; no production row-shape evidence currently proves this happened.
+  Do not remove duplicates or expand allowlists speculatively.
+- Catalog object rights remain VIEW DEFINITION, plus SELECT only on
+  dbo.AiCaseDataDeployment, dbo.AiDataUnicodeRange, dbo.AiDataUnicodeLower,
+  dbo.AiDataWordTransition. No catalog application EXECUTE is allowed. No additional
+  permission, including derived platform permissions, is approved by this change.
+- Every object column is independently checked with HAS_PERMS_BY_NAME for SELECT
+  and UPDATE. Reference columns require SELECT=1. UPDATE=1 is always forbidden;
+  SELECT=1 on any other column is forbidden. Existing invisible-object/NULL handling
+  relies jointly on the complete dbo grant graph and empty object allowlist.
+  Error 15151 is accepted only for OBJECT scope with an EMPTY allowlist. The catalog
+  verifier has a nonempty object allowlist, so it never takes that exception fallback.
+  All those acceptance conditions are retained, including required-evidence failures.
+
+Bounded correction
+- Add fixed verification checkpoint labels, fixed identity labels RUNTIME/CATALOG/
+  BOOTSTRAP, object/column ordinals, numeric permission counts and fixed permission
+  bits NULL/ZERO/ONE/OTHER to the existing sanitized stop message.
+- QUERY in a permission checkpoint means evidence retrieval failed. ASSERT reports
+  result processing/allowlist evaluation; unexpected counts identify excess rights.
+  OBJECT_REQUIRED reports actual/allowed/missing/duplicate counts; duplicate-only
+  mismatches are evidence for a possible result-shape issue, not authority to pass.
+- COLUMN_ASSERT reports row count, required-read boolean, read and update bit states.
+  COLUMN_QUERY identifies failed evidence acquisition before those assertions.
+- No raw exception, error record, SQL text, object/column name, permission name,
+  SID, credential, token, secret value or connection object enters failure output.
+  Successful status retains the existing three approved public identity names.
+- The only SQL query change is ORDER BY column_id in the existing dbo column
+  inventory, to make column ordinals reproducible. Every column is still checked.
+  No permission expectation, acceptance assertion or provisioning path is repaired.
+
+Procedure for the approved operator host (do not execute Provision)
+1. Keep every application/SQL AI/MCP/OAuth/readiness control OFF. Use the existing
+   approved context and established secret-safe host. No Azure settings are changed.
+   Do not rerun migrations, receipts, installers or native/disposable fault campaigns.
+2. Review this patch and SHA256SUMS.txt. Run the offline test in the package directory:
+     powershell.exe -NoProfile -File .\Test-ShaleAiIdentityPackage.ps1
+   On PowerShell 7 use pwsh -NoProfile -File ./Test-ShaleAiIdentityPackage.ps1.
+   Offline tests use only synthetic secrets and fake connections. They import no
+   Azure modules, retrieve no real passwords and open no SQL connections.
+3. Before production reads, ensure approved client/server telemetry cannot capture
+   passwords, tokens, parameters or raw failures. No transcript, debug trace, object
+   dump, $Error export, verbose Azure output, SQL batch logging or shell recording.
+   If that assurance is unavailable, STOP; do not retrieve any passwords.
+4. In a fresh dedicated approved shell, from this package directory, set only the
+   already approved nonsecret context IDs. Do not pass passwords in any argument:
+     $p=@{TenantId='<approved-tenant-guid>';
+       SubscriptionId='<approved-subscription-guid>';
+       AdminAuthentication='Sql';
+       AllApplicationControlsOffConfirmed=$true;
+       SecretSafeTelemetryReviewed=$true}
+     ./Provision-ShaleAiIdentities.ps1 -Mode Verify @p
+     if(!$?){throw 'STOP: retain bounded checkpoint only; keep controls OFF'}
+   Sql prompts securely in the console for the fixed administrator brian. Existing
+   Entra authentication may be selected instead if already approved and configured;
+   never grant rights or configure Azure to accommodate this investigation.
+   Verify performs catalog reads, existing Key Vault secret GETs and actual contained
+   logins. It never enters the Provision transaction, DDL, role or account mutation.
+   It does not invoke business/resolver procedures or SELECT protected application rows.
+   Secret GET is not secret rotation. Preflight alone cannot reproduce login closure.
+5. Retain only package commit/hash, shell version, fixed stage/checkpoint, identity
+   label, ordinals, counts/bits, exit status and confirmed OFF status. Do not record
+   credentials, connection strings, secrets, names from catalog results, raw errors,
+   command objects, $Error or SQL result tables. End the dedicated process afterward.
+   In Verify, a stop can say EXISTING_LOGIN_VERIFY and 'No SQL mutation started.'
+   That describes THIS read-only invocation; it does not undo the earlier commit.
+6. Stop on the first failure. The latest output identifies its exact function/query/
+   assertion checkpoint. Runtime is rechecked, then catalog, then bootstrap. A catalog
+   failure deliberately leaves bootstrap unverified; do not skip it to claim completion.
+   Do not auto-retry, drop, repair, grant, revoke or rotate anything.
+
+Checkpoint interpretation
+- CONNECT: connection creation, SqlCredential assignment or actual Open failed.
+- IDENTITY_QUERY / INDEPENDENT_IDENTITY_QUERY: own-session/independent catalog query.
+- IDENTITY_ROW_ASSERT / IDENTITY_ASSERT: missing or mismatched actual identity proof.
+- TOKEN_QUERY / TOKEN_ASSERT: query error or effective-token discrepancy.
+- DATABASE_PERMISSIONS / SYSTEM_PERMISSIONS / OBJECT_PERMISSIONS: QUERY distinguishes
+  unavailable evidence from ASSERT with unexpected/multiplicity counts.
+- DATABASE_REQUIRED / SYSTEM_REQUIRED / OBJECT_REQUIRED: required evidence missing
+  or exact object-list mismatch. Keep the approved allowlist; investigate metadata.
+- OBJECT_INVENTORY / COLUMN_INVENTORY: dbo metadata enumeration failed.
+- COLUMN_QUERY / COLUMN_ASSERT: per-column evidence unavailable or rejected.
+- EXECUTE_SET: the complete required six-EXECUTE set differs (zero for catalog).
+- CONNECTION_DISPOSE: checks succeeded but closing that connection failed after its
+  success line. A prior body failure keeps its original checkpoint during cleanup.
+- COMPLETE: that identity's complete sequence passed, not readiness/activation.
+
+Local metadata correlation, only if an object/column checkpoint fails
+- Object and column are ONE-BASED ordinals, not physical IDs. Zero means not entered.
+  Hold the same catalog change freeze used for verification; drift invalidates mapping.
+- Using an existing approved dbo SSMS connection, locally identify the object at the
+  reported ordinal from this metadata-only list. Do not export the names/results:
+    SELECT ROW_NUMBER() OVER(ORDER BY s.name,o.name) ObjectOrdinal,
+      o.object_id ObjectId,s.name SchemaName,o.name ObjectName
+    FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id
+    WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT','PC')
+    ORDER BY s.name,o.name;
+  For the identified object, enumerate sys.columns WHERE object_id=<local ID>,
+  ORDER BY column_id. The diagnostic column ordinal is the position in that list;
+  physical column_id can have gaps. Keep catalog names local to approved review.
+- Do not use EXECUTE AS to replace the actual contained authentication proof.
+  Review the exact failing existing query/expected rights through approved actual
+  credentials, retaining only bounded counts/bits. No protected data SELECT is needed.
+  Distinguish a query/metadata-visibility failure from a successful query returning
+  excess/missing authority, then compare with the unchanged role contract and grant
+  provenance under dbo visibility. An extra effective permission remains a STOP even
+  if its origin is an implicit permission hierarchy rather than a direct new grant.
+- A duplicate-only list mismatch warrants investigating fn_my_permissions row shape
+  and PowerShell result handling against the supported engine/shell. It is not proof
+  of a security discrepancy, nor permission to deduplicate, bypass or broaden checks.
+  If the bounded checkpoint cannot settle the cause, prepare a separate narrowly
+  sanitized diagnostic for that checkpoint; never request/export raw exceptions.
+
+Audit and authorization boundary
+These are catalog/permission metadata reads and existing secret GETs. No protected
+application read, business mutation or application audit row/schema is introduced.
+Retain existing secret-safe administrative/access auditing and external change records;
+never put password-bearing SQL or secret material into audit evidence. No AI/MCP/OAuth
+activation, Azure reconfiguration, provisioning retry or SQL/Key Vault repair is authorized.
+
+
+Offline ReferenceNull test failure on Windows 5.1
+- This is a synthetic test failure, not a production SQL finding. Do not invoke
+  Verify/Preflight or retrieve passwords to investigate it. Rerun only the offline
+  Test-ShaleAiIdentityPackage.ps1 on the approved host after reviewing this update.
+- The test now asserts unformatted child state and the typed DBNull fixture, rather
+  than requiring all diagnostic fields on one human-rendered error line. If it fails,
+  share only the bounded OFFLINE_REFERENCE_NULL record (checkpoint, ordinals, counts,
+  fixed bit states and fixture validity), shell version and package checksum.
+- The exact original Windows trigger is unknown because its child fields were hidden.
+  A wrapped correct message reproduces the old assertion failure offline; this is
+  not a claim that the original Windows output wrapped or that production passed.
+- Verification children contain fake connection/SQL boundaries and no production
+  entrypoint, SQL connection constructor, network request or Azure/secret retrieval.
+  The AST guard is not an OS network sandbox. Linux tracing observed no INET connect
+  or send calls; it cannot attribute a Windows antivirus notification or certify
+  host/security-component traffic. Keep the alert open until reviewed separately.
+  Retain only safe AV event metadata: rule/event identifier, timestamp, executable
+  identity, destination category/port and blocked/attempted status. No script dumps,
+  credentials, raw exceptions, packet payloads, TLS decryption or antivirus bypass.
+
+
+Offline recovery-status assertion on Windows 5.1
+- Do not investigate this synthetic test failure with production Verify/Preflight.
+  Update the reviewed package and run its offline package tests. For bounded detail:
+    powershell.exe -NoProfile -File .\Test-ShaleAiIdentityVerification.ps1 -RecoveryDiagnostics
+- Output includes only scenario, typed commit flags, transaction presence, recovery
+  code, message/action/stage checks, fixture and layout. COMMITTED_USERS_REMAIN means
+  the exact original recovery status was selected in the synthetic catch; it does
+  not describe live accounts. Uncommitted/WrongMessage are deliberate negative
+  fixtures that must be rejected by the ordinary committed-recovery predicate.
+- The first recovery assertion is DisposeFailure for the catalog fixture. A local
+  CRLF-wrapping regression reproduces the old literal assertion failure there with
+  correct recovery state. Actual Windows scenario/rendering was not captured by the
+  old test. The new bounded diagnostic separates state errors from presentation.
+- No production catch or permission check was changed. Keep AI/MCP/OAuth OFF.
