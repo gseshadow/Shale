@@ -8,3 +8,6 @@ Review-and-recovery-notes.txt text eol=lf
 role-contract.json text eol=lf
 SHA256SUMS.txt text eol=lf
 Post-commit-diagnostic.txt text eol=lf
+Diagnose-ShaleCatalogDatabasePermissions.ps1 text eol=lf
+Test-ShaleCatalogDatabasePermissions.ps1 text eol=lf
+Catalog-permission-diagnostic-checklist.txt text eol=lf
