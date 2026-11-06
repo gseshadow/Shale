@@ -44,7 +44,9 @@ $contractDigest='A9E6C03C7093C5A411C0644A5733C3C3805CCA2D00C2BB42FA7EF06F7D2603B
 if ((Get-FileHash -LiteralPath $ContractPath -Algorithm SHA256).Hash -cne $contractDigest) {
     throw 'STOP: reviewed role-contract.json checksum differs.'
 }
-$expected=@(Get-Content -LiteralPath $ContractPath -Raw | ConvertFrom-Json)
+# Assign directly: Windows PowerShell 5.1 emits the JSON array as one pipeline item.
+# An outer @() would wrap it in a second array instead of exposing the 324 edges.
+$expected=Get-Content -LiteralPath $ContractPath -Raw | ConvertFrom-Json
 if ($Mode -eq 'Review') {
     'OFFLINE REVIEW ONLY: three contained SQL users; no connections or secret retrieval.'
     'Bootstrap: dedicated password JDBC datasource; six resolver EXECUTEs; no model conversion inferred from V2.'

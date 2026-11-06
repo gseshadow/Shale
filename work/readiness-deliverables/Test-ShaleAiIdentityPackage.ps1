@@ -56,10 +56,45 @@ foreach($line in Get-Content -LiteralPath (Join-Path $PSScriptRoot 'SHA256SUMS.t
     $expectedHash=$Matches[1];$name=$Matches[2]
     Require ((Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $name) -Algorithm SHA256).Hash -ieq $expectedHash) ('Package checksum mismatch: '+$name)
 }
-$contract=@(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'role-contract.json') -Raw | ConvertFrom-Json)
+# Direct assignment supports both 5.1's array object and 7's enumerated output.
+$ContractPath=Join-Path $PSScriptRoot 'role-contract.json'
+$contract=Get-Content -LiteralPath $ContractPath -Raw | ConvertFrom-Json
 Require ($contract.Count -eq 324) 'Exact role contract edge count differs.'
 foreach($item in @(@('AiCaseDataRuntime',228),@('AiCaseDataCatalogVerifier',6),@('AiIntegrationBootstrap',90))){
     Require (@($contract | Where-Object {$_.Role -ceq $item[0]}).Count -eq $item[1]) ('Role permission count differs: '+$item[0])
+}
+# Replay BOTH real loader statements under each ConvertFrom-Json output behavior.
+# The 5.1 case emits one array object, even when this test runs under PowerShell 7.
+# No JSON, permission entry or external boundary is changed by these scoped stubs.
+$testTokens=$null;$testParseErrors=$null
+$testAst=[System.Management.Automation.Language.Parser]::ParseFile($PSCommandPath,[ref]$testTokens,[ref]$testParseErrors)
+Require ($testParseErrors.Count -eq 0) 'Offline test has parser errors.'
+foreach($loaderCase in @(@($ast,'expected'),@($testAst,'contract'))){
+    $variable=$loaderCase[1]
+    $loaders=@($loaderCase[0].EndBlock.Statements | Where-Object {
+        $_ -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $_.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+        $_.Left.VariablePath.UserPath -ceq $variable
+    })
+    Require ($loaders.Count -eq 1) ('Expected one JSON loader for '+$variable)
+    foreach($shape in @('ArrayObject51','Enumerated7')){
+        & {
+            param($loader,$variable,$shape,$entries,$ContractPath)
+            function ConvertFrom-Json {
+                param([Parameter(ValueFromPipeline=$true)]$InputObject)
+                end {
+                    if($shape -eq 'ArrayObject51'){Write-Output -NoEnumerate $entries}
+                    else {foreach($entry in $entries){$entry}}
+                }
+            }
+            . ([scriptblock]::Create($loader.Extent.Text))
+            $loaded=Get-Variable -Name $variable -ValueOnly
+            Require ($loaded.Count -eq 324) ('JSON loader must expose 324 entries: '+$variable+'/'+$shape)
+            for($index=0;$index -lt 324;$index++){
+                Require ([object]::ReferenceEquals($loaded[$index],$entries[$index])) ('JSON loader changed or nested a permission entry: '+$variable+'/'+$shape)
+            }
+        } $loaders[0] $variable $shape $contract (Join-Path $PSScriptRoot 'role-contract.json')
+    }
 }
 # Exercise connection construction and SecureString conversion with ephemeral synthetic
 # data. Extract only these helper definitions; never execute the provisioning body.
@@ -197,5 +232,6 @@ try{
 } finally {Remove-Item -LiteralPath $scratch -Recurse -Force}
 'PASS: parser, 5.1 syntax review, offline defaults, authorization/telemetry guards, package hashes/role counts, TLS construction, prompted SqlCredential, cancellation/invalid credentials, Entra token path and no authentication output.'
 'PASS: isolated orchestration failures (SQL open/prompt, Entra token, Azure context) exit nonzero with sanitized stage/recovery output.'
+'PASS: production/test JSON loaders retain all 324 entries under Windows PowerShell 5.1 array-object and PowerShell 7 enumerated output.'
 'Host: PowerShell '+$PSVersionTable.PSVersion+'; '+[Environment]::OSVersion.Platform
 'NOT RUN: Windows PowerShell 5.1 host unless this command is run there; Azure/SQL integration or production checks.'

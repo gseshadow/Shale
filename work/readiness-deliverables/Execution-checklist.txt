@@ -13,6 +13,9 @@ PREPARATION ONLY. No production connections or changes performed.
    PSScriptAnalyzer 1.24.0 compatibility checks PASS for Windows 5.1 syntax,
    commands and types against its Windows/.NET Framework profile (offline/Linux).
    Linux checks do not establish actual Windows 5.1/.NET Framework execution.
+   JSON loader regression checks cover both 5.1 array-object and 7 enumerated output
+   for the test and provisioning loaders. The old Windows count failure is corrected;
+   re-run the updated package test on Windows before proceeding under separate approval.
 
 2. Prepare approved operator host/context
    Windows PowerShell 5.1 with .NET Framework 4.7.2+, or PowerShell 7.4+; compatible

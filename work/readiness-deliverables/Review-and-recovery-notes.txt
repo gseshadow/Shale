@@ -283,3 +283,28 @@ SQL authentication revision validation (offline only; supersedes test scope abov
   approved Windows host before any separately authorized production use. No
   production SQL, secret retrieval, account creation or Azure permission change
   was performed. Every AI/MCP/OAuth control remains OFF; no activation authorized.
+
+Windows PowerShell JSON array correction (PR #1932 follow-up)
+- Operator Windows PowerShell 5.1.26100.9818 validation failed at the offline exact
+  edge-count assertion despite independently confirming all 324 contract entries
+  (228 runtime, 6 verifier, 90 bootstrap). The permission contract was correct.
+- Windows PowerShell 5.1 ConvertFrom-Json emits the JSON array as one pipeline item.
+  Capturing that pipeline in @() adds an outer array with Count=1. Both the offline
+  test's contract loader and the provisioning script's expected loader now assign
+  ConvertFrom-Json output directly, supporting both 5.1 and 7 output behavior.
+- Regression tests extract both actual loader assignment statements from their ASTs
+  and execute each with scoped ConvertFrom-Json stubs for a single array object
+  (5.1) and enumerated entries (7). They require 324 entries and identical objects
+  in the same order, preventing nested arrays, dropped entries or substitutions.
+- Full offline package tests PASS on PowerShell 7.4.6/Linux. Independently restoring
+  the old @() wrapper in each of two scratch package copies makes the regression
+  fail specifically for that loader under simulated 5.1 array-object output.
+- role-contract.json and its embedded SHA-256 pin are unchanged. Every security
+  check, embedded SQL batch, authentication/authorization gate and transaction is
+  unchanged. Package checksums updated. No audit schema/integration change: this
+  correction only loads reviewed nonsecret permission metadata offline.
+- Actual execution of the corrected package on Windows 5.1 remains UNVERIFIED here.
+  Re-run powershell.exe -NoProfile -File .\Test-ShaleAiIdentityPackage.ps1 on the
+  operator host; a Linux simulation does not establish a Windows runtime pass.
+  No production SQL, secret retrieval, account creation or capability activation.
+  AI/MCP controls remain OFF.
