@@ -1,0 +1,111 @@
+OBJECT PERMISSION VERIFIER CORRECTION - PREPARED FOR REVIEW
+2026-11-06. Base codex/latest a7f10d13.
+
+Cause and scope
+Operator-reported production diagnostic: dbo.AiCaseDataDeployment, ordinal 13;
+SQL/DataTable/processed rows 8/8/8; one object SELECT, one object VIEW DEFINITION,
+six distinct column SELECT rows; six duplicate names, zero duplicate full tuples;
+no unexpected/missing permissions and ROLE_CONTRACT matches=true. The verifier's
+name-only projection incorrectly rejected this valid row shape. These production
+observations are supplied evidence; this task does not repeat production access.
+This correction supersedes the prior investigation's pending-cause/no-correction
+disposition. Historical diagnostic/checklist output retains its original scope.
+
+Acceptance contract
+- OBJECT queries retain entity_name, subentity_name and permission_name, with
+  COUNT_BIG(*) OVER() from the SAME invocation. No DISTINCT or deduplication.
+- Require the exact target entity (schema.name or the supplied quoted spelling),
+  string entity/subentity/permission fields, and
+  an integer SQL count equal on every row to DataTable and processed counts.
+  Reject identical full tuples, including repeated identical column tuples.
+- Empty subentity means object-level. Only those rows feed the existing exact
+  required-object list and EXECUTE set. Column rows never satisfy a missing
+  object SELECT or VIEW DEFINITION. Database-scope acceptance is unchanged.
+- Nonempty subentity means column-level. Accept only SELECT for the catalog
+  verifier on the four already approved dbo reference tables, with exactly one
+  object SELECT and SELECT in its unchanged object allowlist. Recheck the existing
+  six catalog-role edges, states, minor IDs and dbo grantor at this boundary,
+  using the existing database-derivation guard (including its hierarchy proof).
+  Each subentity must occur exactly once in the admin-visible column inventory.
+  No new column grants are authorized. Exact preflight role/direct/public authority
+  checks still reject them, including G/W/D/R column edges.
+- Full tuples and SQL/DataTable/processed counts remain in memory in
+  verificationObjectEvidence. Failure output remains bounded labels/counts only;
+  never dump this object, raw errors, credentials, SIDs or connection objects.
+  OBJECT_REQUIRED actual counts now count object rows; OBJECT_PERMISSIONS can
+  report all-row counts and identical-tuple duplicates on rejection.
+- The later, independent per-column HAS_PERMS_BY_NAME SELECT/UPDATE loop is retained
+  verbatim. SID/authentication, identity separation, exact tokens/membership,
+  ownership, grantor, public/direct grants, RLS and all other preflight checks,
+  transaction/provisioning code, TLS, credentials, allowlists and OFF gates remain.
+  Unexpected system-catalog column evidence still stops; this exception is limited
+  to the four reviewed reference tables. No application/Java attestation changes.
+
+Regression and test-impact inventory
+Pre-edit review: architecture/codex-prompt-rules.md, database-schema.md,
+tenancy-and-rls.md; docs/architecture/azure-sql-case-attestation.md, AI integration
+architecture and production preflight; packet execution/recovery/post-commit notes,
+object/database diagnostic checklists and neighboring offline tests. Repository-wide
+fn_my_permissions, Permission-List, Same-Set and ROLE_CONTRACT searches identified
+these changes: Permission-List/Object-PermissionEvidence and Verify-Login calls ->
+Test-ShaleAiIdentityVerification.ps1 and Test-ShaleObjectPermissionVerification.ps1;
+old projection assertion -> Test-ShaleObjectPermissions.ps1; package -> existing
+Test-ShaleAiIdentityPackage.ps1 invocation chain and SHA256SUMS.txt. The separate
+Java verifier and diagnostics keep their original contracts and bytes.
+
+The new suite loads an eight-row synthetic dbo.AiCaseDataDeployment result through
+real Read-Sql/DataTable.Load with a local DataTableReader. It requires 8/8/8 counts,
+two object permissions, six retained distinct columns and six repeated names.
+It rejects 29 independent tuple/scope/count/role-edge faults, including SELECT-only
+column evidence without object SELECT, missing VIEW DEFINITION, W/D/R/minor-id/
+grantor drift and unauthorized columns. Existing real Verify-Login orchestration
+also exercises this eight-row shape and the unchanged independent column loop.
+Existing ObjectDuplicate now stops earlier at OBJECT_PERMISSIONS on an identical
+tuple, instead of OBJECT_REQUIRED on a duplicate name. Diagnostic reports retain
+all their historical duplicate findings; they are not the corrected acceptance gate.
+
+Audit compatibility
+Only existing security/object metadata reads are added. No protected application
+rows, business/admin mutations, application audit events or schema migrations.
+Preserve secret-safe host/SQL/Key Vault auditing and the external change record.
+
+Operator handoff - offline first
+1. Review the diff and trusted SHA256SUMS.txt; preserve LF checkout bytes.
+2. On Windows PowerShell 5.1/.NET Framework 4.7.2+, run:
+     powershell.exe -NoProfile -File .\Test-ShaleAiIdentityPackage.ps1
+     powershell.exe -NoProfile -File .\Test-ShaleCatalogDatabasePermissions.ps1
+   The package includes verification, object diagnostic and new tuple regressions.
+   Require every test to pass; record shell version, revision and package hashes.
+   Linux PowerShell 7 results do not establish Windows 5.1 execution.
+3. After Windows validation and review, use the existing approved read-only Verify
+   procedure in Execution-checklist.txt section 5 for ALL THREE identities under
+   the existing change freeze and secret-safe telemetry controls. Keep all controls
+   OFF. A diagnostic or partial identity pass does not replace complete verification.
+4. Do not run Provision, change SQL permissions/users/roles/credentials/application
+   settings, retrieve production secrets for tests, or activate AI/MCP/OAuth.
+   Full production verification, bootstrap and Windows validation remain pending.
+
+Executed validation (2026-11-06, PowerShell 7.4.6/Linux)
+- work/tools/pwsh/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleObjectPermissionVerification.ps1: PASS.
+- work/tools/pwsh/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleAiIdentityVerification.ps1: PASS.
+- work/tools/pwsh/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleAiIdentityPackage.ps1: PASS, including
+  parser/5.1 syntax guards, full verifier regressions, new tuple suite, all 35
+  object-diagnostic orchestration/redaction cases, package hashes and role counts.
+- work/tools/pwsh/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleCatalogDatabasePermissions.ps1: PASS,
+  all 36 existing orchestration/report/redaction cases.
+  All PowerShell runs used task-local XDG cache/config/data paths and telemetry OFF.
+  No production entrypoint, Azure module, credential prompt or SQL connection ran.
+- python build/test-selection/select_tests.py --base origin/codex/latest --head HEAD:
+  PASS; all 11 paths are packet-only, no affected application/Maven area or full-suite
+  escalation. Directly affected offline tests above are the relevant behavior tests.
+- /workspace/.tools/bin/mvn -B -ntp test: PASS, 228 tests, zero failures/errors/skips,
+  all seven reactor modules successful. No full-suite or native SQL campaign run.
+- git diff --check and independent SHA-256 manifest validation: PASS. Contract,
+  diagnostics, catalog/database-derived and independent column/EXECUTE checks,
+  identity/preflight and provisioning transaction/orchestration blocks match base.
+These establish offline behavior only. Windows PowerShell 5.1/.NET Framework,
+production SQL and complete three-identity verification remain UNVERIFIED.

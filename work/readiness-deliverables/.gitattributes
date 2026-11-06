@@ -15,3 +15,5 @@ Catalog-derived-permission-review.txt text eol=lf
 Diagnose-ShaleObjectPermissions.ps1 text eol=lf
 Test-ShaleObjectPermissions.ps1 text eol=lf
 Object-permission-diagnostic-checklist.txt text eol=lf
+Test-ShaleObjectPermissionVerification.ps1 text eol=lf
+Object-permission-verifier-correction.txt text eol=lf

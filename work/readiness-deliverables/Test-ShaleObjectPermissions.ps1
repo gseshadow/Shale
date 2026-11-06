@@ -107,15 +107,9 @@ $invalid=$actual.Copy();$invalid.Rows[0].Permission='SYNTHETIC-SENSITIVE-UNKNOWN
 $stopped=$false
 try{Get-ObjectReport $invalid $object 13 $allowed $builtin $grants | Out-Null}catch{$stopped=$true}
 Require $stopped 'Unknown permission vocabulary must stop.'
-# Run the existing Permission-List and Same-Set themselves against the enriched
-# synthetic DataTable. Keeping SQL subentities does not change their projection.
-& {
-    function Read-Sql {param($Connection,$Sql,$Parameters) return ,$loaded}
-    . ([scriptblock]::Create((Definition $originalAst 'Permission-List')))
-    . ([scriptblock]::Create((Definition $originalAst 'Same-Set')))
-    $perms=@(Permission-List $null $object.QualifiedName 'OBJECT' $allowed)
-    Require ($perms.Count -eq 8 -and !(Same-Set $allowed $perms)) 'Existing verifier must retain eight names and fail exact comparison.'
-}
+# Regression for the corrected verifier: preserve eight tuples and compare object
+# permissions independently. The diagnostic above deliberately retains its old model.
+& (Join-Path $PSScriptRoot 'Test-ShaleObjectPermissionVerification.ps1')
 function Import-Module {throw 'SYNTHETIC-SENSITIVE-IMPORT'}
 function Get-AzContext {throw 'SYNTHETIC-SENSITIVE-CONTEXT'}
 function Get-AzKeyVaultSecret {throw 'SYNTHETIC-SENSITIVE-SECRET'}
