@@ -130,3 +130,29 @@ No Java/application contract changes. New SQL reads only own-session/security/ob
 metadata and one existing secret GET. No protected data read or business/admin
 mutation occurs; no application audit event or schema migration is introduced.
 Preserve existing secret-safe host/SQL/Key Vault auditing and external change record.
+
+Executed offline validation (PowerShell 7.4.6/Linux; 2026-11-06)
+- work/tools/pwsh/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleObjectPermissions.ps1: PASS, including
+  actual DataTableReader/Load and existing Permission-List/Same-Set helpers;
+  35 isolated synthetic orchestration, authentication, drift and redaction cases.
+- work/tools/pwsh/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleAiIdentityPackage.ps1: PASS, including
+  original verification-helper suite, new object suite and package hashes.
+- work/tools/pwsh/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleCatalogDatabasePermissions.ps1: PASS,
+  all 36 existing synthetic diagnostic cases and authentication parity checks.
+  All PowerShell commands used task-local XDG cache/config/data paths and disabled
+  telemetry. SQL/Azure/prompt boundaries were synthetic, except closed connection
+  construction. No Azure modules or production entrypoints ran.
+- python build/test-selection/select_tests.py --base origin/codex/latest --head HEAD:
+  PASS against the refreshed 2553dc4b base; seven packet-only paths, no affected
+  Maven/application area or informational full-suite escalation. An initial run
+  used a stale remote-tracking ref; its unrelated selections were discarded.
+- /workspace/.tools/bin/mvn -B -ntp test: PASS, 228 tests; zero failures/errors/skips;
+  all seven reactor modules successful. No full-suite or native SQL campaign run.
+- git diff --check and independent SHA256SUMS.txt validation: PASS.
+  Original verifier, contract and database diagnostic/test bytes match the base.
+  New scripts, documentation and package index are pinned with LF attributes.
+These results establish offline behavior only. Production cause, complete Verify,
+bootstrap and Windows PowerShell 5.1/live SQL semantics remain UNVERIFIED.

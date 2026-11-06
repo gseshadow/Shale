@@ -61,7 +61,8 @@ $allowed=@('VIEW DEFINITION','SELECT')
 $columns=@('EntityName','SubentityName','Permission','SqlResultCount','SqlPermissionCount','SqlTupleCount')
 # Eight rows / two names: six repeated names arise from different subentities.
 $rows=@()
-foreach($permission in $allowed){foreach($sub in @('','SyntheticColumn1','SyntheticColumn2','SyntheticColumn3')){$rows+= ,@('dbo.SYNTHETIC_REFERENCE',$sub,$permission,8,4,1)}}
+$rows+= ,@('dbo.SYNTHETIC_REFERENCE','','VIEW DEFINITION',8,1,1)
+foreach($sub in @('','SyntheticColumn1','SyntheticColumn2','SyntheticColumn3','SyntheticColumn4','SyntheticColumn5','SyntheticColumn6')){$rows+= ,@('dbo.SYNTHETIC_REFERENCE',$sub,'SELECT',8,7,1)}
 $actual=Table $columns $rows
 # Exercise the REAL Read-Sql DataTable.Load and unary-comma return with a local
 # DataTableReader, not a mocked permission projection. No SqlConnection exists.
@@ -148,7 +149,8 @@ function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transacti
         if($Scenario -cin @('Exact','Contract')){
             $rows=@(@('dbo.AiCaseDataDeployment','','SELECT',2,1,1),@('dbo.AiCaseDataDeployment','','VIEW DEFINITION',2,1,1))
         }else{
-            foreach($permission in @('SELECT','VIEW DEFINITION')){foreach($sub in @('','Column1','Column2','Column3')){$rows+= ,@('dbo.AiCaseDataDeployment',$sub,$permission,8,4,1)}}
+            $rows+= ,@('dbo.AiCaseDataDeployment','','VIEW DEFINITION',8,1,1)
+            foreach($sub in @('','Column1','Column2','Column3','Column4','Column5','Column6')){$rows+= ,@('dbo.AiCaseDataDeployment',$sub,'SELECT',8,7,1)}
         }
         if($Scenario -ceq 'CountMismatch'){foreach($r in $rows){$r[3]=9}}
         if($Scenario -ceq 'Unknown'){$rows[0][2]='SYNTHETIC-SENSITIVE-UNKNOWN'}
