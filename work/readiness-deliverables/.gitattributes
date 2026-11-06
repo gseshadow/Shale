@@ -2,7 +2,9 @@
 .gitattributes text eol=lf
 Provision-ShaleAiIdentities.ps1 text eol=lf
 Test-ShaleAiIdentityPackage.ps1 text eol=lf
+Test-ShaleAiIdentityVerification.ps1 text eol=lf
 Execution-checklist.txt text eol=lf
 Review-and-recovery-notes.txt text eol=lf
 role-contract.json text eol=lf
 SHA256SUMS.txt text eol=lf
+Post-commit-diagnostic.txt text eol=lf

@@ -336,3 +336,84 @@ Console-only SQL administrator password revision (offline only)
 - Required local critical reactor attempt: mvn -Dmaven.repo.local=/workspace/work/m2
   test could not resolve Spring Boot 4.1.1 from Maven Central (network unreachable).
   The Java reactor remains unverified; no application source or dependency changed.
+
+
+Post-commit verification investigation (2026-11-06; offline review)
+- Operator-reported production provisioning was separately authorized and committed.
+  Runtime passed complete login/permission closure. A subsequent SSMS query confirmed
+  all three contained SQL users and their exact roles. Catalog and bootstrap remain
+  incomplete. Runtime connection disposal is also a possible stop after its success
+  line; CONNECTION_DISPOSE now distinguishes it from catalog start. These are operator
+  reports, not new production observations here.
+- Reviewed codex/latest d8db3a41, repository prompt rules, database schema, tenancy/RLS,
+  Azure SQL case-attestation contract, confinement V2 contract, production deployment
+  preflight/readiness and the entire identity package/related application attestation.
+- Pre-edit test-impact inventory: Permission-List, Verify-Login, Same-Set and the
+  sanitized outer catch are covered by Test-ShaleAiIdentityPackage.ps1 helper/guard/
+  child-process tests. AiCaseDataAttestationTest covers application routing/refusal;
+  OAuthConfigurationTest covers bootstrap configuration. Those Java contracts are not
+  changed. New Test-ShaleAiIdentityVerification.ps1 extracts real verification helpers
+  and actual outer catch, uses fake SQL/connection boundaries and synthetic credentials,
+  and verifies fail-closed checkpoints/redaction for all three identity paths.
+- Original catch loses the exact inner failure checkpoint: a demonstrated diagnostic
+  defect. Available evidence does NOT establish an incorrect acceptance predicate or
+  actual security discrepancy. No speculative permission or result normalization fix.
+- Fixed checkpoint labels, identity labels, ordinals and bounded numeric/bit evidence
+  now accompany the sanitized failure. Query errors remain separate from permission
+  assertions. Object equality still rejects duplicate rows; diagnostics show counts.
+  All original acceptance predicates, 324 contract edges, embedded contract digest,
+  15151/empty-allowlist rule, TLS, authentication and OFF gates remain unchanged.
+  Only the column inventory SQL adds ORDER BY column_id for reproducible coordinates.
+- Post-commit-diagnostic.txt is the narrow read-only procedure. Use Verify only; no
+  Provision retry, migration replay, account/role repair, secret rotation, Azure
+  configuration, readiness, AI/MCP/OAuth activation or native fault tests. Existing
+  Verify already retrieves the three existing Key Vault passwords securely in memory.
+  It performs metadata/permission queries and actual contained logins, not protected
+  application data reads or resolver executions. Fail-fast order is unchanged.
+- Audit compatibility: catalog reads and existing secret GETs require no application
+  audit row, actor invention or schema change. Retain existing secret-safe external
+  administrative/access audit; never log passwords, tokens, SQL parameters or errors.
+- Actual Windows 5.1 host behavior and SQL/Azure permission semantics remain UNVERIFIED.
+  A local synthetic pass cannot certify production. Keep every capability OFF.
+
+Post-commit diagnostic validation (offline; production cause still unresolved)
+- XDG_CACHE_HOME/XDG_CONFIG_HOME/XDG_DATA_HOME directed to scratch work/investigation.
+  work/investigation/powershell/pwsh -NoProfile -File
+  work/readiness-deliverables/Test-ShaleAiIdentityPackage.ps1: PASS on 7.4.6/Linux,
+  including the integrated verification checkpoint suite. Publisher SHA-256 for the
+  scratch-only PowerShell runtime matched; no dependency/runtime binary is published.
+- New suite exercises synthetic complete verification for runtime/catalog/bootstrap,
+  query failures, missing/mismatched contained identity, extra token, database/system/
+  object unexpected or missing permissions, duplicate object permission rows, column
+  query/inventory failure, forbidden read/update, missing/NULL reference SELECT and
+  incomplete EXECUTE closure and post-success connection-disposal failure. Real
+  production helpers/catch execute; all I/O is fake.
+  Failure cases retain nonzero exit and committed-users-remain status, suppressing
+  synthetic sensitive identity/object/column/exception markers.
+- Independent AST comparison against d8db3a41: every original condition clause and
+  throw/refusal preserved verbatim; identity mappings, six-EXECUTE lists, four reference
+  tables, contract digest and all literal SQL preserved except column ORDER BY.
+  All three PowerShell scripts parse and remain ASCII. Actual 5.1 execution is open.
+- git diff --check: PASS. Repository selector maps this operator-package change to
+  no application/Maven affected area and recommends no full-suite escalation.
+- Required critical reactor attempted with JAVA_HOME=/workspace/.tools/jdk-21 and
+  /workspace/.tools/apache-maven-3.9.11/bin/mvn -B
+  -Dmaven.repo.local=/workspace/Shale/work/investigation/m2 test. BLOCKED resolving
+  org.springframework.boot:spring-boot-dependencies:4.1.1 from Maven Central:
+  network unreachable. No Java tests ran; application reactor remains UNVERIFIED.
+- No production connection, credential retrieval, SQL mutation, Azure modification
+  or capability activation was performed during this investigation. No acceptance
+  predicate fix or production security verdict is claimed; use the bounded Verify
+  procedure on the approved host to establish the exact failing checkpoint.
+
+PR publication status
+- Draft PR publication to the verified source repository gseshadow/Shale, base
+  codex/latest, was blocked by automatic approval review. The reviewer requires
+  explicit approval for publication of operational details and existing secret names
+  to this public repository, despite those names already existing at the verified
+  source baseline. No alternate publication path was attempted after the rejection.
+  The complete tested local patch is retained for review; no PR was opened.
+- The user subsequently explicitly approved publishing the reviewed eight-file patch,
+  including operational references and existing secret names, to public gseshadow/Shale
+  as a draft PR targeting codex/latest. This approval covers publication only; all
+  production prohibitions and OFF controls remain unchanged.
