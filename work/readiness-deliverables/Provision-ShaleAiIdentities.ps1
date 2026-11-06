@@ -273,8 +273,40 @@ function Permission-List($Connection,[string]$Name,[string]$Scope,[string[]]$All
     $actual=@($t.Rows | ForEach-Object {$_.Permission})
     $unexpected=@($actual | Where-Object {$_ -cnotin $Allowed}).Count
     $script:verificationEvidence='ASSERT actual={0} allowed={1} unexpected={2} duplicates={3}' -f $actual.Count,$Allowed.Count,$unexpected,($actual.Count-@($actual | Sort-Object -Unique).Count)
+    if($Scope -ceq 'DATABASE' -and $actual.Count -ne @($actual | Sort-Object -Unique).Count){throw 'STOP: duplicate database permission evidence.'}
     foreach($p in $actual){if($p -cnotin $Allowed){throw 'STOP: unexpected effective permission.'}}
     return $actual
+}
+# Database scope only: these two documented children are not independent grants.
+# Assert-Catalog still checks ALL roles, direct/public authority, ownership and SIDs.
+function Get-CatalogDatabaseDerivedPermissions($Admin) {
+    # Reconfirm the complete six-edge catalog contract at the exception boundary.
+    $edges=Read-Sql $Admin @'
+SELECT r.name Role,p.class Class,
+ CASE WHEN p.class=0 THEN N'' WHEN p.class=1 THEN OBJECT_SCHEMA_NAME(p.major_id)+N'.'+OBJECT_NAME(p.major_id) ELSE N'UNEXPECTED' END Securable,
+ p.permission_name Permission,p.state State,p.minor_id MinorId,p.grantor_principal_id Grantor
+FROM sys.database_permissions p JOIN sys.database_principals r ON r.principal_id=p.grantee_principal_id
+WHERE r.name=N'AiCaseDataCatalogVerifier';
+'@
+    $approved=@($expected | Where-Object {$_.Role -ceq 'AiCaseDataCatalogVerifier'})
+    if($approved.Count -ne 6 -or !(Same-Set @($approved | ForEach-Object {Edge-Key $_}) @($edges.Rows | ForEach-Object {Edge-Key $_})) -or
+       @($edges.Rows | Where-Object {$_.MinorId -ne 0 -or $_.Grantor -ne 1}).Count -or
+       @($edges.Rows | Where-Object {$_.Class -eq 0 -and $_.Securable -ceq '' -and $_.Permission -ceq 'VIEW DEFINITION' -and $_.State -ceq 'G'}).Count -ne 1){
+        throw 'STOP: catalog derivation requires exact approved role edges.'
+    }
+    $hierarchy=Read-Sql $Admin @'
+SELECT class_desc ClassName,permission_name PermissionName,covering_permission_name CoveringPermissionName
+FROM sys.fn_builtin_permissions(DEFAULT)
+WHERE class_desc=N'DATABASE' AND permission_name IN(N'VIEW PERFORMANCE DEFINITION',N'VIEW SECURITY DEFINITION');
+'@
+    $children=@('VIEW PERFORMANCE DEFINITION','VIEW SECURITY DEFINITION')
+    if($hierarchy.Rows.Count -ne 2){throw 'STOP: supported database hierarchy evidence missing.'}
+    foreach($child in $children){
+        if(@($hierarchy.Rows | Where-Object {$_.ClassName -ceq 'DATABASE' -and $_.PermissionName -ceq $child -and $_.CoveringPermissionName -ceq 'VIEW DEFINITION'}).Count -ne 1){
+            throw 'STOP: supported database hierarchy differs.'
+        }
+    }
+    return $children
 }
 function Verify-Login($Identity,[securestring]$Password,$Admin) {
     $script:verificationIdentity=switch -CaseSensitive ($Identity.Role) {
@@ -314,6 +346,7 @@ FROM sys.database_principals p WHERE p.principal_id=USER_ID();
         $dbAllowed=@('CONNECT','VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION')
         if($Identity.Role -ceq 'AiCaseDataCatalogVerifier'){$dbAllowed+= 'VIEW DEFINITION'}
         Set-VerificationStep DATABASE_PERMISSIONS
+        if($Identity.Role -ceq 'AiCaseDataCatalogVerifier'){$dbAllowed+= @(Get-CatalogDatabaseDerivedPermissions $Admin)}
         $dbPerms=@(Permission-List $c '' 'DATABASE' $dbAllowed)
         Set-VerificationStep DATABASE_REQUIRED
         if('CONNECT' -cnotin $dbPerms -or ($Identity.Role -ceq 'AiCaseDataCatalogVerifier' -and 'VIEW DEFINITION' -cnotin $dbPerms)){throw 'STOP: required database permission missing.'}
