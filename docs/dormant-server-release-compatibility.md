@@ -1,5 +1,22 @@
 # Dormant server ordinary release compatibility — 2026-11-04
 
+## Current reconciliation — 2026-11-06
+
+The [current readiness assessment](production-mcp-integration-readiness.md) supersedes this dated
+review's UNKNOWN/deferred Stage B/Phase 1R state and requests to repeat their compatibility evidence.
+Stage B is operator-confirmed installed with fence/effective-read postchecks PASS; Phase 1R is installed
+with POSTCHECK PASS. The reported desktop/API login, remembered login, Cases, directory, statuses and
+authorized updates passed production smoke. Accepted provenance/inventory/pool/local Case evidence
+is retained. Do not run Stage A/B/Phase 1R installers to resolve old UNKNOWN rows.
+
+The November 4 table and next-step text below describe the earlier evidence state. Stage A's complete
+ACL metadata and unreported routes are not inferred from smoke, but no new missing ordinary migration
+is identified. Resolve future release traceability through existing records, not a new survey or replay.
+Exact candidate/rollback JAR hashes, effective settings and OFF-route evidence are not supplied by
+the November 6 smoke; these remain release-specific gates for any new upload. Native acceptance,
+production V2/identity/binding parity and activation approvals remain separate and open.
+
+
 ## Decision and evidence boundary
 
 **Production dormant JAR deployment: BLOCKED on ordinary compatibility evidence and artifact/configuration validation.**

@@ -1,5 +1,16 @@
 # Tenant Architecture
 
+## Current production reconciliation — 2026-11-06
+
+The [current readiness assessment](../docs/production-mcp-integration-readiness.md) records the
+operator-confirmed Stage B installation/fence/effective-read PASS, Phase 1R three-FILTER installation
+and POSTCHECK PASS, and successful desktop/API smoke for the listed ordinary flows. Accepted function
+provenance, inventory hash, pool-reuse and local authoritative Case/RLS tests remain accepted.
+Older missing Users/auditLog/Statuses coverage and next-Phase-1R instructions below are historical.
+Do not rerun Stage B/Phase 1R or completed investigations. FILTER acceptance does not add write BLOCKs
+or close the independent AI native Azure identity/catalog/mutation-fault gates. No SQL change is made.
+
+
 ## Current authentication/security reconciliation — 2026-10-21
 
 The [canonical API/MCP roadmap §2.5](../docs/architecture/ai-integration-and-mcp.md#25-authentication-permissions-and-delivery-reconciliation--2026-10-21)
