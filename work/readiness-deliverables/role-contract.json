@@ -1,0 +1,2270 @@
+[
+  {
+    "Role": "AiCaseDataCatalogVerifier",
+    "Class": 0,
+    "Securable": "",
+    "Permission": "VIEW DEFINITION",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataCatalogVerifier",
+    "Class": 1,
+    "Securable": "sys.sql_expression_dependencies",
+    "Permission": "SELECT",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Cases",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Cases",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Cases",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Cases",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Cases",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Cases",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Users",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Users",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Users",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Users",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Users",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Users",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseUsers",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseUsers",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseUsers",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseUsers",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseUsers",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseUsers",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseStatuses",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseStatuses",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseStatuses",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseStatuses",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseStatuses",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.CaseStatuses",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Statuses",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Statuses",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Statuses",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Statuses",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Statuses",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.Statuses",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.PracticeAreas",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.PracticeAreas",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.PracticeAreas",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.PracticeAreas",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.PracticeAreas",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.PracticeAreas",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.UserSessions",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.UserSessions",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.UserSessions",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.UserSessions",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.UserSessions",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.UserSessions",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ShaleClients",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ShaleClients",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ShaleClients",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ShaleClients",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ShaleClients",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ShaleClients",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.auditLog",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.auditLog",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.auditLog",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.auditLog",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.auditLog",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.auditLog",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.EntityActionAuditLog",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.EntityActionAuditLog",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.EntityActionAuditLog",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.EntityActionAuditLog",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.EntityActionAuditLog",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.EntityActionAuditLog",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.GlobalControlPlaneAuditLog",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.GlobalControlPlaneAuditLog",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.GlobalControlPlaneAuditLog",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.GlobalControlPlaneAuditLog",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.GlobalControlPlaneAuditLog",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.GlobalControlPlaneAuditLog",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataInvocation",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataInvocation",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataInvocation",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataInvocation",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataInvocation",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataInvocation",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataDeployment",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataDeployment",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataDeployment",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataDeployment",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataDeployment",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataDeployment",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeRange",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeRange",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeRange",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeRange",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeRange",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeRange",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeLower",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeLower",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeLower",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeLower",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeLower",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeLower",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataWordTransition",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataWordTransition",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataWordTransition",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataWordTransition",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataWordTransition",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataWordTransition",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAcceptConsentV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAccountCaseAttemptV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiAppendCaseAccessV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiApproveOAuthV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiBeginConsentV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiBeginOAuthV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiChangeIntegrationV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiCompleteOAuthV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiConsumeOAuthCodeV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDenyOAuthV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiExchangeOAuthCodeV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiFindOAuthIntentV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiFinishCaseQuotaV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiGateCaseReadV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiGetProductCapabilityV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiGetTenantPolicyV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiInspectKeysV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiInspectRegistrationsV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiIssueCredentialsV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiLoadOAuthClientV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiLoadRevocationClientV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiOverviewPhiCountV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiRefreshCredentialsV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiRegisterIntegrationV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiReleaseQuotaV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiReserveQuotaV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiReviewCaseAccessV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiRevokeClientKeyV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiRevokeGrantV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiRevokeOAuthCredentialV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiRevokeSessionV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiRotateClientKeyV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiSetProductCapabilityV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiSetTenantPolicyV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiValidateAccessV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiVerifySessionV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiAccessV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiClientV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiCredentialV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiOAuthCodeV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiRefreshV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiRevocationV1",
+    "Permission": "EXECUTE",
+    "State": "D"
+  },
+  {
+    "Role": "AiCaseDataCatalogVerifier",
+    "Class": 1,
+    "Securable": "dbo.AiCaseDataDeployment",
+    "Permission": "SELECT",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataCatalogVerifier",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeRange",
+    "Permission": "SELECT",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataCatalogVerifier",
+    "Class": 1,
+    "Securable": "dbo.AiDataUnicodeLower",
+    "Permission": "SELECT",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataCatalogVerifier",
+    "Class": 1,
+    "Securable": "dbo.AiDataWordTransition",
+    "Permission": "SELECT",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataAuthenticateV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataSearchCasesV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataGetCaseOverviewV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataRecordCaseFailureV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataFinishCaseQuotaV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiCaseDataRuntime",
+    "Class": 1,
+    "Securable": "dbo.AiDataAuthorizeCaseHandoffV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiProductCapability",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.TenantAiIntegrationPolicy",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRegistration",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationRedirect",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiIntegrationClientKey",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegationGrant",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiConsentIntent",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiDelegatedSession",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiOAuthCredential",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiQuotaReservation",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiClientV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiCredentialV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAuthorizationTransaction",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.AiAssertionReplay",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiOAuthCodeV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiRefreshV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiRevocationV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.ResolveAiAccessV1",
+    "Permission": "EXECUTE",
+    "State": "G"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditLog",
+    "Permission": "CONTROL",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "SELECT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "INSERT",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "UPDATE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "DELETE",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "ALTER",
+    "State": "D"
+  },
+  {
+    "Role": "AiIntegrationBootstrap",
+    "Class": 1,
+    "Securable": "dbo.IntegrationAccessAuditResource",
+    "Permission": "CONTROL",
+    "State": "D"
+  }
+]
