@@ -9,11 +9,21 @@ PREPARATION ONLY. No production connections or changes performed.
    datasource; only its six resolver EXECUTEs are approved. No identity conversion.
    Parser and offline checks PASS on PowerShell 7.4.6/Linux. Windows PowerShell 5.1
    and Azure/SQL integration remain UNVERIFIED; validate on the actual Windows host.
+   Run powershell.exe -NoProfile -File .\Test-ShaleAiIdentityPackage.ps1 there.
+   PSScriptAnalyzer 1.24.0 compatibility checks PASS for Windows 5.1 syntax,
+   commands and types against its Windows/.NET Framework profile (offline/Linux).
+   Linux checks do not establish actual Windows 5.1/.NET Framework execution.
 
 2. Prepare approved operator host/context
    Windows PowerShell 5.1 with .NET Framework 4.7.2+, or PowerShell 7.4+; compatible
-   Az.Accounts/Az.KeyVault returning SecureString tokens; built-in System.Data.SqlClient.
-   Approved Azure tenant/subscription, SQL dbo visibility and secret GET are required.
+   Az.Accounts/Az.KeyVault; built-in System.Data.SqlClient. Entra authentication
+   requires Az.Accounts returning SecureString tokens. SQL admin mode does not request
+   an Entra SQL token; the approved Azure context check remains required in both modes.
+   Approved Azure tenant/subscription and existing SQL dbo visibility are required.
+   Existing Key Vault secret GET is needed only for Provision/Verify, never Preflight.
+   For SQL admin mode, review secret-safe telemetry BEFORE the credential prompt,
+   including Preflight. Never supply passwords as arguments, environment variables,
+   files or pasted commands. No stored credential import/export is supported.
    Review client/server secret redaction before retrieving passwords. No transcripts,
    debug/parameter capture or raw exceptions. STOP if secret-safe telemetry is unknown.
    Retain completed Stage B/Phase 1R/V2 acceptance; do not rerun migrations/check campaigns.
@@ -22,22 +32,29 @@ PREPARATION ONLY. No production connections or changes performed.
 
 3. Read-only preflight, under separate approved production read access
    $p=@{TenantId='<tenant-guid>';SubscriptionId='<subscription-guid>';
-     AllApplicationControlsOffConfirmed=$true}
+     AllApplicationControlsOffConfirmed=$true;AdminAuthentication='Sql';
+     SecretSafeTelemetryReviewed=$true}
    ./Provision-ShaleAiIdentities.ps1 -Mode Preflight @p
    if(!$?){throw 'STOP'}
-   No passwords fetched. Missing users are reported; unexpected identities/grants stop.
+   SQL mode securely prompts for brian using Get-Credential in the script. Cancel,
+   an empty password or a different login stops. No Key Vault secrets are fetched.
+   Missing users are reported; unexpected identities/grants stop. TLS validation stays
+   enabled (Encrypt=True; TrustServerCertificate=False). Never bypass a TLS failure.
+   To use Microsoft Entra instead, set $p.AdminAuthentication='Entra' (also the default).
+   There is no automatic fallback between authentication modes.
+   Both modes still require the exact target and USER_NAME() = dbo; no rights are granted.
 
 4. Mutation ONLY after separate production provisioning authorization
    $names=@('shale_prod_ai_case_runtime','shale_prod_ai_catalog_verifier',
      'shale_prod_ai_oauth_bootstrap')
-   ./Provision-ShaleAiIdentities.ps1 -Mode Provision @p -SecretSafeTelemetryReviewed `
+   ./Provision-ShaleAiIdentities.ps1 -Mode Provision @p `
      -AuthorizationReference '<approved-change-reference>' -AuthorizedUsers $names
    if(!$?){throw 'STOP; reconcile using recovery notes'}
    Existing Key Vault passwords stay in memory; only missing exact users are created.
    No password reset, grant repair, Azure change, migration or capability activation.
 
 5. Read-only post-install verification (also automatic after Provision)
-   ./Provision-ShaleAiIdentities.ps1 -Mode Verify @p -SecretSafeTelemetryReviewed
+   ./Provision-ShaleAiIdentities.ps1 -Mode Verify @p
    if(!$?){throw 'STOP'}
    Require actual contained sessions, exact tokens/roles/effective permissions,
    distinct SIDs, preserved ordinary identities/grants and capabilities OFF.
@@ -50,3 +67,16 @@ PREPARATION ONLY. No production connections or changes performed.
    Never auto-drop/revoke/rotate/repair. Further changes need separate authorization.
    Full V2 live attestation, immutable binding, secret-consumer separation and retained
    native/disposable gates remain separate. No readiness/deployment/activation approval.
+
+ADMIN_CONNECT investigation (offline; production connection not retried)
+- The reported ADMIN_CONNECT stop occurred before any SQL mutation. The old code
+  acquired an Entra token, then called Open(); it could not use the established SQL
+  Server Authentication administrator brian. The stage alone does not distinguish
+  token acquisition, login rejection, transport or TLS failure. No specific SQL error
+  number or production root cause is established by the available evidence.
+- Select Sql explicitly for the established administrative connection. If it fails,
+  keep controls OFF and stop. Review approved host/network/certificate trust and
+  existing administrator authentication out of band; do not grant permissions,
+  relax TLS, auto-retry or export raw errors, tokens, credentials or connection objects.
+- AZURE_CONTEXT failures now have their own sanitized stage. SQL mode preserves the
+  Azure context gate; it does not use the Azure token as a SQL administrator credential.

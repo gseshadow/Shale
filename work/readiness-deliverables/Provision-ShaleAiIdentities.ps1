@@ -1,7 +1,8 @@
 #requires -Version 5.1
 <#
 Offline preparation only. Default Review never loads Azure modules or connects.
-Preflight = read-only dbo catalog checks, no password retrieval.
+Preflight = read-only dbo catalog checks, no Key Vault password retrieval.
+SQL administrator authentication prompts securely; no credential input is accepted.
 Verify = preflight plus actual contained logins, no SQL mutation.
 Provision = explicit three-user authorization, one transaction, then actual logins.
 No installer, role repair, password reset, capability change, or cleanup is present.
@@ -12,6 +13,7 @@ Do not enable transcripts, debug tracing, parameter capture or diagnostic dumps.
 [CmdletBinding()]
 param(
     [ValidateSet('Review','Preflight','Provision','Verify')][string]$Mode='Review',
+    [ValidateSet('Entra','Sql')][string]$AdminAuthentication='Entra',
     [string]$TenantId,
     [string]$SubscriptionId,
     [string]$AuthorizationReference,
@@ -55,18 +57,15 @@ if (!$TenantId -or !$SubscriptionId -or !$AllApplicationControlsOffConfirmed) {
 if ($Mode -in @('Provision','Verify') -and !$SecretSafeTelemetryReviewed) {
     throw 'STOP: secret-safe client/server telemetry review required before passwords are fetched.'
 }
+if ($AdminAuthentication -eq 'Sql' -and !$SecretSafeTelemetryReviewed) {
+    throw 'STOP: secret-safe client/server telemetry review required before SQL administrator credential prompt.'
+}
 if ($Mode -eq 'Provision' -and ([string]::IsNullOrWhiteSpace($AuthorizationReference) -or
     @($AuthorizedUsers).Count -ne 3 -or
     ((@($identities.Name | Sort-Object) -join '|') -cne (@($AuthorizedUsers | Sort-Object) -join '|')))) {
     throw 'STOP: separate authorization reference and exact three approved usernames required.'
 }
 Add-Type -AssemblyName System.Data
-Import-Module Az.Accounts
-Import-Module Az.KeyVault
-$azContext=Get-AzContext
-if (!$azContext -or $azContext.Tenant.Id -ne $TenantId -or $azContext.Subscription.Id -ne $SubscriptionId) {
-    throw 'STOP: Azure context mismatch; authenticate/select the approved context outside this script.'
-}
 # Never print exceptions, command objects, credentials, tokens, parameter values, or Azure results.
 function Read-Sql($Connection,[string]$Sql,[hashtable]$Parameters=@{},$Transaction=$null) {
     $cmd=$Connection.CreateCommand(); $cmd.CommandText=$Sql; $cmd.CommandTimeout=30
@@ -102,6 +101,33 @@ function Convert-InMemory([securestring]$Value) {
     $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($Value)
     try {return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)}
     finally {[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)}
+}
+function Set-AdminAuthentication($Connection,[string]$Authentication,[string]$Tenant) {
+    if ($Authentication -eq 'Sql') {
+        $prompt=$null;$password=$null;$assigned=$false
+        try {
+            $prompt=Get-Credential -UserName 'brian' -Message 'Approved Shale SQL administrator (SQL Server Authentication)' -ErrorAction Stop
+            if (!$prompt -or $prompt.UserName -cne 'brian' -or !$prompt.Password -or $prompt.Password.Length -lt 1) {
+                throw 'STOP: approved SQL administrator credential required.'
+            }
+            # SqlCredential keeps the password out of the connection string and managed plaintext.
+            $password=$prompt.Password.Copy();$password.MakeReadOnly()
+            $Connection.Credential=[System.Data.SqlClient.SqlCredential]::new('brian',$password)
+            $assigned=$true
+        } finally {
+            if ($prompt) {$prompt.Password.Dispose()};$prompt=$null
+            if ($password -and !$assigned) {$password.Dispose()};$password=$null
+        }
+    } elseif ($Authentication -eq 'Entra') {
+        $token=$null
+        try {
+            $token=Get-AzAccessToken -ResourceUrl 'https://database.windows.net/' -TenantId $Tenant -ErrorAction Stop
+            if ($token.Token -isnot [securestring]) {throw 'STOP: current Az.Accounts with SecureString access tokens required.'}
+            $Connection.AccessToken=Convert-InMemory $token.Token
+        } finally {
+            if ($token -and $token.Token -is [securestring]) {$token.Token.Dispose()};$token=$null
+        }
+    } else {throw 'STOP: unsupported administrator authentication.'}
 }
 function Assert-Zero($Connection,[string]$Sql,$Transaction=$null) {
     $t=Read-Sql $Connection $Sql @{} $Transaction
@@ -294,13 +320,19 @@ WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT',
         'Verified contained login and permission closure: '+$Identity.Name
     } finally {$c.Dispose()}
 }
-$admin=$null;$transaction=$null;$commitStarted=$false;$committed=$false;$stage='ADMIN_CONNECT'
+$admin=$null;$transaction=$null;$commitStarted=$false;$committed=$false;$stage='AZURE_CONTEXT'
 $passwords=@{}
 try {
+    Import-Module Az.Accounts
+    Import-Module Az.KeyVault
+    $azContext=Get-AzContext
+    if (!$azContext -or $azContext.Tenant.Id -ne $TenantId -or $azContext.Subscription.Id -ne $SubscriptionId) {
+        throw 'STOP: Azure context mismatch; authenticate/select the approved context outside this script.'
+    }
+    $stage='ADMIN_CONNECT'
     $admin=New-Connection
-    $token=Get-AzAccessToken -ResourceUrl 'https://database.windows.net/' -TenantId $TenantId
-    if($token.Token -isnot [securestring]){throw 'STOP: current Az.Accounts with SecureString access tokens required.'}
-    try{$admin.AccessToken=Convert-InMemory $token.Token;$admin.Open()}finally{$token=$null}
+    Set-AdminAuthentication $admin $AdminAuthentication $TenantId
+    $admin.Open()
     $stage='PREFLIGHT';Assert-Catalog $admin
     $baseline=Security-Snapshot $admin
     $missing=@()
@@ -310,7 +342,7 @@ try {
     }
     if($Mode -eq 'Preflight'){
         foreach($i in $identities){'{0}: {1}' -f $i.Name,$(if($i -in $missing){'ABSENT; creation requires separate authorization'}else{'EXISTS; structural checks passed'})}
-        'Read-only preflight passed. No secrets fetched; no SQL mutation.';return
+        'Read-only preflight passed. No Key Vault secrets fetched; no SQL mutation.';return
     }
     if($Mode -eq 'Verify' -and $missing.Count){throw 'STOP: Verify requires all three users to exist.'}
     $stage='KEY_VAULT'
@@ -381,7 +413,12 @@ EXEC sys.sp_executesql @ddl;SET @ddl=NULL;
     exit 1
 } finally {
     if($transaction){$transaction.Dispose()}
-    if($admin){$admin.Dispose()}
+    if($admin){
+        $adminPassword=$null
+        if($admin.Credential){$adminPassword=$admin.Credential.Password}
+        $admin.Dispose()
+        if($adminPassword){$adminPassword.Dispose()};$adminPassword=$null
+    }
     foreach($v in $passwords.Values){$v.Dispose()};$passwords.Clear()
     # Managed strings cannot be reliably zeroed; terminate the dedicated process after execution.
     $Error.Clear()

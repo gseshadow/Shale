@@ -44,8 +44,9 @@ Contract resolution
     compatible Az.Accounts/Az.KeyVault versions. The script uses built-in
     System.Data.SqlClient, including SqlCredential, SqlConnection.AccessToken and
     SqlConnectionStringBuilder. No downloaded driver assembly path is accepted.
-    Require Az.Accounts returning SecureString access tokens; older plaintext-token
-    implementations fail closed. Validate module versions on the chosen operator host.
+    Entra mode requires Az.Accounts returning SecureString access tokens; older
+    plaintext-token implementations fail closed. SQL mode securely prompts for brian
+    and does not request an Entra SQL token. Validate module versions on the chosen operator host.
 [ ] Parse without executing (PowerShell):
     $tok=$null; $err=$null
     [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -73,17 +74,23 @@ Contract resolution
     live attestation gate. If deployed consumers differ, STOP for reviewed mapping.
 [ ] Use an approved dedicated operator process and already approved Azure context:
     tenant/subscription explicit; dbo SQL visibility and Key Vault secret GET rights.
-    Key Vault Secrets Officer does not by itself grant SQL access. Script does not login
-    interactively, select another subscription, grant RBAC, or change firewall settings.
+    Key Vault Secrets Officer does not by itself grant SQL access. Script does not
+    authenticate Azure interactively, select another subscription, grant RBAC or change
+    firewall settings. SQL mode uses only the explicit secure administrator prompt.
 [ ] Establish an exclusive administrative change window; the application lock only
     coordinates this script's instances, not other administrators/configuration writers.
 [ ] Define nonsecret parameters locally:
     $p=@{TenantId='<approved-tenant-guid>';SubscriptionId='<approved-subscription-guid>';
-      AllApplicationControlsOffConfirmed=$true}
+      AllApplicationControlsOffConfirmed=$true;AdminAuthentication='Sql';
+      SecretSafeTelemetryReviewed=$true}
     ./Provision-ShaleAiIdentities.ps1 -Mode Preflight @p
     if(!$?){throw 'STOP'}
     Expected initial result: all three users ABSENT. Existing exact users are accepted
-    structurally; any other state stops. Preflight does not fetch passwords or prove
+    structurally; any other state stops. SQL admin mode prompts securely for brian;
+    telemetry review is required before that prompt, including in Preflight.
+    No password/credential parameter, environment variable or saved file is accepted.
+    Use AdminAuthentication=Entra for the retained default token option; no fallback.
+    Preflight fetches no Key Vault secrets and does not prove
     missing users' live permissions. Output contains no passwords or credential hashes.
 
 3. Secret handling and separately authorized mutation
@@ -104,7 +111,7 @@ Contract resolution
 [ ] After approval only:
     $names=@('shale_prod_ai_case_runtime','shale_prod_ai_catalog_verifier',
       'shale_prod_ai_oauth_bootstrap')
-    ./Provision-ShaleAiIdentities.ps1 -Mode Provision @p -SecretSafeTelemetryReviewed `
+    ./Provision-ShaleAiIdentities.ps1 -Mode Provision @p `
       -AuthorizationReference '<approved-change-reference>' -AuthorizedUsers $names
     if(!$?){throw 'STOP; follow recovery below'}
     All secrets are fetched before mutation, used only in memory, checked for equality,
@@ -119,7 +126,7 @@ Contract resolution
     effective database/application object/column permissions and six EXECUTEs where
     applicable. No resolver/business procedure is invoked and no PHI is read.
 [ ] Independently rerun under authorized read-only access if needed:
-    ./Provision-ShaleAiIdentities.ps1 -Mode Verify @p -SecretSafeTelemetryReviewed
+    ./Provision-ShaleAiIdentities.ps1 -Mode Verify @p
     if(!$?){throw 'STOP'}
 [ ] Retain nonsecret status/checksums, authorization record and confirmed OFF state.
     End the dedicated process. Preserve existing shale_app/shale_runtime identities,
@@ -170,7 +177,7 @@ Windows PowerShell 5.1 compatibility review
   No PowerShell 7 ternary, pipeline-chain, null-coalescing or null-conditional syntax.
 - System.Data.SqlClient replaces Microsoft.Data.SqlClient/7.4-specific setup.
   Framework 4.7.2+ and compatible Az module versions are explicit operator prerequisites.
-  A compatible Az.Accounts must expose Get-AzAccessToken.Token as SecureString; the
+  In Entra mode, Az.Accounts must expose Get-AzAccessToken.Token as SecureString; the
   script rejects plaintext tokens instead of emitting or accepting them.
 - Script/test are ASCII; nested .gitattributes pins LF package bytes even when
   core.autocrlf=true on Windows, preserving the contract digest and all checksums.
@@ -228,3 +235,51 @@ PR validation record (2026-11-06; no production access)
   existing packet, or test expectation is modified. New tests cover this operator script.
   Repository selector and Git diff checks are recorded in the PR. Maven application
   tests are not needed for a package-only change when no application area is selected.
+
+SQL administrator authentication revision (2026-11-06)
+- The reported ADMIN_CONNECT stop is before mutation. Its original path acquires an
+  Entra token then opens SQL; it never offers the established SQL login brian. This
+  establishes an authentication-path mismatch, not a proven underlying SQL/TLS error.
+  No production connection or secret retrieval was attempted to diagnose it here.
+- AdminAuthentication defaults to Entra; Sql explicitly prompts with Get-Credential
+  for brian and assigns a read-only SecureString through SqlCredential. The password
+  never enters a connection string or managed plaintext conversion. Cancel, empty or
+  wrong-login credentials stop. The prompt buffer and connection password are disposed.
+  No mode fallback, account creation, permission repair or TLS bypass is added.
+- Both modes preserve the approved Azure context, exact server/database/dbo evidence,
+  role contract, effective permissions, SID checks, transaction, explicit provisioning
+  authorization and all-OFF gates. Imports/context failures are now sanitized under
+  AZURE_CONTEXT; authentication/open failures remain sanitized under ADMIN_CONNECT.
+- Test impact: Test-ShaleAiIdentityPackage.ps1 covers both offline Review selections,
+  telemetry before the SQL prompt, closed SQL/Entra authentication construction,
+  cancellation/empty/wrong login, plaintext-token rejection and zero helper output.
+  Isolated child-shell tests extract the original orchestration and authentication
+  helpers, substituting fake Azure/prompt/connection boundaries. SQL open/prompt,
+  Entra token and Azure-context failures exit 1 with stage/recovery status only;
+  synthetic sensitive exception markers never appear in captured output.
+  Existing package guard/TLS/hash/role tests remain. No application tests are changed.
+- Audit compatibility is unchanged: credential prompting/catalog inspection introduces
+  no PHI or business mutation, and no application audit actor/schema is invented.
+  Retain external authorization and approved secret-safe administrative auditing.
+  Passwords, tokens, connection objects and raw exceptions must never enter evidence.
+
+SQL authentication revision validation (offline only; supersedes test scope above)
+- PowerShell 7.4.6/Linux: Test-ShaleAiIdentityPackage.ps1 PASS, including isolated
+  failure/redaction orchestration, closed connection helpers, unchanged original
+  guard/role/contract/hash checks. Only synthetic credentials were generated.
+- PSScriptAnalyzer 1.24.0: PSUseCompatibleSyntax, PSUseCompatibleCommands and
+  PSUseCompatibleTypes PASS for both provisioning/test scripts. TargetVersions=5.1;
+  TargetProfiles=win-48_x64_10.0.17763.0_5.1.17763.316_x64_4.0.30319.42000_framework.
+  These static checks do not replace execution on the actual Windows 5.1 host.
+- Independently compared every embedded SQL batch and the complete Assert-Zero
+  through Verify-Login function region with base 8b0176a0: unchanged. The pinned
+  contract digest, all role edges and production SQL permissions are unchanged.
+- Git diff whitespace checks PASS; repository test selection maps this package to
+  no Maven area and recommends no full-suite escalation. The default mvn test
+  command could not execute (mvn unavailable). Application reactor tests remain
+  unverified; no Java, migration SQL, application configuration or capability changed.
+- Windows PowerShell 5.1 execution and Azure/SQL integration remain UNVERIFIED.
+  Run powershell.exe -NoProfile -File .\Test-ShaleAiIdentityPackage.ps1 on the
+  approved Windows host before any separately authorized production use. No
+  production SQL, secret retrieval, account creation or Azure permission change
+  was performed. Every AI/MCP/OAuth control remains OFF; no activation authorized.
