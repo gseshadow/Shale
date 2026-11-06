@@ -98,3 +98,9 @@ ADMIN_CONNECT investigation (offline; production connection not retried)
   relax TLS, auto-retry or export raw errors, tokens, credentials or connection objects.
 - AZURE_CONTEXT failures now have their own sanitized stage. SQL mode preserves the
   Azure context gate; it does not use the Azure token as a SQL administrator credential.
+
+Object 13 duplicate investigation (2026-11-06): see
+Object-permission-diagnostic-checklist.txt. Use the separate read-only
+Diagnose-ShaleObjectPermissions.ps1 only after offline checks and operator review.
+No verifier correction is inferred from aggregate duplicate counts. Do not rerun
+Provision, change permissions or activate AI/MCP/OAuth. Bootstrap remains unverified.

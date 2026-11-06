@@ -257,3 +257,5 @@ try{
 'NOT RUN: Windows PowerShell 5.1 host unless this command is run there; Azure/SQL integration or production checks.'
 
 & (Join-Path $PSScriptRoot 'Test-ShaleAiIdentityVerification.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-ShaleObjectPermissions.ps1')
