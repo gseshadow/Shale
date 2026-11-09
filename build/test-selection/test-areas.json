@@ -502,6 +502,8 @@
       ],
       "paths": [
         "**/auth/**",
+        "**/config/AiJdbcUrl*.java",
+        "**/config/DataSources*.java",
         "**/security/**",
         "**/*Audit*.java",
         "**/*Tenant*.java",
@@ -560,6 +562,8 @@
         "com.shale.data.security.ai.IntegrationCaseReadTest",
         "com.shale.data.runtime.RuntimeSessionServiceTimingTest",
         "com.shale.data.config.DataSourcesAiCaseDataTest",
+        "com.shale.data.config.AiJdbcUrlTest",
+        "com.shale.server.oauth.OAuthCodeBootstrapConfigurationTest",
         "com.shale.data.security.ai.ProofDigestTest",
         "com.shale.data.security.ai.AiCaseDataAccessTest",
         "com.shale.data.security.ai.AiCaseDataMigrationContractTest",

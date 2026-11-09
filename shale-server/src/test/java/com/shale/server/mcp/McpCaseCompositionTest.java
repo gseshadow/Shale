@@ -191,6 +191,13 @@ class McpCaseCompositionTest {
                 Map.entry("shale.ai.oauth.bootstrap.jdbc-url","jdbc:sqlserver://sql.example;databaseName=shale"),
                 Map.entry("shale.ai.oauth.bootstrap.username","bootstrap"),
                 Map.entry("shale.ai.oauth.bootstrap.password","synthetic"));
+        for(String key:List.of("shale.ai.data.jdbc-url","shale.ai.data.verifier.jdbc-url","shale.ai.oauth.bootstrap.jdbc-url")) {
+            var env=environment("azure");complete.forEach(env::setProperty);
+            env.setProperty(key,"jdbc:sqlserver://sql.example;encrypt=false");
+            var pools=mock(DataSources.class);
+            assertThrows(IllegalStateException.class,()->new McpAiCaseData(env,PRODUCTION,pools));
+            verifyNoInteractions(pools);
+        }
         for(String missing:complete.keySet()) {
             var env=environment("azure");complete.forEach((key,value)->{if(!key.equals(missing))env.setProperty(key,value);});
             var pools=mock(DataSources.class);

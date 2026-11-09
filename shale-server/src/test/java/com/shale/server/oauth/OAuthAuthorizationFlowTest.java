@@ -69,7 +69,7 @@ class OAuthAuthorizationFlowTest {
         sessions=new ShaleOAuthHumanTest.FixtureSessions();sessions.current=new UserSessionView(1,sid,ClientType.WEB,null,prepared.tokenId(),Instant.now(),Instant.now().plusSeconds(3600),null,null,null);
         try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,72,'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
         context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles(PRODUCTION?"azure":"test");
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin",ORIGIN,"shale.ai.oauth.identity",PRODUCTION?"PRODUCTION":"TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url",url(db),"shale.ai.oauth.bootstrap.username",bootstrapLogin,"shale.ai.oauth.bootstrap.password",bootstrapSecret)));
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin",ORIGIN,"shale.ai.oauth.identity",PRODUCTION?"PRODUCTION":"TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url","jdbc:sqlserver://localhost:"+port+";databaseName="+db,"shale.ai.oauth.bootstrap.username",bootstrapLogin,"shale.ai.oauth.bootstrap.password",bootstrapSecret)));
         context.register(McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class,Fixtures.class);context.refresh();
     }
     @Configuration static class Fixtures {
