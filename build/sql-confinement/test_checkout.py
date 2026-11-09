@@ -14,11 +14,19 @@ ROOT = Path(__file__).resolve().parents[2]
 PATTERNS = checkout_bytes.PATTERNS
 
 
+def pinned_paths():
+    # Git pathspecs include nested paths here; pathlib.glob('*.sql') does not.
+    return sorted(path.decode('utf-8') for path in
+                  checkout_bytes.git(ROOT, 'ls-files', '-z', '--', *PATTERNS).split(b'\0') if path)
+
+
 class PinnedCheckout(unittest.TestCase):
     def test_windows_autocrlf_checkout_preserves_every_reviewed_blob(self):
-        paths = sorted({p.relative_to(ROOT).as_posix() for pattern in PATTERNS for p in ROOT.glob(pattern)})
+        paths = pinned_paths()
         self.assertIn('docs/sql/ai-integration/phase3b8-confinement.sql', paths)
         self.assertIn('docs/sql/ai-integration/phase3b7-confinement.sql', paths)
+        self.assertIn('docs/sql/ai-integration/deployment-binding/discover.sql', paths,
+                      'Checkout fixtures must include the nested SQL selected by the real guard')
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             def git(*args):
@@ -38,16 +46,21 @@ class PinnedCheckout(unittest.TestCase):
                 target.write_bytes(raw)
             (repo / 'unrelated.txt').write_bytes(b'ordinary checkout\n')
             git('add', '.')
-            git('-c', 'core.autocrlf=true', 'checkout-index', '--all', '--force', '--prefix=checkout/')
-            for path, raw in expected.items():
-                self.assertTrue(raw == (repo / 'checkout' / path).read_bytes(), path + ' bytes differ')
-            self.assertEqual(b'ordinary checkout\r\n', (repo / 'checkout/unrelated.txt').read_bytes(),
-                             'The test must actually exercise Windows-style Git conversion')
-            checkout_bytes.verify_receipts({path: (repo / 'checkout' / path).read_bytes() for path in paths})
+            for autocrlf in ('true', 'input', 'false'):
+                with self.subTest(autocrlf=autocrlf):
+                    destination = repo / ('checkout-' + autocrlf)
+                    git('-c', 'core.autocrlf=' + autocrlf, '-c', 'core.eol=lf',
+                        'checkout-index', '--all', '--force', '--prefix=' + destination.as_posix() + '/')
+                    for path, raw in expected.items():
+                        self.assertTrue(raw == (destination / path).read_bytes(), path + ' bytes differ')
+                    ordinary = b'ordinary checkout\r\n' if autocrlf == 'true' else b'ordinary checkout\n'
+                    self.assertEqual(ordinary, (destination / 'unrelated.txt').read_bytes(),
+                                     'The fixture must exercise Git conversion without changing unrelated files')
+                    checkout_bytes.verify_receipts({path: (destination / path).read_bytes() for path in paths})
 
     @contextmanager
     def existing_checkout(self, switch=True):
-        paths = sorted({p.relative_to(ROOT).as_posix() for pattern in PATTERNS for p in ROOT.glob(pattern)})
+        paths = pinned_paths()
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             def git(*args):
@@ -219,7 +232,7 @@ class PinnedCheckout(unittest.TestCase):
             self.assertIn('PINNED_CHECKOUT FAIL', result.stdout)
             result = run('--refresh')
             self.assertEqual(0, result.returncode, result.stdout)
-            self.assertIn('PINNED_CHECKOUT PASS files=25', result.stdout)
+            self.assertIn(f'PINNED_CHECKOUT PASS files={len(expected)}', result.stdout)
             self.assertIn('PINNED_INDEX PASS clean=true', result.stdout)
             for version, (_, receipt) in checkout_bytes.RECEIPTS.items():
                 self.assertIn(f'PINNED_RECEIPT {version} PASS {receipt}', result.stdout)

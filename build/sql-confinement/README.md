@@ -1,7 +1,10 @@
 # Confined SQL build inputs
 
-Git attributes select LF when Git writes the reviewed AI SQL chain and paired resources. An
-existing cached CRLF worktree can remain clean and can be skipped by `checkout-index --force`
+Git attributes select LF when Git writes the reviewed AI SQL chain and paired resources.
+An explicit rule also covers the nested `docs/sql/ai-integration/deployment-binding/*.sql` packet;
+the parent `*.sql` attributes pattern does not cover subdirectories. The guard and checkout test
+fixtures use the same Git pathspec inventory, including these seven nested files.
+An existing cached CRLF worktree can remain clean and can be skipped by `checkout-index --force`
 even after the attributes change. After cloning/switching/updating, run:
 
 ```sh
@@ -10,7 +13,7 @@ python build/sql-confinement/checkout_bytes.py
 ```
 
 These offline commands refresh only exact conversion-only pinned files, refuse local/staged edits,
-verify all 25 actual working-tree byte sequences against HEAD, and print the unchanged V1/V2 source
+verify every pinned working-tree byte sequence against HEAD, and print the unchanged V1/V2 source
 receipts. They materialize a fresh Git prefix and verify it before replacing worktree copies;
 then Git's `checkout-index --force --index` updates stat metadata from its existing entries.
 Both commands require genuinely empty `diff-files`/porcelain results for pinned inputs and print
@@ -20,6 +23,8 @@ mask status, change historical SQL, normalize security-contract text or touch un
 `python -m unittest discover -s build/sql-confinement -p test_checkout.py` covers the cached existing
 worktree transition, fresh clone/prefix, byte preflight and refusal paths. The raw source receipt
 calculation formerly in that regression is shared with the operator tool. See the
+[nested LF repair verification](../../docs/testing/deployment-binding-lf-attributes.md) for the
+`core.autocrlf=true/input/false` checks and unchanged source receipts. See the
 [native operator packet](../../docs/testing/native-azure-readonly-operator-runbook.md) for refreshing
 an existing clean checkout and for mandatory replacement of a failed disposable setup database.
 

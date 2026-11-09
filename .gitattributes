@@ -1,6 +1,7 @@
 # Exact LF source/module/receipt bytes, including on Windows with core.autocrlf=true.
 # Restrict this to the reviewed AI confinement chain and its paired verifier resources.
 docs/sql/ai-integration/*.sql text eol=lf
+docs/sql/ai-integration/deployment-binding/*.sql text eol=lf
 shale-data/src/main/resources/ai/*.sql text eol=lf
 shale-data/src/main/resources/ai/confinement*-modules.properties text eol=lf
 build/sql-confinement/*.sql text eol=lf
