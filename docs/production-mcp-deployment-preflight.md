@@ -1,5 +1,15 @@
 # Production MCP deployment preflight
 
+## Binding preparation update — 2026-11-09
+
+Identity verification is operator-reported PASS for all three dedicated contained users. Accept that
+completed prerequisite; do not repeat provisioning/identity verification or completed migrations.
+See [immutable binding readiness](production-mcp-deployment-binding-readiness.md) for read-only
+checks and the **unexecuted**, separately authorized initial-insert proposal. Approved production
+OAuth origin and actual Java/SQL mapping require operator evidence; no URL or UTC value is inferred.
+Historical pending-identity statements below are superseded only for that reported gate. Full live
+attestation and retained deployment/activation gates remain open. Preparation authorizes no execution.
+
 ## Current decision — 2026-11-06
 
 The [updated readiness assessment](production-mcp-integration-readiness.md) reconciles baseline

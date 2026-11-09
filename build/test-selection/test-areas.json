@@ -492,6 +492,9 @@
       "blocking_smoke_patterns": []
     },
     "security-data": {
+      "python_tests": [
+        "python -m unittest discover -s build/deployment-binding -p test_packet.py"
+      ],
       "modules": [
         "shale-core",
         "shale-data",
@@ -510,6 +513,7 @@
         "build/auth-verification/**",
         "build/phase1r-verification/**",
         "build/sql-confinement/**",
+        "build/deployment-binding/**",
         "docs/sql/phase1r/**",
         "**/Phase1R*.java",
         "**/verification/CaseRead*.java",
