@@ -128,7 +128,7 @@ These are future operator actions, not instructions to execute during source rev
   Existing `/api/auth/*` CORS configuration must already allow that UI. The OAuth filter supplies its own
   narrow CORS because these endpoints execute before MVC. Do not add wildcards or credentialed CORS.
 - Serve `/oauth/mcp/authorize` through SPA fallback at the web host. Verify effective frame denial,
-  no-referrer, HTTPS and no-store for HTML/API responses at CDN/proxy/host layers. The supplied SWA
+  no-referrer and HTTPS for HTML, and no-store for OAuth API responses at CDN/proxy/host layers. The supplied SWA
   header configuration must actually be published; meta referrer alone does not prevent framing.
   Suppress query strings, Location headers, bodies and Authorization in ingress/APM/error capture on
   OAuth routes. Initial API authorization URLs contain client state; code callbacks necessarily reach

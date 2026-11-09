@@ -63,6 +63,15 @@ it('late decision after session teardown cannot navigate',async()=>{
   await act(async()=>{end();resolve(response({redirect:'https://client.test/cb?code=synthetic&state=exact'}));});
   expect(complete).not.toHaveBeenCalled();
 });
+it('a decision response after leaving the screen cannot navigate',async()=>{
+  const complete=setup();await screen.findByRole('heading',{name:'Hermes'});
+  let resolve!: (r:Response)=>void;
+  fetchMock.mockReturnValueOnce(new Promise(r=>{resolve=r;}));
+  fireEvent.click(screen.getByRole('button',{name:'Approve access'}));
+  cleanup();
+  await act(async()=>{resolve(response({redirect:'https://client.test/cb?code=synthetic&state=exact'}));});
+  expect(complete).not.toHaveBeenCalled();
+});
 it('denies substituted callbacks, schemes and state',()=>{
   for(const target of ['https://evil.test/cb?state=exact','https://client.test/other?state=exact','javascript:alert(1)',
     'https://client.test/cb?state=other','https://client.test/cb?state=exact&state=exact','https://client.test/cb?state=exact#leak'])

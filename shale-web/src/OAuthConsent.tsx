@@ -39,7 +39,10 @@ export function OAuthConsent({ token, user, request, onComplete = url => window.
   const [busy, setBusy] = useState(false);
   const [expired, setExpired] = useState(false);
   const submitting = useRef(false);
-  const current = captureSessionRequestGuard(token);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const sessionIsCurrent = captureSessionRequestGuard(token);
+  const current = () => mounted.current && sessionIsCurrent();
   useEffect(() => {
     let active = true;
     setConsent(null); setError(''); setExpired(false);
