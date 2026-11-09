@@ -166,6 +166,7 @@ public class McpOAuthSecurityConfiguration {
                     }))));
         }
         // The gate precedes AS processing. Explicit exchange enables opaque code/refresh issuance and authenticated family revocation.
+        if(durable!=null) http.addFilterBefore(new OAuthBrowserFilter(environment.getProperty("shale.ai.oauth.browser-origin"),properties), SecurityContextHolderFilter.class);
         http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled), SecurityContextHolderFilter.class);
         if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable),SecurityContextHolderFilter.class);
         var chain = http.build();

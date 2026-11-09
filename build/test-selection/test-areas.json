@@ -385,6 +385,7 @@
         "com.shale.server.controller.AuthControllerTest",
         "com.shale.server.oauth.OAuthConfigurationTest",
         "com.shale.server.oauth.OAuthClientMappingTest",
+        "com.shale.server.oauth.OAuthBrowserFilterTest",
         "com.shale.server.oauth.OAuthFilterIsolationTest",
         "com.shale.server.oauth.OAuthMetadataTest",
         "com.shale.server.oauth.ShaleOAuthHumanTest",

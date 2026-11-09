@@ -70,6 +70,7 @@ class OAuthAuthorizationFlowTest {
         try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+sid+"',7,72,'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
         context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.getEnvironment().setActiveProfiles(PRODUCTION?"azure":"test");
         context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("oauth",Map.of("shale.ai.oauth.public-origin",ORIGIN,"shale.ai.oauth.identity",PRODUCTION?"PRODUCTION":"TEST","shale.ai.oauth.composition-enabled","true","shale.ai.oauth.authorization-enabled","true","shale.ai.oauth.exchange-enabled","true","shale.ai.oauth.bootstrap.jdbc-url","jdbc:sqlserver://localhost:"+port+";databaseName="+db,"shale.ai.oauth.bootstrap.username",bootstrapLogin,"shale.ai.oauth.bootstrap.password",bootstrapSecret)));
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("browser",Map.of("shale.ai.oauth.browser-origin",ORIGIN)));
         context.register(McpOAuthSecurityConfiguration.class,com.shale.server.mcp.McpTransportConfiguration.class,Fixtures.class);context.refresh();
     }
     @Configuration static class Fixtures {
@@ -112,6 +113,95 @@ class OAuthAuthorizationFlowTest {
         assertEquals(Set.of(CASES_SEARCH),store.consume(result.get("code"),sid,client,REDIRECT,VERIFIER,ISSUER,RESOURCE).scopes());
         var token=new MockHttpServletRequest("POST","/oauth/mcp/token");token.addParameter("grant_type","authorization_code");token.addParameter("code",result.get("code"));
         var blocked=send(token);assertEquals(400,blocked.getStatus());assertFalse(blocked.getContentAsString().contains("access_token"));
+    }
+    @Test void mountedBrowserNavigationAndPreflightPrecedeBearerAuthentication() throws Exception {
+        var navigation=authorization();navigation.setAttribute("skipAuthorization",true);navigation.addHeader("Accept","text/html");
+        var redirected=send(navigation);assertEquals(302,redirected.getStatus());
+        assertTrue(redirected.getRedirectedUrl().startsWith(ORIGIN+"/oauth/mcp/authorize#"));
+        assertEquals("no-referrer",redirected.getHeader("Referrer-Policy"));
+        var preflight=new MockHttpServletRequest("OPTIONS","/oauth/mcp/authorize");preflight.setAttribute("skipAuthorization",true);
+        preflight.addHeader("Origin",ORIGIN);preflight.addHeader("Access-Control-Request-Method","POST");
+        preflight.addHeader("Access-Control-Request-Headers","authorization,content-type");
+        assertEquals(204,send(preflight).getStatus(),"CORS must run before the foundation method gate");
+    }
+    @Test void browserJsonFlowRequiresExplicitDecisionAndPreservesSingleUseBinding() throws Exception {
+        var start=authorization(); start.addHeader("Accept","application/json");start.addHeader("Origin",ORIGIN);
+        var begun=send(start);assertEquals(200,begun.getStatus());assertNull(begun.getRedirectedUrl());
+        var mapper=new tools.jackson.databind.ObjectMapper();
+        String location=mapper.readTree(begun.getContentAsString()).path("redirect").asText();
+        String nonce=query(location).get("state");
+        var inspect=new MockHttpServletRequest("GET","/oauth/mcp/consent");inspect.addHeader("Accept","application/json");
+        inspect.addParameter("client_id",client);inspect.addParameter("state",nonce);
+        var details=mapper.readTree(send(inspect).getContentAsString());
+        assertEquals(72,details.path("user").asInt());assertEquals(7,details.path("tenant").asInt());
+        assertFalse(details.path("intent_expires_at").asText().isEmpty());
+        var decision=approve(nonce);decision.addHeader("Accept","application/json");decision.addHeader("Origin",ORIGIN);
+        var issued=send(decision);assertEquals(200,issued.getStatus());assertNull(issued.getHeader("Location"));
+        var callback=query(mapper.readTree(issued.getContentAsString()).path("redirect").asText());
+        assertEquals("exact + & = é",callback.get("state"));assertNotNull(callback.get("code"));
+        var replay=approve(nonce);replay.addHeader("Accept","application/json");
+        assertEquals(400,send(replay).getStatus());
+    }
+    @Test void browserForeignTenantAndReplacementSessionCannotInspectOrApproveIntent() throws Exception {
+        String nonce=query(send(authorization()).getRedirectedUrl()).get("state");
+        var original=sessions.current;
+        for(var principal:List.of(new ServerPrincipal(82,8,null),new ServerPrincipal(72,7,null))) {
+            UUID replacement=UUID.randomUUID();var prepared=tokens.prepare(principal);
+            String replacementToken=tokens.issueBound(prepared,replacement);
+            try(var c=owner(db)){sql(c,"INSERT dbo.UserSessions VALUES('"+replacement+"',"+principal.shaleClientId()+","+principal.userId()+",'WEB',DATEADD(hour,2,SYSUTCDATETIME()),NULL)");}
+            sessions.current=new UserSessionView(2,replacement,ClientType.WEB,null,prepared.tokenId(),Instant.now(),Instant.now().plusSeconds(3600),null,null,null);
+            try {
+                for(String path:List.of("/oauth/mcp/consent","/oauth/mcp/authorize")) {
+                    var foreign=path.endsWith("consent")?new MockHttpServletRequest("GET",path):approve(nonce);
+                    foreign.setParameter("state",nonce);foreign.setParameter("client_id",client);
+                    foreign.setAttribute("skipAuthorization",true);foreign.addHeader("Authorization","Bearer "+replacementToken);
+                    foreign.addHeader("Accept","application/json");foreign.addHeader("Origin",ORIGIN);
+                    var denied=send(foreign);assertTrue(denied.getStatus()>=400,"Foreign tenant/session must fail closed");
+                    assertNull(denied.getHeader("Location"));assertFalse(denied.getContentAsString().contains("code"));
+                }
+            } finally {sessions.current=original;}
+        }
+        assertEquals(302,send(approve(nonce)).getStatus(),"Rejected substitutions cannot consume the owner's intent");
+    }
+    @Test void browserConsentAuditFailureRollsBackCodeAndGrant() throws Exception {
+        String nonce=query(send(authorization()).getRedirectedUrl()).get("state");
+        long before=issuedCodeCount();
+        try(var c=owner(db)){sql(c,"CREATE TRIGGER dbo.FailConsentAudit ON dbo.EntityActionAuditLog AFTER INSERT AS IF EXISTS(SELECT 1 FROM inserted WHERE EntityType='AI_DELEGATION_GRANT' AND Action='CREATED') THROW 58999,'Injected consent audit fault',1");}
+        try {
+            var decision=approve(nonce);decision.addHeader("Accept","application/json");decision.addHeader("Origin",ORIGIN);
+            var denied=send(decision);assertTrue(denied.getStatus()>=400);assertNull(denied.getHeader("Location"));
+            assertFalse(denied.getContentAsString().contains("code"));assertEquals(before,issuedCodeCount());
+        } finally {try(var c=owner(db)){sql(c,"DROP TRIGGER dbo.FailConsentAudit");}}
+    }
+    @Test void expiredBrowserIntentCannotBeViewedApprovedOrDenied() throws Exception {
+        String active=query(send(authorization()).getRedirectedUrl()).get("state");
+        String expired=Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]);
+        // Owner-only synthetic fixture inserts historical rows; no clock sleeps or disabled security triggers.
+        try(var c=owner(db);var statement=c.prepareStatement("""
+            DECLARE @old binary(32)=HASHBYTES('SHA2_256',CONVERT(varchar(43),?)),
+                    @expired binary(32)=HASHBYTES('SHA2_256',CONVERT(varchar(43),?));
+            INSERT dbo.AiConsentIntent(ShaleClientId,IntegrationId,UserId,IntentHash,ScopeMask,CreatedAt,ExpiresAt,GrantExpiresAt)
+            SELECT ShaleClientId,IntegrationId,UserId,@expired,ScopeMask,DATEADD(minute,-6,CreatedAt),DATEADD(minute,-6,ExpiresAt),GrantExpiresAt
+            FROM dbo.AiConsentIntent WHERE IntentHash=@old;
+            INSERT dbo.AiAuthorizationTransaction(TransactionId,ShaleClientId,IntegrationId,UserId,WebSessionId,IntentHash,
+              ClientId,Issuer,Resource,RedirectUri,Challenge,ClientState,RequestedScopeMask,RegistrationVersion,CredentialId,CreatedAt,IntentExpiresAt)
+            SELECT NEWID(),ShaleClientId,IntegrationId,UserId,WebSessionId,@expired,ClientId,Issuer,Resource,RedirectUri,Challenge,
+              ClientState,RequestedScopeMask,RegistrationVersion,CredentialId,DATEADD(minute,-6,CreatedAt),DATEADD(minute,-6,IntentExpiresAt)
+            FROM dbo.AiAuthorizationTransaction WHERE IntentHash=@old;
+            """)) {statement.setString(1,active);statement.setString(2,expired);statement.execute();}
+        long before=issuedCodeCount();
+        var inspect=new MockHttpServletRequest("GET","/oauth/mcp/consent");inspect.setParameter("state",expired);inspect.setParameter("client_id",client);
+        var approve=approve(expired);var deny=approve(expired);deny.removeParameter("scope");
+        for(var request:List.of(inspect,approve,deny)) {
+            request.addHeader("Accept","application/json");var response=send(request);
+            assertTrue(response.getStatus()>=400);assertNull(response.getHeader("Location"));assertFalse(response.getContentAsString().contains("code"));
+        }
+        assertEquals(before,issuedCodeCount());
+    }
+    long issuedCodeCount() throws Exception {
+        try(var c=owner(db);var statement=c.createStatement();var rows=statement.executeQuery("SELECT COUNT(*) FROM dbo.AiAuthorizationTransaction WHERE CodeHash IS NOT NULL")) {
+            assertTrue(rows.next());return rows.getLong(1);
+        }
     }
     String freshCode()throws Exception {return query(send(approve(query(send(authorization()).getRedirectedUrl()).get("state"))).getRedirectedUrl()).get("code");}
     MockHttpServletRequest exchangeRequest(String code) {

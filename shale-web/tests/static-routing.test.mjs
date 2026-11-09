@@ -18,7 +18,7 @@ function excluded(path) { return excludes.some(pattern => match(pattern, path));
 
 test('index fallback stays available for supported extensionless routes', () => {
   assert.equal(config.navigationFallback.rewrite, '/index.html');
-  for (const path of ['/', '/login', '/my-shale', '/case-workspace', '/case-workspace/6502', '/cases/6502', '/tasks/1', '/contacts/1', '/organizations/1', '/team/1', '/settings']) {
+  for (const path of ['/', '/login', '/my-shale', '/case-workspace', '/case-workspace/6502', '/cases/6502', '/tasks/1', '/contacts/1', '/organizations/1', '/team/1', '/settings', '/oauth/mcp/authorize']) {
     assert.equal(excluded(path), false, path);
   }
 });
@@ -30,7 +30,10 @@ test('missing emitted assets and nested static file paths cannot resolve to SPA 
   for (const path of ['/assets/missing.js', '/assets/nested/missing.css', '/missing.js', '/nested/missing.png', '/image.svg', '/manifest.webmanifest', '/foundation.html', '/staticwebapp.config.json', '/unknown.pdf']) assert.equal(excluded(path), true, path);
   assert.equal(excluded('/cases/6502/overview'), false);
 });
-test('keeps scope limited to navigationFallback without headers, API proxy or routes', () => {
-  assert.deepEqual(Object.keys(config), ['navigationFallback']);
+test('preserves fallback and protects browser consent from framing and referrer leakage', () => {
+  assert.deepEqual(Object.keys(config), ['navigationFallback', 'globalHeaders']);
+  assert.equal(config.globalHeaders['Referrer-Policy'], 'no-referrer');
+  assert.equal(config.globalHeaders['X-Frame-Options'], 'DENY');
+  assert.match(config.globalHeaders['Content-Security-Policy'], /frame-ancestors 'none'/);
   assert.equal(config.navigationFallback.exclude.includes('/assets/*'), true);
 });

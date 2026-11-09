@@ -78,6 +78,7 @@ public final class DurableOAuthAuthorization implements OAuth2AuthorizationServi
             return OAuth2Authorization.withRegisteredClient(client).id(intent.id().toString()).principalName(human.getName())
                     .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                     .attribute("consentExpiresAt",intent.createdAt().plusSeconds(3600).toString())
+                    .attribute("intentExpiresAt",intent.createdAt().plusSeconds(300).toString())
                     .attribute(Principal.class.getName(),ShaleOAuthHuman.authentication(human))
                     .attribute(OAuth2AuthorizationRequest.class.getName(),original).attribute("state",token).build();
         }).orElse(null);

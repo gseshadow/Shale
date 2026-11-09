@@ -45,6 +45,7 @@ final class OAuthHumanFilter extends OncePerRequestFilter {
                 new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter().write(Map.of("client_id",original.getClientId(),
                         "client_name",authorizations.findByClientId(original.getClientId()).getClientName(),"expires_at",pending.getAttribute("consentExpiresAt"),
                         "scopes",original.getScopes(),"state",request.getParameter("state"),"tenant",identity.tenant(),
+                        "user",identity.user(),"intent_expires_at",pending.getAttribute("intentExpiresAt"),
                         "notice","Approval delegates these Case read scopes to this client for one hour. Minimized Case names, numbers and staff identities may leave Shale."),
                         org.springframework.http.MediaType.APPLICATION_JSON,new org.springframework.http.server.ServletServerHttpResponse(response));
             } else chain.doFilter(request,response);

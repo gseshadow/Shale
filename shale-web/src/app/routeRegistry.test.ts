@@ -6,7 +6,7 @@ import { foundationUrl, previewNavigation } from '../preview/navigation';
 
 // Independent compatibility inventory: adding/changing a route requires a URL decision.
 const expectedRoutes = {
-  root: '/', login: '/login', caseWorkspace: '/case-workspace', caseOverview: '/case-workspace/:caseId', myShale: '/my-shale', cases: '/cases', caseDetail: '/cases/:caseId',
+  oauthAuthorize: '/oauth/mcp/authorize', root: '/', login: '/login', caseWorkspace: '/case-workspace', caseOverview: '/case-workspace/:caseId', myShale: '/my-shale', cases: '/cases', caseDetail: '/cases/:caseId',
   tasks: '/tasks', taskDetail: '/tasks/:taskId', contacts: '/contacts', contactDetail: '/contacts/:contactId',
   organizations: '/organizations', organizationDetail: '/organizations/:organizationId', team: '/team',
   teamMemberDetail: '/team/:userId', settings: '/settings', fallback: '*',
@@ -20,7 +20,7 @@ describe('canonical existing application route ownership', () => {
       expect(operationalRouteIds).not.toContain(id);
     }
     for (const id of operationalRouteIds) expect(routes[id].safeReturn).toBe(true);
-    expect(new Set(Object.values(routes).map(route => route.path)).size).toBe(17);
+    expect(new Set(Object.values(routes).map(route => route.path)).size).toBe(18);
   });
   it.each([
     ['/case-workspace', 'caseWorkspace', 'Case workspace'], ['/case-workspace/7', 'caseOverview', 'Case workspace'],
