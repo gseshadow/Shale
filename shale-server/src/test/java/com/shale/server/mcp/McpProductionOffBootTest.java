@@ -16,6 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Full Boot/embedded HTTP startup, real ordinary beans, no SQL server or simulated AI attestation. */
+@org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
 class McpProductionOffBootTest {
     private final Map<String,String> previous=new LinkedHashMap<>();
 
@@ -42,7 +43,8 @@ class McpProductionOffBootTest {
     }
 
     @ParameterizedTest @ValueSource(strings={"azure","prod"})
-    void fullProductionBootStartsWithoutAiConfigurationAndKeepsProtocolClosed(String profile)throws Exception {
+    void fullProductionBootStartsWithoutAiConfigurationAndKeepsProtocolClosed(String profile, org.springframework.boot.test.system.CapturedOutput output)throws Exception {
+        var before = java.time.ZoneId.systemDefault();
         try(var context=new SpringApplicationBuilder(ShaleServerApplication.class).profiles(profile).run(
                 "--server.port=0","--server.address=127.0.0.1","--shale.ai.oauth.identity=PRODUCTION",
                 "--shale.ai.enabled=false","--shale.ai.mcp.enabled=false",
@@ -50,6 +52,15 @@ class McpProductionOffBootTest {
                 "--shale.ai.mcp.search-cases-enabled=false","--shale.ai.mcp.get-case-overview-enabled=false",
                 "--shale.ai.oauth.composition-enabled=false","--shale.ai.oauth.authorization-enabled=false",
                 "--shale.ai.oauth.exchange-enabled=false")) {
+            var diagnosticLines = output.getAll().lines().filter(line -> line.contains("SHALE_JVM_STARTUP ")).toList();
+            assertEquals(1, diagnosticLines.size(), "All-OFF production Boot must log exactly one JVM diagnostic");
+            String replica = System.getenv("WEBSITE_INSTANCE_ID");
+            if (replica == null || !replica.matches("[A-Za-z0-9_-]{1,128}")) replica = "unavailable";
+            assertTrue(diagnosticLines.getFirst().endsWith("SHALE_JVM_STARTUP zoneId=" + before.getId()
+                    + " javaVersion=" + Runtime.version() + " replicaId=" + replica),
+                    "Startup evidence must come from the running JVM with only the three approved fields");
+            assertEquals(before, java.time.ZoneId.systemDefault(), "OFF Boot diagnostic must not change time zone");
+            assertNotNull(context.getBean(com.shale.server.diagnostics.JvmStartupDiagnostic.class));
             assertEquals(List.of(profile),List.of(context.getEnvironment().getActiveProfiles()));
             assertInstanceOf(BearerTokenServerSessionResolver.class,context.getBean(ServerSessionResolver.class));
             assertInstanceOf(SqlDurableSessionStore.class,context.getBean(DurableSessionStore.class));

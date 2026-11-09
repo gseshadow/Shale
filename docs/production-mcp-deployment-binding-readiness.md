@@ -1,5 +1,15 @@
 # Production MCP immutable deployment binding readiness
 
+**Startup diagnostic preparation — 2026-11-09:** accepted operator discovery now records Linux /
+Microsoft OpenJDK 21.0.13, one production replica, OS `Etc/UTC`, unset `TZ`/`WEBSITE_TIME_ZONE`, SQL
+clock UTC, and an existing empty `AiCaseDataDeployment` at `shale.database.windows.net/Shale`.
+All three dedicated identities passed production verification. The running JVM zone remains
+UNVERIFIED. The [startup diagnostic implementation and release requirements](production-jvm-startup-diagnostic.md)
+provide a separately governed future JAR route while all controls stay OFF. This supersedes the
+historical statement that the repository has no narrow diagnostic implementation; it does not
+claim the diagnostic is deployed, waive any binding gate or authorize deployment/SQL/settings changes.
+
+
 Prepared 2026-11-09 against `codex/latest` at `9671ac5be4ccd0ee5895697f986b9e46ef08cc57`.
 **Installation BLOCKED pending the confirmations below.** All SQL is an unexecuted proposal.
 No production SQL connection, secret retrieval, SQL execution, JAR deployment or AI/MCP/OAuth
