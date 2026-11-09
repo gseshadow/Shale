@@ -1,5 +1,17 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
+**Dormant startup evidence extension — 2026-11-09:** the
+[JVM/controls diagnostic runbook](../production-jvm-startup-diagnostic.md#eight-control-startup-evidence-extension--2026-11-09)
+records a separate fixed-format `SHALE_AI_CONTROLS_STARTUP` INFO entry alongside the unchanged JVM
+marker. It reconciles all eight resolved startup controls with bound properties, constructed security
+gates, policy reads, recorded Spring conditions and existing bean registrations. Values are individually
+TRUE/FALSE/UNKNOWN; release-evidence readiness is blocked unless all are reliably FALSE and nonsecret
+build/startup/replica correlation is complete. Ordinary startup/health/auth/RLS and feature decisions
+are unchanged. No endpoint, SQL, attestation, credentials or external dependency is added. Audit review:
+allowlisted operational metadata has no sensitive read or domain/admin mutation, so no audit row/schema
+change is appropriate. Production evidence, deployment authorization and AI activation gates remain open;
+the current JAR cannot report new code before the one separately approved successor deployment.
+
 **Current deployment decision:** the [production preflight](../production-mcp-deployment-preflight.md#current-decision--2026-11-04)
 and [final diagnostic evidence](../testing/native-azure-diagnostic-closeout.md) supersede earlier retry
 instructions and umbrella deployment classifications for a dormant JAR only. Native Azure acceptance

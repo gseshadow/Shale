@@ -3,6 +3,8 @@ package com.shale.server.mcp;
 import com.shale.data.config.DataSources;
 import com.shale.data.security.ai.AiAccessTokenValidator;
 import com.shale.server.oauth.McpOAuthProperties;
+import com.shale.server.diagnostics.AiStartupControls.Control;
+import com.shale.server.diagnostics.AiStartupControls.Value;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.modern.McpSchema;
@@ -33,9 +35,35 @@ import java.util.Map;
 @Import({McpSearchConfiguration.class,McpOverviewConfiguration.class})
 @EnableConfigurationProperties({McpTransportProperties.class,McpOAuthProperties.class})
 public class McpTransportConfiguration {
+    private McpCaseCompositionPolicy startupPolicy;
+    private Map<Control, Value> startupGateControls = Map.of();
+
+    /** Boolean-only observations; inspecting these cannot instantiate or attest an AI boundary. */
+    public Map<Control, Value> startupPolicyControls() {
+        return startupPolicy == null ? Map.of() : startupPolicy.startupControls();
+    }
+
+    public Map<Control, Value> startupGateControls() { return startupGateControls; }
+
+    /** Existing bean metadata only, including replacements; never initializes a boundary/handler. */
+    public Map<Control, Value> startupBoundaryRegistrations(
+            org.springframework.beans.factory.config.ConfigurableListableBeanFactory factory) {
+        return Map.of(Control.CASE_DATA, initialized(factory, McpAiCaseData.class),
+                Control.SEARCH, initialized(factory, McpSearchHandler.class),
+                Control.OVERVIEW, initialized(factory, McpOverviewHandler.class));
+    }
+
+    private static Value initialized(org.springframework.beans.factory.config.ConfigurableListableBeanFactory factory,
+            Class<?> type) {
+        String[] names = factory.getBeanNamesForType(type, true, false);
+        if (names.length == 0) return Value.FALSE;
+        return names.length == 1 && factory.containsSingleton(names[0]) ? Value.TRUE : Value.UNKNOWN;
+    }
+
     @Bean
     McpCaseCompositionPolicy mcpCaseCompositionPolicy(Environment environment, McpOAuthProperties identity) {
-        return new McpCaseCompositionPolicy(environment, identity);
+        startupPolicy = new McpCaseCompositionPolicy(environment, identity);
+        return startupPolicy;
     }
 
     @Bean(initMethod="report")
@@ -79,7 +107,8 @@ public class McpTransportConfiguration {
                 .securityContext(c->c.securityContextRepository(new NullSecurityContextRepository()))
                 .sessionManagement(c->c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(c->c.anyRequest().permitAll());
-        http.addFilterBefore(new McpGate(transport,identity,env.getProperty("shale.ai.enabled",Boolean.class,false),
+        boolean globalEnabled = env.getProperty("shale.ai.enabled",Boolean.class,false);
+        http.addFilterBefore(new McpGate(transport,identity,globalEnabled,
                 (token,deadline)->{
                     var protectedData=confined.getIfAvailable();
                     if(protectedData!=null)return protectedData.authenticate(token,deadline);
@@ -87,7 +116,9 @@ public class McpTransportConfiguration {
                     var fixture=validators.getIfAvailable();
                     return fixture!=null?fixture.validate(token):bounded.getObject().validate(token,deadline);
                 },System::nanoTime),SecurityContextHolderFilter.class);
-        return http.build();
+        var chain = http.build();
+        startupGateControls = Map.of(Control.AI, Value.of(globalEnabled), Control.MCP, Value.of(transport.enabled()));
+        return chain;
     }
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${shale.ai.mcp.case-data-composition-enabled:false}' == 'true' || ('${shale.ai.enabled:false}' == 'true' && '${shale.ai.mcp.enabled:false}' == 'true' && ('${shale.ai.mcp.search-cases-enabled:false}' == 'true' || '${shale.ai.mcp.get-case-overview-enabled:false}' == 'true'))")

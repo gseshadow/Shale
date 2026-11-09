@@ -47,6 +47,15 @@ class McpCaseCompositionTest {
             if(transport&&!common) {
                 assertThrows(RuntimeException.class,()->context(profile,properties,mock(McpAiCaseData.class)),"Incomplete production transport must refuse Spring composition");
             } else try(var context=context(profile,properties,mock(McpAiCaseData.class))) {
+                var observations=context.getBean(McpTransportConfiguration.class);
+                var controls=com.shale.server.diagnostics.AiStartupControls.Control.values();
+                for(int bit=0;bit<flags.length;bit++)assertEquals(
+                        com.shale.server.diagnostics.AiStartupControls.Value.of((mask&(1<<bit))!=0),
+                        observations.startupPolicyControls().get(controls[bit]),
+                        "Startup evidence must preserve every independent policy flag: "+flags[bit]);
+                assertEquals(Map.of(controls[0],com.shale.server.diagnostics.AiStartupControls.Value.of((mask&1)!=0),
+                        controls[1],com.shale.server.diagnostics.AiStartupControls.Value.of(transport)),
+                        observations.startupGateControls(),"Observe the exact booleans used by the constructed transport gate");
                 assertEquals(common&&(mask&8)!=0, !context.getBeansOfType(McpSearchHandler.class).isEmpty());
                 assertEquals(common&&(mask&16)!=0, !context.getBeansOfType(McpOverviewHandler.class).isEmpty());
                 assertEquals(transport,context.containsBean("mcpServlet"));
@@ -113,6 +122,20 @@ class McpCaseCompositionTest {
                 assertTrue(response.getStatus()>=400);
             }
         }
+    }
+
+    @Test void startupPolicyObservationRetainsAConsumedDisagreementEvenAfterTheValueReturnsFalse() {
+        var env=environment("azure");
+        for(String key:List.of(GLOBAL,TRANSPORT,SEARCH,OVERVIEW,McpCaseCompositionPolicy.COMPOSITION))env.setProperty(key,"false");
+        var policy=new McpCaseCompositionPolicy(env,PRODUCTION);
+        assertFalse(policy.boundaryRequired());
+        env.setProperty(GLOBAL,"true");
+        assertFalse(policy.boundaryRequired(),"MCP remains OFF; the observation must not change a decision");
+        env.setProperty(GLOBAL,"false");
+        assertFalse(policy.boundaryRequired());
+        assertEquals(com.shale.server.diagnostics.AiStartupControls.Value.UNKNOWN,
+                policy.startupControls().get(com.shale.server.diagnostics.AiStartupControls.Control.AI),
+                "A FALSE reread must not conceal a different Boolean consumed during startup");
     }
 
     @Test void readinessLogContainsOnlyClosedStateAndNeverDiagnosticDetails() {

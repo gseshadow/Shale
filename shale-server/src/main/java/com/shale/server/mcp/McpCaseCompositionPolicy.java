@@ -1,6 +1,12 @@
 package com.shale.server.mcp;
 
 import com.shale.server.oauth.McpOAuthProperties;
+import com.shale.server.diagnostics.AiStartupControls;
+import static com.shale.server.diagnostics.AiStartupControls.Control.*;
+import com.shale.server.diagnostics.AiStartupControls.Control;
+import com.shale.server.diagnostics.AiStartupControls.Value;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 
@@ -9,10 +15,13 @@ final class McpCaseCompositionPolicy {
     static final String COMPOSITION = "shale.ai.mcp.case-data-composition-enabled";
     private final Environment environment;
     private final McpOAuthProperties identity;
+    private final Map<Control, Value> startupControls;
 
     McpCaseCompositionPolicy(Environment environment, McpOAuthProperties identity) {
         this.environment = environment;
         this.identity = identity;
+        this.startupControls = new ConcurrentHashMap<>(AiStartupControls.read(environment,
+                AI, MCP, CASE_DATA, SEARCH, OVERVIEW));
         if (production() && environment.acceptsProfiles(Profiles.of("test", "local", "dev"))) throw refused();
     }
 
@@ -60,7 +69,16 @@ final class McpCaseCompositionPolicy {
         identity.resource();
     }
 
-    private boolean flag(String name) { return environment.getProperty(name, Boolean.class, false); }
+    Map<Control, Value> startupControls() { return Map.copyOf(startupControls); }
+
+    private boolean flag(String name) {
+        boolean consumed = environment.getProperty(name, Boolean.class, false);
+        // Retain disagreement with any value actually consumed by this policy. No decision changes.
+        for (Control control : startupControls.keySet()) {
+            if (control.key().equals(name)) startupControls.merge(control, Value.of(consumed), Value::agree);
+        }
+        return consumed;
+    }
     private static IllegalStateException refused() {
         return new IllegalStateException("AI Case composition is not authorized by the active profile, identity and controls.");
     }

@@ -1,5 +1,108 @@
 # Production JVM startup diagnostic
 
+## Eight-control startup evidence extension — 2026-11-09
+
+The successor prepared from `codex/latest` commit `d9747133a5b48cc0cd30e4a93f5254b26976f32d`
+preserves `JvmStartupDiagnostic` and its exact three-field `SHALE_JVM_STARTUP` INFO payload.
+It adds an independent, unconditional `AiControlsStartupDiagnostic` ApplicationRunner. Both run
+in the actual server JVM after context initialization, before application-ready notification.
+This is preparation for **one reviewed dormant server JAR deployment**, not deployment authorization.
+No production effective control value or JVM zone has been verified by these source changes/tests.
+
+### Fixed controls record and readiness meaning
+
+Exactly one INFO entry per runner instance uses this fixed field order (example only):
+
+```text
+SHALE_AI_CONTROLS_STARTUP shale.ai.enabled=FALSE shale.ai.mcp.enabled=FALSE shale.ai.mcp.case-data-composition-enabled=FALSE shale.ai.mcp.search-cases-enabled=FALSE shale.ai.mcp.get-case-overview-enabled=FALSE shale.ai.oauth.composition-enabled=FALSE shale.ai.oauth.authorization-enabled=FALSE shale.ai.oauth.exchange-enabled=FALSE replicaId=0123456789abcdef buildVersion=1.0.138 buildTime=2026-11-09T12:00:00Z startedAt=2026-11-09T12:05:00Z startupId=01234567-89ab-cdef-0123-456789abcdef readiness=READY
+```
+
+Each canonical control is independently `TRUE`, `FALSE`, or `UNKNOWN`. A disabled parent or absent
+handler never converts a TRUE child setting to FALSE. Missing, inaccessible, nonliteral, malformed,
+contradictory or unsupported evidence is UNKNOWN, never a defaulted FALSE. The diagnostic resolves
+only these eight keys through the current Spring Environment, including effective profile Config
+Data, imports, placeholders, command-line/JSON/system/environment overrides and custom precedence.
+It does not enumerate settings, property sources, environment variables or JVM properties.
+
+`readiness=READY` means **only that this dormant-release startup evidence is complete**: all eight
+reconciled values are FALSE and all five correlation fields are valid/available. TRUE, UNKNOWN,
+missing consumers/condition decisions, unexpected/uninitialized conditional registrations or missing
+correlation produce `readiness=BLOCKED`. Missing/filtered INFO entries also block operator acceptance.
+This is a fail-closed **release acceptance** verdict, not a change to `/api/health`, database health,
+Spring ApplicationAvailability, SQL attestation or `AI_CASE_SQL_READINESS`. The diagnostic does not
+abort ordinary startup, alter authentication/RLS, disable existing features, or grant activation.
+A later startup failure still invalidates the evidence. Fatal JVM errors are not swallowed.
+
+### Evidence comes from actual startup consumers
+
+Pre-edit impact inspection covered the existing `JvmStartupDiagnosticTest`,
+`McpProductionOffBootTest`, `McpCaseCompositionTest`, `OAuthConfigurationTest`,
+`OAuthMetadataTest`, `OAuthSecurityTestContext` and references in the neighboring MCP/OAuth tests.
+The existing startup consumers keep their decisions and Boolean conversion/default behavior:
+
+| Controls | Actual consumed evidence reconciled by the runner |
+| --- | --- |
+| AI, MCP, Case-data composition, search, Overview | Initial effective five-control observation in the existing MCP policy, with sticky agreement against each Boolean actually read by that policy during startup |
+| AI, MCP | Exact global Boolean passed to the constructed MCP gate and bound `McpTransportProperties.enabled()` used by that gate |
+| OAuth composition, authorization, exchange | Exact bound composition Boolean and authorization/exchange Booleans used to construct the OAuth foundation gate/security chain |
+| MCP, OAuth composition | Existing initialized configuration-properties records, independently compared with the constructed gates |
+| Conditional activation | Spring's existing recorded OnPropertyCondition results for transport/body filter, both handler configurations and exchange bootstrap; recorded OnExpressionCondition result for the Case boundary; actual initialized/absent bean registrations, including typed boundary/handler replacements |
+
+No condition is reevaluated and no condition message/property source is printed. A mismatch between
+the existing case-sensitive expression and Boolean conversion (for example uppercase `TRUE`) fails
+closed. Missing observations remain UNKNOWN. The runner never instantiates lazy AI components,
+calls `McpCaseReadiness.state/report`, opens a pool, attests a boundary, runs a handler, or obtains
+OAuth/SQL services. Reading the observations works with all eight controls OFF and no AI credentials.
+This is startup evidence only; later refresh/configuration changes require new governed evidence.
+
+`replicaId` uses only the existing approved `WEBSITE_INSTANCE_ID` getter. `buildVersion`/`buildTime`
+come from the already-generated Boot build-info resource, `startedAt` from context startup time,
+and `startupId` is a new random UUID for this context/runner. No new build dependency/plugin or
+credential is added. Version/replica tokens are bounded at 128 ASCII characters; timestamp fields
+must parse as bounded UTC Instants; the startup ID must have the UUID token shape. Unsafe or missing
+metadata is replaced entirely by `unavailable`; raw values and exception text are never logged.
+Build version/time are correlation, not a substitute for the exact reviewed JAR SHA-256 and provenance.
+Match both startup markers using the existing log process ID/timestamp, replica, release window,
+build metadata and source/artifact deployment record. The original JVM payload remains unchanged.
+
+Audit compatibility: these are allowlisted nonsecret operational observations, with no sensitive
+application read, tenant/actor action, SQL or domain/admin mutation. No PHI/integration/entity/session
+audit row is appropriate; existing transactional audits/schema remain unchanged. No migration or
+deferred audit-schema work is required. Existing auth, RLS, payload logging and restriction gates remain.
+
+### One-deployment operator acceptance and limitations
+
+The old running JAR cannot execute this new diagnostic. Before deployment, use existing approved
+nonsecret evidence for the current dormant configuration; packaged defaults, the rollback copy and
+an undeployed JAR cannot prove the old process's effective flags. If that evidence is absent, record
+the predeployment effective-values gate as unresolved. This PR does not silently waive that gate or
+claim a new diagnostic can prove the predecessor's values before it has been deployed.
+
+After review and separate authorization of the exact successor JAR, the existing one-deployment
+procedure can collect **both** diagnostics from the replacement JVM. No preliminary diagnostic JAR,
+Azure setting change, new endpoint/Actuator exposure, SQL query, agent or extra restart is proposed.
+Retain the already SHA-256-verified production rollback copy. Preserve all eight OFF inputs and
+ordinary settings; no AI origin/credential/configuration addition is required to run these diagnostics.
+
+Use the existing approved private log destination and read-only worker inventory command below.
+For every current serving worker require one current-process JVM marker and controls marker,
+all eight FALSE, `readiness=READY`, complete correlation, and successful ordinary startup/established
+release acceptance. A local run without `WEBSITE_INSTANCE_ID` correctly prints unavailable/BLOCKED
+while ordinary startup and health continue. Inventory workers again after collection; a new/recycled
+worker needs fresh evidence. UNKNOWN/TRUE/BLOCKED, missing markers, uncorrelated builds/processes,
+unexpected AI readiness, or ordinary compatibility failure is STOP for operator review, not permission
+to repair settings, run SQL or activate features. AI readiness/serving/pilot gates remain closed.
+
+Focused tests cover all 256 independent Boolean output combinations, each of the eight TRUE/FALSE/
+UNKNOWN resolutions, missing/conflicting consumer evidence, aliases/precedence/placeholders, changed
+startup values, mismatched bound properties, conditional-decision disagreement, unexpected/lazy beans,
+metadata sanitization and one INFO event. The existing real azure/prod all-OFF Boot regression checks
+both markers plus ordinary auth/session beans, health, protected-route denial, closed protocol routes
+and no AI pool. Tests use synthetic local state; SQL opt-ins remain unenabled. Validation results for
+this successor are recorded in its draft PR; the older results below retain their original scope.
+
+---
+
 Prepared 2026-11-09 on `codex/latest` baseline `259180cf1c6685f19954fb13352b0cd24fc76a4e`.
 This change prepares a dormant server release. **No deployment, restart, Azure setting change,
 production SQL, secret retrieval or AI/MCP/OAuth activation is authorized or performed here.**
