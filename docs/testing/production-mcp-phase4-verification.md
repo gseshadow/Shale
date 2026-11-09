@@ -41,7 +41,36 @@ Production-to-test mapping: `AiJdbcUrl` / `DataSources` -> `AiJdbcUrlTest`,
 
 ## Local verification
 
-Commands and final results will be recorded after the focused, selector-affected and critical runs.
+Final results: **PASS**. Zero failures/errors/skips in the executed Maven tests.
+
+| Check | Result |
+| --- | --- |
+| Focused datasource/OAuth/composition/OFF Boot | 27 tests PASS |
+| Selector affected security-data/server/Case dependencies | 197 tests PASS |
+| Critical reactor, all modules | 237 tests PASS |
+| Selector Python unit tests | 32 PASS |
+| Deployment-binding packet checks selected by security-data | 5 PASS |
+| `git diff --check b3d6f86c HEAD` | PASS |
+
+Exact commands, from the repository root (the existing `/workspace/.tools/bin/mvn` launcher
+selects Maven 3.9.11, JDK 21, workspace cache and the configured proxy/trust settings):
+
+```bash
+/workspace/.tools/bin/mvn -B -pl shale-server -am -Dtest=AiJdbcUrlTest,DataSourcesAiCaseDataTest,OAuthCodeBootstrapConfigurationTest,OAuthConfigurationTest,McpCaseCompositionTest,McpProductionOffBootTest -Dsurefire.failIfNoSpecifiedTests=false test
+python build/test-selection/select_tests.py --base b3d6f86c --head HEAD --output work/selection.json
+PATH=/workspace/.tools/bin:$PATH python build/test-selection/run_selection.py work/selection.json --command affected
+python -m unittest discover -s build/test-selection -p test_select_tests.py
+python -m unittest discover -s build/deployment-binding -p test_packet.py
+/workspace/.tools/bin/mvn -B test
+git diff --check b3d6f86c HEAD
+```
+
+The selector's areas cover shared connection configuration, OAuth/exchange/filter isolation,
+Case readiness, tenant/RLS/audit and ordinary authentication regressions. The selector flagged the
+inventory/mapping edits for informational full-suite escalation; `-Pall-tests` was not run. The
+required focused, selected affected and critical checks passed. Opt-in SQL classes execute no SQL
+without their explicit disposable-fixture environment. No live SQL, certificate handshake, native
+Azure acceptance or browser/client consent campaign was executed; those are not claimed as passes.
 Maven 3.9.11 and JDK 21 use the existing workspace launcher and dependency cache. Initial development
 runs exposed a missing-property test fixture error and an unavailable data-module Mockito dependency;
 the fixture and test were corrected without adding a dependency or weakening the security contract.
