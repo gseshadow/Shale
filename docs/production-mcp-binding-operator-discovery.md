@@ -1,5 +1,15 @@
 # Read-only production binding discovery checklist
 
+**Startup diagnostic preparation — 2026-11-09:** accepted operator discovery now records Linux /
+Microsoft OpenJDK 21.0.13, one production replica, OS `Etc/UTC`, unset `TZ`/`WEBSITE_TIME_ZONE`, SQL
+clock UTC, and an existing empty `AiCaseDataDeployment` at `shale.database.windows.net/Shale`.
+All three dedicated identities passed production verification. The running JVM zone remains
+UNVERIFIED. The [startup diagnostic implementation and release requirements](production-jvm-startup-diagnostic.md)
+provide a separately governed future JAR route while all controls stay OFF. This supersedes the
+historical statement that the repository has no narrow diagnostic implementation; it does not
+claim the diagnostic is deployed, waive any binding gate or authorize deployment/SQL/settings changes.
+
+
 Target supplied by the operator: App Service **shale-api**, resource group **Shale**, SQL server
 **shale.database.windows.net**, database **Shale**. These identifiers are supplied facts; the values
 returned below are live evidence only after an authorized operator runs the checks. No commands
