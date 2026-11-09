@@ -4511,3 +4511,16 @@ conditional SQL order; the [closeout decision table](../testing/native-azure-dia
 separates completed evidence from production prerequisites. AI readiness/enablement and the one-client
 pilot remain blocked by native/live and all retained Category B approvals. No new probe, diagnostic,
 grant, timeout, migration or audit event/schema is introduced by this status-only update.
+
+### Phase 4 browser authorization/consent source increment — 2026-11-09
+
+The [Phase 4 browser security design and operator runbook](../production-mcp-phase4-acceptance-runbook.md#phase-4-browser-authorization-and-consent--november-9-2026)
+adds the existing Shale WEB login/return/session controls as consumer of §10.17's durable consent
+protocol. A configured canonical UI origin receives browser navigation; authenticated JSON redirects
+keep WEB bearers out of client callbacks. Explicit consent, original session/tenant binding, S256,
+SQL expiry/replay and maintained-AS validation remain authoritative. No second authentication system,
+SQL migration, immutable-binding change, token contract change or activation is introduced.
+Audit compatibility uses the existing transactional grant/code/entity-action seam; no PHI is read by
+the new UI, no UI-generated authoritative audit is added, and no new audit schema is needed.
+[Verification](../testing/production-mcp-phase4-verification.md#browser-authorization-and-consent-verification)
+distinguishes local SQL, browser mocks, pinned MCP compatibility and unexecuted Hermes/deployed gates.

@@ -1,3 +1,4 @@
+import { OAuthConsent } from './OAuthConsent';
 import { startTransition, FormEvent, useEffect, useMemo, useState, useRef, createContext, useContext } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { redirectPathFrom } from './returnPath';
@@ -179,6 +180,11 @@ function SessionProtectedRoutes() {
   const { authState, sessionGeneration } = useAppSession();
   return <ProtectedRoute key={sessionGeneration} authState={authState} />;
 }
+function SessionOAuthConsent() {
+  const { authState } = useAppSession();
+  const location = useLocation();
+  return <OAuthConsent token={authState.accessToken ?? ''} user={authState.user!} request={location.hash.slice(1)} />;
+}
 function SessionShell() {
   const { authState, handleLogout } = useAppSession();
   return <CaseWorkspaceMemory token={authState.accessToken ?? ''}><AppShell user={authState.user} onLogout={handleLogout} /></CaseWorkspaceMemory>;
@@ -198,7 +204,7 @@ export const appRouteObjects: RouteObject[] = [{
   children: [
     { path: routes.root.path, element: <PublicRoute id="root" /> },
     { path: routes.login.path, element: <PublicRoute id="login" /> },
-    { element: <SessionProtectedRoutes />, children: [{ element: <SessionShell />, children:
+    { element: <SessionProtectedRoutes />, children: [{ path: routes.oauthAuthorize.path, element: <SessionOAuthConsent /> }, { element: <SessionShell />, children:
       operationalRouteIds.map(id => ({ path: routes[id].path, element: <OperationalScreen id={id} /> })),
     }] },
     { path: routes.fallback.path, element: <PublicRoute id="fallback" /> },

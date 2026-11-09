@@ -2,7 +2,7 @@ import { generatePath, matchPath } from 'react-router-dom';
 
 type Navigation = { label: string; order: number } | { parent: 'caseWorkspace' | 'cases' | 'tasks' | 'contacts' | 'organizations' | 'team' } | null;
 type RouteDefinition = {
-  kind: 'operational' | 'public' | 'fallback';
+  kind: 'operational' | 'public' | 'protected' | 'fallback';
   path: string;
   navigation: Navigation;
   safeReturn: boolean;
@@ -12,6 +12,7 @@ type RouteDefinition = {
 // enforcement. No components, API clients or shell imports may enter this module.
 export const routes = {
   root: { kind: 'public', path: '/', navigation: null, safeReturn: false },
+  oauthAuthorize: { kind: 'protected', path: '/oauth/mcp/authorize', navigation: null, safeReturn: true },
   login: { kind: 'public', path: '/login', navigation: null, safeReturn: false },
   myShale: { kind: 'operational', path: '/my-shale', navigation: { label: 'My Shale', order: 0 }, safeReturn: true },
   caseWorkspace: { kind: 'operational', path: '/case-workspace', navigation: { label: 'Case workspace', order: 2.5 }, safeReturn: true },
@@ -52,6 +53,7 @@ export function matchExistingRoute(pathname: string) {
   return operationalRouteIds.find(id => matchPath({ path: routes[id].path, end: true }, pathname));
 }
 export function isSafeReturnRoute(pathname: string): boolean {
+  if (pathname === routes.oauthAuthorize.path) return true;
   const id = matchExistingRoute(pathname);
   return id !== undefined && routes[id].safeReturn;
 }
