@@ -6,7 +6,7 @@ IF @BindServer IS NULL OR @BindDatabase IS NULL OR @BindOrigin IS NULL
 IF CONVERT(varbinary(max),@BindServer)<>CONVERT(varbinary(max),CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')))
  OR CONVERT(varbinary(max),@BindDatabase)<>CONVERT(varbinary(max),DB_NAME())
  THROW 59301,'Wrong logical server or database.',1;
-/* Full URI validation uses the existing McpOAuthProperties offline probe, not SQL URL guessing. */
+/* Full canonical URI validation is operator evidence against existing McpOAuthProperties rules. */
 IF DATALENGTH(@BindOrigin)=0 OR DATALENGTH(@BindOrigin)>480
  OR DATALENGTH(@BindIssuer)>512 OR DATALENGTH(@BindResource)>512
  OR CONVERT(varbinary(max),@BindIssuer)<>CONVERT(varbinary(max),@BindOrigin+N'/oauth/mcp')

@@ -203,3 +203,26 @@ one guarded durable INSERT/no replacement, fail-closed defaults, exact V2 source
 output under Denver DST and Kolkata non-hour offsets. These are packaging/contract checks, not SQL
 execution/production acceptance. No local SQL mutation fixture is run. Live SQL compilation,
 concurrency and commit semantics remain unverified until separately authorized operator execution.
+
+Validation on 2026-11-09:
+
+| Command | Result |
+| --- | --- |
+| `python -m unittest discover -s build/deployment-binding -p test_packet.py -v` | 5 PASS |
+| `python -m unittest discover -s build/test-selection -p test_select_tests.py` | 32 PASS |
+| `mvn -pl shale-data,shale-server -am -Dtest=AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,AiCaseDataAttestationTest,OAuthConfigurationTest,McpProductionOffBootTest -Dsurefire.failIfNoSpecifiedTests=false test` | 20 PASS |
+| `python build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format json` followed by its `selected_maven_args` | security-data suite: 142 PASS |
+| `mvn test` | critical reactor: 228 PASS |
+| `git diff --check` | PASS |
+
+Maven execution used workspace-installed Maven 3.9.11/JDK 21.0.13, the session proxy settings file,
+workspace local repository and existing system CA trust (`-s work/maven-settings.xml`,
+`-Dmaven.repo.local=/workspace/Shale/work/m2`,
+`JAVA_HOME=/workspace/Shale/work/jdk21`,
+`MAVEN_OPTS=-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts`). The initial bundled compiler,
+default unwritable Maven cache and missing proxy/CA configuration were corrected without repository
+build changes. SQL opt-ins were absent/removed; the selected local SQL class ran zero fixture tests,
+which is not SQL acceptance. The selector's full-suite recommendation from selector infrastructure
+changes is informational; no runtime production behavior changed. SQL files were inspected/tested as
+text only. Changed-file review maps packet/helper to the new Python checks, selector mapping to its
+32 tests, and unchanged attestation/OAuth/default-OFF/security contracts to the focused/affected suites.
