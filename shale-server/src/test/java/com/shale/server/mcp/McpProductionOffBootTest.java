@@ -61,6 +61,20 @@ class McpProductionOffBootTest {
                     "Startup evidence must come from the running JVM with only the three approved fields");
             assertEquals(before, java.time.ZoneId.systemDefault(), "OFF Boot diagnostic must not change time zone");
             assertNotNull(context.getBean(com.shale.server.diagnostics.JvmStartupDiagnostic.class));
+            var controlLines = output.getAll().lines().filter(line -> line.contains("SHALE_AI_CONTROLS_STARTUP ")).toList();
+            assertEquals(1, controlLines.size(), "All-OFF Boot must emit one separate controls INFO entry");
+            StringBuilder controls = new StringBuilder("SHALE_AI_CONTROLS_STARTUP");
+            for (var control : com.shale.server.diagnostics.AiStartupControls.Control.values())
+                controls.append(' ').append(control.key()).append("=FALSE");
+            var build = context.getBean(org.springframework.boot.info.BuildProperties.class);
+            controls.append(" replicaId=").append(replica).append(" buildVersion=").append(build.getVersion())
+                    .append(" buildTime=").append(build.getTime()).append(" startedAt=")
+                    .append(java.time.Instant.ofEpochMilli(context.getStartupDate())).append(" startupId=");
+            assertTrue(controlLines.getFirst().contains(controls),
+                    "Report actual bound/consumed/conditional startup state, not merely packaged defaults");
+            assertTrue(controlLines.getFirst().matches(".* startupId=[a-f0-9-]{36} readiness="
+                    + ("unavailable".equals(replica) ? "BLOCKED" : "READY")),
+                    "Missing replica evidence blocks release readiness without breaking ordinary Boot");
             assertEquals(List.of(profile),List.of(context.getEnvironment().getActiveProfiles()));
             assertInstanceOf(BearerTokenServerSessionResolver.class,context.getBean(ServerSessionResolver.class));
             assertInstanceOf(SqlDurableSessionStore.class,context.getBean(DurableSessionStore.class));

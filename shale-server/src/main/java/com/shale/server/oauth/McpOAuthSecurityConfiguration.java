@@ -22,6 +22,9 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.NullSecurityContextRepository;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.shale.server.diagnostics.AiStartupControls.Control;
+import com.shale.server.diagnostics.AiStartupControls.Value;
+import java.util.Map;
 
 /** The only Spring security chain. Unmatched Shale routes retain their controller/service authority. */
 @Configuration(proxyBeanMethods = false)
@@ -29,6 +32,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @org.springframework.context.annotation.Import(OAuthCodeBootstrapConfiguration.class)
 @EnableConfigurationProperties(McpOAuthProperties.class)
 public class McpOAuthSecurityConfiguration {
+    private Map<Control, Value> startupControls = Map.of();
+
+    /** Values passed to the constructed security gate, never credentials or OAuth origin. */
+    public Map<Control, Value> startupControls() { return startupControls; }
+
     @Bean
     SecurityFilterChain mcpOAuthFoundation(HttpSecurity http, McpOAuthProperties properties, Environment environment,
             org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.ShaleAuthTokenService> tokens,
@@ -160,7 +168,11 @@ public class McpOAuthSecurityConfiguration {
         // The gate precedes AS processing. Explicit exchange enables opaque code/refresh issuance and authenticated family revocation.
         http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled), SecurityContextHolderFilter.class);
         if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable),SecurityContextHolderFilter.class);
-        return http.build();
+        var chain = http.build();
+        startupControls = Map.of(Control.OAUTH_COMPOSITION, Value.of(properties.compositionEnabled()),
+                Control.OAUTH_AUTHORIZATION, Value.of(authorizationEnabled),
+                Control.OAUTH_EXCHANGE, Value.of(exchangeEnabled));
+        return chain;
     }
 
     private static final class FoundationGate extends OncePerRequestFilter {
