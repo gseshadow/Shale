@@ -1,5 +1,14 @@
 # Production MCP integration readiness — 2026-11-06
 
+## Immutable binding phase — 2026-11-09
+
+Production identity verification is operator-reported PASS for all three dedicated contained users;
+do not repeat provisioning or completed migrations. The
+[binding readiness package](production-mcp-deployment-binding-readiness.md) records the exact schema,
+unconfirmed configuration/time-zone values, read-only checks and unexecuted insert proposal.
+This supersedes historical pending-identity status for that exact prerequisite only. Binding
+installation, complete live attestation, deployment and activation remain separately gated.
+
 Assessment baseline: `600723b92fe34731e1d6d25e598fc9e3cbfc2770`.
 Production updates below are the operator's November 6 confirmations, not agent-executed checks.
 This assessment supersedes older pending Stage B/Phase 1R status and rollout instructions in the

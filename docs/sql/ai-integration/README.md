@@ -71,6 +71,11 @@ Separately governed provisioning must insert exactly one `AiCaseDataDeployment` 
 Contract=`case-read-v1`, canonical Issuer/Resource, the existing JVM local JavaTimeZone and corresponding
 SQL TimeZone. The table starts empty and cannot be changed/deleted after provisioning; configuration
 changes require drained pools and a reviewed additive migration. It contains no tenant enablement.
+The [2026-11-09 binding package](../../production-mcp-deployment-binding-readiness.md) provides
+read-only discovery/preflight/postcheck and a separately authorized, unexecuted initial-insert
+proposal. The [operator discovery checklist](../../production-mcp-binding-operator-discovery.md)
+collects nonsecret Azure/replica/SQL evidence without retrieving all App Settings. Three contained
+identities have operator-reported verification PASS; do not repeat provisioning or completed migrations.
 Local fixtures use UTC. Startup checks live SIDs against ordinary/auth/bootstrap identities, database,
 exact tokens and permissions, source/catalog/module receipts, call graph, owners, predicates/triggers,
 reference data and SQL/Java wall-time mapping. Failure removes readiness; no unchecked file attestation.

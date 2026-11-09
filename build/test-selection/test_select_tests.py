@@ -24,6 +24,13 @@ class ChangeSelectorTest(unittest.TestCase):
     def selected(self, path):
         return SELECTOR.select([path])
 
+    def test_deployment_binding_tools_select_offline_packet_and_security_contracts(self):
+        result = self.selected("build/deployment-binding/BindingTimeZoneProbe.java")
+        self.assertIn("security-data", result["selected_areas"])
+        self.assertIn("python -m unittest discover -s build/deployment-binding -p test_packet.py",
+                      result["python_commands"])
+        self.assertIn("com.shale.data.security.ai.AiCaseDataAttestationTest", result["test_patterns"])
+
     def test_ai_migration_selects_security_foundation_and_default_off_smokes(self):
         result = self.selected("docs/sql/ai-integration/phase3b1.sql")
         self.assertIn("security-data", result["selected_areas"])
