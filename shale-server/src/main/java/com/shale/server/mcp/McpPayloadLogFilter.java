@@ -8,7 +8,7 @@ import ch.qos.logback.core.spi.FilterReply;
 import org.slf4j.Marker;
 
 /** SDK parser DEBUG includes raw JSON. Deny its modern payload/exception loggers even under root DEBUG. */
-final class McpPayloadLogFilter extends TurboFilter {
+public final class McpPayloadLogFilter extends TurboFilter {
     static void install() {
         if (!(org.slf4j.LoggerFactory.getILoggerFactory() instanceof LoggerContext context))
             throw new IllegalStateException("Reviewed MCP log filter requires the supported Logback baseline.");
@@ -18,7 +18,7 @@ final class McpPayloadLogFilter extends TurboFilter {
             }
         }
     }
-    static void installSqlProtection() {
+    public static void installSqlProtection() {
         install();
         java.util.logging.Logger.getLogger("com.microsoft.sqlserver.jdbc").setLevel(java.util.logging.Level.OFF);
         var manager=java.util.logging.LogManager.getLogManager();var names=manager.getLoggerNames();

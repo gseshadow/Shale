@@ -58,3 +58,6 @@ com.shale.data.security.ai.AiCaseDataMigrationContractTest
 com.shale.server.mcp.McpCaseCompositionTest
 com.shale.server.mcp.McpProductionOffBootTest
 com.shale.data.security.ai.AiCaseDataV2MigrationContractTest
+
+com.shale.data.config.AiJdbcUrlTest
+com.shale.server.oauth.OAuthCodeBootstrapConfigurationTest

@@ -45,9 +45,11 @@ final class McpAiCaseData {
         contract(env); // Reject missing/unknown version before allocating any pool.
         // Resolve every dedicated setting before allocating the independent pool.
         var config=new com.shale.data.config.Config(env::getProperty);
-        config.aiCaseDataJdbcUrl();config.aiCaseDataUser();config.aiCaseDataPassword();
-        for(String prefix:List.of("shale.ai.data.verifier","shale.ai.oauth.bootstrap"))
+        com.shale.data.config.AiJdbcUrl.validate(config.aiCaseDataJdbcUrl());config.aiCaseDataUser();config.aiCaseDataPassword();
+        for(String prefix:List.of("shale.ai.data.verifier","shale.ai.oauth.bootstrap")) {
+            com.shale.data.config.AiJdbcUrl.validate(required(env,prefix+".jdbc-url"));
             for(String suffix:List.of(".jdbc-url",".username",".password"))required(env,prefix+suffix);
+        }
         required(env,"shale.ai.data.database");
         return sources.aiCaseData();
     }
@@ -60,11 +62,11 @@ final class McpAiCaseData {
         return value;
     }
     private static DataSource source(Environment env,String prefix) {
+        String url=com.shale.data.config.AiJdbcUrl.validate(required(env,prefix+".jdbc-url"));
+        String username=required(env,prefix+".username"),password=required(env,prefix+".password");
+        McpPayloadLogFilter.installSqlProtection();
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();
-        String url=required(env,prefix+".jdbc-url");
-        if(!url.startsWith("jdbc:sqlserver://")||java.util.regex.Pattern.compile("(?i);\\s*(encrypt|trustServerCertificate|hostNameInCertificate|user|userName|password|integratedSecurity|authentication|accessToken|multipleActiveResultSets|loginTimeout|socketTimeout)\\s*=").matcher(url).find())
-            throw new IllegalStateException("AI JDBC URL contains a protected connection setting.");
-        source.setURL(url);source.setUser(required(env,prefix+".username"));source.setPassword(required(env,prefix+".password"));
+        source.setURL(url);source.setUser(username);source.setPassword(password);
         source.setLoginTimeout(2);source.setSocketTimeout(5000);source.setEncrypt("true");source.setTrustServerCertificate(false);
         return source;
     }

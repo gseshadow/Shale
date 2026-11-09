@@ -55,10 +55,7 @@ public final class DataSources implements AutoCloseable {
         if (aiCaseData == null) {
             // Resolve all required settings before constructing a pool; no partial initialization.
             String url = cfg.aiCaseDataJdbcUrl();
-            // TLS, identity and timeout settings cannot be overridden by JDBC URL precedence.
-            if (!url.startsWith("jdbc:sqlserver://") || java.util.regex.Pattern.compile(
-                    "(?i);\\s*(encrypt|trustServerCertificate|hostNameInCertificate|user|userName|password|integratedSecurity|authentication|accessToken|multipleActiveResultSets|loginTimeout|socketTimeout)\\s*=")
-                    .matcher(url).find()) throw new IllegalStateException("AI JDBC URL contains a protected connection setting.");
+            AiJdbcUrl.validate(url);
             String user = cfg.aiCaseDataUser();
             String password = cfg.aiCaseDataPassword();
             HikariConfig c = new HikariConfig();

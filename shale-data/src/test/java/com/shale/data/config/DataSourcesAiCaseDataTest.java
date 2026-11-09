@@ -15,6 +15,18 @@ class DataSourcesAiCaseDataTest {
             }
         });
     }
+    @Test void unsafeAiUrlIsRejectedBeforePoolAllocation() {
+        configured(true, () -> {
+            System.setProperty("shale.ai.data.jdbc-url","jdbc:sqlserver://127.0.0.1:1;trustServerCertificate=true");
+            try(var sources=new DataSources(new Config())) {
+                assertThrows(IllegalStateException.class,sources::aiCaseData);
+                try {
+                    var field=DataSources.class.getDeclaredField("aiCaseData");field.setAccessible(true);
+                    assertNull(field.get(sources),"Rejected URL must not allocate an AI pool");
+                } catch(ReflectiveOperationException failure) {throw new AssertionError(failure);}
+            }
+        });
+    }
     @Test void poolRotationAndLifecycleAreIndependent() {
         configured(true, () -> {
             var sources = new DataSources(new Config());
