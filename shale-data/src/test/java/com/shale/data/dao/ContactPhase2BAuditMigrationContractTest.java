@@ -76,6 +76,10 @@ final class ContactPhase2BAuditMigrationContractTest {
         for(String type:Set.of("TENANT_AI_POLICY","AI_INTEGRATION","AI_CLIENT_KEY","AI_DELEGATION_GRANT","AI_DELEGATED_SESSION")) {
             assertTrue(ai.contains("('"+type+"')")); complete.add(type);
         }
+        String universal=Files.readString(Path.of("..","docs","sql","ai-integration","universal-pr3.sql"));
+        assertEquals(Set.of("AI_APPLICATION_APPROVAL"),AuditEntityTypeMigrationChain.declaredAllowlist(universal),
+                "the registry successor must add only its scoped approval discriminator");
+        complete.addAll(AuditEntityTypeMigrationChain.declaredAllowlist(universal));
         assertEquals(AuditEntityTypeMigrationChain.currentlyRequiredVocabulary(),complete,
                 "every chronological successor must preserve the deployed vocabulary and add only its intended tokens");
         assertEquals(List.of(AuditEntityTypeMigrationChain.PHASE_1C,AuditEntityTypeMigrationChain.PHASE_2B,

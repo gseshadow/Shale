@@ -120,9 +120,19 @@ class AiCaseDataAttestationTest {
         }
         paths.add(java.nio.file.Path.of("src/main/resources/ai/confinement-catalog.sql"));
         paths.add(java.nio.file.Path.of("src/main/resources/ai/confinement-v2-catalog.sql"));
+        paths.add(java.nio.file.Path.of("src/main/resources/ai/registry-confinement-v1-catalog.sql"));
         assertTrue(paths.size()>10,"The Azure migration/verification inventory must not be empty");
         for(var path:paths) {
             String sql=java.nio.file.Files.readString(path).toLowerCase(Locale.ROOT);
+            if(Set.of("universal-pr3-confinement-verify.sql","registry-confinement-v1-catalog.sql").contains(path.getFileName().toString())) {
+                // SQL Server metadata lives in a dynamic ELSE branch; Azure must never compile/issue it.
+                assertTrue(sql.contains("if @registryedition=5 begin"));
+                assertTrue(sql.contains("end else begin"));
+                var dynamic=java.util.regex.Pattern.compile("declare @registryservercheck nvarchar\\(max\\)=n'((?:[^']|'')*)';\\s*exec\\(@registryservercheck\\);",java.util.regex.Pattern.DOTALL).matcher(sql);
+                assertTrue(dynamic.find(),"Explicit platform dispatch required: "+path);
+                assertTrue(dynamic.group(1).contains("sys.server_principals"));
+                sql=dynamic.replaceFirst("");
+            }
             for(String unsupported:List.of("sys.database_recovery_status","sys.server_permissions","sys.server_principals",
                     "sys.endpoints","sys.login_token","sys.master_files","sys.configurations","sys.linked_logins",
                     "sys.servers","sys.dm_xe_sessions","sys.dm_xe_session_targets","msdb.","master."))

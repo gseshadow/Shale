@@ -31,6 +31,7 @@ com.shale.updater.platform.MacPlatformSupportTest
 
 com.shale.core.security.ai.AiScopeTest
 com.shale.data.security.ai.AiSecurityContractTest
+com.shale.data.security.ai.AiApplicationContractTest
 
 com.shale.server.oauth.OAuthConfigurationTest
 com.shale.server.oauth.OAuthClientMappingTest

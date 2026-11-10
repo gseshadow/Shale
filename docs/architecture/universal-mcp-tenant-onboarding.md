@@ -392,3 +392,12 @@ advertisement or SQL authority. Public publication never establishes tenant appr
 The reviewed registry/tenant-approval boundary (PR 3) remains the next implementation dependency;
 production and all immutable-binding/OFF constraints above remain unchanged. Audit compatibility:
 public metadata retrieval has no PHI/domain mutation and adds no audit schema or tenant event.
+
+## PR 3 isolated registry and approval candidate
+
+The [PR 3 security/migration review](../sql/ai-integration/universal-pr3-review.md) defines the additive
+registry, retained publication revisions and tenant approvals. Approval creates a suspended internal
+integration and no consent or credentials; active OAuth remains disconnected. The candidate explicitly
+blocks installation alongside Case confinement until compatibility/successor review, preserving all
+historical receipts and immutable binding contracts. See its production prerequisites and
+[synthetic verification](../testing/universal-mcp-pr3-verification.md) before proposing deployment.

@@ -554,6 +554,8 @@
         "com.shale.server.runtime.ServerSessionSkeletonTest",
         "com.shale.core.security.ai.AiScopeTest",
         "com.shale.data.security.ai.AiSecurityContractTest",
+        "com.shale.data.security.ai.AiApplicationContractTest",
+        "com.shale.data.security.ai.AiApplicationLocalSqlServerTest",
         "com.shale.data.security.ai.AiOAuthExchangeContractTest",
         "com.shale.data.security.ai.AiOAuthCredentialContractTest",
         "com.shale.data.security.ai.AiOAuthRevocationContractTest",
