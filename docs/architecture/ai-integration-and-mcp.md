@@ -1,5 +1,12 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
+**Universal onboarding proposal — November 9, 2026:**
+[URL-only tenant onboarding design and PR sequence](universal-mcp-tenant-onboarding.md)
+reviews the current Phase 4 source, CIMD/DCR standards and client compatibility. It proposes separating
+external application identity from tenant approval while preserving manual clients. Its first increment
+is an unwired pure CIMD identifier validator only. Manual provisioning remains the implemented contract;
+no registration advertisement, SQL/binding change, production readiness or activation is implied.
+
 **Dormant startup evidence extension — 2026-11-09:** the
 [JVM/controls diagnostic runbook](../production-jvm-startup-diagnostic.md#eight-control-startup-evidence-extension--2026-11-09)
 records a separate fixed-format `SHALE_AI_CONTROLS_STARTUP` INFO entry alongside the unchanged JVM
