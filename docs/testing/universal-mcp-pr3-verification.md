@@ -43,8 +43,12 @@ put an SA password in command arguments, test output or committed files:
 - `SHALE_AI_SQL_PASSWORD=<disposable fixture SA password>`
 - `SHALE_AI_SQL_TRUSTSTORE=<absolute path to test PKCS12 truststore>`
 
-Use Java 21 JDK and Maven 3.9.11. Session commands used a local Maven repository, proxy settings and JVM
+Used Microsoft JDK 21.0.13.0.2 and Maven 3.9.11. Session commands used a local Maven repository, proxy settings and JVM
 truststore to access dependencies; these are environment-only options, not project configuration.
+The separate SQL-backed browser fixture also needs the fixture certificate in its JVM truststore for
+the strict bootstrap pool. Used a local copy of Debian cacerts with that one certificate imported;
+no system or production truststore changed. An initial browser-fixture run without that trust entry
+failed closed at token exchange; its rerun result is recorded below.
 The equivalent exact test commands (with normal `mvn` on PATH) are:
 
 ```sh
@@ -87,7 +91,53 @@ Focused run: **36 passed, zero failures/errors/skips**, including **9 real SQL s
 
 Every scenario also checks the pre-existing manual client RowVer is unchanged by migration.
 
-Remaining regression commands and results are recorded below after local execution.
+Additional final-code local runs:
+
+| Check | Result |
+| --- | --- |
+| Existing real SQL `AiSecurityLocalSqlServerTest` | 182 PASS; zero failures/errors/skips; 18m33s including reactor setup. |
+| Manual OAuth mapping/metadata/browser/exchange/revoke and cumulative audit focused checks | 28 PASS; zero failures/errors/skips. |
+| Selector affected core/data/server suite | 157 PASS; zero reported failures/errors/skips. SQL-opt-in classes execute zero tests in this non-opt-in batch; the real SQL runs above are the acceptance evidence. |
+| Critical `mvn -B test` | 245 PASS; all seven reactor modules successful; zero failures/errors/skips. |
+| SQL-backed `OAuthAuthorizationFlowTest` with explicit opt-in and trusted bootstrap pool | 22 PASS; zero failures/errors/skips. |
+| `python3 -m unittest build/test-selection/test_select_tests.py` | 32 PASS. |
+
+Counts overlap and must not be added as distinct cases. The selector selected security-data and contacts
+(the latter only because the cumulative audit migration test is maintained there). Its full-suite
+recommendation is informational, triggered solely by test-list/ownership additions. No full historical
+`-Pall-tests` or visual suite was run; no runtime module/build/workflow/dependency configuration changed.
+
+Exact additional commands:
+
+```sh
+mvn -B -pl shale-server -am \
+  -Dtest=ContactPhase2BAuditMigrationContractTest,OAuthClientMappingTest,OAuthMetadataTest,OAuthAuthorizationFlowTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,OAuthBrowserFilterTest,OAuthFilterIsolationTest,OAuthConfigurationTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 85f8b9d9 --head HEAD \
+  --format markdown --plan-output work/pr3-plan.json --output work/pr3-selection.md
+python3 - <<'PYPLAN'
+import json, os, subprocess
+env = os.environ.copy()
+env.pop("SHALE_AI_SQL_OPT_IN", None)
+for args in json.load(open("work/pr3-plan.json"))["selected_maven_batches"]:
+    subprocess.run(["mvn", *args], env=env, check=True)
+PYPLAN
+mvn -B test
+python3 -m unittest build/test-selection/test_select_tests.py
+```
+
+The SQL-backed browser rerun used the same private disposable SQL environment and combined truststore:
+
+```sh
+mvn -B -pl shale-server -am -Dtest=OAuthAuthorizationFlowTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+The first manual OAuth batch ran without SQL opt-in: `OAuthAuthorizationFlowTest` executed zero tests,
+so it was verified separately with explicit disposable SQL opt-in (22 PASS). No zero-test class is counted
+as SQL acceptance. Certificate-validated owner cleanup then confirmed zero retained fixture databases or
+logins; the dedicated container was removed. The extra fixture uses real maintained servlet filters and SQL, with fixture WEB
+identity; it is not actual browser/stock-client interoperability evidence.
 
 ## Evidence limits and deployment dependency
 
@@ -95,4 +145,4 @@ The compatibility guard, production/native Azure gates and PR 4 live binding/con
 open exactly as listed in the linked review. No production connection, SQL, settings, credential change,
 deployment, feature activation, migration replay or immutable binding update occurred. Local receipts and
 synthetic SQL are not production permission/catalog acceptance. RowVer transition replay tests do not
-claim OAuth assertion/code/refresh replay integration. No new public registration capability is advertised.
+claim external CIMD assertion/code/refresh replay integration (PR 4); existing manual wire paths are covered separately. No new public registration capability is advertised.
