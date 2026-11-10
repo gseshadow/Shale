@@ -120,4 +120,36 @@ tenant authorization, manual client, third-party client, dependency or workflow 
 
 ## Verification results
 
-Pending final focused, selector affected and critical runs. Commands/results will be recorded before PR submission.
+Final code: `5b4be93f` (plus this documentation-only result record). Maven 3.9.11 / Temurin
+Java 21.0.12.1. All final suites ran **sequentially** against the same code:
+
+```bash
+/workspace/.tools/bin/mvn -B -pl shale-server -am -DskipTests compile
+/workspace/.tools/bin/mvn -B -pl shale-server -am -Dtest=CimdMetadataTest,CimdRetrievalTest,CimdClientIdentifierTest,OAuthClientMappingTest,OAuthMetadataTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,PinnedClientAssertionTest,OAuthBrowserFilterTest -Dsurefire.failIfNoSpecifiedTests=false test
+python build/test-selection/select_tests.py --base 96b7a4f6 --head HEAD --output work/cimd-selection.json
+PATH=/workspace/.tools/bin:$PATH python build/test-selection/run_selection.py work/cimd-selection.json --command affected
+/workspace/.tools/bin/mvn -B test
+git diff --check 96b7a4f6 HEAD
+git diff --name-only 96b7a4f6 HEAD -- docs/sql shale-data/src/main/resources/ai
+rg -n 'oauth.cimd|CimdMetadataService' shale-server/src/main/java --glob '!**/oauth/cimd/**'
+```
+
+- Compile PASS. Focused: **48 PASS**, including **21 new CIMD tests**.
+- Affected: **73 PASS**. Selector chooses only server area and dependencies, including new tests,
+  OAuth/client/assertion/browser/OFF-composition and ordinary-login regressions; no full-suite escalation.
+- Critical: **242 PASS**, all seven reactor modules successful.
+- Every final test run has zero failures/errors/skips. Counts overlap and are not additive unique totals.
+- Diff whitespace, changed-file/test mapping, final source/reference review and changed-document
+  relative-link/code-fence checks PASS. No production caller outside the new package. SQL and AI
+  resource-tree changed-path checks return no changes, preserving immutable binding inputs.
+
+An initial weak-key test fixture used a generator that refused weak keys; the fixture was corrected
+to supply a small public modulus directly. One development run overlapped another Maven compilation
+and suffered a missing-class error; it is discarded. The final sequential runs above all passed.
+No assertions were loosened to recover a production regression. Final documentation-only changes
+are reselected/reviewed; the affected plan remains unchanged.
+
+No SQL opt-in fixtures or real third-party sessions were configured or exercised. SQL contract/mock
+checks in the reactor do not constitute real SQL, deployed-egress or URL-only acceptance. Browser,
+historical all-tests and UI visual suites are outside this isolated non-UI change and were not run.
+No dependency, selector, workflow or version change. No deployment or automatic merge.
