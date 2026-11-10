@@ -329,7 +329,7 @@ change or activation is authorized by this plan.
 | 7 | Stock-client compatibility and fully combined URL-only synthetic acceptance. | Matrix above with at least one stock CIMD and one stock DCR path where available; no supplied client ID; login/admin/consent/tools/refresh/revoke and two-tenant isolation. Transport/localhost/CORS compatibility changes, if necessary, are separate narrowly reviewed PRs before claiming that client passes. |
 | 8 | Production readiness proposal only after synthetic acceptance. | Retain all existing native Azure/V2/identity/binding/ingress/artifact/operations/legal/operator/tenant gates. Produce a concrete release/rollback proposal; obtain separately required approval before any production action. No activation in this task. |
 
-Suggested next implementation is PR 2, followed by the reviewed registry/tenant design. Do not start
+PR 2 now has an isolated implementation (see the verification record below); the reviewed registry/tenant design in PR 3 is next. Do not start
 by enabling Spring's registration endpoint or loosening the 64-character regex: neither establishes
 tenant isolation or the complete client binding. PR 1 is independently safe to review/merge.
 
@@ -382,3 +382,13 @@ synthetic immutable binding may be installed once as fixture setup under its own
 Pass means the user supplied only URL + normal credentials/browser/admin decisions and used tools.
 Separate CIMD/DCR passes, manual-client regression, two-tenant isolation and revocation evidence are
 required. This scenario is specified here, not executed by PR 1. Production acceptance remains open.
+
+## PR 2 isolated retrieval implementation
+
+The [PR 2 security design and verification](../testing/universal-mcp-pr2-verification.md) records
+`oauth.cimd` destination/TLS, parser, method/key profile and bounded cache contracts. The subsystem
+is initially unwired: no Spring bean, authorization/registration call site, endpoint, metadata
+advertisement or SQL authority. Public publication never establishes tenant approval or consent.
+The reviewed registry/tenant-approval boundary (PR 3) remains the next implementation dependency;
+production and all immutable-binding/OFF constraints above remain unchanged. Audit compatibility:
+public metadata retrieval has no PHI/domain mutation and adds no audit schema or tenant event.
