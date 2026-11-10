@@ -95,7 +95,9 @@ Their exact explicit permission counts are 19 and 20. Existing application roles
 unchanged. The independent catalog role receives no new permission: its existing metadata visibility
 reads the supplement; it cannot execute the private helper. On SQL Server/MI the independent reviewer
 also needs its existing server-definition/database inventory visibility. Azure never issues the boxed
-server-catalog branch. Unknown engines refuse rather than selecting a fallback.
+server-catalog branch. Unknown engines refuse rather than selecting a fallback. A legitimate destination-only control or
+representation needs a separately reviewed source accommodation; never remove an established trigger,
+policy or permission fence to match a disposable fixture.
 
 `AiRegistryIdentityAttestation` is a dormant read-only verifier, with no Spring bean, pool configuration,
 endpoint or credentials. It verifies distinct actual publisher/tenant/catalog sessions, mapped SQL versus
@@ -182,6 +184,26 @@ The following are separate remaining gates, not instructions to resume an archiv
   tenant approval and explicit future consent gates. No automatic client registration is advertised;
   CIMD, DCR and MCP/OAuth activation remain out of scope.
 
+## Test impact and regression scope
+
+Pre-edit searches covered constructor/resource loading, receipt/source dispatch, SQL role/permission and
+binding checks, registry procedure/trigger bodies, and all neighboring migration/attestation tests.
+
+| Changed production contract | Relevant verification |
+| --- | --- |
+| New graph template, generator, prepare/verify and registry guard/seal | Six authoritative scenarios per V1/V2: refusal without prerequisite, sealed install, drift/restore, cross-database actual identity, prepare/seal rollback, and business audit rollback. Reverse-order unsealed readiness rejection on each version. |
+| Existing Case attestor's additive presence/read-only stage | V1/V2 legacy-only actual readiness, incomplete preparation rejection, combined positive readiness, actual existing manual proof-bound overview, recovery after drift; existing `AiCaseDataAttestationTest` Azure routing/inventory and both migration contracts. |
+| Dormant registry identity attestor | Distinct real logins, exact EXECUTEs, all-object/column permissions, fixed/custom-role and direct/column/public authority, other-database mapping, terminal triggers, table-expression modules and policy identity. |
+| Generated source/binding boundary | Three public generator contracts, unchanged old standalone verifier embedding/source pins; five existing immutable-binding packet checks; raw-byte comparison of 31 historical artifacts. |
+| Unchanged application business/lifecycle and JDBC boundary | Existing nine real SQL registry scenarios rerun: two tenants, administrator authorization, races, RowVer/replay, stale/expired revisions, ceiling/revocation, manual client preservation and failed audit rollback. Existing security/OAuth completion/credential/exchange/revoke contracts. |
+
+The selector chooses Case and security-data core/data/server smoke and dependency tests. This covers the
+protected Case boundary and tenant/JDBC/OAuth/audit composition affected by readiness. Its full-suite
+recommendation is informational because the new resource path is not mapped by the old selector; that
+resource is directly exercised by authoritative SQL, migration/source checks and affected tests. No UI,
+visual, dependency, build, workflow or general Case business behavior changed; the full historical profile
+is not run. No SQL-opt-in skip counts as SQL acceptance.
+
 ## Local verification results and merge recommendation
 
 The isolated SQL instance uses SQL Server 2022 Linux image
@@ -209,7 +231,8 @@ mvn -B -pl shale-data -am \
 
 Unset SQL opt-in for ordinary unit/affected/critical runs. Microsoft JDK 21.0.13.0.2 and Maven 3.9.11,
 local dependency repository and session-only proxy/trust options match the original verification record.
-No build, workflow, dependency or test timeout was changed.
+No build, workflow, dependency or test timeout was changed. The generated helper Source SHA-256 is
+`3636deda3744ada73314b233532834bd13d02a102132f16ea4cf00ab91cde5c1`.
 
 ```sh
 mvn -B -pl shale-data -am \
@@ -222,6 +245,55 @@ mvn -B test
 python3 -m unittest build/test-selection/test_select_tests.py
 ```
 
-Results and cleanup evidence are appended after final execution. Counts from overlapping runs must not
-be added as distinct tests. The original #1947 verification record retains its historical results;
+Counts from overlapping runs must not be added as distinct tests. The original #1947 verification record retains its historical results;
 this review does not rerun all 182 unchanged legacy SQL scenarios or reopen accepted local campaigns.
+
+Verified final-source authoritative scenarios: **14/14** across V1 and V2. The final expanded 14-scenario
+batch passed 12 and exposed two test-fixture DDL errors: a CHECK and function had the same SQL object
+name. Only the constraint was renamed; the two affected scenarios then passed in the clean focused run.
+No production SQL or assertion was relaxed for that correction.
+
+| Check | Result |
+| --- | --- |
+| Final authoritative scenarios | 14 distinct scenarios verified: two versions each of guard refusal, guarded install/old manual Case read/two-tenant approval, drift/recovery, actual other-DB mapping, failed preparation/late seal rollback, business audit rollback; plus unprepared reverse-order rejection on each version. |
+| Corrected focused run | 39 PASS, zero failures/errors/skips: 28 migration/attestation/application/security/OAuth contracts, nine existing real SQL registry scenarios, two authoritative graph/actual-identity scenarios. |
+| Selector affected suite | 153 PASS, zero failures/errors/skips reported; core/data/server successful. SQL opt-in is absent, so zero-test SQL classes are not acceptance evidence. |
+| Critical `mvn -B test` | 245 PASS, zero failures/errors/skips; all seven reactor modules successful. |
+| Generator/source contracts | 3 PASS; generated artifacts current. |
+| Existing immutable-binding packet tests | 5 PASS. |
+| Selector tests | 32 PASS. |
+
+The authoritative negative tests cover fixed/custom role inheritance, direct table and column grants,
+a public bridge view, a terminal global-audit trigger, a CHECK invoking an unreviewed function and a
+replacement RLS policy. Unchanged standalone Case/registry SQL verifiers remain green for the seven role-member, terminal-audit,
+table-expression and policy-identity mutations while the supplement, Case readiness and actual registry
+identity verification refuse; removing each fault restores acceptance. The public bridge also exercises
+the existing public-authority guard. The terminal-trigger test also proves the controlled synthetic Case write through publish,
+while the publisher's direct UPDATE is denied. No application identity can create that trigger.
+Old source-pinned root procedure/trigger bodies remain unchanged from #1947.
+
+The corrected focused run used this command with the private disposable SQL environment still present:
+
+```sh
+mvn -B -pl shale-data -am \
+  -Dtest=AiApplicationConfinementLocalSqlServerTest#newGraphRejectsMemberPublicColumnAndTerminalAuditBridges,AiApplicationConfinementV2LocalSqlServerTest#newGraphRejectsMemberPublicColumnAndTerminalAuditBridges,AiApplicationLocalSqlServerTest,AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,AiApplicationContractTest,AiSecurityContractTest,AiOAuthCredentialContractTest,AiOAuthExchangeContractTest,AiOAuthRevocationContractTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 -m unittest discover -s build/deployment-binding -p test_packet.py
+```
+
+Final preservation review compared all 31 historical SQL/resource/manifest/binding artifacts byte-for-byte
+to `c4cd97889cf8990e7656a26723e076096aa3d2ae`. A broader comparison also confirmed 44 predecessor
+artifacts/records unchanged, including old generators, binding packet code and the original #1947 test
+record. Registry procedure/trigger bodies are unchanged. Actual positive SQL tests compare every historical
+extended-property value and every immutable binding field before/after installation. The attached fixture
+retains its approved SHA-256. Certificate-validated owner metadata verification found **zero user databases
+and zero nonce logins** after the SQL runs; the dedicated container and generated SA secret/key/truststore
+were then removed. No fixture, private body, credential, live receipt or destination metadata is committed.
+`git diff --check` passed.
+
+**Merge recommendation: REQUEST CHANGES on #1947 as-is.** A versioned supplement is justified and this
+successor is isolated for explicit review against #1947's branch. Incorporate the reviewed successor before
+merging the combined offline foundation into `codex/latest`. Production installation remains **NO-GO**
+until the independently governed native Azure, existing binding/JVM, destination, artifact/configuration
+and operator approval prerequisites pass. No SQL deployment, production permission change, feature
+activation or automatic merge occurred.

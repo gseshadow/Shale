@@ -1,9 +1,6 @@
 # Universal MCP PR 3 verification
 
 Baseline `85f8b9d9e43d0f7c991bd6bf608252a8c7bfeddc` (merged #1946).
-This is the original PR #1947 implementation evidence. The later authoritative-schema compatibility review
-and successor evidence are recorded [separately](../architecture/pr1947-confinement-compatibility.md);
-its results do not rewrite the historical results below.
 [Security design, migration review and exact deployment prerequisites](../sql/ai-integration/universal-pr3-review.md).
 
 ## Pre-edit impact review
