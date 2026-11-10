@@ -43,6 +43,8 @@ com.shale.server.oauth.ShaleOAuthHumanTest
 com.shale.data.security.ai.AiOAuthExchangeContractTest
 com.shale.server.oauth.OAuthCodeExchangePolicyTest
 com.shale.server.oauth.PinnedClientAssertionTest
+com.shale.server.oauth.CimdClientAuthenticationTest
+com.shale.server.oauth.CimdBrowserBindingTest
 
 com.shale.data.security.ai.AiOAuthCredentialContractTest
 
