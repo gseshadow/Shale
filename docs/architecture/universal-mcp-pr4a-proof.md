@@ -144,3 +144,23 @@ The following work remains outside this bounded PR:
    production action is authorized by a local passing test.
 
 No Settings, DCR, browser flow, stock client, production deployment or automatic merge is included.
+
+## Migration dependencies and review sequence
+
+The draft is stacked on #1949 rather than duplicating its unmerged dependency record and SQL-inspection
+regression fix. Its SQL baseline is still latest `codex/latest` (`38281e8e`). Review this PR's diff
+against #1949's branch; retarget to `codex/latest` only after that dependency is resolved.
+
+This is not a deployment instruction. A future separately authorized installation requires the accepted
+seven AI predecessors, exact V1 or V2 confinement, immutable binding already present, the sealed #1948
+registry/confinement supplement and PR 3 registry. Do not replay accepted production installers or copy
+a disposable receipt/binding. Require fresh unscoped dbo, complete metadata visibility, the existing
+exclusive schema lock and global capability OFF. Run both predecessor verification scopes unchanged,
+then the candidate, then its independent verifier and compare the exact historical receipt/binding
+before-record. Any missing, changed or partial state aborts. No new pool/role membership/feature may
+be activated based on the old attestor alone.
+
+Containment keeps the new proof control and application switches OFF and drains any future new pools.
+Retain family, credential, invocation and audit history. No destructive down migration, receipt refresh,
+manual-client conversion, legacy-registration activation or fallback to an older proof is supplied.
+The new control has no application setter; a future governed activation/audit contract is still required.
