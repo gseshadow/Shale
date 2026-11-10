@@ -8,6 +8,17 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 final class EntityActionAuditEventTest {
+    @Test void applicationApprovalLifecycleUsesClosedSafeAuditState() {
+        for (String state : java.util.List.of("PENDING","APPROVED","DENIED","REVOKED")) {
+            var event=EntityActionAuditEvent.now(7,71,EntityActionAuditEvent.EntityType.AI_APPLICATION_APPROVAL,1,
+                    EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.AI_APPROVAL_STATE,state));
+            assertEquals(state,event.metadata().get(EntityActionAuditEvent.MetadataKey.AI_APPROVAL_STATE));
+            assertEquals(Map.of("AI_APPROVAL_STATE",state),EntityActionAuditDao.parseSafeMetadata("{\"AI_APPROVAL_STATE\":\""+state+"\"}"));
+        }
+        assertThrows(IllegalArgumentException.class,()->EntityActionAuditEvent.now(7,71,EntityActionAuditEvent.EntityType.AI_APPLICATION_APPROVAL,1,
+                EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.AI_APPROVAL_STATE,"https://vendor.test")));
+        assertTrue(EntityActionAuditDao.parseSafeMetadata("{\"AI_APPROVAL_STATE\":\"arbitrary\"}").isEmpty());
+    }
     @Test
     void aiControlsUseExistingMutationAuditWithoutCredentialOrCasePayloads() {
         for (var type : java.util.List.of(EntityActionAuditEvent.EntityType.AI_CLIENT_KEY,

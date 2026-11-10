@@ -1,5 +1,10 @@
 # Phase 3B.1 integration security candidate
 
+Universal MCP PR 3 is a separate [offline registry/tenant approval candidate](universal-pr3-review.md).
+Its installer deliberately blocks coexistence with Case confinement pending explicit compatibility review;
+no historical installer, verifier, receipt or deployment binding is changed. Do not apply it in production.
+
+
 This directory owns the additive SQL candidate and operator instructions, not another AI roadmap.
 The [canonical contract and implementation record](../../architecture/ai-integration-and-mcp.md#1013-phase-3b1-integration-persistence-and-security-foundation)
 owns status and evidence. Nothing here authorizes production execution or enablement.
