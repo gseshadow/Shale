@@ -117,7 +117,7 @@ final class CimdHttps {
         var out=new ByteArrayOutputStream();
         for (int c; (c=in.read())!=-1;) {
             if (++count[0]>8192 || c>127 || c<32 && c!='\r' && c!='\n' && c!='\t') throw CimdDestination.invalid();
-            if (c=='\r') { if (in.read()!='\n') throw CimdDestination.invalid(); return out.toString(StandardCharsets.US_ASCII); }
+            if (c=='\r') { if (++count[0]>8192 || in.read()!='\n') throw CimdDestination.invalid(); return out.toString(StandardCharsets.US_ASCII); }
             if (c=='\n') throw CimdDestination.invalid();
             out.write(c);
         }
