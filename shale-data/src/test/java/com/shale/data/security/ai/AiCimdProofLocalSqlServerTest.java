@@ -27,11 +27,20 @@ class AiCimdProofLocalSqlServerTest extends AiApplicationConfinementV2LocalSqlSe
             sql(c,"CREATE LOGIN ["+prefix+"_"+role+"] WITH PASSWORD='"+secret+"',CHECK_POLICY=OFF");secrets.put(role,secret);
         }}
     }
-    @BeforeEach void proofFoundation() throws Exception {
+    @BeforeEach void proofFoundation(TestInfo info) throws Exception {
         installCompatibility();
         try(Connection c=owner(db)) {
             historical=receipts(c);immutableBinding=binding(c);
-            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof.sql")));
+            String candidate=Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof.sql"));
+            if(info.getTestMethod().orElseThrow().getName().equals("independentReceiptRejectsDriftWithoutRelaxingHistoricalSnapshot")){
+                String injected=candidate.replace("DECLARE @C4aSealVerify", "GRANT EXECUTE ON dbo.AiCimdDataLoadAuthorityV1 TO AiCimdCaseRuntimeV1;\nDECLARE @C4aSealVerify");
+                assertNotEquals(candidate,injected);
+                assertThrows(SQLException.class,()->sql(c,injected),"A late permission fault must roll back the new receipt and all DDL before COMMIT.");
+                assertEquals(0,count(c,"SELECT COUNT(*) FROM sys.tables WHERE name LIKE 'AiCimd%'") );
+                assertEquals(0,count(c,"SELECT COUNT(*) FROM sys.database_principals WHERE name IN('AiCimdCaseRuntimeV1','AiCimdLifecycleV1')"));
+                assertEquals(historical,receipts(c));assertEquals(immutableBinding,binding(c));
+            }
+            sql(c,candidate);
             assertEquals(0,count(c,"SELECT CONVERT(int,Enabled) FROM dbo.AiCimdProofControlV1"),"Candidate must install default OFF.");
             sql(c,"ALTER ROLE AiCimdCaseRuntimeV1 ADD MEMBER ["+prefix+"_cimd]; ALTER ROLE AiCimdLifecycleV1 ADD MEMBER ["+prefix+"_cimdlife]");
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof-verify.sql")));
@@ -208,6 +217,11 @@ class AiCimdProofLocalSqlServerTest extends AiApplicationConfinementV2LocalSqlSe
             sql(c,"ALTER ROLE db_datareader ADD MEMBER ["+prefix+"_cimd]");
             assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof-verify.sql"))),"Inherited authority must fail the new verifier.");
             sql(c,"ALTER ROLE db_datareader DROP MEMBER ["+prefix+"_cimd]");
+            sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof-verify.sql")));
+            sql(c,"CREATE PROCEDURE dbo.Pr4aUnexpectedRoot AS SELECT 1 AS UnexpectedValue");
+            sql(c,"GRANT EXECUTE ON dbo.Pr4aUnexpectedRoot TO AiCimdCaseRuntimeV1");
+            assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof-verify.sql"))),"Extra new-role EXECUTE must be rejected explicitly.");
+            sql(c,"REVOKE EXECUTE ON dbo.Pr4aUnexpectedRoot FROM AiCimdCaseRuntimeV1; DROP PROCEDURE dbo.Pr4aUnexpectedRoot");
             sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof-verify.sql")));
             sql(c,"ALTER PROCEDURE dbo.AiCimdDataAuthenticateV1 AS THROW 59999,'Synthetic source drift',1");
             assertThrows(SQLException.class,()->sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof-verify.sql"))),"Source drift must not be adopted.");

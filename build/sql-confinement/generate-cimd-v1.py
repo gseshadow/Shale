@@ -132,14 +132,28 @@ DECLARE @C4aBefore binary(32)=HASHBYTES('SHA2_256',@C4aOldState);
 module_checks="DECLARE @C4aModules table(Name sysname PRIMARY KEY,Hash binary(32),OwnerLookup bit); INSERT @C4aModules VALUES "+','.join("(N'"+n+"',0x"+hashlib.sha256(b.encode('utf-16le')).hexdigest()+","+str(int(n=='AiCimdDataLocateAccessOwnerV1'))+")" for n,b in modules.items())+";\n"
 module_checks+="""IF EXISTS(SELECT 1 FROM @C4aModules e WHERE NOT EXISTS(SELECT 1 FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE s.name='dbo' AND o.name=e.Name AND COALESCE(o.principal_id,s.principal_id)=1 AND m.uses_ansi_nulls=1 AND m.uses_quoted_identifier=1 AND ((e.OwnerLookup=1 AND m.execute_as_principal_id=-2) OR (e.OwnerLookup=0 AND m.execute_as_principal_id IS NULL)) AND HASHBYTES('SHA2_256',m.definition)=e.Hash)) THROW 59400,'CIMD proof module source/owner/context drift.',1;
 """
-shape_checks="""IF EXISTS(SELECT 1 FROM sys.triggers t WHERE OBJECT_NAME(t.parent_id) IN(SELECT Name FROM @C4aObjects) AND t.name NOT IN(SELECT Name FROM @C4aModules))
+expected_permissions=[]
+for role in roles:
+ for table_name in newtables:
+  for permission in ['SELECT','INSERT','UPDATE','DELETE','ALTER','CONTROL']:expected_permissions.append((role,table_name,permission,'D'))
+for proc in roots:expected_permissions.append(('AiCimdCaseRuntimeV1',proc,'EXECUTE','G'))
+expected_permissions.append(('AiCimdLifecycleV1','AiCimdRevokeFamilyV1','EXECUTE','G'))
+permission_check="DECLARE @C4aPermissions table(RoleName sysname,ObjectName sysname,PermissionName sysname,State char(1)); INSERT @C4aPermissions VALUES "+','.join('('+','.join("N'"+x+"'" for x in row)+')' for row in expected_permissions)+";\n"
+permission_check+="""IF EXISTS(SELECT USER_NAME(p.grantee_principal_id),OBJECT_NAME(p.major_id),p.permission_name,p.state FROM sys.database_permissions p WHERE p.grantee_principal_id IN(DATABASE_PRINCIPAL_ID('AiCimdCaseRuntimeV1'),DATABASE_PRINCIPAL_ID('AiCimdLifecycleV1')) EXCEPT SELECT RoleName,ObjectName,PermissionName,State FROM @C4aPermissions)
+ OR EXISTS(SELECT RoleName,ObjectName,PermissionName,State FROM @C4aPermissions EXCEPT SELECT USER_NAME(p.grantee_principal_id),OBJECT_NAME(p.major_id),p.permission_name,p.state FROM sys.database_permissions p WHERE p.grantee_principal_id IN(DATABASE_PRINCIPAL_ID('AiCimdCaseRuntimeV1'),DATABASE_PRINCIPAL_ID('AiCimdLifecycleV1')))
+ OR EXISTS(SELECT 1 FROM sys.database_permissions p WHERE p.grantee_principal_id IN(DATABASE_PRINCIPAL_ID('AiCimdCaseRuntimeV1'),DATABASE_PRINCIPAL_ID('AiCimdLifecycleV1')) AND (p.class<>1 OR p.minor_id<>0 OR p.grantor_principal_id<>1 OR OBJECT_SCHEMA_NAME(p.major_id)<>'dbo'))
+ THROW 59400,'CIMD exact role permission drift.',1;
+"""
+shape_checks="""IF EXISTS(SELECT 1 FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name='dbo' AND o.name IN(SELECT Name FROM @C4aObjects) AND COALESCE(o.principal_id,s.principal_id)<>1)
+ THROW 59400,'CIMD object ownership drift.',1;
+IF EXISTS(SELECT 1 FROM sys.triggers t WHERE OBJECT_NAME(t.parent_id) IN(SELECT Name FROM @C4aObjects) AND t.name NOT IN(SELECT Name FROM @C4aModules))
  OR EXISTS(SELECT 1 FROM sys.sql_expression_dependencies d JOIN sys.objects o ON o.object_id=d.referencing_id WHERE (o.name IN(SELECT Name FROM @C4aObjects) AND o.type='U' OR o.type IN('C','D') AND OBJECT_NAME(o.parent_object_id) IN(SELECT Name FROM @C4aObjects)) AND (d.referenced_server_name IS NOT NULL OR d.referenced_database_name IS NOT NULL OR EXISTS(SELECT 1 FROM sys.objects f WHERE f.object_id=d.referenced_id AND f.type IN('FN','IF','TF','FS','FT','P','PC','SN'))))
  THROW 59400,'Unreviewed CIMD trigger/table-expression edge.',1;
 IF (SELECT COUNT(*) FROM sys.security_predicates p JOIN sys.security_policies sp ON sp.object_id=p.object_id WHERE OBJECT_NAME(p.target_object_id) IN('AiCimdFamilyV1','AiCimdCredentialV1','AiCimdInvocationV1') AND sp.object_id=OBJECT_ID('sec.TenantFilter') AND sp.is_enabled=1 AND sp.is_schema_bound=1 AND p.predicate_definition COLLATE Latin1_General_100_BIN2=N'([sec].[fn_FilterByTenant]([ShaleClientId]))')<>9
  OR (SELECT COUNT(*) FROM sys.security_predicates WHERE OBJECT_NAME(target_object_id) IN('AiCimdFamilyV1','AiCimdCredentialV1','AiCimdInvocationV1'))<>9
  THROW 59400,'CIMD strict RLS drift.',1;
 """
-verify=pre+owned_sql+oldstate+module_checks+shape_checks+catalog+f"""
+verify=pre+owned_sql+oldstate+module_checks+shape_checks+permission_check+catalog+f"""
 IF ISNULL((SELECT SourceHash FROM dbo.AiCimdProofReceiptV1 WHERE Id=1),0x)<>0x{source_hash}
  OR ISNULL((SELECT CatalogHash FROM dbo.AiCimdProofReceiptV1 WHERE Id=1),0x)<>@C4aFingerprint
  OR ISNULL((SELECT BeforeHash FROM dbo.AiCimdProofReceiptV1 WHERE Id=1),0x)<>@C4aBefore
@@ -172,7 +186,7 @@ IF @C4aLock<0 OR NOT EXISTS(SELECT 1 FROM dbo.AiProductCapability WHERE Id=1 AND
  THROW 59400,'Exclusive schema lock and capability OFF required.',1;
 """+pre+owned_sql
 install+="IF EXISTS(SELECT 1 FROM sys.objects WHERE schema_id=SCHEMA_ID('dbo') AND name IN(SELECT Name FROM @C4aObjects)) OR EXISTS(SELECT 1 FROM sys.database_principals WHERE name IN('AiCimdCaseRuntimeV1','AiCimdLifecycleV1')) THROW 59400,'CIMD proof objects already present; never overwrite.',1;\n"
-install+=oldstate+'DECLARE @C4aSaved binary(32)=@C4aBefore;\n'+source+module_checks+shape_checks+pre.replace('@C4aPredecessors','@C4aAfterPredecessors')+catalog
+install+=oldstate+'DECLARE @C4aSaved binary(32)=@C4aBefore;\n'+source+module_checks+shape_checks+permission_check+pre.replace('@C4aPredecessors','@C4aAfterPredecessors')+catalog
 install+="INSERT dbo.AiCimdProofReceiptV1(Id,SourceHash,BeforeHash,CatalogHash) VALUES(1,0x"+source_hash+",@C4aSaved,@C4aFingerprint);\n"
 install+='COMMIT TRANSACTION; END TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK TRANSACTION; THROW; END CATCH;\n'
 verify+="""
@@ -198,6 +212,9 @@ server_check="""IF EXISTS(SELECT 1 FROM sys.database_role_members r JOIN sys.dat
  THROW 59400,'CIMD SQL login authority drift.',1;
 """
 verify+="IF @C4aEdition<>5 BEGIN DECLARE @C4aServerCheck nvarchar(max)="+hexsql(server_check)+"; EXEC sys.sp_executesql @C4aServerCheck; END;\n"
+# The entire independent verifier runs in a nested batch before the owning install COMMIT.
+# A late grant/owner/signature/trigger fault rolls back DDL and the new receipt together.
+install=install.replace('COMMIT TRANSACTION; END TRY', 'DECLARE @C4aSealVerify nvarchar(max)='+hexsql(verify)+'; EXEC sys.sp_executesql @C4aSealVerify;\nCOMMIT TRANSACTION; END TRY')
 emit(SQL/'universal-pr4a-proof.sql',install);emit(SQL/'universal-pr4a-proof-verify.sql',verify)
 emit(BUILD/'cimd-v1-modules.sha256',''.join(n+'='+hashlib.sha256(b.encode('utf-16le')).hexdigest()+'\n' for n,b in modules.items()))
 print('CIMD proof source '+source_hash+'; modules='+str(len(modules)))

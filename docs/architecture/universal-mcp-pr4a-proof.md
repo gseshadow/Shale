@@ -117,7 +117,9 @@ catalog/before receipt, columns/constraints/indexes/FKs, exact RLS, trigger/tabl
 signatures, new role/member grants/inheritance/ownership and SQL platform-specific login facts. No
 verification path refreshes a receipt. Installation is a one-shot unscoped dbo transaction under the
 existing schema lock, with global capability OFF; existing or partial new objects abort. The old
-verifiers also run after new DDL before sealing. No old table/role permission or binding is changed.
+verifiers also run after new DDL before sealing. The complete independent verifier, including the
+explicit new-role permission allowlist, executes again after the new receipt is inserted and before
+COMMIT; a late injected permission fault must roll back all new DDL and the new receipt together. No old table/role permission or binding is changed.
 
 ## Explicit remaining boundaries
 
@@ -164,3 +166,8 @@ Containment keeps the new proof control and application switches OFF and drains 
 Retain family, credential, invocation and audit history. No destructive down migration, receipt refresh,
 manual-client conversion, legacy-registration activation or fallback to an older proof is supplied.
 The new control has no application setter; a future governed activation/audit contract is still required.
+
+The family-revocation administrative seam relies on authenticated tenant/user connection initialization,
+as existing tenant administration does; mutable SQL session context is not independent authentication.
+The Case data role has no lifecycle permission and derives its owner from credential proof regardless
+of caller context. Runtime identity/pool acceptance must retain this separation.
