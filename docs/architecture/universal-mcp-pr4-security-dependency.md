@@ -134,8 +134,80 @@ baseline checks are not new CIMD lifecycle acceptance.
 
 ## Verification results
 
-Pending final sequential verification. No test result here establishes a complete CIMD lifecycle,
-stock-client interoperability, production/native Azure acceptance or tenant rollout readiness.
+The counterexample is **confirmed on both V1 and V2**: advancing a publication digest/revision made
+both approvals stale, but the deliberately legacy-issued families still authenticated and disclosed
+each tenant's own Case. Registry identity and Case attestation passed. This is evidence against the
+shortcut, not a regression in disconnected PR 3 or authorization to use it. Both probes assert all
+receipt and immutable binding values remain unchanged.
+
+The only initial failure was the baseline `AiCaseDataAttestationTest` recursive-regex
+`StackOverflowError`; the final focused run passes with the test-only fix above. No SQL or production
+assertion was weakened. Maven 3.9.11 and Temurin Java 21.0.12.1 were used. Final runs are sequential.
+
+| Check | Result |
+| --- | --- |
+| Focused CIMD retrieval/parser, manual OAuth/browser/assertion and data/confinement contracts | 74 PASS; zero failures/errors/skips. |
+| Actual SQL registry scenarios and authoritative confinement compatibility/dependency probes | 12 PASS; zero failures/errors/skips: nine registry scenarios, one V2 compatibility scenario, one new V1 and one new V2 two-tenant counterexample. |
+| Selector affected core/data/server suite | 154 PASS; zero reported failures/errors/skips. SQL-opt-in classes execute zero tests in this non-opt-in run; only the separate 12-scenario run is SQL evidence. |
+| Critical seven-module reactor | 246 PASS; all seven modules successful; zero failures/errors/skips. |
+| Unchanged registry supplement generation | 3 PASS. |
+| Immutable binding packet / test selector | 5 / 32 PASS. |
+| Whitespace, changed-document links and historical/production changed-path checks | PASS; no production source, SQL, packaged AI resource or confinement generator changes. |
+
+Counts overlap and must not be added as unique cases. Cases/security-data are the selector's affected
+areas because these tests protect Case proof admission, database authority and Azure platform routing.
+Their core/data/server dependencies are relevant. The selector does not recommend a full-suite
+escalation; no historical all-tests, UI visual, actual browser or stock-client run was performed.
+No test result establishes a complete CIMD lifecycle, production/native Azure acceptance or tenant
+rollout readiness.
+
+Disposable SQL used the pinned SQL Server 2022 image
+`mcr.microsoft.com/mssql/server@sha256:11927f5edc5122658e90b3a80ee36e8aef779310bf771415c1d89271859c73fd`,
+a dedicated container and loopback port 14333. The fixture used generated localhost TLS material,
+`encrypt=true`, `trustServerCertificate=false` and a private PKCS12 truststore; system trust and
+production were untouched. Only nonce-owned synthetic databases/logins were created. A final
+certificate-validated JDBC query independently confirmed zero user databases and zero nonce logins.
+The dedicated container and generated credential/key/certificate/truststore were removed. The attached
+candidate's SHA-256 remained identical after SQL use; it was never modified or committed.
+
+Exact test/check commands from the repository root (the local Maven executable was
+`/workspace/.tools/bin/mvn`; use normal `mvn` with equivalent JDK setup):
+
+```sh
+mvn -B -pl shale-server -am \
+  -Dtest=CimdClientIdentifierTest,CimdMetadataTest,CimdRetrievalTest,AiApplicationContractTest,AiOAuthExchangeContractTest,AiOAuthCredentialContractTest,AiOAuthRevocationContractTest,OAuthClientMappingTest,OAuthMetadataTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,OAuthBrowserFilterTest,PinnedClientAssertionTest,OAuthConfigurationTest,AiCaseDataAttestationTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+# Only with the dedicated disposable loopback fixture and private environment below:
+mvn -B -pl shale-data -am \
+  '-Dtest=AiApplicationLocalSqlServerTest,AiApplicationConfinementV2LocalSqlServerTest#preparedCompatibilityInstallsWithoutRefreshingAnyHistoricalReceipt+legacyFamilyCannotServeAsCimdRevisionBinding,AiApplicationConfinementLocalSqlServerTest#legacyFamilyCannotServeAsCimdRevisionBinding' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 38281e8e --head HEAD \
+  --format markdown --plan-output work/pr4/selection.json --output work/pr4/selection.md
+# Run outside SQL opt-in; execute each selected_maven_batches argument array with mvn.
+python3 - <<'PYSELECT'
+import json, os, subprocess
+env = os.environ.copy()
+for name in list(env):
+    if name.startswith(('SHALE_AI_SQL_', 'SHALE_CASE_VERIFY_')):
+        env.pop(name)
+for args in json.load(open('work/pr4/selection.json'))['selected_maven_batches']:
+    subprocess.run(['mvn', '-B', *args], env=env, check=True)
+subprocess.run(['mvn', '-B', 'test'], env=env, check=True)
+PYSELECT
+python3 -m unittest discover -s build/sql-confinement -p test_registry_v1.py
+python3 -m unittest discover -s build/deployment-binding -p test_packet.py
+python3 -m unittest build/test-selection/test_select_tests.py
+git diff --check 38281e8e HEAD
+git diff --name-only 38281e8e HEAD -- docs/sql shale-data/src/main/resources/ai \
+  shale-core/src/main shale-data/src/main shale-server/src/main build/sql-confinement
+```
+
+Private fixture environment: `SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI`,
+`SHALE_AI_SQL_PORT=14333`, `SHALE_AI_SQL_PASSWORD` (generated disposable secret, never logged),
+`SHALE_AI_SQL_TRUSTSTORE` (generated PKCS12 path), `SHALE_CASE_VERIFY_SCHEMA` (attached candidate path),
+and `SHALE_CASE_VERIFY_SCHEMA_SHA256` (the verified digest above). The expected synthetic truststore
+password is `synthetic-trust`, as required by the unchanged fixture. Setup is restricted to that
+dedicated local container; these commands do not authorize production or native Azure setup.
 
 ## Remaining interoperability and rollout dependencies
 
