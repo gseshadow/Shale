@@ -58,7 +58,6 @@ class AiCimdProofLocalSqlServerTest extends AiApplicationConfinementV2LocalSqlSe
         String access=AiOAuthCredentialStore.opaque(),refresh=AiOAuthCredentialStore.opaque(),code=AiOAuthCredentialStore.opaque();
         try(Connection c=owner(db)) {
             // Synthetic exchange receipt only: grant/session created by fixture owner, never by approval.
-            sql(c,"UPDATE dbo.AiIntegrationRegistration SET Status='ACTIVE' WHERE IntegrationId='"+approval.integrationId()+"'");
             try(var p=c.prepareStatement("INSERT dbo.UserSessions(SessionId,ShaleClientId,UserId,ClientType,CurrentAccessJti,IssuedAt,ExpiresAt) VALUES(?,?,?,'WEB',NEWID(),SYSUTCDATETIME(),DATEADD(hour,2,SYSUTCDATETIME()))")){
                 p.setObject(1,web);p.setInt(2,tenant);p.setInt(3,user);p.executeUpdate();
             }
@@ -189,6 +188,8 @@ class AiCimdProofLocalSqlServerTest extends AiApplicationConfinementV2LocalSqlSe
         try(Connection c=owner(db);var p=c.prepareStatement("SELECT ClientId FROM dbo.AiCimdFamilyV1 WHERE SessionId=?")){
             p.setObject(1,a.session());try(var r=p.executeQuery()){assertTrue(r.next());internal=r.getString(1);}
         }
+        assertTrue(new AiOAuthTransactionStore(provider("runtime",7,72),true,ISSUER,RESOURCE).loadClient(internal).isEmpty(),"The CIMD integration must stay unavailable to the old client loader.");
+        assertThrows(IllegalStateException.class,()->controls(7,72).beginConsent(approvalA.integrationId(),AiScope.fromMask(3),1),"Old consent cannot mint another legacy family for a CIMD integration.");
         assertTrue(new AiOAuthExchangeStore(bootstrap,ISSUER,RESOURCE).resolve(a.code(),internal).isEmpty(),"New code digest must not enter the legacy exchange.");
         assertTrue(new AiOAuthCredentialStore(bootstrap,ISSUER,RESOURCE).resolveRefresh(a.refresh(),internal).isEmpty(),"New refresh digest must not enter legacy rotation.");
         manualRead();

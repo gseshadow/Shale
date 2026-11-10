@@ -31,6 +31,7 @@ for name,body in original.items():
  if name in ['AiDataLocateAccessOwnerV1','AiDataLoadAuthorityV1']:
   text=text.replace('a.TransactionId=s.TransactionId','a.SessionId=s.SessionId AND s.TransactionId IS NULL')
  if name=='AiDataLoadAuthorityV1':
+  text=text.replace("i.Status='ACTIVE'","i.Status='SUSPENDED' AND i.Revision=1")
   text=text.replace('SELECT @web=WebSessionId FROM dbo.AiCimdFamilyV1 WITH(HOLDLOCK) WHERE ShaleClientId=@t AND TransactionId=@transaction;', 'SELECT @web=WebSessionId FROM dbo.AiCimdFamilyV1 WITH(HOLDLOCK) WHERE ShaleClientId=@t AND SessionId=@SessionId;')
   marker=' -- Acquire every row explicitly in fixed order, BEFORE the validation join and UTC sample.'
   assert marker in text;text=text.replace(marker,(BUILD/'cimd-v1-authority.sql').read_text()+'\n'+marker)

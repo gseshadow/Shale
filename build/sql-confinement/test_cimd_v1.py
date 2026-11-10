@@ -20,7 +20,7 @@ class CimdProofGenerationTest(unittest.TestCase):
    if name.startswith('AiCimdData'):
     self.assertNotRegex(body,r'\bdbo\.(AiOAuthCredential|AiAuthorizationTransaction|AiCaseDataInvocation)\b',name)
   load=modules['AiCimdDataLoadAuthorityV1']
-  for predicate in ['p.RowVer=f.ApprovalVersion','e.Revision=f.ApplicationRevision','e.MetadataDigest=f.MetadataDigest','e.Disabled=0','DATALENGTH(e.ExternalClientId)=DATALENGTH(f.ExternalClientId)','s.TransactionId IS NULL','@approvalDeadline<@deadline']:
+  for predicate in ['p.RowVer=f.ApprovalVersion','e.Revision=f.ApplicationRevision','e.MetadataDigest=f.MetadataDigest','e.Disabled=0','DATALENGTH(e.ExternalClientId)=DATALENGTH(f.ExternalClientId)','s.TransactionId IS NULL',"i.Status='SUSPENDED' AND i.Revision=1",'@approvalDeadline<@deadline']:
    self.assertIn(predicate,load)
   for name in ['AiCimdDataAuthenticateV1','AiCimdDataSearchCasesV1','AiCimdDataGetCaseOverviewV1','AiCimdDataAuthorizeCaseHandoffV1']:
    self.assertIn('EXEC dbo.AiCimdDataLoadAuthorityV1',modules[name],name)

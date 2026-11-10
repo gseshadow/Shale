@@ -10,7 +10,9 @@ A CIMD family uses a separate immutable binding and separate credential table. R
 `AiDelegatedSession` only as a tenant/grant/session lifecycle and audit anchor, with its historical
 `TransactionId` **NULL**. Its new versioned family binding supplies the original WEB, consent and
 consumed-code/S256 receipt. No CIMD code or credential is inserted into the legacy transaction or
-credential table. Existing legacy proof locators require their historical authorization transaction
+credential table. The integration also remains legacy-SUSPENDED at Revision=1: new SQL does not activate
+it. The new live loader requires that initial dormant anchor, so ordinary administrative modification
+invalidates the new path, and the old OAuth client loader/consent cannot create an alternative family. Existing legacy proof locators require their historical authorization transaction
 join and therefore cannot admit this family, independently of Java or token-string validation.
 
 New versioned Case modules derive owner only from the new ACCESS digest, use a separate invocation
@@ -128,7 +130,8 @@ The following work remains outside this bounded PR:
    No callable issuer, code resolver, refresh rotation or automatic activation is supplied here. Existing
    manual issuance/rotation remains unchanged. A stored S256 receipt alone is not PKCE verification.
 2. Connect secure metadata retrieval to exact conditional publication resolution and tenant approval,
-   method/key lifecycle and bounded freshness. No fetch or Java eligibility code is added here.
+   method/key lifecycle and bounded freshness. Preserve legacy-SUSPENDED integration anchors; do not
+   activate them as a shortcut. No fetch or Java eligibility code is added here.
 3. Compose the new Case roots with an independent pool and a new full runtime identity attestor that
    includes both old and new verifiers, effective object/column permissions, real endpoint identity
    separation and cross-database access probes. The new standalone catalog verifier currently requires
