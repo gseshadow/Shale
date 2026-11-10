@@ -171,3 +171,123 @@ The family-revocation administrative seam relies on authenticated tenant/user co
 as existing tenant administration does; mutable SQL session context is not independent authentication.
 The Case data role has no lifecycle permission and derives its owner from credential proof regardless
 of caller context. Runtime identity/pool acceptance must retain this separation.
+
+## Disposable verification and evidence limits
+
+Authoritative private fixture SHA-256, verified before SQL use and unchanged afterward:
+`4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f`.
+It was used only through the existing disposable schema-import safety harness and was never edited
+or committed. SQL Server 2022 image:
+`mcr.microsoft.com/mssql/server@sha256:11927f5edc5122658e90b3a80ee36e8aef779310bf771415c1d89271859c73fd`.
+The dedicated container used loopback port 14333, generated localhost TLS material, certificate-
+validated JDBC (`encrypt=true`, `trustServerCertificate=false`) and a private PKCS12 truststore.
+No system trust or production resource was changed. JDK 21.0.12.1 / Maven 3.9.11.
+
+The primary suite passed **20 real SQL scenarios**, ten each against unchanged authoritative V1 and
+V2. Both use actual restricted mapped logins and real JDBC, not simulated SQL results. The test-only
+DataSource adapter changes procedure names to the new namespace; it delegates every connection,
+statement and result to the real driver. Fixtures seed the exchange receipt as owner; they do not
+claim browser consent/code/refresh implementation. Each fresh fixture also obtains ordinary manual
+credentials through the existing real WEB-session/S256/code/issuance sequence.
+
+The ten scenarios on each baseline cover:
+
+1. Two independent tenant families and own-Case reads, foreign Case rejection, separate new versus old
+   proof namespaces, REFRESH rejection as Case proof and actual manual-client Case continuity.
+2. Publication change after committed SQL read but before final handoff: no data escapes; both tenants'
+   old access proofs subsequently fail admission, while manual access remains functional.
+3. Disabled application denies both tenants and preserves unrelated manual access.
+4. Competing family revocations have one RowVer winner; A cannot revoke B and B remains functional.
+5. Failed entity-action audit rolls back session and new-credential revocation; failed required Case
+   audit prevents a committed read receipt or serialized result. The intentional fault produces only
+   the existing fixed `INTEGRATION_ACCESS_AUDIT_OUTAGE` diagnostic during bounded cleanup.
+6. Approval revocation after read prevents final disclosure and blocks A while B remains usable.
+7. OFF control, expired approval and reduced ceiling fail closed; unrelated manual grants remain usable.
+8. Actual new identities deny direct old/new tables and legacy Case roots. Legacy code and refresh
+   resolvers cannot consume the new digests. The legacy client loader and consent also reject the
+   still-SUSPENDED integration, preventing creation of an alternative legacy family.
+9. Immutable receipt, one-shot install and source/member/extra-EXECUTE drift rejection. #1948 still
+   rejects an added `Shale.*` property; no historical snapshot is bypassed or resealed.
+10. Actual FILTER and AFTER INSERT BLOCK isolation on new tables, immutable external identity and
+    legacy-transaction exclusion, nontruncating RowVer input and manual continuity.
+
+The proof schema/module/permission source hash is
+`6ad3d47b5cfdd4e6e9c49b1ef8abf3b1cd18529cafca7d9fd57240bbf0191941`.
+After adding the final independent permission allowlist and complete pre-COMMIT seal verification,
+the proof bodies and schema retained that exact source hash. **Four additional real SQL checks passed**:
+namespace/manual continuity and receipt/installation drift on each V1/V2 baseline. These final receipt
+checks also inject a late permission fault after receipt creation and require rollback of every new
+table/role/receipt, with all historical receipt and immutable binding values unchanged. Counts overlap;
+they are not 24 distinct security scenarios.
+
+Development runs found generator EXEC-expression/batch-scope errors and a catalog-collation conflict.
+They were corrected in the new generator; no historical SQL or security assertion was weakened.
+Development runs are not acceptance evidence. Only the successful batches above are reported as SQL
+acceptance. New explicit permission comparisons use binary collation on both operands, preserving
+exact allowlist semantics across the fixture's database/catalog collation difference.
+
+Final sequential checks: **47 focused contracts**, **154 affected core/data/server tests**
+and **245 critical tests across all seven reactor modules** passed, with zero failures/errors/skips.
+The new generation checks passed 3; unchanged registry generation 3, binding packet 5 and selector 32
+also passed. Counts overlap. SQL-opt-in classes executing zero tests outside opt-in are not SQL
+acceptance; only the dedicated real SQL batches above supply that evidence.
+
+After the final SQL batch, an independent certificate-validated JDBC cleanup query confirmed **zero
+user databases and zero nonce logins**. The dedicated container and generated credential/key/certificate/
+truststore were removed. The attached fixture hash stayed unchanged. Historical SQL, packaged AI
+resources, module/source manifests and immutable binding inputs remain byte-identical to the baseline.
+No production Java source changed. Git whitespace, document links/fences, public generation and final
+selector consistency checks passed.
+The selector chooses security-data and its core/data/server dependencies because the new SQL changes
+credential authority, Case proof, audits, RLS and catalog verification. It recommends no full-suite
+escalation. No full historical, visual, browser, stock-client or native Azure suite is claimed.
+
+Reproduction requires the dedicated disposable loopback setup described in
+[the existing SQL fixture record](../testing/universal-mcp-pr3-verification.md#disposable-sql-setup-and-commands).
+Private environment only: `SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI`, `SHALE_AI_SQL_PORT=14333`,
+`SHALE_AI_SQL_PASSWORD` (generated secret), `SHALE_AI_SQL_TRUSTSTORE` (private PKCS12, synthetic password
+`synthetic-trust`), `SHALE_CASE_VERIFY_SCHEMA` (the attached candidate path) and
+`SHALE_CASE_VERIFY_SCHEMA_SHA256` (the exact digest above). Never put a credential in command arguments
+or logs. From the repository root, with the supported JDK and Maven on PATH:
+
+```sh
+python3 build/sql-confinement/generate-cimd-v1.py --check
+python3 -m unittest discover -s build/sql-confinement -p test_cimd_v1.py
+# Only with the exact private disposable environment above:
+python3 - <<'PYSQL'
+from pathlib import Path
+import re, subprocess
+source=Path('shale-data/src/test/java/com/shale/data/security/ai/AiCimdProofLocalSqlServerTest.java').read_text()
+methods='+'.join(re.findall(r'@Test void (\w+)\(',source))
+classes=['AiCimdProofLocalSqlServerTest','AiCimdProofV1LocalSqlServerTest']
+selection=','.join(f'{name}#{methods}' for name in classes)
+subprocess.run(['mvn','-B','-pl','shale-data','-am',f'-Dtest={selection}',
+                '-Dsurefire.failIfNoSpecifiedTests=false','test'],check=True)
+PYSQL
+# Final seal/namespace rechecks, under the same disposable opt-in:
+mvn -B -pl shale-data -am \
+  '-Dtest=AiCimdProofLocalSqlServerTest#namespaceAndTwoTenantCaseProofPreserveManualClients+independentReceiptRejectsDriftWithoutRelaxingHistoricalSnapshot,AiCimdProofV1LocalSqlServerTest#namespaceAndTwoTenantCaseProofPreserveManualClients+independentReceiptRejectsDriftWithoutRelaxingHistoricalSnapshot' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+# The following runs are outside disposable SQL opt-in:
+mvn -B -pl shale-server -am \
+  -Dtest=AiCaseDataAttestationTest,AiCaseDataMigrationContractTest,AiCaseDataV2MigrationContractTest,AiApplicationContractTest,AiOAuthCredentialContractTest,AiOAuthExchangeContractTest,AiOAuthRevocationContractTest,OAuthClientMappingTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,PinnedClientAssertionTest,OAuthBrowserFilterTest,OAuthMetadataTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base a70bbc6f --head HEAD \
+  --format markdown --plan-output work/pr4a/selection.json --output work/pr4a/selection.md
+python3 - <<'PYSELECT'
+import json, os, subprocess
+env=os.environ.copy()
+for key in list(env):
+    if key.startswith(('SHALE_AI_SQL_','SHALE_CASE_VERIFY_')): env.pop(key)
+for args in json.load(open('work/pr4a/selection.json'))['selected_maven_batches']:
+    subprocess.run(['mvn','-B',*args],env=env,check=True)
+subprocess.run(['mvn','-B','test'],env=env,check=True)
+PYSELECT
+python3 -m unittest discover -s build/sql-confinement -p test_registry_v1.py
+python3 -m unittest discover -s build/deployment-binding -p test_packet.py
+python3 -m unittest build/test-selection/test_select_tests.py
+git diff --check a70bbc6f HEAD
+```
+
+The local executable used was `/workspace/.tools/bin/mvn`. No native Azure or production connection,
+fixture writes, settings, credentials, permissions, SQL deployment, activation or automatic merge.
