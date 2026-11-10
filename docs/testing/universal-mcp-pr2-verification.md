@@ -38,7 +38,9 @@ The production transport creates a direct `Socket(Proxy.NO_PROXY)` to a validate
 It never invokes URLConnection, ProxySelector, system HTTP proxy resolution, cookies or HTTP auth.
 Every fetch resolves all returned A/AAAA (at most sixteen), rejects any unsafe/mixed answer, then
 pins one address without a second hostname lookup. TLS still uses the original hostname for SNI
-and HTTPS endpoint identification against the JVM trust store. There is no TLS bypass, redirect,
+and HTTPS endpoint identification against the JVM trust store. A dedicated SSLContext has empty
+client key managers: application TLS client credentials and a replaced default SSLContext cannot
+leak into metadata connections. There is no TLS bypass, redirect,
 retry, connection pooling or fallback. Cross-origin JWKS repeats the same checks. HTTPS callback
 hosts are checked independently but never fetched; only the existing public native literal-loopback
 exception survives. No localhost, encoded/query callback or legacy five-callback rule is broadened.

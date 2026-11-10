@@ -4,6 +4,7 @@ import com.shale.server.oauth.CimdClientIdentifier;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import org.junit.jupiter.api.*;
 import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.SSLContext;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
@@ -246,6 +247,18 @@ class CimdRetrievalTest {
         fixture.handler=r -> CimdFixture.Reply.json(CimdFixture.publicMetadata(encoded.value()),"max-age=60");
         assertEquals(encoded,service.retrieve(encoded).identifier());
         assertTrue(fixture.requests.getLast().startsWith("GET /%63lient.json HTTP/1.1"));
+    }
+
+    @Test void productionTlsDoesNotInheritReplacedApplicationDefaultContext() throws Exception {
+        var original=SSLContext.getDefault();
+        try {
+            SSLContext.setDefault(CimdFixture.clientContext);
+            try (var isolated=new CimdMetadataService(ISSUER,clock,fixture.transport(CimdHttps.platformTls()))) {
+                assertThrows(IllegalArgumentException.class,()->isolated.retrieve(ID),
+                        "An application's replaced SSLContext must not replace the metadata trust boundary");
+            }
+            assertTrue(fixture.requests.isEmpty());
+        } finally { SSLContext.setDefault(original); }
     }
 
 }

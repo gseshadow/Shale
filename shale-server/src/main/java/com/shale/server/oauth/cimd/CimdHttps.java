@@ -4,6 +4,7 @@ import javax.net.ssl.*;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.concurrent.*;
@@ -22,7 +23,16 @@ final class CimdHttps {
     interface Connector { Socket connect(InetAddress address, int port, int timeout) throws IOException; }
     private final Connector connector;
 
-    CimdHttps() { this(InetAddress::getAllByName, (SSLSocketFactory) SSLSocketFactory.getDefault()); }
+    CimdHttps() { this(InetAddress::getAllByName, platformTls()); }
+    static SSLSocketFactory platformTls() {
+        try {
+            var context=SSLContext.getInstance("TLS");
+            // Use JVM trust, but never inherit application TLS client credentials or a replaced
+            // process-wide default SSLContext. Metadata origins cannot request Shale client keys.
+            context.init(new KeyManager[0],null,null);
+            return context.getSocketFactory();
+        } catch (GeneralSecurityException failure) { throw new IllegalStateException("CIMD TLS unavailable."); }
+    }
     // Package-private fixture seam: production always uses platform DNS and verified default TLS.
     CimdHttps(Resolver resolver, SSLSocketFactory tls) {
         this(resolver,tls,(address,port,timeout) -> {
