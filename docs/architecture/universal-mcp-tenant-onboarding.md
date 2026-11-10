@@ -53,7 +53,8 @@ does not implement DCR. Do not advertise capabilities before the full durable pa
 
 ## Observed blockers and retained strengths
 
-Paths below are relative to the repository root. Historical roadmap sections describe earlier phases;
+Java OAuth/MCP paths below use the `shale-server/src/main/java/com/shale/server/` prefix; data adapters
+use `shale-data/src/main/java/com/shale/data/security/ai/`. Historical roadmap sections describe earlier phases;
 the latest source and dated Phase 4 records establish the following current behavior.
 
 | Blocker/evidence | Required change |
@@ -63,6 +64,7 @@ the latest source and dated Phase 4 records establish the following current beha
 | `phase3b1.sql`: `AiIntegrationRegistration.ClientId` is globally unique `varchar(64)`; registration creates a random ID, belongs to one tenant, requires an administrator, and expires within 90 days. | Model one external application identity with independent tenant approvals; a single CIMD URL must work for tenant A and tenant B. Keep legacy rows/IDs unchanged. |
 | `DurableOAuthAuthorization.findByClientId` loads only a pre-existing active tenant registration under authenticated WEB authority. No path creates a pending client/approval. | Authenticate the human first, then resolve/create only that tenant's pending request; never infer a tenant from client metadata. |
 | Phase 4 browser route now exists in `OAuthBrowserFilter` and `OAuthConsent.tsx`, but requires approved `browser-origin`, matching web/server artifacts and hosting/CORS/header setup. | Reuse it; deployment acceptance is still outstanding. No separate password page or external-client WEB bearer entry. |
+| Existing registration/snapshot adapters cap redirects at five. Hermes' published CIMD has ten entries (five ports, two hosts). | A new bounded CIMD metadata profile must accommodate this without silently altering exact callbacks or changing legacy rows. |
 | No CIMD fetch/cache/key lifecycle or DCR abuse controls exist. Existing confidential clients use local administratively pinned RS256 keys only. | Add isolated bounded fetching and reviewed automatic public-key onboarding; retain the manual pinned path. |
 | Existing administration is backend service/procedure driven (`AiIntegrationSecurityService`); no complete Settings application/approval/self-grant inventory exists. | Expose authenticated, tenant-confined Settings flows and missing bounded read projections. |
 | Protected-resource metadata currently publishes resource/issuer only; the strict authorize flow rejects missing scopes. | Publish the existing two scopes in protected-resource discovery or appropriate 401 scope guidance before relying on clients to choose scopes automatically. Do not require users to configure scope strings. |
@@ -153,7 +155,11 @@ outside this roadmap and blocks the affected implementation boundary. No SQL is 
 9. Every MCP request uses the existing verified immutable integration context and live checks, quotas,
    shared secured Case operations, fail-closed audit and final disclosure checks. Same application
    in two tenants produces distinct grants and token families. Refresh/revocation use credential
-   digest-derived owner, not a client-chosen tenant; unknown revocations remain non-oracular.
+   digest-derived owner, not a client-chosen tenant; unknown revocations remain non-oracular. For an
+   unknown credential, authenticate the application using the tenant-neutral registry and return the
+   RFC 7009 empty success without selecting a tenant or revoking anything. The existing fallback
+   through a unique tenant registration creator cannot resolve a shared CIMD ID and must not be reused
+   for this case. Known credentials still require matching application authentication and owner binding.
 
 ## CIMD fetching and metadata controls
 
@@ -171,8 +177,9 @@ outside this roadmap and blocks the affected implementation boundary. No SQL is 
   IPv4-mapped IPv6, unusual IP notation and DNS rebinding. If an outbound proxy resolves DNS, enforce
   the same policy at that proxy; application DNS prechecks alone do not prove safety. Redirect URIs
   are never fetched. Native callback exceptions do not apply to metadata fetching.
-- Initial proposed bounds: 32 KiB decompressed metadata/JWKS each, JSON depth 8, 5 redirects in
-  metadata (matching the current registry maximum), 2 live signing keys, name 100 characters,
+- Initial proposed bounds: 32 KiB decompressed metadata/JWKS each, JSON depth 8, 16 redirect entries in
+  CIMD metadata (Hermes currently publishes ten; legacy registrations retain their five-entry bound),
+  2 live signing keys, name 100 characters,
   2-second connect and 5-second total fetch deadline, 16 concurrent fetches per replica. Reject
   duplicate JSON keys/type confusion, invalid UTF-8, control/bidi display characters, private JWK
   parameters and incompatible algorithms. Bound arrays/strings and actual streaming/decompressed
@@ -293,7 +300,7 @@ combined URL-only client test. Existing SDK fixtures use provisioned credentials
 | ChatGPT | [Official authentication guide](https://developers.openai.com/apps-sdk/build/auth/) documents CIMD, DCR, predefined clients, S256, none/private_key_jwt and issuer checks. Public [client document](https://chatgpt.com/oauth/client.json) fetched successfully: exact URL client ID, HTTPS callback, plural none/private_key_jwt plus singular private_key_jwt, RS256 and remote JWKS. | Published/source configuration verified; Shale connection UNVERIFIED. Test stable and callback-specific ID modes, plural method negotiation, JWKS rotation, path-scoped issuer/resource, scopes, current transport, consent, refresh and revoke. Do not reject its entire metadata because it offers an extra unimplemented grant; never enable that grant. Workspace plan/admin/app-creation permissions are normal client-side prerequisites. |
 | Claude Code | [Official MCP guide](https://code.claude.com/docs/en/mcp) documents DCR and automatically discovered CIMD, browser OAuth, random callback ports and `http://localhost:PORT/callback`. | Documented support; Shale connection UNVERIFIED. Existing literal-IP-only redirect policy can reject its localhost callback. Pin the actual release and test native callback, resource/issuer/PKCE/scopes and MCP revision. No --client-id in acceptance. |
 | Claude web/Desktop connectors | [Claude platform remote-MCP documentation](https://platform.claude.com/docs/en/agents-and-tools/remote-mcp-servers) confirms remote services but is not a proof of claude.ai/Desktop registration behavior. | UNKNOWN per product/build/workspace. Do not infer from Claude Code or Anthropic API connector, which can receive externally supplied tokens. Record actual registration/auth/transport support and any workspace administrator prerequisite. |
-| Hermes (assumed NousResearch/hermes-agent) | Inspected public main `74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5`: [OAuth manager](https://github.com/NousResearch/hermes-agent/blob/74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5/tools/mcp_oauth_manager.py), [provider](https://github.com/NousResearch/hermes-agent/blob/74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5/tools/mcp_oauth_provider.py), [transport](https://github.com/NousResearch/hermes-agent/blob/74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5/tools/mcp_tool.py). Uses SDK OAuthClientProvider, discovery, cached DCR clients and CIMD-aware rejection handling. | Source indications only; installed Hermes version/SDK, automatic CIMD identifier availability and Shale E2E remain UNKNOWN. Pin source/package and SDK; run stock URL setup plus interactive login. Test protocol revision, callback host, exact resource/state/iss, registration metadata and refresh. Existing source compatibility fallbacks are not a reason to weaken Shale issuer validation. If another Hermes product was intended, no compatibility claim transfers. |
+| Hermes (assumed NousResearch/hermes-agent) | Inspected public main `74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5`: [OAuth manager](https://github.com/NousResearch/hermes-agent/blob/74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5/tools/mcp_oauth_manager.py), [provider](https://github.com/NousResearch/hermes-agent/blob/74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5/tools/mcp_oauth_provider.py), [transport](https://github.com/NousResearch/hermes-agent/blob/74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5/tools/mcp_tool.py). Also inspected [mcp_oauth.py](https://github.com/NousResearch/hermes-agent/blob/74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5/tools/mcp_oauth.py) and fetched its [public CIMD](https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json). Source automatically chooses its hosted CIMD when eligible/SDK-capable, else DCR; public metadata declares none, native code/refresh and ten loopback redirects. | Source and published metadata verified; installed Hermes version/SDK and Shale E2E remain UNKNOWN. The ten-entry document exceeds Shale's current five-redirect cap. Pin source/package and SDK; run stock URL setup plus interactive login. Test protocol revision, callback host, exact resource/state/iss, registration metadata and refresh. Existing source compatibility fallbacks are not a reason to weaken Shale issuer validation. If another Hermes product was intended, no compatibility claim transfers. |
 | Other MCP clients / Inspector / independent SDKs | Existing Shale pinned TypeScript client 2.4.0 and Python fixtures plus `McpSdkCompatibilityTest` establish their recorded synthetic scope only. | Classify CIMD-capable, DCR-capable, manual-only and unsupported transport separately. Run a fresh maintained stock client with automatic registration enabled; a script with a supplied ID is not URL-only evidence. |
 
 Record exact application/SDK build, OS, date, transport revision, registration mechanism, discovery,

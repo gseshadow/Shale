@@ -48,7 +48,19 @@ git diff --check c4800cb5 HEAD
 ```
 
 Focused result: **23 PASS**, zero failures/errors/skips, including four new identifier tests.
-Affected/critical/static results will be recorded after execution, before opening the PR.
+Affected result: **56 PASS**, zero failures/errors/skips. The selector includes the new test and
+existing OAuth/client/assertion/browser/OFF-composition and ordinary login regressions; server is
+the only affected area, with no full-suite escalation. Opt-in SQL lifecycle scenarios did not execute.
+Critical `mvn -B test`: **242 PASS**, zero failures/errors/skips across all seven reactor modules.
+Counts overlap and are not additive unique-test totals. Maven 3.9.11 / Temurin Java 21.0.12.1.
+
+Static checks: changed-document code fences and new-document relative links PASS; `git diff --check`
+PASS; changed-file/test review and reference search PASS. `CimdClientIdentifier` is referenced only
+by its own test; the active manual client-ID checks and registration metadata assertions are unchanged.
+Independent changed-path checks confirm the complete `docs/sql` and `shale-data/src/main/resources/ai`
+trees are unchanged, including immutable binding inputs. No workflow, dependency or selector edits.
+The historical all-tests profile, web/browser campaigns and SQL opt-ins were not required for this
+isolated non-UI/non-SQL foundation and were not run.
 
 No SQL, registry, CIMD fetch or DCR behavior was exercised or implemented. No actual Hermes/Claude/
 ChatGPT session was run. The plan's combined browser/client/SQL URL-only scenario is specified,
