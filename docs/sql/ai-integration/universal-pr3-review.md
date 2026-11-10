@@ -91,19 +91,19 @@ permissions/column permissions, role owners, inherited role authority and audit 
 catalog visibility. A matching verification is read-only; drift is never repaired by refreshing a receipt.
 A second installation is rejected, rather than silently applying an incompatible revision.
 
-**Production installation is intentionally blocked when `AiCaseDataDeployment` exists**, including when
-that immutable table is empty. The guard isolates compatibility review from the historical confinement
-contracts. Do not remove it as an operational workaround. The existing V1/V2 installers, dispatch/startup
-verifiers, source receipts, binding files/table/trigger and issuer/resource/time-zone tuple are unchanged.
-The historical foundation receipt still verifies after this extension in the synthetic fixture. That is
-not evidence of full production V2 permission-graph or native Azure compatibility.
+**Production installation remains guarded when `AiCaseDataDeployment` exists.** The separately reviewed
+[registry/confinement supplement V1](../../architecture/pr1947-confinement-compatibility.md) adds an exact
+source-pinned prerequisite, locked precheck and transactional seal. Without that approved prerequisite,
+including when the binding table is empty, installation still refuses. This is a proposed compatibility
+successor for explicit review; it is not an installation waiver or deployment authorization.
 
-Before lifting that guard in a separately reviewed change, prove the new dbo-owned modules/roles and
-static chains against the complete confinement dependency/effective-authority graph and both catalog
-identities. Determine whether a versioned verification successor is necessary. If necessary, add it
-separately with its own installation/verification and source receipt; do not edit/reissue old receipts,
-expand bootstrap authority, or change the immutable binding. This PR supplies no waiver or successor
-that pretends those checks ran. Existing production contracts remain authoritative.
+The historical V1/V2 installers, standalone/packaged verifiers, module/source manifests and binding
+files/table/trigger are unchanged. Existing receipt and binding values are read and preserved. A new
+namespaced requirement marker is added to `AiCaseDataInvocation`, with separate source/before/catalog
+receipts on a private helper. Missing or unsealed registry components remove Case readiness.
+The supplement changes readiness only by adding checks; it never adopts a reverse-order installation,
+refreshes an old receipt, expands bootstrap authority or changes an immutable binding. Native Azure and
+current production gates remain open at the scopes recorded in their governing documents.
 
 ## Exact production prerequisites and verification order
 

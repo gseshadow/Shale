@@ -4,13 +4,40 @@
 SET NOCOUNT ON; SET XACT_ABORT ON; SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON;
 IF USER_NAME()<>N'dbo' OR (SELECT COUNT(*) FROM sys.schemas WHERE name IN(N'dbo',N'sec') AND principal_id=DATABASE_PRINCIPAL_ID(N'dbo'))<>2 OR SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL
  THROW 59300,'Fresh unscoped dbo session required.',1;
-IF OBJECT_ID(N'dbo.AiCaseDataDeployment') IS NOT NULL
+/* Registry confinement guard V1: an existing deployment still requires exact reviewed prerequisites. */
+IF OBJECT_ID(N'dbo.AiCaseDataDeployment') IS NOT NULL BEGIN
+IF NOT EXISTS(SELECT 1 FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id JOIN sys.sql_modules m ON m.object_id=o.object_id
+ JOIN sys.extended_properties p ON p.class=1 AND p.major_id=o.object_id AND p.minor_id=0 AND p.name=N'Shale.RegistryConfinementV1.Source'
+ WHERE s.name=N'dbo' AND o.name=N'AiRegistryConfinementV1' AND o.type='P' AND COALESCE(o.principal_id,s.principal_id)=1 AND m.execute_as_principal_id IS NULL AND m.uses_ansi_nulls=1 AND m.uses_quoted_identifier=1
+ AND HASHBYTES('SHA2_256',m.definition)=0x3636deda3744ada73314b233532834bd13d02a102132f16ea4cf00ab91cde5c1 AND CONVERT(varbinary(32),p.value)=0x3636deda3744ada73314b233532834bd13d02a102132f16ea4cf00ab91cde5c1
+ AND EXISTS(SELECT 1 FROM sys.extended_properties r WHERE r.class=1 AND r.major_id=OBJECT_ID(N'dbo.AiCaseDataInvocation') AND r.name=N'Shale.RegistryConfinementV1.Required' AND CONVERT(varbinary(32),r.value)=0x3636deda3744ada73314b233532834bd13d02a102132f16ea4cf00ab91cde5c1))
  THROW 59300,'Confinement successor review required before installing PR 3 alongside Case confinement.',1;
+IF EXISTS(SELECT 1 FROM sys.database_permissions WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiRegistryConfinementV1') AND NOT(grantee_principal_id=DATABASE_PRINCIPAL_ID(N'public') AND minor_id=0 AND permission_name='EXECUTE' AND state='D' AND grantor_principal_id=1))
+ OR NOT EXISTS(SELECT 1 FROM sys.database_permissions WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiRegistryConfinementV1') AND grantee_principal_id=DATABASE_PRINCIPAL_ID(N'public') AND permission_name='EXECUTE' AND state='D')
+ OR EXISTS(SELECT 1 FROM sys.crypt_properties WHERE major_id=OBJECT_ID(N'dbo.AiRegistryConfinementV1'))
+ THROW 59310,'Private compatibility module permission/signature drift.',1;
+END;
+/* End registry confinement guard V1. */
 BEGIN TRY
 BEGIN TRANSACTION;
 DECLARE @rc int;
 EXEC @rc=sys.sp_getapplock @Resource=N'AiSchemaV1',@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=3000;
 IF @rc<0 THROW 59300,'Schema lock unavailable.',1;
+/* Registry confinement locked precheck V1. */
+IF OBJECT_ID(N'dbo.AiCaseDataDeployment') IS NOT NULL BEGIN
+IF NOT EXISTS(SELECT 1 FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id JOIN sys.sql_modules m ON m.object_id=o.object_id
+ JOIN sys.extended_properties p ON p.class=1 AND p.major_id=o.object_id AND p.minor_id=0 AND p.name=N'Shale.RegistryConfinementV1.Source'
+ WHERE s.name=N'dbo' AND o.name=N'AiRegistryConfinementV1' AND o.type='P' AND COALESCE(o.principal_id,s.principal_id)=1 AND m.execute_as_principal_id IS NULL AND m.uses_ansi_nulls=1 AND m.uses_quoted_identifier=1
+ AND HASHBYTES('SHA2_256',m.definition)=0x3636deda3744ada73314b233532834bd13d02a102132f16ea4cf00ab91cde5c1 AND CONVERT(varbinary(32),p.value)=0x3636deda3744ada73314b233532834bd13d02a102132f16ea4cf00ab91cde5c1
+ AND EXISTS(SELECT 1 FROM sys.extended_properties r WHERE r.class=1 AND r.major_id=OBJECT_ID(N'dbo.AiCaseDataInvocation') AND r.name=N'Shale.RegistryConfinementV1.Required' AND CONVERT(varbinary(32),r.value)=0x3636deda3744ada73314b233532834bd13d02a102132f16ea4cf00ab91cde5c1))
+ THROW 59310,'Reviewed registry confinement prerequisite missing or changed.',1;
+IF EXISTS(SELECT 1 FROM sys.database_permissions WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiRegistryConfinementV1') AND NOT(grantee_principal_id=DATABASE_PRINCIPAL_ID(N'public') AND minor_id=0 AND permission_name='EXECUTE' AND state='D' AND grantor_principal_id=1))
+ OR NOT EXISTS(SELECT 1 FROM sys.database_permissions WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiRegistryConfinementV1') AND grantee_principal_id=DATABASE_PRINCIPAL_ID(N'public') AND permission_name='EXECUTE' AND state='D')
+ OR EXISTS(SELECT 1 FROM sys.crypt_properties WHERE major_id=OBJECT_ID(N'dbo.AiRegistryConfinementV1'))
+ THROW 59310,'Private compatibility module permission/signature drift.',1;
+EXEC dbo.AiRegistryConfinementV1 @Phase='BEFORE';
+END;
+/* End registry confinement locked precheck V1. */
 IF OBJECT_ID(N'dbo.AiActorV1',N'P') IS NULL OR OBJECT_ID(N'dbo.AiLockV1',N'P') IS NULL
  OR OBJECT_ID(N'dbo.AiIntegrationRegistration',N'U') IS NULL
  OR NOT EXISTS(SELECT 1 FROM sys.security_policies WHERE object_id=OBJECT_ID(N'sec.TenantFilter') AND is_enabled=1 AND is_schema_bound=1)
@@ -483,5 +510,6 @@ SET @catalog=@catalog+COALESCE((SELECT CONCAT(name,N':',definition,N':',is_disab
 
 DECLARE @receipt varbinary(32)=HASHBYTES('SHA2_256',@catalog); EXEC sys.sp_addextendedproperty @name=N'Shale.UniversalMcpPR3',@value=@receipt,@level0type=N'SCHEMA',@level0name=N'dbo',@level1type=N'TABLE',@level1name=N'AiExternalApplication';
 
+IF OBJECT_ID(N'dbo.AiCaseDataDeployment') IS NOT NULL EXEC dbo.AiRegistryConfinementV1 @Phase='SEAL';
 COMMIT TRANSACTION;
 END TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK TRANSACTION; THROW; END CATCH;
