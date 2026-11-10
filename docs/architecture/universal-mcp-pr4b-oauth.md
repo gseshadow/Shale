@@ -44,7 +44,7 @@ Implementation and exact executed verification are recorded below before handoff
 
 ## Implemented candidate
 
-The additive installer creates seven tables, twenty-four modules and five initially empty
+The additive installer creates seven tables, twenty-five modules and five initially empty
 roles. The metadata publisher resolves an unchanged, exact digest/method publication and
 stores bounded validated public callbacks/keys/freshness. It never advances a registry
 revision. Browser, issuer, resolver and neutral-revocation roles are separate. No existing
@@ -117,12 +117,12 @@ The new metadata/lifecycle composition also needs that real HTTPS/SQL combined t
 fetcher tests alone do not establish its combined behavior. The candidate deliberately
 fails new authority when no-store metadata has no positive remaining freshness.
 
-Known-token service revocation currently uses the strict original live authority projection.
-Thus expired/revoked WEB or approval authority can prevent that service path even though
-its underlying SQL mutation only reduces authority. Runtime integration must close the
-inactive-known-token RFC 7009 behavior using current tenant-neutral client authentication,
-with the known digest owner retained; do not select a tenant creator or weaken issuance/
-refresh checks. This is an explicit remaining interoperability/security-contract gap.
+Known and unknown revocation authenticate the current exact publication digest and public
+method/key profile independently of WEB, grant or approval liveness. Known credentials
+retain their immutable digest-derived owner. Client authentication, global replay
+reservation, family mutation and any required audit commit atomically. A publication
+change between signature verification and SQL rejects the stale digest. Inactive known
+credentials and repeated/unknown tokens return empty success without granting authority.
 
 DCR, Settings, production/native Azure activation, stock-client URL-only acceptance,
 artifact/ingress/binding/operator/legal/tenant gates and automatic merge remain outside this

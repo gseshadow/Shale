@@ -89,8 +89,8 @@ public final class AiCimdOAuthStore implements AiOAuthBrowserStore {
                 AiOAuthCredentialStore.digest(token),client,issuer,resource,AiSql.nullable(key,Types.VARCHAR),jti(key,jti,issued,expires),AiSql.nullable(issued,Types.TIMESTAMP),AiSql.nullable(expires,Types.TIMESTAMP),AiOAuthCredentialStore.digest(access),AiOAuthCredentialStore.digest(refresh),UUID.randomUUID()));
         if(result.scopes().isEmpty())throw new SecurityException("CIMD refresh unavailable.");return result;
     }
-    public void revoke(String token,String client,UUID key,String jti,Instant issued,Instant expires) {
-        AiSql.call(db,"AiCimdRevokeCredentialV1",r->true,AiOAuthCredentialStore.revocationDigest(token),client,issuer,resource,AiSql.nullable(key,Types.VARCHAR),jti(key,jti,issued,expires),AiSql.nullable(issued,Types.TIMESTAMP),AiSql.nullable(expires,Types.TIMESTAMP),UUID.randomUUID());
+    public void revoke(String token,String client,byte[] digest,String method,String kid,String jti,Instant issued,Instant expires) {
+        AiSql.call(db,"AiCimdRevokeCredentialV1",r->true,AiOAuthCredentialStore.revocationDigest(token),client,issuer,resource,digest,method,AiSql.nullable(kid,Types.NVARCHAR),revocationJti(method,kid,jti,issued,expires),AiSql.nullable(issued,Types.TIMESTAMP),AiSql.nullable(expires,Types.TIMESTAMP),UUID.randomUUID());
     }
     public void publishMetadata(UUID application,long revision,byte[] digest,String redirects,String keys,Instant freshUntil) {
         AiSql.call(db,"AiCimdPublishMetadataV1",r->true,application,revision,digest,redirects,keys,freshUntil);
@@ -99,9 +99,15 @@ public final class AiCimdOAuthStore implements AiOAuthBrowserStore {
     public Publication resolvePublication(String external,byte[] digest,int methods) {
         return AiSql.one(AiSql.call(db,"AiCimdResolvePublicationV1",r->new Publication(AiSql.uuid(r,"ApplicationId"),r.getLong("Revision")),external,issuer,resource,digest,methods));
     }
-    public void revokeUnknown(String external,String method,String kid,String jti,Instant issued,Instant expires) {
-        byte[] hash=jti==null?null:AiSql.hash(jti.getBytes(StandardCharsets.UTF_8));
-        AiSql.call(db,"AiCimdRevokeUnknownV1",r->true,external,issuer,resource,method,AiSql.nullable(kid,Types.NVARCHAR),hash,AiSql.nullable(issued,Types.TIMESTAMP),AiSql.nullable(expires,Types.TIMESTAMP));
+    public void revokeUnknown(String external,byte[] digest,String method,String kid,String jti,Instant issued,Instant expires) {
+        AiSql.call(db,"AiCimdRevokeUnknownV1",r->true,external,issuer,resource,digest,method,AiSql.nullable(kid,Types.NVARCHAR),revocationJti(method,kid,jti,issued,expires),AiSql.nullable(issued,Types.TIMESTAMP),AiSql.nullable(expires,Types.TIMESTAMP));
+    }
+    private static byte[] revocationJti(String method,String kid,String jti,Instant issued,Instant expires) {
+        if("none".equals(method)) {
+            if(kid!=null||jti!=null||issued!=null||expires!=null)throw new SecurityException("Unexpected client assertion.");return null;
+        }
+        if(!"private_key_jwt".equals(method)||kid==null||kid.isEmpty()||kid.length()>128||jti==null||jti.isBlank()||jti.length()>256||issued==null||expires==null)throw new SecurityException("Client assertion required.");
+        return AiSql.hash(jti.getBytes(StandardCharsets.UTF_8));
     }
     private static AiOAuthCredentialStore.Tokens tokens(ResultSet r,String access,String refresh)throws SQLException{return new AiOAuthCredentialStore.Tokens(access,refresh,AiSql.instant(r,"IssuedAt"),AiSql.instant(r,"AccessExpiresAt"),AiScope.fromMask(r.getInt("ScopeMask")));}
     private static byte[] intentDigest(String nonce) {

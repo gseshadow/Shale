@@ -112,16 +112,6 @@ b=b.replace(' IF @consumed IS NOT NULL OR', ' IF @consumed IS NOT NULL OR',1)
 b=b.replace(' COMMIT TRANSACTION;\n SELECT CAST(1 AS bit)', ' UPDATE dbo.AiCimdCredentialV1 SET RevokedAt=@now WHERE ShaleClientId=@t AND SessionId=@s AND RevokedAt IS NULL;\n COMMIT TRANSACTION;\n SELECT CAST(1 AS bit)',1)
 b=b.replace(' SET @now=SYSUTCDATETIME();\n IF @revoked', ' IF @currentDeadline<@liveDeadline SET @liveDeadline=@currentDeadline;\n SET @now=SYSUTCDATETIME();\n IF @revoked',1)
 modules['AiCimdRefreshV1']=b
-# Token revocation derives the exact new family before client authentication and mutation.
-b=transform(legacy['AiRevokeOAuthCredentialV1']).replace('dbo.AiRevokeOAuthCredentialV1','dbo.AiCimdRevokeCredentialV1',1)
-b=b.replace(' BEGIN TRY BEGIN TRANSACTION;',fresh+' BEGIN TRY BEGIN TRANSACTION;',1)
-b=b.replace('DATALENGTH(@ClientId) NOT BETWEEN 1 AND 64','DATALENGTH(@ClientId) NOT BETWEEN 2 AND 4096')
-start=b.index(' SELECT @i=IntegrationId,@type=ClientType');end=b.index(" IF @i IS NULL OR",start)
-b=b[:start]+" SELECT @i=f.IntegrationId,@type=i.ClientType FROM dbo.AiCimdCredentialV1 c JOIN dbo.AiCimdFamilyV1 f ON f.ShaleClientId=c.ShaleClientId AND f.SessionId=c.SessionId JOIN dbo.AiIntegrationRegistration i WITH(HOLDLOCK) ON i.ShaleClientId=f.ShaleClientId AND i.IntegrationId=f.IntegrationId WHERE c.ShaleClientId=@t AND c.UserId=@u AND c.CredentialHash=@Hash AND f.ExternalClientId=@ClientId COLLATE Latin1_General_100_BIN2 AND DATALENGTH(f.ExternalClientId)=DATALENGTH(@ClientId) AND f.Issuer=@Issuer AND DATALENGTH(f.Issuer)=DATALENGTH(@Issuer) AND f.Resource=@Resource AND DATALENGTH(f.Resource)=DATALENGTH(@Resource);\n"+b[end:]
-b=b.replace('AND s.TransactionId IS NOT NULL AND s.ClientId=@ClientId COLLATE Latin1_General_100_BIN2 AND DATALENGTH(s.ClientId)=DATALENGTH(@ClientId)',"AND s.TransactionId IS NULL AND EXISTS(SELECT 1 FROM dbo.AiCimdFamilyV1 f WHERE f.ShaleClientId=s.ShaleClientId AND f.SessionId=s.SessionId AND f.ExternalClientId=@ClientId COLLATE Latin1_General_100_BIN2 AND DATALENGTH(f.ExternalClientId)=DATALENGTH(@ClientId) AND ((f.CredentialId=@KeyId) OR (f.CredentialId IS NULL AND @KeyId IS NULL)))")
-b=b.replace(' COMMIT TRANSACTION;'," UPDATE dbo.AiCimdCredentialV1 SET RevokedAt=@now WHERE ShaleClientId=@t AND SessionId=@s AND RevokedAt IS NULL;\n COMMIT TRANSACTION;",1)
-modules['AiCimdRevokeCredentialV1']=b
-
 # Bootstrap resolves exact external identity and digest only, never a tenant chosen by the caller.
 for suffix,table,condition in [('Code','AiCimdAuthorizationV1','x.CodeHash=@Hash'),('Refresh','AiCimdCredentialV1',"c.CredentialHash=@Hash AND c.Kind='REFRESH'"),('Revocation','AiCimdCredentialV1','c.CredentialHash=@Hash')]:
  name='AiCimdResolve'+suffix+'V1'
@@ -137,7 +127,7 @@ for suffix,table,condition in [('Code','AiCimdAuthorizationV1','x.CodeHash=@Hash
  AND x.Resource=@Resource COLLATE Latin1_General_100_BIN2 AND DATALENGTH(x.Resource)=DATALENGTH(@Resource);
  END;"""
 # The full external identity is shared by tenants, so tenant-local replay alone is insufficient.
-for name,origin in [('AiCimdRedeemV1','transaction'),('AiCimdRefreshV1','family'),('AiCimdRevokeCredentialV1','revocation')]:
+for name,origin in [('AiCimdRedeemV1','transaction'),('AiCimdRefreshV1','family')]:
  b=modules[name]
  if origin=='transaction':
   query="SELECT @ja=ApplicationId,@jr=ApplicationRevision,@ji=IntegrationId FROM dbo.AiCimdAuthorizationV1 WHERE ShaleClientId=@t AND TransactionId=@TransactionId;"
@@ -150,7 +140,7 @@ for name,origin in [('AiCimdRedeemV1','transaction'),('AiCimdRefreshV1','family'
  modules[name]=b
 
 # Wire CIMD IDs are full Unicode SQL strings; internal anchor IDs retain varchar(64).
-for name in ['AiCimdRedeemV1','AiCimdIssueV1','AiCimdRefreshV1','AiCimdRevokeCredentialV1']:
+for name in ['AiCimdRedeemV1','AiCimdIssueV1','AiCimdRefreshV1']:
  modules[name]=modules[name].replace('@ClientId varchar(max)','@ClientId nvarchar(max)')
 
 # New table source derives exact verified FK/expiry/PKCE/nonce constraints from the immutable predecessor.
@@ -180,11 +170,6 @@ if extra.exists():
  for b in extra.read_text().split('\nGO\n'):
   b=b.strip();match=re.search(r'CREATE (?:PROCEDURE|TRIGGER) dbo\.(\w+)',b)
   if match:modules[match[1]]=b[b.index('CREATE '):]
-unknown=modules['AiCimdRevokeUnknownV1']
-start=unknown.index(' DELETE TOP(256) FROM dbo.AiCimdNeutralReplayV1')
-end=unknown.index(' END;',start)
-modules['AiCimdRevokeUnknownV1']=unknown[:start]+' EXEC dbo.AiCimdReserveAssertionV1 @a,@r,@Kid,@JtiHash,@Issued,@Expires;\n'+unknown[end:]
-
 roles={'AiCimdOAuthNeutralV1':['AiCimdRevokeUnknownV1'], 'AiCimdMetadataPublisherV1':['AiCimdPublishMetadataV1','AiCimdResolvePublicationV1'],
        'AiCimdOAuthBrowserV1':['AiCimdBeginOAuthV1','AiCimdFindOAuthIntentV1','AiCimdApproveOAuthV1','AiCimdCompleteOAuthV1','AiCimdDenyOAuthV1','AiCimdLoadClientV1'],
        'AiCimdOAuthIssuerV1':['AiCimdRedeemV1','AiCimdRefreshV1','AiCimdRevokeCredentialV1','AiCimdLoadClientProofV1'],

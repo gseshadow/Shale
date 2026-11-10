@@ -112,8 +112,8 @@ class AiCimdOAuthLocalSqlServerTest extends AiCimdProofLocalSqlServerTest {
     @Test void lifecycleTokenRevocationIsTenantConfinedAndAudited()throws Exception {
         var ta=redeem(consent(7,72));var tb=redeem(consent(8,82));
         assertTrue(neutral("cimdresolver").resolve(ta.accessToken(),EXTERNAL,"REVOKE").isPresent());
-        assertThrows(RuntimeException.class,()->issuer(8,82).revoke(ta.refreshToken(),EXTERNAL,null,null,null,null));read(7,72,ta.accessToken(),100);
-        issuer(7,72).revoke(ta.accessToken(),EXTERNAL,null,null,null,null);assertThrows(RuntimeException.class,()->cimd(ta.accessToken()));
+        issuer(8,82).revoke(ta.refreshToken(),EXTERNAL,new byte[32],"none",null,null,null,null);read(7,72,ta.accessToken(),100);
+        issuer(7,72).revoke(ta.accessToken(),EXTERNAL,new byte[32],"none",null,null,null,null);assertThrows(RuntimeException.class,()->cimd(ta.accessToken()));
         assertThrows(RuntimeException.class,()->issuer(7,72).refresh(ta.refreshToken(),EXTERNAL,null,null,null,null));read(8,82,tb.accessToken(),200);manualRead();
     }
     @Test void lifecycleChangedPublicationBlocksPendingCodeExchangeAndRefresh()throws Exception {
@@ -147,7 +147,7 @@ class AiCimdOAuthLocalSqlServerTest extends AiCimdProofLocalSqlServerTest {
         finally{try(Connection c=owner(db)){sql(c,"DROP TRIGGER dbo.Pr4bAuditFault");}}
         var ta=redeem(f);
         try(Connection c=owner(db)){sql(c,"CREATE TRIGGER dbo.Pr4bAuditFault ON dbo.EntityActionAuditLog AFTER INSERT AS THROW 59999,'Synthetic audit fault',1");}
-        try{assertThrows(RuntimeException.class,()->issuer(7,72).refresh(ta.refreshToken(),EXTERNAL,null,null,null,null));assertThrows(RuntimeException.class,()->issuer(7,72).revoke(ta.accessToken(),EXTERNAL,null,null,null,null));}
+        try{assertThrows(RuntimeException.class,()->issuer(7,72).refresh(ta.refreshToken(),EXTERNAL,null,null,null,null));assertThrows(RuntimeException.class,()->issuer(7,72).revoke(ta.accessToken(),EXTERNAL,new byte[32],"none",null,null,null,null));}
         finally{try(Connection c=owner(db)){sql(c,"DROP TRIGGER dbo.Pr4bAuditFault");}}
         read(7,72,ta.accessToken(),100);var rotated=issuer(7,72).refresh(ta.refreshToken(),EXTERNAL,null,null,null,null);
         try(Connection c=owner(db)){sql(c,"CREATE TRIGGER dbo.Pr4bAuditFault ON dbo.EntityActionAuditLog AFTER INSERT AS THROW 59999,'Synthetic audit fault',1");}
@@ -186,13 +186,24 @@ class AiCimdOAuthLocalSqlServerTest extends AiCimdProofLocalSqlServerTest {
         var bKey=issuer(8,82).clientProof(bCode,external,"CODE");
         assertThrows(RuntimeException.class,()->issuer(8,82).redeem(bCode,external,CALLBACK,VERIFIER,bKey.keyId(),"first-jti",now,expires),"The same external assertion cannot replay in a different tenant.");
         var bTokens=issuer(8,82).redeem(bCode,external,CALLBACK,VERIFIER,bKey.keyId(),"B-jti",now,expires);read(8,82,bTokens.accessToken(),200);
-        assertThrows(RuntimeException.class,()->neutral("cimdneutral").revokeUnknown(external,"private_key_jwt",selected.kid(),"first-jti",now,expires),"Known and unknown-token revocation share the global replay boundary.");
-        neutral("cimdneutral").revokeUnknown(external,"private_key_jwt",selected.kid(),"unknown-jti",now,expires);
-        neutral("cimdneutral").revokeUnknown(EXTERNAL,"none",null,null,null,null);
+        assertThrows(RuntimeException.class,()->neutral("cimdneutral").revokeUnknown(external,digest,"private_key_jwt",selected.kid(),"first-jti",now,expires),"Known and unknown-token revocation share the global replay boundary.");
+        neutral("cimdneutral").revokeUnknown(external,digest,"private_key_jwt",selected.kid(),"unknown-jti",now,expires);
+        neutral("cimdneutral").revokeUnknown(EXTERNAL,new byte[32],"none",null,null,null,null);
         read(7,72,tokens.accessToken(),100);read(8,82,bTokens.accessToken(),200);
         assertThrows(RuntimeException.class,()->issuer(7,72).refresh(tokens.refreshToken(),external,selected.keyId(),"first-jti",now,expires),"The same JTI cannot be reused at refresh.");
         var rotated=issuer(7,72).refresh(tokens.refreshToken(),external,selected.keyId(),"second-jti",now,expires);read(7,72,rotated.accessToken(),100);
-        issuer(7,72).revoke(rotated.refreshToken(),external,selected.keyId(),"third-jti",now,expires);assertThrows(RuntimeException.class,()->cimd(rotated.accessToken()));manualRead();
+        issuer(7,72).revoke(rotated.refreshToken(),external,digest,"private_key_jwt",selected.kid(),"third-jti",now,expires);assertThrows(RuntimeException.class,()->cimd(rotated.accessToken()));manualRead();
+    }
+    @Test void lifecycleInactiveKnownCredentialsStillRevokeWithCurrentClientProof()throws Exception {
+        var fa=consent(7,72);var ta=redeem(fa);var tb=redeem(consent(8,82));
+        byte[] changedDigest=new byte[32];changedDigest[0]=1;
+        assertThrows(RuntimeException.class,()->issuer(7,72).revoke(ta.refreshToken(),EXTERNAL,changedDigest,"none",null,null,null,null),"Client authentication must remain pinned to the verified current publication digest.");
+        try(Connection c=owner(db)){sql(c,"UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME() WHERE SessionId='"+fa.web()+"'");}
+        issuer(7,72).revoke(ta.refreshToken(),EXTERNAL,new byte[32],"none",null,null,null,null);
+        try(Connection c=owner(db);var p=c.prepareStatement("SELECT COUNT(*) FROM dbo.AiCimdCredentialV1 WHERE SessionId=(SELECT SessionId FROM dbo.AiCimdFamilyV1 WHERE TransactionId=?) AND RevokedAt IS NULL")){p.setObject(1,fa.transaction());try(var r=p.executeQuery()){assertTrue(r.next());assertEquals(0,r.getInt(1),"Inactive known credentials must revoke every credential row without live WEB authority.");}}
+        issuer(7,72).revoke(ta.refreshToken(),EXTERNAL,new byte[32],"none",null,null,null,null);
+        neutral("cimdneutral").revokeUnknown(EXTERNAL,new byte[32],"none",null,null,null,null);
+        read(8,82,tb.accessToken(),200);manualRead();
     }
     @Test void lifecycleExpiredCodeAndRefreshDoNotResurrectAuthority()throws Exception {
         var f=consent(7,72);var live=redeem(f);String oldCode=AiOAuthCredentialStore.opaque(),oldRefresh=AiOAuthCredentialStore.opaque();

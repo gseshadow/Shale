@@ -66,24 +66,22 @@ public final class CimdOAuthLifecycle {
     /** Known credentials remain owner-bound; unknown credentials authenticate without a tenant lookup. */
     public void revoke(String client,String credential,String method,String assertion) {
         var id=new CimdClientIdentifier(client);var snapshot=prepare(id);
+        if(!snapshot.methods().contains(method))throw denied();
+        String kid=null;AiCimdOAuthStore.ClientProof selected;
+        if("none".equals(method))selected=new AiCimdOAuthStore.ClientProof("none",null,null,null,null,null);
+        else if("private_key_jwt".equals(method)) {
+            if(assertion==null||assertion.length()>8192)throw denied();
+            try{kid=com.nimbusds.jwt.SignedJWT.parse(assertion).getHeader().getKeyID();}catch(Exception invalid){throw denied();}
+            String selectedKid=kid;
+            var key=snapshot.keys().stream().filter(k->k.kid().equals(selectedKid)).findFirst().orElseThrow(CimdOAuthLifecycle::denied);
+            selected=new AiCimdOAuthStore.ClientProof(method,null,kid,key.rsa(),Instant.EPOCH,snapshot.expiresAt());
+        } else throw denied();
+        var proof=CimdClientAuthentication.verify(id,selected,method,assertion,properties.issuer()+"/revoke",clock);
+        byte[] digest=HexFormat.of().parseHex(snapshot.revision());
         var owner=resolver.resolve(credential,client,"REVOKE");
-        if(owner.isPresent()) {
-            var store=issuers.apply(owner.get());
-            var proof=CimdClientAuthentication.verify(id,store.clientProof(credential,client,"REVOKE"),method,assertion,properties.issuer()+"/revoke",clock);
-            store.revoke(credential,client,proof==null?null:proof.keyId(),proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
-        } else {
-            if(!snapshot.methods().contains(method))throw denied();
-            String kid=null;AiCimdOAuthStore.ClientProof selected;
-            if("none".equals(method))selected=new AiCimdOAuthStore.ClientProof("none",null,null,null,null,null);
-            else if("private_key_jwt".equals(method)) {
-                try{kid=com.nimbusds.jwt.SignedJWT.parse(assertion).getHeader().getKeyID();}catch(Exception invalid){throw denied();}
-                String selectedKid=kid;
-                var key=snapshot.keys().stream().filter(k->k.kid().equals(selectedKid)).findFirst().orElseThrow(CimdOAuthLifecycle::denied);
-                selected=new AiCimdOAuthStore.ClientProof(method,null,kid,key.rsa(),Instant.EPOCH,snapshot.expiresAt());
-            } else throw denied();
-            var proof=CimdClientAuthentication.verify(id,selected,method,assertion,properties.issuer()+"/revoke",clock);
-            neutral.revokeUnknown(client,method,kid,proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
-        }
+        if(owner.isPresent())issuers.apply(owner.get()).revoke(credential,client,digest,method,kid,proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
+        else neutral.revokeUnknown(client,digest,method,kid,proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
     }
+
     private static SecurityException denied(){return new SecurityException("CIMD authorization unavailable.");}
 }
