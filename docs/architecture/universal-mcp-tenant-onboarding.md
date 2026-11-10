@@ -382,3 +382,13 @@ synthetic immutable binding may be installed once as fixture setup under its own
 Pass means the user supplied only URL + normal credentials/browser/admin decisions and used tools.
 Separate CIMD/DCR passes, manual-client regression, two-tenant isolation and revocation evidence are
 required. This scenario is specified here, not executed by PR 1. Production acceptance remains open.
+
+## PR 2 isolated retrieval implementation
+
+The [PR 2 security design and verification](../testing/universal-mcp-pr2-verification.md) records
+`oauth.cimd` destination/TLS, parser, method/key profile and bounded cache contracts. The subsystem
+is initially unwired: no Spring bean, authorization/registration call site, endpoint, metadata
+advertisement or SQL authority. Public publication never establishes tenant approval or consent.
+The reviewed registry/tenant-approval boundary (PR 3) remains the next implementation dependency;
+production and all immutable-binding/OFF constraints above remain unchanged. Audit compatibility:
+public metadata retrieval has no PHI/domain mutation and adds no audit schema or tenant event.
