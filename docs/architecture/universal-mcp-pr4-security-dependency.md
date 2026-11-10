@@ -149,7 +149,7 @@ assertion was weakened. Maven 3.9.11 and Temurin Java 21.0.12.1 were used. Final
 | Focused CIMD retrieval/parser, manual OAuth/browser/assertion and data/confinement contracts | 74 PASS; zero failures/errors/skips. |
 | Actual SQL registry scenarios and authoritative confinement compatibility/dependency probes | 12 PASS; zero failures/errors/skips: nine registry scenarios, one V2 compatibility scenario, one new V1 and one new V2 two-tenant counterexample. |
 | Selector affected core/data/server suite | 154 PASS; zero reported failures/errors/skips. SQL-opt-in classes execute zero tests in this non-opt-in run; only the separate 12-scenario run is SQL evidence. |
-| Critical seven-module reactor | 246 PASS; all seven modules successful; zero failures/errors/skips. |
+| Critical seven-module reactor | 245 PASS; all seven modules successful; zero failures/errors/skips. |
 | Unchanged registry supplement generation | 3 PASS. |
 | Immutable binding packet / test selector | 5 / 32 PASS. |
 | Whitespace, changed-document links and historical/production changed-path checks | PASS; no production source, SQL, packaged AI resource or confinement generator changes. |
