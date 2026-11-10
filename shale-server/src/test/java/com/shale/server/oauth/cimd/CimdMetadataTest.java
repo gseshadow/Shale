@@ -87,7 +87,7 @@ class CimdMetadataTest {
 
     @Test void addressPolicyRejectsMixedMappedReservedAndAlternativeIpSpellings() throws Exception {
         for (String ip:List.of("0.0.0.0","10.1.2.3","127.0.0.1","169.254.169.254","172.16.1.1","192.168.1.1","100.100.100.200",
-                "192.0.0.9","198.18.0.1","192.0.2.1","198.51.100.1","203.0.113.1","224.0.0.1","240.0.0.1",
+                "168.63.129.16","192.0.0.9","198.18.0.1","192.0.2.1","198.51.100.1","203.0.113.1","224.0.0.1","240.0.0.1",
                 "::","::1","::ffff:127.0.0.1","fc00::1","fe80::1","ff02::1","64:ff9b::a00:1","2002:a00:1::","2001:db8::1","2001::1"))
             assertFalse(CimdDestination.publicAddress(InetAddress.getByName(ip)),ip);
         for (String ip:List.of("93.184.215.14","2606:4700:4700::1111")) assertTrue(CimdDestination.publicAddress(InetAddress.getByName(ip)),ip);

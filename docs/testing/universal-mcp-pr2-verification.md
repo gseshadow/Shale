@@ -45,7 +45,8 @@ exception survives. No localhost, encoded/query callback or legacy five-callback
 
 The explicit public-DNS-only URL profile rejects literals, alternative IP notation, single labels,
 trailing dots and special internal/special-use namespaces. IP policy rejects private, loopback,
-link-local, CGNAT, multicast, unspecified, reserved, documentation and transition allocations.
+link-local, CGNAT, multicast, unspecified, reserved, documentation and transition allocations,
+including Azure platform virtual IP `168.63.129.16`.
 IPv6 is restricted to ordinary global unicast, excluding the special 2001::/23 range and 6to4.
 This deliberately conservative subset may reject some legitimately public special-purpose hosts.
 Exact encoded metadata paths are retained on the wire; decoded dot segments remain forbidden.
