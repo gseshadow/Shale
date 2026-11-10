@@ -99,7 +99,7 @@ public final class EntityActionAuditDao {
 			if (!isAllowedMetadataKey(key)) continue;
 			String value = m.group(2) != null ? m.group(2) : (m.group(3) != null ? m.group(3) : m.group(4));
 			if ("AI_APPROVAL_STATE".equals(key) && !java.util.Set.of("PENDING","APPROVED","DENIED","REVOKED").contains(value)) continue;
-            if (value != null && value.length() <= 128) out.put(key, value);
+			if (value != null && value.length() <= 128) out.put(key, value);
 		}
 		return Map.copyOf(out);
 	}

@@ -384,8 +384,8 @@ BEGIN
  IF @Decision IN(''REVOKE'',''REDUCE'') BEGIN
   IF @Decision=''REVOKE'' SET @ScopeMask=0;
   UPDATE dbo.AiIntegrationRegistration SET ScopeMask=@ScopeMask,Status=CASE WHEN @Decision=''REVOKE'' THEN ''REVOKED'' ELSE Status END,
-   RevokedAt=CASE WHEN @Decision=''REVOKE'' THEN @now ELSE RevokedAt END,RevokedByUserId=CASE WHEN @Decision=''REVOKE'' THEN @u ELSE RevokedByUserId END,
-   RevocationReason=CASE WHEN @Decision=''REVOKE'' THEN ''ADMIN'' ELSE RevocationReason END,Revision=Revision+1,UpdatedAt=@now,UpdatedByUserId=@u
+   RevokedAt=CASE WHEN @Decision=''REVOKE'' THEN COALESCE(RevokedAt,@now) ELSE RevokedAt END,RevokedByUserId=CASE WHEN @Decision=''REVOKE'' THEN COALESCE(RevokedByUserId,@u) ELSE RevokedByUserId END,
+   RevocationReason=CASE WHEN @Decision=''REVOKE'' THEN COALESCE(RevocationReason,''ADMIN'') ELSE RevocationReason END,Revision=Revision+1,UpdatedAt=@now,UpdatedByUserId=@u
   WHERE ShaleClientId=@t AND IntegrationId=@integration;
   UPDATE dbo.AiDelegationGrant SET RevokedAt=@now,RevokedByUserId=@u,RevocationReason=''ADMIN'',Revision=Revision+1
   WHERE ShaleClientId=@t AND IntegrationId=@integration AND RevokedAt IS NULL AND (@Decision=''REVOKE'' OR (ScopeMask & @ScopeMask)<>ScopeMask);

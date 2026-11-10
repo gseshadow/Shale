@@ -118,8 +118,8 @@ public record EntityActionAuditEvent(
 			if (entry.getKey() == null) throw new IllegalArgumentException("metadata key must not be null");
 			if (entry.getValue() == null) throw new IllegalArgumentException("metadata value must not be null");
 			validateSafeKey(entry.getKey());
-            if (entry.getKey() == MetadataKey.AI_APPROVAL_STATE && !Set.of("PENDING","APPROVED","DENIED","REVOKED").contains(entry.getValue()))
-                throw new IllegalArgumentException("Invalid approval audit state.");
+			if (entry.getKey() == MetadataKey.AI_APPROVAL_STATE && !Set.of("PENDING","APPROVED","DENIED","REVOKED").contains(entry.getValue()))
+				throw new IllegalArgumentException("Invalid approval audit state.");
 			if (entry.getValue().length() > 128) throw new IllegalArgumentException("metadata value is too long");
 			copy.put(entry.getKey(), entry.getValue());
 		}

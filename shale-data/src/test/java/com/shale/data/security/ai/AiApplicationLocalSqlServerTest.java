@@ -15,11 +15,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class AiApplicationLocalSqlServerTest {
     private static final String ISSUER="https://shale.test/oauth/mcp",RESOURCE="https://shale.test/mcp",CLIENT="https://vendor.test/oauth/client.json";
     private String db,prefix,password,port,trust;
+    private boolean ownedDatabase;
     private final Map<String,String> secrets=new LinkedHashMap<>();
     @BeforeAll void setup() throws Exception {
         Assumptions.assumeTrue("LOCAL_DISPOSABLE_AI".equals(System.getenv("SHALE_AI_SQL_OPT_IN")),"Explicit disposable SQL opt-in required; skip is not acceptance.");
         password=System.getenv("SHALE_AI_SQL_PASSWORD");port=System.getenv("SHALE_AI_SQL_PORT");trust=System.getenv("SHALE_AI_SQL_TRUSTSTORE");
-        assertNotNull(password);assertNotNull(trust);assertNotNull(port);assertTrue(port.matches("[0-9]{4,5}"));
+        assertNotNull(password);assertNotNull(trust);assertNotNull(port);assertTrue(port.matches("[0-9]{4,5}"));assertTrue(Integer.parseInt(port)>=1024 && Integer.parseInt(port)<=65535);
         prefix="Pr3_"+UUID.randomUUID().toString().replace("-","");
         try(Connection c=owner("master")) { for(String role:List.of("tenant","publisher","bootstrap","probe","legacy")) {
             String secret=UUID.randomUUID()+"aB9!";exec(c,"CREATE LOGIN ["+prefix+role+"] WITH PASSWORD='"+secret+"',CHECK_POLICY=OFF");secrets.put(role,secret);
@@ -27,7 +28,7 @@ class AiApplicationLocalSqlServerTest {
     }
     @BeforeEach void fresh() throws Exception {
         db=prefix+"db";
-        try(Connection c=owner("master")){exec(c,"CREATE DATABASE ["+db+"]");}
+        try(Connection c=owner("master")){exec(c,"CREATE DATABASE ["+db+"]");ownedDatabase=true;}
         try(Connection c=owner(db)) {
             for(String batch:Files.readString(Path.of("src/test/resources/ai/synthetic-prerequisites.sql")).split("(?im)^GO\\s*$"))if(!batch.isBlank())exec(c,batch);
             exec(c,Files.readString(Path.of("../docs/sql/ai-integration/phase3b1.sql")));
@@ -45,7 +46,7 @@ class AiApplicationLocalSqlServerTest {
             exec(c,"INSERT dbo.TenantAiIntegrationPolicy(ShaleClientId,Enabled,UpdatedByUserId) VALUES(7,1,71),(8,1,81)");
         }
     }
-    @AfterEach void drop() throws Exception {if(db!=null){try(Connection c=owner("master")){exec(c,"ALTER DATABASE ["+db+"] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE ["+db+"]");}db=null;}}
+    @AfterEach void drop() throws Exception {if(ownedDatabase && db!=null){try(Connection c=owner("master")){exec(c,"ALTER DATABASE ["+db+"] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE ["+db+"]");}db=null;ownedDatabase=false;}}
     @AfterAll void cleanup() throws Exception {if(prefix!=null)try(Connection c=owner("master")){for(String role:secrets.keySet())exec(c,"DROP LOGIN ["+prefix+role+"]");}}
 
     @Test void sameExactIdentityTwoTenantsIndependentApprovalAndNoAccessFromIdentity() throws Exception {
@@ -55,6 +56,8 @@ class AiApplicationLocalSqlServerTest {
         assertThrows(IllegalStateException.class,()->decide(7,72,a,APPROVE,3));
         var aa=decide(7,71,a,APPROVE,3);var bb=decide(8,81,b,APPROVE,1);
         assertNotEquals(aa.integrationId(),bb.integrationId());
+        assertThrows(IllegalStateException.class,()->decide(7,71,bb,REVOKE,0));
+        assertThrows(IllegalStateException.class,()->decide(8,81,aa,REDUCE,1));
         var legacy=new AiIntegrationSecurityService(provider("legacy",7,72),true,ISSUER,RESOURCE);
         assertThrows(IllegalStateException.class,()->legacy.beginConsent(aa.integrationId(),AiScope.fromMask(1),1));
         try(Connection c=owner(db)) {
@@ -132,6 +135,9 @@ class AiApplicationLocalSqlServerTest {
             assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo."+table+" WHERE ShaleClientId=7 AND RevokedAt IS NOT NULL"));
             assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo."+table+" WHERE ShaleClientId=8 AND RevokedAt IS NULL"));
         }}
+        var legacyAdmin=new AiIntegrationSecurityService(provider("legacy",7,71),true,ISSUER,RESOURCE);
+        var registration=legacyAdmin.inspectRegistrations().stream().filter(r->r.integrationId().equals(a.integrationId())).findFirst().orElseThrow();
+        legacyAdmin.changeIntegration(a.integrationId(),AiScope.fromMask(1),true,registration.rowVersion());
         var revoked=decide(7,71,reduced,REVOKE,0);assertThrows(IllegalStateException.class,()->decide(7,71,revoked,APPROVE,1));
         assertNotEquals(a.approvalId(),request(7,72,app).approvalId());
     }
