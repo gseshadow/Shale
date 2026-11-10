@@ -137,7 +137,9 @@ class AiApplicationLocalSqlServerTest {
         }}
         var legacyAdmin=new AiIntegrationSecurityService(provider("legacy",7,71),true,ISSUER,RESOURCE);
         var registration=legacyAdmin.inspectRegistrations().stream().filter(r->r.integrationId().equals(a.integrationId())).findFirst().orElseThrow();
-        legacyAdmin.changeIntegration(a.integrationId(),AiScope.fromMask(1),true,registration.rowVersion());
+        var narrowed=legacyAdmin.changeIntegration(a.integrationId(),AiScope.fromMask(0),false,registration.rowVersion());
+        assertThrows(IllegalStateException.class,()->decide(7,71,reduced,REDUCE,1),"Approval management must preserve a stricter existing integration ceiling.");
+        legacyAdmin.changeIntegration(a.integrationId(),AiScope.fromMask(0),true,narrowed.rowVersion());
         var revoked=decide(7,71,reduced,REVOKE,0);assertThrows(IllegalStateException.class,()->decide(7,71,revoked,APPROVE,1));
         assertNotEquals(a.approvalId(),request(7,72,app).approvalId());
     }

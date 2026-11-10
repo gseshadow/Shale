@@ -381,7 +381,8 @@ BEGIN
   VALUES(@t,@u,''AI_INTEGRATION'',SCOPE_IDENTITY(),''CREATED'',@CorrelationId,''SHALE_SERVICE'');
   IF @@ROWCOUNT<>1 THROW 59304,''Integration audit unavailable.'',1;
  END;
- IF @Decision=''REDUCE'' AND ((@ScopeMask & @oldScope)<>@ScopeMask OR @expires<=SYSUTCDATETIME()) THROW 59303,''Ceiling may only be reduced.'',1;
+ IF @Decision=''REDUCE'' AND ((@ScopeMask & @oldScope)<>@ScopeMask OR @expires<=SYSUTCDATETIME()
+ OR NOT EXISTS(SELECT 1 FROM dbo.AiIntegrationRegistration WHERE ShaleClientId=@t AND IntegrationId=@integration AND (ScopeMask & @ScopeMask)=@ScopeMask)) THROW 59303,''Ceiling may only be reduced.'',1;
  IF @Decision IN(''REVOKE'',''REDUCE'') BEGIN
   IF @Decision=''REVOKE'' SET @ScopeMask=0;
   UPDATE dbo.AiIntegrationRegistration SET ScopeMask=@ScopeMask,Status=CASE WHEN @Decision=''REVOKE'' THEN ''REVOKED'' ELSE Status END,
