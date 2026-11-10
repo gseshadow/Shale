@@ -294,6 +294,7 @@ BEGIN
  DECLARE @hash binary(32)=HASHBYTES(''SHA2_256'',CONVERT(varbinary(max),@Issuer)+0x0000+CONVERT(varbinary(max),@ExternalClientId)),@id bigint;
  SELECT @id=Id FROM dbo.AiExternalApplication WHERE IdentityHash=@hash;
  IF @id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.AiExternalApplication WHERE Id=@id
+ AND DATALENGTH(Issuer)=DATALENGTH(@Issuer) AND DATALENGTH(ExternalClientId)=DATALENGTH(@ExternalClientId) AND DATALENGTH(Resource)=DATALENGTH(@Resource)
  AND CONVERT(varbinary(max),Issuer)=CONVERT(varbinary(max),@Issuer) AND CONVERT(varbinary(max),ExternalClientId)=CONVERT(varbinary(max),@ExternalClientId) AND CONVERT(varbinary(max),Resource)=CONVERT(varbinary(max),@Resource))
  THROW 59302,''Application identity collision.'',1;
  IF @id IS NULL BEGIN
