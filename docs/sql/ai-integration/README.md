@@ -1,7 +1,7 @@
 # Phase 3B.1 integration security candidate
 
 Universal MCP PR 3 is a separate [offline registry/tenant approval candidate](universal-pr3-review.md).
-Its installer deliberately blocks coexistence with Case confinement pending explicit compatibility review;
+Its installer requires the separately reviewed [registry/confinement supplement V1](../../architecture/pr1947-confinement-compatibility.md) before coexistence with Case confinement;
 no historical installer, verifier, receipt or deployment binding is changed. Do not apply it in production.
 
 
