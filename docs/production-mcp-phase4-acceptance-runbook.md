@@ -1,5 +1,11 @@
 # Phase 4 OAuth bootstrap datasource security invariant
 
+**Universal onboarding follow-up — November 9, 2026:** the
+[onboarding review and phased plan](architecture/universal-mcp-tenant-onboarding.md) identifies the
+remaining manual-client, metadata, tenant-approval, Settings and protocol-compatibility barriers and
+specifies a combined URL-only synthetic test. CIMD/DCR remain unimplemented; the first PR adds only
+an isolated syntax validator. Existing production/OFF/binding/activation gates below retain their scope.
+
 This scoped hardening starts from `b3d6f86c` on `codex/latest`, including merged PR #1942.
 This runbook and the companion verification record were absent at that baseline. Existing authority
 remains in `production-mcp-deployment-preflight.md`, `production-mcp-integration-readiness.md`, and
