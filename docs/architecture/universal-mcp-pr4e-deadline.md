@@ -161,3 +161,48 @@ Before HTTP integration: accepted complete deadline-safe runtime/audited handoff
 concurrent workload/drift/revocation acceptance, separately accepted Azure contract, and the existing
 provider routing, metadata/original-WEB lifecycle, source/artifact/configuration/binding/ingress/
 logging/operator/legal/tenant gates. No live routing or advertisement is introduced here.
+
+## Final verification and reproduction
+
+Before/after result: **no production change was applied**, so there is no passing after-runtime timing.
+The unchanged PR 4D positive diagnostic was explicitly rerun and still failed closed. The new stricter
+complete-request diagnostic also failed before any protected buffer was returned. Its positive Case
+and audit assertions remain positive requirements; they are not replaced by an expected-failure
+assertion or counted as passing controls. Production readiness remains unverified/blocked.
+
+| Final evidence | Result |
+| --- | --- |
+| Existing catalogCaseDisclosureBudgetDiagnostic | 1 ERROR (IntegrationReadException), required positive acceptance still FAILS |
+| New completeAuditedDisclosureWithinOriginalDeadlines | 1 ERROR during measured baseline, required positive acceptance still FAILS |
+| catalogCostProfile development runs | PASS; overlapping timing probes, not request acceptance |
+| Three final explicitly selected SQL controls | 3 PASS, zero failures/errors/skips |
+| AiCimdRuntimeTest / AiCaseDataAccessTest / IntegrationCaseReadTest | 52 PASS |
+| Selector security-data/core/data/server suite | 162 PASS |
+| Default critical reactor | 254 PASS |
+| Existing SQL/resources/confinement build inputs | All 82 files byte-identical to #1953 |
+| Independent certificate-validated cleanup | Zero user databases, nonce logins, V2 signers and master certificates |
+
+All fixture hashes were checked before and after execution. The dedicated container and generated
+passwords, TLS private keys and private truststores were removed after independent cleanup inspection.
+No native Azure, HTTP/browser, representative runtime load or unrelated historical SQL suite ran.
+Controls are intentionally selected by method because the reused fixture inherits historical tests;
+no run of the entire opt-in class is claimed. The default regression commands omit all SQL opt-ins.
+A development audit assertion incorrectly named the existing child FK; it was corrected to the
+verified EventId schema before the final three controls passed. No product SQL/schema changed.
+
+Normalized commands (same executed selections; local JDK/Maven repository/TLS wrappers omitted):
+
+```sh
+# Actual authoritative fixture harness/TLS and approved hash are required for SQL commands.
+# Required full-runtime positives currently fail; keep them as failing acceptance gates.
+mvn -pl shale-data -am '-Dtest=AiCimdDeadlineSqlServerTest#completeAuditedDisclosureWithinOriginalDeadlines' -Dsurefire.failIfNoSpecifiedTests=false test
+SHALE_CIMD_CASE_BUDGET_OPT_IN=LOCAL_DISPOSABLE_CIMD_BUDGET mvn -pl shale-data -am '-Dtest=AiCimdCatalogV2SqlServerTest#catalogCaseDisclosureBudgetDiagnostic' -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-data -am '-Dtest=AiCimdDeadlineSqlServerTest#catalogCostProfile' -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-data -am '-Dtest=AiCimdDeadlineSqlServerTest#liveProofBoundaryDoesNotFencePermissionDrift+runtimeRefusesExpiredAdmissionAndPermissionOrCatalogDrift+proofControlsPreserveConcurrencyRevocationAndDeadline' -Dsurefire.failIfNoSpecifiedTests=false test
+# No SQL opt-ins for these regression commands.
+mvn -pl shale-data -am -Dtest=AiCimdRuntimeTest,AiCaseDataAccessTest,IntegrationCaseReadTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 442191e847322a0bfbaafe10291195e455841cc7 --head HEAD --plan-output work/pr4e/selection.json
+# Execute the emitted selected_maven_batches (security-data and core/data/server dependencies).
+mvn test
+git diff --check 442191e847322a0bfbaafe10291195e455841cc7
+```
