@@ -12,6 +12,7 @@ class AiCimdRuntimeTest {
             values.put(prefix+".jdbc-url","jdbc:sqlserver://127.0.0.1:9;databaseName=synthetic");
             values.put(prefix+".username","synthetic-"+role.key()); values.put(prefix+".password","secret-sentinel");
         }
+        values.put("shale.ai.cimd.catalog-version","V2"); values.put("shale.ai.cimd.catalog-certificate-sha256","a".repeat(64)); values.put("shale.ai.cimd.catalog-owner-sid","b".repeat(32));
         values.put("shale.ai.cimd.database","synthetic"); values.put("shale.ai.cimd.issuer","https://issuer.test/oauth");
         values.put("shale.ai.cimd.resource","https://issuer.test/mcp"); values.put("shale.ai.cimd.contract-version","V2"); return values;
     }
@@ -35,6 +36,17 @@ class AiCimdRuntimeTest {
         var badTls=settings; assertThrows(IllegalStateException.class,()->AiCimdRuntime.Configuration.read(badTls::get));
         var unknown=settings(); unknown.put("shale.ai.cimd.contract-version","V3");
         assertThrows(IllegalStateException.class,()->AiCimdRuntime.Configuration.read(unknown::get));
+    }
+    @Test void catalogV2RequiresExplicitVersionAndExactIndependentBinding() {
+        for(String version:List.of("V1","V3","")) {
+            var settings=settings(); settings.put("shale.ai.cimd.catalog-version",version);
+            assertThrows(IllegalStateException.class,()->AiCimdRuntime.Configuration.read(settings::get));
+        }
+        for(String key:List.of("shale.ai.cimd.catalog-owner-sid","shale.ai.cimd.catalog-certificate-sha256")) {
+            var settings=settings(); settings.put(key,"invalid");
+            assertThrows(IllegalStateException.class,()->AiCimdRuntime.Configuration.read(settings::get));
+        }
+        assertEquals("CimdCatalogBinding[redacted]",AiCimdRuntime.Configuration.read(settings()::get).catalogBinding().toString());
     }
     @Test void poolsHaveIndependentIdentityAndFixedValidatedTlsWithBoundedResources() {
         var config=AiCimdRuntime.Configuration.read(settings()::get);

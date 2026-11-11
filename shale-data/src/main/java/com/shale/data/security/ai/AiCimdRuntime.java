@@ -20,7 +20,10 @@ public final class AiCimdRuntime implements AutoCloseable {
         }
         @Override public String toString() { return "CimdEndpoint[redacted]"; }
     }
-    public record Configuration(Map<AiCimdIdentity,Endpoint> endpoints,String database,String issuer,String resource,AiCaseDataAttestation.Contract contract) {
+    public record Configuration(Map<AiCimdIdentity,Endpoint> endpoints,String database,String issuer,String resource,AiCaseDataAttestation.Contract contract,AiCimdRuntimeAttestation.CatalogBinding catalogBinding) {
+        public Configuration(Map<AiCimdIdentity,Endpoint> endpoints,String database,String issuer,String resource,AiCaseDataAttestation.Contract contract) {
+            this(endpoints,database,issuer,resource,contract,null);
+        }
         public Configuration {
             endpoints=Map.copyOf(endpoints);
             if(!endpoints.keySet().equals(EnumSet.allOf(AiCimdIdentity.class)) || database==null || database.isBlank() || contract==null) throw invalid();
@@ -31,6 +34,8 @@ public final class AiCimdRuntime implements AutoCloseable {
         @Override public String toString() { return "CimdConfiguration[redacted]"; }
         /** Reads only dedicated keys. All values resolve before any pool allocation. */
         public static Configuration read(Function<String,String> settings) {
+            if(!"V2".equals(required(settings,"shale.ai.cimd.catalog-version"))) throw invalid();
+            var binding=new AiCimdRuntimeAttestation.CatalogBinding(required(settings,"shale.ai.cimd.catalog-certificate-sha256"),required(settings,"shale.ai.cimd.catalog-owner-sid"));
             var endpoints=new EnumMap<AiCimdIdentity,Endpoint>(AiCimdIdentity.class);
             for(var role:AiCimdIdentity.values()) {
                 String prefix="shale.ai.cimd."+role.key();
@@ -38,7 +43,7 @@ public final class AiCimdRuntime implements AutoCloseable {
             }
             try {
                 return new Configuration(endpoints,required(settings,"shale.ai.cimd.database"),required(settings,"shale.ai.cimd.issuer"),required(settings,"shale.ai.cimd.resource"),
-                        AiCaseDataAttestation.Contract.valueOf(required(settings,"shale.ai.cimd.contract-version")));
+                        AiCaseDataAttestation.Contract.valueOf(required(settings,"shale.ai.cimd.contract-version")),binding);
             } catch(RuntimeException invalid) { throw invalid(); }
         }
     }
@@ -54,7 +59,7 @@ public final class AiCimdRuntime implements AutoCloseable {
             var sources=new EnumMap<AiCimdIdentity,DataSource>(AiCimdIdentity.class);
             var users=new EnumMap<AiCimdIdentity,String>(AiCimdIdentity.class);
             pools.forEach((role,pool)->{sources.put(role,pool);users.put(role,config.endpoints().get(role).username());});
-            attestation=new AiCimdRuntimeAttestation(sources,users,forbidden,config.database(),config.issuer(),config.resource(),config.contract());
+            attestation=new AiCimdRuntimeAttestation(sources,users,forbidden,config.database(),config.issuer(),config.resource(),config.contract(),config.catalogBinding());
             attestation.verify();
         } catch(RuntimeException failure) { close(); throw unavailable(); }
     }

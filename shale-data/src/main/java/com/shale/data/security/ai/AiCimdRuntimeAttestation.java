@@ -13,15 +13,29 @@ public final class AiCimdRuntimeAttestation {
     private final List<DataSource> forbidden;
     private final String database,issuer,resource;
     private final AiCaseDataAttestation.Contract contract;
+    public record CatalogBinding(String certificateSha256,String ownerSid) {
+        @Override public String toString() { return "CimdCatalogBinding[redacted]"; }
+        public CatalogBinding {
+            if(certificateSha256==null || !certificateSha256.matches("[a-fA-F0-9]{64}") || ownerSid==null || !ownerSid.matches("[a-fA-F0-9]{32}")) throw refused("CATALOG_BINDING");
+        }
+    }
+    private final CatalogBinding binding;
+    private final String catalogRole,catalogRoot;
     private final String catalogHash;
 
     public AiCimdRuntimeAttestation(Map<AiCimdIdentity,DataSource> sources, Map<AiCimdIdentity,String> users,
             List<DataSource> forbidden, String database, String issuer, String resource, AiCaseDataAttestation.Contract contract) {
+        this(sources,users,forbidden,database,issuer,resource,contract,null);
+    }
+    public AiCimdRuntimeAttestation(Map<AiCimdIdentity,DataSource> sources, Map<AiCimdIdentity,String> users,
+            List<DataSource> forbidden,String database,String issuer,String resource,AiCaseDataAttestation.Contract contract,CatalogBinding binding) {
+        this.binding=binding; catalogRole=binding==null?"AiCimdCatalogV1":"AiCimdCatalogV2";
+        catalogRoot=binding==null?"AiCimdAttestCatalogV1":"AiCimdAttestCatalogV2";
         this.sources=Map.copyOf(sources); this.users=Map.copyOf(users); this.forbidden=List.copyOf(forbidden);
         this.database=Objects.requireNonNull(database); this.issuer=Objects.requireNonNull(issuer);
         this.resource=Objects.requireNonNull(resource); this.contract=Objects.requireNonNull(contract);
         if(!sources.keySet().equals(EnumSet.allOf(AiCimdIdentity.class)) || !users.keySet().equals(sources.keySet()) || forbidden.size()!=4) throw refused("CONFIGURATION");
-        try(var stream=getClass().getResourceAsStream("/ai/cimd-runtime-v1-catalog.sha256")) {
+        try(var stream=getClass().getResourceAsStream(binding==null?"/ai/cimd-runtime-v1-catalog.sha256":"/ai/cimd-runtime-v2-catalog.sha256")) {
             if(stream==null) throw refused("SOURCE"); catalogHash=new String(stream.readAllBytes(),StandardCharsets.US_ASCII).strip();
             if(!catalogHash.matches("[a-f0-9]{64}")) throw refused("SOURCE");
         } catch(Exception failure) { throw refused("SOURCE"); }
@@ -44,12 +58,15 @@ public final class AiCimdRuntimeAttestation {
                 require(review,"SELECT HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DEFINITION')",1);
                 require(review,"SELECT HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DATABASE')",1);
             }
+            if(binding!=null && platform!=AiCaseDataAttestation.Platform.SQL_SERVER_OR_MI) throw refused("NATIVE_CATALOG_V2_UNACCEPTED");
+            if(binding!=null) verifySigningEnvelope(review);
             var seen=new HashSet<String>();
             for(var role:AiCimdIdentity.values()) {
                 var id=identities.get(role); Connection c=sessions.get(role);
                 if(!database.equals(id.database) || !catalog.server.equals(id.server) || AiCaseDataAttestation.platform(c)!=platform
                         || !users.get(role).equals(id.user) || !seen.add(HexFormat.of().formatHex(id.sid))) throw refused(stage);
-                verifyIdentity(c,review,id,role,platform);
+                verifyIdentity(c,review,id,role,platform,catalogRole,catalogRoot);
+                if(binding!=null) systemSessions(c,role);
             }
             for(DataSource source:forbidden) try(Connection c=source.getConnection()) {
                 var id=identity(c);
@@ -62,29 +79,35 @@ public final class AiCimdRuntimeAttestation {
             if(contract==AiCaseDataAttestation.Contract.V1) require(review,"SELECT COUNT(*) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID('dbo.AiCaseDataInvocation') AND name IN('Shale.AiCaseDataV2','Shale.AiCaseDataV2.Source')",0);
             stage="SOURCE";
             // Hash and context are checked through independent complete metadata BEFORE entering owner context.
-            try(var s=statement(review);var r=s.executeQuery("SELECT m.definition,m.execute_as_principal_id,m.uses_ansi_nulls,m.uses_quoted_identifier,COALESCE(o.principal_id,s.principal_id) FROM sys.sql_modules m JOIN sys.objects o ON o.object_id=m.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name='dbo' AND o.name='AiCimdAttestCatalogV1' AND o.type='P'")) {
+            try(var s=statement(review);var r=s.executeQuery("SELECT m.definition,m.execute_as_principal_id,m.uses_ansi_nulls,m.uses_quoted_identifier,COALESCE(o.principal_id,s.principal_id) FROM sys.sql_modules m JOIN sys.objects o ON o.object_id=m.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name='dbo' AND o.name='"+catalogRoot+"' AND o.type='P'")) {
                 if(!r.next() || !catalogHash.equals(HexFormat.of().formatHex(AiSql.hash(r.getString(1).getBytes(StandardCharsets.UTF_16LE))))
                         || r.getInt(2)!=-2 || r.getInt(3)!=1 || r.getInt(4)!=1 || r.getInt(5)!=1 || r.next()) throw refused(stage);
             }
-            require(review,"SELECT COUNT(*) FROM sys.crypt_properties WHERE major_id=OBJECT_ID('dbo.AiCimdAttestCatalogV1')",0);
-            require(review,"SELECT COUNT(*) FROM sys.database_permissions WHERE class=1 AND major_id=OBJECT_ID('dbo.AiCimdAttestCatalogV1') AND NOT(minor_id=0 AND grantee_principal_id=DATABASE_PRINCIPAL_ID('AiCimdCatalogV1') AND grantor_principal_id=1 AND permission_name='EXECUTE' AND state='G')",0);
+            require(review,"SELECT COUNT(*) FROM sys.crypt_properties WHERE major_id=OBJECT_ID('dbo."+catalogRoot+"')",binding==null?0:1);
+            require(review,"SELECT COUNT(*) FROM sys.database_permissions WHERE class=1 AND major_id=OBJECT_ID('dbo."+catalogRoot+"') AND NOT(minor_id=0 AND grantee_principal_id=DATABASE_PRINCIPAL_ID('"+catalogRole+"') AND grantor_principal_id=1 AND permission_name='EXECUTE' AND state='G')",0);
             stage="RECEIPTS_GRAPH_BINDING";
             String sqlZone=null;
             try(var s=statement(review)) {
-                boolean more=s.execute("EXEC dbo.AiCimdAttestCatalogV1"); int bindings=0;
+                // A driver's short login/validation socket deadline must not become the
+                // catalog query deadline. The complete V2 system authority closure has its
+                // own bounded startup/verification deadline; business/proof limits stay fixed.
+                if(binding!=null) { s.setQueryTimeout(15); review.setNetworkTimeout(Runnable::run,16000); }
+                boolean more=s.execute("EXEC dbo."+catalogRoot); int bindings=0;
                 while(true) {
                     if(more) try(var r=s.getResultSet()) {
                         // Unchanged predecessors emit bounded finding/count/receipt reports.
                         // Consume them privately; the fixed gate emits the unique binding last.
                         var columns=new ArrayList<String>();
                         for(int n=1;n<=r.getMetaData().getColumnCount();n++) columns.add(r.getMetaData().getColumnLabel(n));
-                        if(!columns.equals(List.of("Issuer","Resource","Contract","JavaTimeZone","SqlTimeZone"))) {
+                        var expectedColumns=binding==null?List.of("Issuer","Resource","Contract","JavaTimeZone","SqlTimeZone"):List.of("Issuer","Resource","Contract","JavaTimeZone","SqlTimeZone","CatalogCertificateSha256","CatalogOwnerSid");
+                        if(!columns.equals(expectedColumns)) {
                             if(bindings!=0) throw refused(stage);
                             while(r.next()) { }
                         } else {
                         if(++bindings!=1 || !r.next() || !issuer.equals(r.getString("Issuer")) || !resource.equals(r.getString("Resource"))
                                 || !"case-read-v1".equals(r.getString("Contract"))
                                 || !ZoneId.systemDefault().equals(ZoneId.of(r.getString("JavaTimeZone"))) || r.getString("SqlTimeZone")==null) throw refused(stage);
+                        if(binding!=null && (!binding.certificateSha256().equalsIgnoreCase(r.getString("CatalogCertificateSha256")) || !binding.ownerSid().equalsIgnoreCase(r.getString("CatalogOwnerSid")))) throw refused("CATALOG_BINDING");
                         sqlZone=r.getString("SqlTimeZone");
                         if(r.next()) throw refused(stage);
                         }
@@ -119,11 +142,16 @@ public final class AiCimdRuntimeAttestation {
     }
     /** Package-visible for real SQL tests of the authority boundary independently of private receipts. */
     static void verifyIdentity(Connection c,Connection review,Identity id,AiCimdIdentity role,AiCaseDataAttestation.Platform platform)throws SQLException {
+        verifyIdentity(c,review,id,role,platform,"AiCimdCatalogV1","AiCimdAttestCatalogV1");
+    }
+    static void verifyIdentity(Connection c,Connection review,Identity id,AiCimdIdentity role,AiCaseDataAttestation.Platform platform,String catalogRole,String catalogRoot)throws SQLException {
+        String roleName=role==AiCimdIdentity.CATALOG?catalogRole:role.role();
+        Set<String> allowedRoots=role==AiCimdIdentity.CATALOG?Set.of(catalogRoot):role.roots();
         var names=new HashSet<String>();
         try(var s=statement(c);var r=s.executeQuery("SELECT name,type FROM sys.user_token")) {
             while(r.next()) { names.add(r.getString(1)); if(id.user.equals(r.getString(1)) && !"SQL USER".equals(r.getString(2))) throw refused("TOKENS"); }
         }
-        if(!names.equals(Set.of(id.user,"public",role.role()))) throw refused("TOKENS");
+        if(!names.equals(Set.of(id.user,"public",roleName))) throw refused("TOKENS");
         try(var p=review.prepareStatement("SELECT sid,type,authentication_type FROM sys.database_principals WHERE principal_id=? AND name=?")) {
             p.setInt(1,id.id); p.setString(2,id.user); p.setQueryTimeout(5);
             try(var r=p.executeQuery()) {
@@ -155,7 +183,7 @@ public final class AiCimdRuntimeAttestation {
         permissions(c,null,"DATABASE",dbAllowed);
         // A complete token excludes inherited/nested roles; check every explicit grant class,
         // ownership route and grant option, including grants not summarized by fn_my_permissions.
-        String tokenIds=id.id+",DATABASE_PRINCIPAL_ID('"+role.role()+"'),DATABASE_PRINCIPAL_ID('public')";
+        String tokenIds=id.id+",DATABASE_PRINCIPAL_ID('"+roleName+"'),DATABASE_PRINCIPAL_ID('public')";
         for(String sql:List.of(
                 "SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id="+id.id+" AND NOT(class=0 AND state='G' AND permission_name='CONNECT')",
                 "SELECT COUNT(*) FROM sys.schemas WHERE principal_id IN("+tokenIds+")",
@@ -166,17 +194,20 @@ public final class AiCimdRuntimeAttestation {
                 "SELECT COUNT(*) FROM sys.asymmetric_keys WHERE principal_id IN("+tokenIds+")",
                 "SELECT COUNT(*) FROM sys.assemblies WHERE principal_id IN("+tokenIds+")",
                 "SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id IN("+tokenIds+") AND state='W'")) require(review,sql,0);
-        require(review,"SELECT COUNT(*) FROM sys.database_role_members WHERE role_principal_id=DATABASE_PRINCIPAL_ID('"+role.role()+"')",1);
-        if(role==AiCimdIdentity.CATALOG) require(review,"SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=DATABASE_PRINCIPAL_ID('AiCimdCatalogV1') AND NOT(state='G' AND grantor_principal_id=1 AND (class=0 AND permission_name='VIEW DEFINITION' OR class=1 AND minor_id=0 AND major_id=OBJECT_ID('dbo.AiCimdAttestCatalogV1') AND permission_name='EXECUTE'))",0);
-        String roots=role.roots().stream().map(AiCimdRuntimeAttestation::literal).collect(java.util.stream.Collectors.joining(","));
-        require(review,"SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=DATABASE_PRINCIPAL_ID('"+role.role()+"') AND state IN('G','W') AND NOT(state='G' AND grantor_principal_id=1 AND (class=1 AND minor_id=0 AND permission_name='EXECUTE' AND OBJECT_SCHEMA_NAME(major_id)='dbo' AND OBJECT_NAME(major_id) IN("+roots+")"+(role==AiCimdIdentity.CATALOG?" OR class=0 AND permission_name='VIEW DEFINITION'":"")+"))",0);
+        require(review,"SELECT COUNT(*) FROM sys.database_role_members WHERE role_principal_id=DATABASE_PRINCIPAL_ID('"+roleName+"')",1);
+        if(role==AiCimdIdentity.CATALOG) require(review,"SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=DATABASE_PRINCIPAL_ID('"+catalogRole+"') AND NOT(state='G' AND grantor_principal_id=1 AND (class=0 AND permission_name='VIEW DEFINITION' OR class=1 AND minor_id=0 AND major_id=OBJECT_ID('dbo."+catalogRoot+"') AND permission_name='EXECUTE'))",0);
+        String roots=allowedRoots.stream().map(AiCimdRuntimeAttestation::literal).collect(java.util.stream.Collectors.joining(","));
+        require(review,"SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=DATABASE_PRINCIPAL_ID('"+roleName+"') AND state IN('G','W') AND NOT(state='G' AND grantor_principal_id=1 AND (class=1 AND minor_id=0 AND permission_name='EXECUTE' AND OBJECT_SCHEMA_NAME(major_id)='dbo' AND OBJECT_NAME(major_id) IN("+roots+")"+(role==AiCimdIdentity.CATALOG?" OR class=0 AND permission_name='VIEW DEFINITION'":"")+"))",0);
+        if(catalogRoot.equals("AiCimdAttestCatalogV2")) {
+            batchedEffectivePermissions(c,review,role,allowedRoots); return;
+        }
         var executable=new HashSet<String>();
         try(var s=statement(review);var objects=s.executeQuery("SELECT s.name,o.name,o.object_id FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT','PC','X','AF','SO','SQ')")) {
             while(objects.next()) {
                 String object=quote(objects.getString(1))+"."+quote(objects.getString(2));
                 var allow=new HashSet<String>();
                 if(role==AiCimdIdentity.CATALOG) allow.addAll(Set.of("VIEW DEFINITION","VIEW SECURITY DEFINITION","VIEW PERFORMANCE DEFINITION"));
-                if("dbo".equals(objects.getString(1)) && role.roots().contains(objects.getString(2))) allow.add("EXECUTE");
+                if("dbo".equals(objects.getString(1)) && allowedRoots.contains(objects.getString(2))) allow.add("EXECUTE");
                 if(permissions(c,object,"OBJECT",allow).contains("EXECUTE")) executable.add(objects.getString(2));
                 // Inventory is from the full reviewer, never the caller's filtered sys.columns.
                 try(var p=review.prepareStatement("SELECT name FROM sys.columns WHERE object_id=?")) {
@@ -190,7 +221,64 @@ public final class AiCimdRuntimeAttestation {
                 }
             }
         }
-        if(!executable.equals(role.roots())) throw refused("ROOTS");
+        if(!executable.equals(allowedRoots)) throw refused("ROOTS");
+    }
+    private static void batchedEffectivePermissions(Connection caller,Connection review,AiCimdIdentity role,Set<String> roots)throws SQLException {
+        // Same independent full inventory and complete permission vocabulary, evaluated
+        // by the actual caller. Batching avoids thousands of network round trips.
+        var objects=new ArrayList<String>();var columns=new ArrayList<String>();var permissions=new ArrayList<String>();
+        try(var st=statement(review);var r=st.executeQuery("SELECT s.name,o.name,o.object_id FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT','PC','X','AF','SO','SQ')")) {
+            while(r.next()) {
+                String name=quote(r.getString(1))+"."+quote(r.getString(2));
+                objects.add("("+literal(name)+","+("dbo".equals(r.getString(1))&&roots.contains(r.getString(2))?1:0)+")");
+            }
+        }
+        try(var st=statement(review);var r=st.executeQuery("SELECT s.name,o.name,c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT','PC','X','AF','SO','SQ')")) {
+            while(r.next()) columns.add("("+literal(quote(r.getString(1))+"."+quote(r.getString(2)))+","+literal(r.getString(3))+")");
+        }
+        try(var st=statement(review);var r=st.executeQuery("SELECT permission_name FROM sys.fn_builtin_permissions('OBJECT')")) {
+            while(r.next()) permissions.add("("+literal(r.getString(1))+")");
+        }
+        if(objects.isEmpty()||permissions.isEmpty()) throw refused("EFFECTIVE_INVENTORY");
+        String sql="DECLARE @Objects table(Name nvarchar(517),Root bit); DECLARE @Columns table(Name nvarchar(517),ColumnName sysname); DECLARE @Permissions table(Name sysname);";
+        sql+=values("@Objects",objects)+values("@Columns",columns)+values("@Permissions",permissions);
+        sql+="SELECT (SELECT COUNT(*) FROM @Objects o CROSS JOIN @Permissions p WHERE HAS_PERMS_BY_NAME(o.Name,'OBJECT',p.Name)=1 AND NOT(o.Root=1 AND p.Name='EXECUTE'"+(role==AiCimdIdentity.CATALOG?" OR p.Name IN('VIEW DEFINITION','VIEW SECURITY DEFINITION','VIEW PERFORMANCE DEFINITION')":"")+")),";
+        sql+="(SELECT COUNT(*) FROM @Columns c CROSS JOIN (VALUES('SELECT'),('UPDATE'),('REFERENCES')) p(Name) WHERE HAS_PERMS_BY_NAME(c.Name,'OBJECT',p.Name,c.ColumnName,'COLUMN')=1),";
+        sql+="(SELECT COUNT(*) FROM @Objects WHERE Root=1 AND HAS_PERMS_BY_NAME(Name,'OBJECT','EXECUTE')=1)";
+        try(var st=statement(caller);var r=st.executeQuery(sql)) {
+            if(!r.next()||r.getInt(1)!=0||r.getInt(2)!=0||r.getInt(3)!=roots.size()||r.next()) throw refused("EFFECTIVE_PERMISSIONS");
+        }
+    }
+    private static String values(String table,List<String> rows) {
+        var sql=new StringBuilder();
+        for(int i=0;i<rows.size();i+=500) sql.append("INSERT ").append(table).append(" VALUES ").append(String.join(",",rows.subList(i,Math.min(i+500,rows.size())))).append(';');
+        return sql.toString();
+    }
+    private void verifySigningEnvelope(Connection review)throws SQLException {
+        try(var st=statement(review);var r=st.executeQuery("SELECT CONVERT(varchar(170),d.owner_sid,2),p.type,p.is_disabled FROM sys.databases d JOIN sys.server_principals p ON p.sid=d.owner_sid WHERE d.database_id=DB_ID()")) {
+            if(!r.next() || !binding.ownerSid().equalsIgnoreCase(r.getString(1)) || !"S".equals(r.getString(2)) || r.getInt(3)!=1 || r.next()) throw refused("CATALOG_OWNER");
+        }
+        require(review,"SELECT COUNT(*) FROM sys.certificates WHERE name='AiCimdCatalogCertificateV2' AND principal_id=1 AND pvt_key_encryption_type='NA' AND expiry_date>SYSUTCDATETIME()",1);
+        require(review,"SELECT COUNT(*) FROM sys.crypt_properties WHERE major_id=OBJECT_ID('dbo.AiCimdAttestCatalogV2') AND thumbprint=(SELECT thumbprint FROM sys.certificates WHERE name='AiCimdCatalogCertificateV2')",1);
+    }
+    private void systemSessions(Connection caller,AiCimdIdentity role)throws SQLException {
+        for(String system:List.of("master","model","msdb","tempdb")) {
+            try(var p=caller.prepareStatement("SELECT HAS_DBACCESS(?)")) {
+                p.setString(1,system);p.setQueryTimeout(5);
+                try(var r=p.executeQuery()) { if(!r.next() || r.getInt(1)!=(system.equals("model")?0:1) || r.wasNull() || r.next()) throw refused("SYSTEM_DATABASE_ACCESS"); }
+            }
+            if(system.equals("model")) continue;
+            try {
+                caller.setCatalog(system);
+                require(caller,"SELECT CASE WHEN USER_NAME()='guest' THEN 1 ELSE 0 END",1);
+                var tokens=new HashSet<String>();
+                try(var st=statement(caller);var r=st.executeQuery("SELECT name FROM sys.user_token")) { while(r.next()) tokens.add(r.getString(1)); }
+                if(!tokens.equals(Set.of("guest","public"))) throw refused("SYSTEM_DATABASE_TOKEN");
+                var allow=new HashSet<>(Set.of("CONNECT","VIEW ANY COLUMN ENCRYPTION KEY DEFINITION","VIEW ANY COLUMN MASTER KEY DEFINITION"));
+                if(role==AiCimdIdentity.CATALOG) allow.addAll(Set.of("VIEW DEFINITION","VIEW SECURITY DEFINITION","VIEW PERFORMANCE DEFINITION"));
+                permissions(caller,null,"DATABASE",allow);
+            } finally { caller.setCatalog(database); }
+        }
     }
     private static Set<String> permissions(Connection c,String object,String scope,Set<String> allow)throws SQLException {
         var actual=new HashSet<String>();
