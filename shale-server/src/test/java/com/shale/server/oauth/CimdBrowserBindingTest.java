@@ -64,6 +64,11 @@ class CimdBrowserBindingTest {
         SecurityContextHolder.getContext().setAuthentication(ShaleOAuthHuman.authentication(new ShaleOAuthHuman.Identity(8,82,UUID.randomUUID())));
         assertThrows(SecurityException.class,()->durable.findByClientId(CLIENT));assertTrue(events.isEmpty());
     }
+    @Test void unknownClientTypeCannotDowngradeToPublicAuthentication(){
+        assertEquals(org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE,DurableOAuthAuthorization.cimdClientMethod("PUBLIC"));
+        assertEquals(org.springframework.security.oauth2.core.ClientAuthenticationMethod.PRIVATE_KEY_JWT,DurableOAuthAuthorization.cimdClientMethod("CONFIDENTIAL"));
+        for(String type:Arrays.asList(null,"UNKNOWN","public","CONFIDENTIAL "))assertThrows(SecurityException.class,()->DurableOAuthAuthorization.cimdClientMethod(type));
+    }
     @Test void alteredExternalIdentityDoesNotNormalizeOrFallBackToManualClient(){
         assertNull(durable.findByClientId(CLIENT.replace("%2F","%2f")));assertNull(durable.findByClientId("manual-client"));assertTrue(events.isEmpty());
     }

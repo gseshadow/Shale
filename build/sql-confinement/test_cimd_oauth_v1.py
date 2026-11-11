@@ -20,6 +20,15 @@ class CimdOAuthGenerationTest(unittest.TestCase):
   self.assertIn("'AI_CLIENT_KEY'",text)
   self.assertIn('p.RowVer=@ApprovalVersion',text)
   self.assertIn('m.FreshUntil>@now',text)
+ def test_server_catalog_checks_are_retained_only_in_guarded_dynamic_sql(self):
+  text=(SQL/'universal-pr4b-oauth-verify.sql').read_text()
+  match=re.search(r'IF @C4bEdition<>5 BEGIN DECLARE @C4bServerCheck nvarchar\(max\)=CONVERT\(nvarchar\(max\),0x([0-9a-f]+)\); EXEC sys.sp_executesql @C4bServerCheck; END;',text)
+  self.assertIsNotNone(match)
+  server=bytes.fromhex(match[1]).decode('utf-16le')
+  for name in ['sys.server_principals','sys.server_permissions','sys.server_role_members']:
+   self.assertIn(name,server)
+   self.assertNotIn(name,text)
+  self.assertIn("@C4bEdition NOT IN(2,3,4,5,8)",text)
  def test_permissions_and_default_off_never_expand_old_roles(self):
   text=(SQL/'universal-pr4b-oauth.sql').read_text()
   grants=re.findall(r'GRANT EXECUTE ON dbo\.(\w+) TO (\w+);',text)

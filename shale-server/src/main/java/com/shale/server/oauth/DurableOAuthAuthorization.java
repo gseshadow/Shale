@@ -29,7 +29,7 @@ public final class DurableOAuthAuthorization implements OAuth2AuthorizationServi
                 new CimdClientIdentifier(c.clientId());
                 if(!properties.issuer().equals(c.issuer()) || !properties.resource().equals(c.resource())) throw denied();
                 var builder=RegisteredClient.withId("cimd:"+c.tenant()+":"+c.integration()).clientId(c.clientId()).clientName(c.name())
-                        .clientAuthenticationMethod("CONFIDENTIAL".equals(c.type()) ? org.springframework.security.oauth2.core.ClientAuthenticationMethod.PRIVATE_KEY_JWT : org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE)
+                        .clientAuthenticationMethod(cimdClientMethod(c.type()))
                         .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                         .clientSettings(org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(true).build());
                 c.scopes().forEach(scope->builder.scope(scope.wireValue()));
@@ -129,5 +129,10 @@ public final class DurableOAuthAuthorization implements OAuth2AuthorizationServi
         return result;
     }
     static Set<String> wire(Set<AiScope> values) { return values.stream().map(AiScope::wireValue).collect(java.util.stream.Collectors.toUnmodifiableSet()); }
+    static org.springframework.security.oauth2.core.ClientAuthenticationMethod cimdClientMethod(String type) {
+        if("PUBLIC".equals(type))return org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE;
+        if("CONFIDENTIAL".equals(type))return org.springframework.security.oauth2.core.ClientAuthenticationMethod.PRIVATE_KEY_JWT;
+        throw denied();
+    }
     private static SecurityException denied() { return new SecurityException("OAuth binding unavailable."); }
 }

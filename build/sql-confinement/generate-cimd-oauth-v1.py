@@ -245,7 +245,7 @@ server=f"""IF EXISTS(SELECT 1 FROM sys.database_principals u JOIN @C4bMembers a 
  OR EXISTS(SELECT 1 FROM sys.server_permissions p JOIN sys.server_principals s ON s.principal_id=p.grantee_principal_id JOIN sys.database_principals u ON u.sid=s.sid JOIN @C4bMembers a ON a.Id=u.principal_id WHERE p.state IN('G','W') AND NOT(p.class=100 AND p.state='G' AND p.permission_name IN('CONNECT SQL','VIEW ANY DATABASE'))) THROW 59500,'CIMD server identity drift.',1;"""
 # Dynamic batch cannot see the local table variable; derive the same membership set directly.
 server=server.replace('JOIN @C4bMembers a ON a.Id=u.principal_id',f'JOIN sys.database_role_members a ON a.member_principal_id=u.principal_id AND a.role_principal_id IN({role_ids})')
-verify+='IF @C4bEdition<>5 BEGIN '+execute(server)+' END;\n'
+verify+="IF @C4bEdition<>5 BEGIN DECLARE @C4bServerCheck nvarchar(max)=CONVERT(nvarchar(max),0x"+server.encode('utf-16le').hex()+"); EXEC sys.sp_executesql @C4bServerCheck; END;\n"
 verify+=catalog+f"IF ISNULL((SELECT SourceHash FROM dbo.AiCimdOAuthReceiptV1 WHERE Id=1),0x)<>0x{source_hash} OR ISNULL((SELECT BeforeHash FROM dbo.AiCimdOAuthReceiptV1 WHERE Id=1),0x)<>@C4bBefore OR ISNULL((SELECT CatalogHash FROM dbo.AiCimdOAuthReceiptV1 WHERE Id=1),0x)<>@C4bFingerprint THROW 59500,'CIMD OAuth receipt drift.',1;\n"
 install="""/* Generated PR 4B OFF candidate. Disposable acceptance is not production authorization. */
 SET NOCOUNT ON; SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;
