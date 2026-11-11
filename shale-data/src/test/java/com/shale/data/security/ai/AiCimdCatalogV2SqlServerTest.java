@@ -24,7 +24,7 @@ class AiCimdCatalogV2SqlServerTest extends AiCimdOAuthLocalSqlServerTest {
             if(count(c,"SELECT COUNT(*) FROM sys.certificates WHERE name='AiCimdCatalogCertificateV2'")==1) sql(c,"DROP CERTIFICATE AiCimdCatalogCertificateV2");
         }
     }
-    @AfterAll void removeOwners()throws Exception { try(var c=owner("master")) { for(String login:ownerLogins) sql(c,"DROP LOGIN ["+login+"]"); } }
+    @AfterAll void removeOwners()throws Exception { if(ownerLogins.isEmpty()) return; try(var c=owner("master")) { for(String login:ownerLogins) sql(c,"DROP LOGIN ["+login+"]"); } }
     void foundation()throws Exception {
         try(var c=owner(db)) {
             sql(c,"UPDATE dbo.AiProductCapability SET Enabled=0; UPDATE dbo.AiCimdProofControlV1 SET Enabled=0; UPDATE dbo.AiCimdOAuthControlV1 SET Enabled=0");

@@ -57,7 +57,7 @@ unchanged; V1 `--check` proves every V1 generated artifact remains identical.
 | AiCimdCatalogV2 | Database VIEW DEFINITION and EXECUTE only on AiCimdAttestCatalogV2; no direct application data/column access |
 | AiCimdCatalogSignerV2 | Non-connectable certificate-mapped login; exactly VIEW ANY DEFINITION, VIEW ANY DATABASE, AUTHENTICATE SERVER and CONNECT ANY DATABASE; no role, grant option, endpoint or principal ownership |
 | Dedicated disabled owner | Existing dbo authority only in the target DB, ordinary server defaults; cannot establish a new login session |
-| Eight business identities | Their unchanged exact procedure roots and permissions from PR 4C; no signing or system-database grants |
+| Eight business identities | Their unchanged exact procedure roots and permissions from [PR 4C](universal-mcp-pr4c-runtime.md#exact-permission-matrix); no signing or system-database grants |
 
 CREATE LOGIN's redundant explicit CONNECT SQL grant is revoked from the certificate login. Certificate
 login type C has no password authentication; public CONNECT SQL defaults do not make it a credential.
