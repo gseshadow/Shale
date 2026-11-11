@@ -7,13 +7,7 @@ No production credentials, SQL, permission changes, settings, deployment or merg
 
 ## Blocking findings
 
-1. The private authoritative fixture used by PR 4A/4B is absent from this workspace. Expected
-   candidate SHA-256: `4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f`.
-   The documented earlier `/workspace/attachments/.../authoritative-candidate.sql` is unavailable;
-   library/shared/download directories contain no substitute. No reconstructed schema, changed hash,
-   modified receipt or skipped confinement assertion is used to claim acceptance. Authoritative V1/V2
-   lifecycle, graph, catalog installation and positive full-runtime tests remain **NOT RUN**.
-2. Restricted catalog execution is still unresolved on SQL Server/MI. Direct SELECT grants on
+1. Restricted catalog execution is still unresolved on SQL Server/MI. Direct SELECT grants on
    PR 4A/4B receipt tables would change their sealed permission catalogs. The additive parameterless
    owner-context catalog gate avoids those grants, but `EXECUTE AS OWNER` loses server visibility.
    A real restricted catalog login has VIEW ANY DEFINITION; inside an owner-context procedure on a
@@ -23,10 +17,22 @@ No production credentials, SQL, permission changes, settings, deployment or merg
    reviewed least-privilege catalog execution contract is required; this candidate does not add
    TRUSTWORTHY, impersonation, server administrative roles, signing authority, or altered verifiers.
 
-The missing authoritative fixture alone prevents claiming a working full attestor on either platform.
-The boxed catalog finding independently blocks SQL Server/MI full runtime readiness. The native Azure
+The authoritative fixture was subsequently restored and hash-verified as recorded below.
+The boxed catalog finding still blocks SQL Server/MI full runtime readiness. The native Azure
 path is also **unverified**; a local boxed refusal is not evidence that Azure succeeds. Keep all live
 composition disabled and do not install the new SQL candidate as a production workaround.
+
+## Restored authoritative fixture
+
+The original path `/workspace/attachments/86798399-e48c-4839-a4ca-096931b813b1/authoritative-candidate.sql`
+is missing. The user supplied the attachment again; its downloaded copy is at
+`/workspace/attachments/815fd541-5132-4fca-be78-16a1af192a37/authoritative-candidate.sql`.
+Its SHA-256 matches the required
+`4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f` exactly.
+Hash verification precedes schema import and is repeated after SQL execution. The file remains
+unmodified and uncommitted. The existing restrictive, hash-gated DDL importer treats it as schema
+evidence, not operator instructions. No substitute schema or production SQL is used. This clears
+the earlier missing-fixture blocker; it does not clear restricted catalog execution or native gates.
 
 ## Pre-edit review and test impact
 
@@ -68,7 +74,9 @@ OAuth bootstrap and legacy Case identities, proven through actual sessions and c
 | `registry-tenant` / AiApplicationTenant | AiRequestApplicationV1, AiDecideApplicationV1 | Authenticated tenant/actor; SQL verifies administrator decision |
 | `catalog` / **new** AiCimdCatalogV1 | **new** AiCimdAttestCatalogV1 | Neutral, read-only verification |
 
-The catalog role additionally has database VIEW DEFINITION; SQL Server/MI requires a separately
+The new authoritative tests reuse the established nonce-owned OAuth fixture, add a distinct restricted
+catalog login and exercise only their explicitly selected methods; inherited historical campaigns are
+not run. The catalog role additionally has database VIEW DEFINITION; SQL Server/MI requires a separately
 configured login with VIEW ANY DEFINITION and complete database visibility. SQL Server 2022 reports
 VIEW SECURITY/PERFORMANCE DEFINITION as implications of VIEW DEFINITION, and corresponding ANY
 implications at server scope. Only the original explicit VIEW DEFINITION grants are allowed; no
@@ -154,8 +162,8 @@ The candidate examines actual authenticated sessions and the independent complet
 The new one-shot candidate installer creates only the catalog role and fixed gate under the existing
 schema lock and OFF controls. Its final independent verification runs before COMMIT. It never creates
 logins, secrets, memberships, historical properties or a replacement binding/receipt. It must **not** be
-used to repair an accepted installation. Positive install/rollback and graph-fault acceptance remain
-unexecuted without the authoritative fixture; no claim is made that the supplemental graph accepts it.
+used to repair an accepted installation. Authoritative installation and a focused terminal-audit
+fault test are recorded below; no complete runtime or exhaustive graph-fault acceptance is claimed.
 
 ## Audit compatibility
 
@@ -174,8 +182,9 @@ All SQL executed on a new
 loopback-only disposable SQL Server 2022 container with actual nonce-owned SQL logins. Its image was
 `mcr.microsoft.com/mssql/server@sha256:11927f5edc5122658e90b3a80ee36e8aef779310bf771415c1d89271859c73fd`.
 Generated localhost certificate/private truststore enforced `trustServerCertificate=false`; neither
-system trust nor production changed. The synthetic schema intentionally has no authoritative receipts.
-It establishes identity authority and fail-closed behavior, **not** Case/RLS/catalog lifecycle acceptance.
+system trust nor production changed. The original eight synthetic identity/refusal scenarios intentionally
+have no authoritative receipts and establish only that boundary. The subsequent authoritative scenarios
+use the restored hash-verified fixture and unchanged V1/V2/#1948/4A/4B sources, with synthetic rows only.
 
 Eight SQL scenarios cover exact per-role root access; denial of tables/wrong issuer roots; column exceptions,
 inherited db_datareader and scoped user impersonation; schema ownership/public chained views/other-DB
@@ -190,14 +199,33 @@ permission enumeration, keeping explicit grants exact. No predecessor assertion 
 | --- | --- |
 | Focused configuration/startup/Case/old attestation/TLS URL contracts | 27 PASS; zero failures/errors/skips |
 | Actual restricted-login SQL scenarios | 8 PASS; identity/refusal evidence only; no authoritative lifecycle acceptance |
+| Authoritative V1/V2 lifecycle compatibility | 4 PASS: two-tenant issue/rotate/legacy exclusion and private-key/global replay/audit rollback, each on V1 and V2 |
+| Authoritative V1/V2 PR 4C catalog/identity/rollback | 4 PASS: installation plus restricted refusal, and late terminal-audit fault rollback, each on V1 and V2 |
 | Selector affected core/data/server batch | 221 PASS; zero failures/errors/skips |
 | Critical seven-module reactor | 254 PASS; all modules successful; zero failures/errors/skips |
 | CIMD generators/contracts (4B, 4A, new runtime) | 11 PASS (4 + 3 + 4) |
 | Unchanged registry generation/contracts | 3 PASS |
 | Immutable binding packet / selector unit tests | 5 / 32 PASS |
 | Diff whitespace, historical artifacts and private-fixture non-substitution | PASS; only additive new SQL/resources |
-| Authoritative V1/V2 full runtime, new graph and catalog receipts | **BLOCKED / NOT RUN**, private fixture missing; boxed catalog execution independently blocked |
+| Successful full boxed runtime readiness | **BLOCKED**: unchanged #1948 rejects owner-context catalog execution with SQL 59310 on V1 and V2 |
 | Native Azure catalog and mutation/fault acceptance | **NOT RUN**, independent gates remain open |
+
+The eight authoritative executions comprise four distinct scenarios repeated on V1 and V2. The
+catalog scenario installs the exact PR 4C candidate with controls OFF, confirms the supplemental graph
+accepts the authoritative schema, verifies all nine actual identities/effective permissions through
+the dedicated catalog login, checks source/selected-contract checks reach the catalog phase, and
+asserts both direct SQL 59310 with `Registry server catalog visibility required.` and full-runtime
+startup refusal/complete pool cleanup. It preserves every historical receipt and immutable binding
+and reruns the unchanged cumulative PR 4B verifier. The late-fault scenario injects an unreviewed
+terminal-audit trigger after creating the new role; failure rolls back that trigger, role and catalog
+gate, preserving old receipts/binding and manual-client continuity.
+
+The first authoritative batch passed its four unchanged lifecycle checks. The four new runtime tests
+then failed their final manual-client check because the fixture still had the ordinary global
+capability OFF. Restoring that ordinary flag inside the disposable test before manual continuity
+corrected setup; all four runtime tests passed in the focused rerun. Production code, SQL generation,
+permissions, receipts and confinement assertions were unchanged. The previously passing eight
+synthetic identity/TLS tests remain separate evidence; they are not relabeled authoritative tests.
 
 Counts overlap. SQL-opt-in classes execute zero tests in affected/critical batches and are not SQL
 acceptance. The selector's informational full-suite suggestion comes from the selector inventory edit
@@ -214,6 +242,14 @@ mvn -B -pl shale-server -am \
 # and a private truststore containing the test certificate are required.
 mvn -B -pl shale-data -am -Dtest=AiCimdRuntimeSqlServerTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
+# Restored fixture: SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI, hash-gated schema,
+# generated disposable credentials, and SHALE_AI_SQL_TRUSTSTORE (synthetic-trust).
+mvn -B -pl shale-data -am \
+  '-Dtest=AiCimdOAuthLocalSqlServerTest#lifecycleTwoTenantIssuanceRotationAndLegacyExclusion+lifecyclePrivateKeyBindingAndAssertionReplayAreAtomic,AiCimdOAuthV1LocalSqlServerTest#lifecycleTwoTenantIssuanceRotationAndLegacyExclusion+lifecyclePrivateKeyBindingAndAssertionReplayAreAtomic' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -pl shale-data -am \
+  '-Dtest=AiCimdRuntimeAuthoritativeSqlServerTest#runtime*,AiCimdRuntimeAuthoritativeV1SqlServerTest#runtime*' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
 python3 build/sql-confinement/generate-cimd-runtime-v1.py --check
 python3 -m unittest discover -s build/sql-confinement -p 'test_cimd*.py'
 python3 -m unittest discover -s build/sql-confinement -p test_registry_v1.py
@@ -229,8 +265,9 @@ git diff --check 4043996008de85cd7c9f7b137598e3d597698ea4 HEAD
 
 A separate certificate-validated JDBC connection confirmed **zero disposable user databases and zero
 nonce logins** after the final SQL run. The dedicated container, generated passwords/key/certificate
-and private truststores were removed. No authoritative fixture was downloaded, reconstructed,
-modified or committed. No live application endpoint/browser/stock client was contacted.
+and private truststores were removed. The restored authoritative attachment was imported only into
+disposable databases; it was not reconstructed, modified or committed. No live application
+endpoint/browser/stock client was contacted.
 
 ## Independent native Azure acceptance and HTTP dependencies
 
@@ -242,8 +279,8 @@ The existing stopped native catalog investigation and separate mutation/fault ga
 does not restart them or substitute production. Retain accepted Stage 0 and existing identity evidence
 at their documented scopes.
 
-After the catalog contract (including boxed system-database authority) is resolved and the private fixture restored, run focused authoritative V1/V2
-installation/late rollback, all new identity/graph/permission faults, actual runtime leases across tenants,
+After the catalog contract (including boxed system-database authority) is resolved, complete the remaining
+authoritative V1/V2 identity/graph/permission faults and actual accepted runtime leases across tenants,
 poisoned pool reuse, rotation/restart, source/schema/receipt/binding mutation, Case proof/final disclosure,
 issuer replay/revocation/audit rollback and manual continuity. Repeat the native contained-user catalog
 and separate disposable mutation/fault cases independently; Linux SQL Server is not native acceptance.
