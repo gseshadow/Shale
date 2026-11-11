@@ -161,7 +161,8 @@ check pass. The final missing-signature fault intentionally remains broken until
 It fails closed with repeated full attestation inside the original ten-second proof/eight-second
 read budgets. Development timing showed roughly four seconds in the unchanged historical/catalog
 batch plus actual-session checks; batching reduced overhead but does not establish a complete
-response within that budget. The diagnostic is separate from catalog/startup acceptance, is not
+response within that budget. The diagnostic failed during development before the final expansion of system authority checks;
+it was not repeated after that expansion. It is separate from catalog/startup acceptance, is not
 counted as a pass, and has no TTL/cache, skipped verifier or extended disclosure window workaround.
 Before HTTP integration, implement/review deadline-aware request composition and demonstrate the
 complete audited handoff. Do not advertise readiness from a startup/catalog pass alone.
@@ -182,7 +183,43 @@ Test-impact review:
 
 The selector selects security-data and its core/data/server dependencies. Its informational unknown
 resource-path escalation does not justify replaying all historical SQL or the all-tests profile.
-Final commands/results and independent cleanup are recorded after final checks below.
+Final local validation (2026-11-11, JDK 21 / Maven 3.9.11):
+
+| Check | Result |
+| --- | --- |
+| Three explicitly selected authoritative SQL methods | 3 PASS, no failures/errors/skips |
+| AiCimdRuntimeTest + AiCaseDataAttestationTest | 18 PASS |
+| test_cimd_catalog_v2.py | 5 PASS, including V1/V2 generation checks |
+| Selector security-data/core/data/server batch | 162 PASS |
+| Default critical reactor | 254 PASS |
+| Full Case-disclosure diagnostic | Development FAIL CLOSED; unresolved, not counted as acceptance |
+| Native Azure | NOT RUN; both independent gates OPEN |
+| Predecessor bytes | All 73 existing SQL/resource/confinement-build files identical to #1952 |
+| Independent TLS cleanup | Zero user DBs, nonce SQL logins, V2 signer logins and master certificates |
+
+Normalized Maven commands below retain the executed selections; local JDK/repository/truststore
+wrappers supplied tooling and disposable TLS material. Authoritative SQL variables use the existing
+PR 4B fixture harness, approved fixture hash and explicit LOCAL_DISPOSABLE_AI opt-in. They are absent
+for focused/affected/critical regression commands. No inherited historical SQL methods are selected.
+
+```sh
+mvn -pl shale-data -am '-Dtest=AiCimdCatalogV2SqlServerTest#catalogSuccessfulReadinessAndConfinedRuntime+catalogPermissionAndBindingDriftFailsClosed,AiCimdCatalogV2V1SqlServerTest#catalogSuccessfulReadinessAndConfinedRuntime' -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-data -am -Dtest=AiCimdRuntimeTest,AiCaseDataAttestationTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 -m unittest discover -s build/sql-confinement -p test_cimd_catalog_v2.py
+python3 build/test-selection/select_tests.py --base 93b8610ca9caef69669ebd11dee9a1971557abad --head HEAD --plan-output work/pr4c/selection.json
+# Execute the emitted selected_maven_batches (security-data, core/data/server).
+mvn test
+git diff --check 93b8610ca9caef69669ebd11dee9a1971557abad
+```
+
+The boxed installer was subsequently relocated into boxed/ with byte-identical SQL (SHA-256
+`126a661092ae68cffbb531b85d3ec667824cf258312c88581c7d0e712ebe42e1`); focused and affected
+checks validate the final path and unchanged Azure inventory. The test cleanup was corrected to
+avoid opening SQL when setup is legitimately skipped and no owner login was created. Neither change
+alters tested SQL or the successful actual-login cleanup path; no historical SQL replay was needed.
+The accepted authoritative attachment hash remained unchanged after execution. Following independent
+cleanup inspection, the disposable container and generated passwords, TLS private keys and private
+truststores were removed. No all-tests campaign or GitHub Actions tests were run.
 
 ## Native Azure and HTTP dependencies
 
