@@ -48,7 +48,7 @@ AS BEGIN
  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID('dbo.AiCaseDataInvocation') AND name='Shale.RegistryConfinementV1.Required')<>1
   THROW 59600,'Registry compatibility receipt required.',1;
 """
-# Fixed hex constant, no parameter, concatenation or caller-selected SQL. Executes all
+# Fixed Unicode constant, no parameter, concatenation or caller-selected SQL. Executes all
 # predecessors byte-for-byte, including V1/V2 dispatch, #1948 and PR4A/4B source/catalog/before checks.
 body+=' EXEC sys.sp_executesql '+literal(pre)+';\n'+graph
 body+="""

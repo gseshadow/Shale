@@ -48,6 +48,11 @@ class AiCimdRuntimeSqlServerTest {
     }
     @AfterEach void removeDatabase()throws Exception { if(db!=null) try(var c=owner("master")) { execute(c,"ALTER DATABASE "+quote(db)+" SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE "+quote(db)); db=null; } }
     @AfterAll void removeLogins()throws Exception { if(prefix!=null) try(var c=owner("master")) { for(String key:secrets.keySet()) execute(c,"DROP LOGIN "+quote(prefix+"_"+key)); } }
+    @Test void trustedCertificateWithWrongHostnameCannotConnect()throws Exception {
+        var s=(com.microsoft.sqlserver.jdbc.SQLServerDataSource)source("browser");
+        s.setHostNameInCertificate("unaccepted.invalid");
+        assertThrows(SQLException.class,s::getConnection,"A trusted local certificate with the wrong hostname must fail before a SQL lease is returned.");
+    }
     @Test void actualSeparateRestrictedSessionsHaveExactlyTheirDeclaredRootsAndNoTableAuthority()throws Exception {
         for(var role:AiCimdIdentity.values()) assertDoesNotThrow(()->check(role),role.name());
         try(var c=source("browser").getConnection()) {

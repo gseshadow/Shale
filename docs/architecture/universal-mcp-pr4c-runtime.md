@@ -132,7 +132,11 @@ The candidate examines actual authenticated sessions and the independent complet
 - SQL Server/MI cross-database HAS_DBACCESS for every other database from the independent complete
   inventory, including the catalog identity. Missing/NULL probe results refuse. Native Azure checks
   contained own-session authentication and rejects synonyms/external/cross-database references;
-  it must not execute boxed server-catalog probes.
+  it must not execute boxed server-catalog probes. Full system-database public/guest/mapped-user
+  authority is not positively accepted by the boxed prototype: its cross-database loop covers other
+  user databases, matching the predecessor. That additional scope must be closed in the reviewed
+  boxed catalog successor; current full boxed readiness is already blocked. Do not label the
+  isolated identity-helper tests complete cross-database acceptance.
 - Before entering the catalog gate: exact packaged SHA-256 over its SQL Server UTF-16LE definition,
   owner/execution context, ANSI/QI settings, exact grants, and absence of signatures. Unknown source,
   schema, role, property, receipt, binding or result contract cannot establish readiness.
@@ -166,20 +170,67 @@ remain operator responsibilities. Those are not fabricated tenant timeline event
 
 ## Executed validation
 
-Final commands/results are recorded below after the final verification run. All SQL executed on a new
+All SQL executed on a new
 loopback-only disposable SQL Server 2022 container with actual nonce-owned SQL logins. Its image was
 `mcr.microsoft.com/mssql/server@sha256:11927f5edc5122658e90b3a80ee36e8aef779310bf771415c1d89271859c73fd`.
 Generated localhost certificate/private truststore enforced `trustServerCertificate=false`; neither
 system trust nor production changed. The synthetic schema intentionally has no authoritative receipts.
 It establishes identity authority and fail-closed behavior, **not** Case/RLS/catalog lifecycle acceptance.
 
-Six SQL scenarios cover exact per-role root access; denial of tables/wrong issuer roots; column exceptions,
+Eight SQL scenarios cover exact per-role root access; denial of tables/wrong issuer roots; column exceptions,
 inherited db_datareader and scoped user impersonation; schema ownership/public chained views/other-DB
 mappings; scoped server impersonation and catalog column grants; incomplete schema/duplicate identity/
-failed-runtime pool cleanup; and the independently asserted owner-context server-visibility blocker.
-Scenario assertions overlap; this is six tests, not a V1/V2 lifecycle campaign. Two development fixture
-identifier errors were corrected; SQL Server 2022 metadata implications were admitted only after actual
+failed-runtime pool cleanup; fixed-gate compilation/missing-receipt refusal; certificate hostname rejection; and the independently asserted owner-context server-visibility blocker.
+Scenario assertions overlap; this is eight tests, not a V1/V2 lifecycle campaign. Development fixture
+identifier/column-grant setup errors were corrected; SQL Server 2022 metadata implications were admitted only after actual
 permission enumeration, keeping explicit grants exact. No predecessor assertion was relaxed.
+
+
+| Final local check | Result |
+| --- | --- |
+| Focused configuration/startup/Case/old attestation/TLS URL contracts | 27 PASS; zero failures/errors/skips |
+| Actual restricted-login SQL scenarios | 8 PASS; identity/refusal evidence only; no authoritative lifecycle acceptance |
+| Selector affected core/data/server batch | 221 PASS; zero failures/errors/skips |
+| Critical seven-module reactor | 254 PASS; all modules successful; zero failures/errors/skips |
+| CIMD generators/contracts (4B, 4A, new runtime) | 11 PASS (4 + 3 + 4) |
+| Unchanged registry generation/contracts | 3 PASS |
+| Immutable binding packet / selector unit tests | 5 / 32 PASS |
+| Diff whitespace, historical artifacts and private-fixture non-substitution | PASS; only additive new SQL/resources |
+| Authoritative V1/V2 full runtime, new graph and catalog receipts | **BLOCKED / NOT RUN**, private fixture missing; boxed catalog execution independently blocked |
+| Native Azure catalog and mutation/fault acceptance | **NOT RUN**, independent gates remain open |
+
+Counts overlap. SQL-opt-in classes execute zero tests in affected/critical batches and are not SQL
+acceptance. The selector's informational full-suite suggestion comes from the selector inventory edit
+and new resource paths; no unrelated historical full suite was run, honoring the requested scope.
+
+Exact commands from the repository root (workspace-local JDK 21/Maven 3.9.11, Cloud proxy/CA settings):
+
+```sh
+mvn -B -pl shale-server -am \
+  '-Dtest=AiCimdRuntimeTest,AiCaseDataAccessTest,AiCaseDataAttestationTest,AiJdbcUrlTest,DataSourcesAiCaseDataTest,CimdRuntimeConfigurationTest' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+# Only inside the dedicated disposable TLS setup; never supply production credentials.
+# SHALE_CIMD_SQL_OPT_IN=LOCAL_DISPOSABLE_CIMD, generated password, port 14333,
+# and a private truststore containing the test certificate are required.
+mvn -B -pl shale-data -am -Dtest=AiCimdRuntimeSqlServerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/sql-confinement/generate-cimd-runtime-v1.py --check
+python3 -m unittest discover -s build/sql-confinement -p 'test_cimd*.py'
+python3 -m unittest discover -s build/sql-confinement -p test_registry_v1.py
+python3 -m unittest discover -s build/deployment-binding -p test_packet.py
+python3 -m unittest build/test-selection/test_select_tests.py
+python3 build/test-selection/select_tests.py --base 4043996008de85cd7c9f7b137598e3d597698ea4 \
+  --head HEAD --format markdown --plan-output work/pr4c/selection.json \
+  --output work/pr4c/selection.md
+# Outside ALL SQL opt-ins, run each selected_maven_batches entry, then:
+mvn -B test
+git diff --check 4043996008de85cd7c9f7b137598e3d597698ea4 HEAD
+```
+
+A separate certificate-validated JDBC connection confirmed **zero disposable user databases and zero
+nonce logins** after the final SQL run. The dedicated container, generated passwords/key/certificate
+and private truststores were removed. No authoritative fixture was downloaded, reconstructed,
+modified or committed. No live application endpoint/browser/stock client was contacted.
 
 ## Independent native Azure acceptance and HTTP dependencies
 
@@ -191,7 +242,7 @@ The existing stopped native catalog investigation and separate mutation/fault ga
 does not restart them or substitute production. Retain accepted Stage 0 and existing identity evidence
 at their documented scopes.
 
-After the catalog contract is resolved and the private fixture restored, run focused authoritative V1/V2
+After the catalog contract (including boxed system-database authority) is resolved and the private fixture restored, run focused authoritative V1/V2
 installation/late rollback, all new identity/graph/permission faults, actual runtime leases across tenants,
 poisoned pool reuse, rotation/restart, source/schema/receipt/binding mutation, Case proof/final disclosure,
 issuer replay/revocation/audit rollback and manual continuity. Repeat the native contained-user catalog
