@@ -245,8 +245,9 @@ mvn -B -pl shale-data -am -Dtest=AiCimdRuntimeSqlServerTest \
 # Restored fixture: SHALE_AI_SQL_OPT_IN=LOCAL_DISPOSABLE_AI, hash-gated schema,
 # generated disposable credentials, and SHALE_AI_SQL_TRUSTSTORE (synthetic-trust).
 mvn -B -pl shale-data -am \
-  '-Dtest=AiCimdOAuthLocalSqlServerTest#lifecycleTwoTenantIssuanceRotationAndLegacyExclusion+lifecyclePrivateKeyBindingAndAssertionReplayAreAtomic,AiCimdOAuthV1LocalSqlServerTest#lifecycleTwoTenantIssuanceRotationAndLegacyExclusion+lifecyclePrivateKeyBindingAndAssertionReplayAreAtomic' \
+  '-Dtest=AiCimdRuntimeAuthoritativeSqlServerTest#runtime*,AiCimdRuntimeAuthoritativeV1SqlServerTest#runtime*,AiCimdOAuthLocalSqlServerTest#lifecycleTwoTenantIssuanceRotationAndLegacyExclusion+lifecyclePrivateKeyBindingAndAssertionReplayAreAtomic,AiCimdOAuthV1LocalSqlServerTest#lifecycleTwoTenantIssuanceRotationAndLegacyExclusion+lifecyclePrivateKeyBindingAndAssertionReplayAreAtomic' \
   -Dsurefire.failIfNoSpecifiedTests=false test
+# Focused rerun after correcting only the new disposable manual-continuity setup.
 mvn -B -pl shale-data -am \
   '-Dtest=AiCimdRuntimeAuthoritativeSqlServerTest#runtime*,AiCimdRuntimeAuthoritativeV1SqlServerTest#runtime*' \
   -Dsurefire.failIfNoSpecifiedTests=false test
