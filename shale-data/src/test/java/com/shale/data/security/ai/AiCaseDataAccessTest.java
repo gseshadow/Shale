@@ -29,10 +29,25 @@ class AiCaseDataAccessTest {
             assertFalse(f.events.contains("encode"));
         }
     }
+    @Test void explicitCimdReaderUsesVersionedReadHandoffAndBothFailureRoots() {
+        var f=new Fixture();
+        var invocation=IntegrationInvocation.overview(f.request.authority(),System.nanoTime()+8_000_000_000L);
+        assertTrue(new AiCaseDataAccess(f.data,f.cleanup,f.request,AiCaseDataAccess.Namespace.CIMD_V1).overview(invocation,100L,DisclosureBuffer::size).size()>0);
+        assertEquals(2,f.procedures.size());
+        assertTrue(f.procedures.get(0).contains("dbo.AiCimdDataGetCaseOverviewV1"));
+        assertTrue(f.procedures.get(1).contains("dbo.AiCimdDataAuthorizeCaseHandoffV1"));
+        var failed=new Fixture(); failed.fault="uncertain";
+        assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(failed.data,failed.cleanup,failed.request,AiCaseDataAccess.Namespace.CIMD_V1)
+                .overview(IntegrationInvocation.overview(failed.request.authority(),System.nanoTime()+8_000_000_000L),100L,DisclosureBuffer::size));
+        assertTrue(failed.procedures.stream().allMatch(call->call.contains("dbo.AiCimdData")));
+        assertTrue(failed.procedures.stream().anyMatch(call->call.contains("RecordCaseFailureV1")));
+        assertTrue(failed.procedures.stream().anyMatch(call->call.contains("FinishCaseQuotaV1")));
+    }
     private static final class Fixture {
         final DataSource data,cleanup;
         final AtomicLong clock=new AtomicLong();final AtomicInteger cleanups=new AtomicInteger();
         final List<String> events=new ArrayList<>();final AiCaseDataRequest request;
+        final List<String> procedures=new ArrayList<>();
         String fault="";long remaining=500,elapsedOnGateClose=0;
         Fixture() {
             var c=IntegrationCaseReadTest.context(7,72);
@@ -61,7 +76,7 @@ class AiCaseDataAccessTest {
             });
             return proxy(Connection.class,(p,m,a)->switch(m.getName()) {
                 case "getAutoCommit"->true;
-                case "prepareCall"->statement;
+                case "prepareCall"->{procedures.add((String)a[0]);yield statement;}
                 case "close"->{if(!kind.equals("cleanup"))events.add(kind+"-close");if(kind.equals("gate"))clock.set(elapsedOnGateClose);if(kind.equals("read")&&fault.equals("close"))throw new SQLException("synthetic close");yield null;}
                 default->zero(m);
             });

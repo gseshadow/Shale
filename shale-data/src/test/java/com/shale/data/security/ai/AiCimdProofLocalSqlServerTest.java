@@ -83,27 +83,15 @@ class AiCimdProofLocalSqlServerTest extends AiApplicationConfinementV2LocalSqlSe
         }
         return new Family(tenant,user,session,access,refresh,code);
     }
-    /** Test-only name routing to the new real SQL roots. This proxy never simulates a query or result. */
-    DataSource cimdSource(){
-        DataSource original=source("cimd");
-        return (DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},(p,m,args)->{
-            Object value=invoke(original,m,args);
-            if(!m.getName().equals("getConnection"))return value;
-            Connection connection=(Connection)value;
-            return Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class[]{Connection.class},(cp,cm,ca)->{
-                if((cm.getName().equals("prepareCall")||cm.getName().equals("prepareStatement"))&&ca!=null&&ca[0] instanceof String statement){ca=ca.clone();ca[0]=statement.replace("dbo.AiData","dbo.AiCimdData");}
-                return invoke(connection,cm,ca);
-            });
-        });
-    }
+    DataSource cimdSource(){ return source("cimd"); }
     static Object invoke(Object target,Method method,Object[] args)throws Throwable {
         try{return method.invoke(target,args);}catch(InvocationTargetException failure){throw failure.getCause();}
     }
-    AiCaseDataRequest cimd(String access){return AiCaseDataAccess.authenticate(cimdSource(),access,ISSUER,RESOURCE,System.nanoTime()+10_000_000_000L);}
+    AiCaseDataRequest cimd(String access){return AiCaseDataAccess.authenticate(cimdSource(),access,ISSUER,RESOURCE,System.nanoTime()+10_000_000_000L,AiCaseDataAccess.Namespace.CIMD_V1);}
     void ownRead(Family f,long id){try(var request=cimd(f.access())){
         assertEquals(f.tenant(),request.authority().shaleClientId());
         var invocation=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
-        assertTrue(new AiCaseDataAccess(cimdSource(),cimdSource(),request).overview(invocation,id,DisclosureBuffer::size).size()>0);
+        assertTrue(new AiCaseDataAccess(cimdSource(),cimdSource(),request,AiCaseDataAccess.Namespace.CIMD_V1).overview(invocation,id,DisclosureBuffer::size).size()>0);
     }}
     void manualRead(){try(var request=authenticate(token)){
         var invocation=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
@@ -119,7 +107,7 @@ class AiCimdProofLocalSqlServerTest extends AiApplicationConfinementV2LocalSqlSe
         assertThrows(RuntimeException.class,()->cimd(a.refresh()),"Refresh is not Case proof.");
         try(var request=cimd(a.access())){
             var invocation=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
-            assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(cimdSource(),cimdSource(),request).overview(invocation,200L,bf->fail("No foreign Case may reach serialization.")));
+            assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(cimdSource(),cimdSource(),request,AiCaseDataAccess.Namespace.CIMD_V1).overview(invocation,200L,bf->fail("No foreign Case may reach serialization.")));
         }
         try(Connection c=owner(db)){sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4a-proof-verify.sql")));}
         identitiesAttestation().verify();attestation().verify();
@@ -128,7 +116,7 @@ class AiCimdProofLocalSqlServerTest extends AiApplicationConfinementV2LocalSqlSe
         ownRead(b,200);
         try(var request=cimd(a.access())){
             var invocation=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
-            assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(cimdSource(),cimdSource(),request).overview(invocation,100L,buffer->{republish(false);return buffer.size();}),
+            assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(cimdSource(),cimdSource(),request,AiCaseDataAccess.Namespace.CIMD_V1).overview(invocation,100L,buffer->{republish(false);return buffer.size();}),
                     "Publication changes after audited SQL read must prevent final disclosure.");
         }
         assertThrows(RuntimeException.class,()->cimd(a.access()));assertThrows(RuntimeException.class,()->cimd(b.access()));manualRead();
@@ -161,14 +149,14 @@ class AiCimdProofLocalSqlServerTest extends AiApplicationConfinementV2LocalSqlSe
         try(Connection c=owner(db)){sql(c,"CREATE TRIGGER dbo.Pr4aReadFault ON dbo.IntegrationAccessAuditLog AFTER INSERT AS THROW 59999,'Synthetic audit fault',1");}
         try(var request=cimd(a.access())){
             var invocation=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
-            assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(cimdSource(),cimdSource(),request).overview(invocation,100L,buffer->fail("Uncommitted audit must withhold data.")));
+            assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(cimdSource(),cimdSource(),request,AiCaseDataAccess.Namespace.CIMD_V1).overview(invocation,100L,buffer->fail("Uncommitted audit must withhold data.")));
         }finally{try(Connection c=owner(db)){sql(c,"DROP TRIGGER dbo.Pr4aReadFault");}}
         manualRead();
     }
     @Test void approvalRevocationBetweenReadAndHandoffIsTenantConfined() throws Exception {
         try(var request=cimd(a.access())){
             var invocation=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
-            assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(cimdSource(),cimdSource(),request).overview(invocation,100L,buffer->{
+            assertThrows(IntegrationReadException.class,()->new AiCaseDataAccess(cimdSource(),cimdSource(),request,AiCaseDataAccess.Namespace.CIMD_V1).overview(invocation,100L,buffer->{
                 new AiTenantApplicationService(provider("tenant",7,71)).decide(approvalA.approvalId(),approvalA.rowVersion(),AiTenantApplicationService.Decision.REVOKE,Set.of(),0);
                 return buffer.size();
             }),"Revocation after SQL read must deny final disclosure.");

@@ -573,7 +573,10 @@
         "com.shale.data.security.ai.AiCaseDataAccessTest",
         "com.shale.data.security.ai.AiCaseDataMigrationContractTest",
         "com.shale.data.security.ai.AiCaseDataV2MigrationContractTest",
-        "com.shale.data.security.ai.AiCaseDataAttestationTest"
+        "com.shale.data.security.ai.AiCaseDataAttestationTest",
+        "com.shale.data.security.ai.AiCimdRuntimeTest",
+        "com.shale.data.security.ai.AiCimdRuntimeSqlServerTest",
+        "com.shale.server.oauth.CimdRuntimeConfigurationTest"
       ]
     },
     "notifications": {
