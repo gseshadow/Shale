@@ -46,8 +46,10 @@ reviewed versioned mechanism rather than relaxing this profile.
 The new one-shot OFF installer creates `AiCimdCatalogV2`, `AiCimdAttestCatalogV2` and a new signing
 certificate. It embeds the unchanged PR 4B verifier byte-for-byte, transitively retaining original
 V1/V2 dispatch, PR 3/#1948 and PR 4A/4B source/catalog/before receipts. The PR 4C closed graph is reused.
-No old SQL/module/receipt/manifest/binding is edited or refreshed. The V1 generator excludes the new
-V2 installation source from its inputs; `--check` proves every V1 generated artifact remains identical.
+No old SQL/module/receipt/manifest/binding or generator is edited or refreshed. The new installer is
+[explicitly boxed-only](../sql/ai-integration/boxed/universal-pr4d-catalog.sql), outside the existing
+Azure-compatible top-level inventory and the sealed V1 generator inputs. Their discovery rules remain
+unchanged; V1 `--check` proves every V1 generated artifact remains identical.
 
 | Principal | Authority |
 | --- | --- |
@@ -170,6 +172,16 @@ fail-closed disclosure are unchanged. Signing/owner preparation belongs to gover
 change records; this draft adds no audit schema/vocabulary or historical allowlist edit. No credential,
 assertion, URL, module body or sensitive payload is logged as new application evidence.
 
+Test-impact review:
+
+| Changed contract | Relevant verification |
+| --- | --- |
+| Runtime configuration/binding and V1 compatibility constructors | Updated AiCimdRuntimeTest; AiCaseDataAttestationTest; selector's server configuration checks |
+| Actual identity/permission probing, signed root and pooled leases | Three explicitly selected authoritative V1/V2 methods; scoped drift assertions; existing AiCimdRuntimeSqlServerTest is selected with SQL opt-ins absent |
+| New signing/system profile and frozen predecessor generator inputs | Five test_cimd_catalog_v2.py contracts, V1/V2 generation checks and predecessor-byte comparison |
+
+The selector selects security-data and its core/data/server dependencies. Its informational unknown
+resource-path escalation does not justify replaying all historical SQL or the all-tests profile.
 Final commands/results and independent cleanup are recorded after final checks below.
 
 ## Native Azure and HTTP dependencies

@@ -30,7 +30,7 @@ class AiCimdCatalogV2SqlServerTest extends AiCimdOAuthLocalSqlServerTest {
             sql(c,"UPDATE dbo.AiProductCapability SET Enabled=0; UPDATE dbo.AiCimdProofControlV1 SET Enabled=0; UPDATE dbo.AiCimdOAuthControlV1 SET Enabled=0");
             installSql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4c-runtime.sql")));
             sql(c,"ALTER ROLE AiCimdCatalogV1 ADD MEMBER ["+prefix+"_catalogv1]");
-            assertEquals(59620,assertThrows(SQLException.class,()->installSql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4d-catalog.sql")))).getErrorCode(),"An sa-owned database is never accepted for signed server authentication.");
+            assertEquals(59620,assertThrows(SQLException.class,()->installSql(c,Files.readString(Path.of("../docs/sql/ai-integration/boxed/universal-pr4d-catalog.sql")))).getErrorCode(),"An sa-owned database is never accepted for signed server authentication.");
             assertEquals(0,count(c,"SELECT COUNT(*) FROM sys.objects WHERE name='AiCimdAttestCatalogV2'"));
         }
         try(var c=source("catalogv1").getConnection()) { assertEquals(59310,assertThrows(SQLException.class,()->installSql(c,"EXEC dbo.AiCimdAttestCatalogV1")).getErrorCode()); }
@@ -39,7 +39,7 @@ class AiCimdCatalogV2SqlServerTest extends AiCimdOAuthLocalSqlServerTest {
             sql(c,"CREATE LOGIN ["+ownerLogin+"] WITH PASSWORD='"+UUID.randomUUID()+"aB9!',CHECK_POLICY=OFF; ALTER LOGIN ["+ownerLogin+"] DISABLE; ALTER AUTHORIZATION ON DATABASE::["+db+"] TO ["+ownerLogin+"]");
         }
         try(var c=owner(db)) {
-            String candidate=Files.readString(Path.of("../docs/sql/ai-integration/universal-pr4d-catalog.sql"));
+            String candidate=Files.readString(Path.of("../docs/sql/ai-integration/boxed/universal-pr4d-catalog.sql"));
             String fault=candidate.replace("EXEC dbo.AiCimdAttestCatalogV2;\nCOMMIT TRANSACTION;","EXEC sys.sp_executesql N'USE master; GRANT VIEW SERVER STATE TO AiCimdCatalogSignerV2;';\nEXEC dbo.AiCimdAttestCatalogV2;\nCOMMIT TRANSACTION;");
             assertNotEquals(candidate,fault);
             assertEquals(59620,assertThrows(SQLException.class,()->installSql(c,fault)).getErrorCode());

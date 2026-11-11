@@ -77,4 +77,4 @@ END TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK TRANSACTION; THROW; END CATCH;
 """
 emit(RES/'cimd-runtime-v2-catalog.sql',body)
 emit(RES/'cimd-runtime-v2-catalog.sha256',hashlib.sha256(body.encode('utf-16le')).hexdigest()+'\n')
-emit(SQL/'universal-pr4d-catalog.sql',install)
+emit(SQL/'boxed/universal-pr4d-catalog.sql',install)
