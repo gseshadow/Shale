@@ -14,7 +14,8 @@ def literal(s): return "N'"+s.replace("'","''")+"'"
 # installed generation, catalog, execution context and settings. Do not infer trust from a receipt alone.
 allowed=set()
 for path in SQL.glob('*.sql'):
- if path.name.startswith('universal-pr4c'): continue
+ # Later catalog mechanisms are not new reviewed execution edges for the sealed V1 graph.
+ if path.name.startswith(('universal-pr4c','universal-pr4d')): continue
  for match in re.finditer(r"EXEC\(N'((?:[^']|'')*)'\);|EXEC sys\.sp_executesql N'((?:[^']|'')*)';",path.read_text(),re.S):
   body=next(x for x in match.groups() if x is not None).replace("''", "'")
   module=re.match(r'(CREATE|ALTER) (?:PROCEDURE|TRIGGER|FUNCTION) (?:dbo|sec)\.(\w+)',body)
