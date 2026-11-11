@@ -12,7 +12,8 @@ import java.util.*;
 
 /** Bounded procedure adapter. Authenticated runtime context owns tenant/user; never a client parameter.
  * No Spring serialization, raw code storage, credential issuance or Case access. */
-public final class AiOAuthTransactionStore {
+public final class AiOAuthTransactionStore implements AiOAuthBrowserStore {
+    @Override public boolean externalIdentity() { return false; }
     public record Key(UUID id, RSAPublicKey rsa, String algorithm, Instant validFrom, Instant expiresAt) {}
     public record Client(int tenant, UUID integration, String clientId, String name, String type, Set<AiScope> scopes,
             Instant expiresAt, AiIntegrationSecurityService.RowVersion version, String issuer, String resource,
@@ -20,7 +21,7 @@ public final class AiOAuthTransactionStore {
         public Client { scopes=Set.copyOf(scopes); redirects=Set.copyOf(redirects); keys=List.copyOf(keys); }
     }
     public record Intent(UUID id, int tenant, int user, UUID integration, UUID webSession, String clientId,
-            String redirect, String challenge, String clientState, Set<AiScope> requested, Instant createdAt) {
+            String redirect, String challenge, String clientState, Set<AiScope> requested, Instant createdAt, Instant consentExpiresAt) {
         public Intent { requested=Set.copyOf(requested); }
         @Override public String toString() { return "OAuthIntent[redacted]"; }
     }
@@ -85,7 +86,7 @@ public final class AiOAuthTransactionStore {
         requireEnabled();
         var rows=AiSql.call(runtime,"AiFindOAuthIntentV1",r->new Intent(AiSql.uuid(r,"TransactionId"),r.getInt("ShaleClientId"),r.getInt("UserId"),
                 AiSql.uuid(r,"IntegrationId"),AiSql.uuid(r,"WebSessionId"),r.getString("ClientId"),r.getString("RedirectUri"),r.getString("Challenge"),
-                r.getString("ClientState"),AiScope.fromMask(r.getInt("RequestedScopeMask")),AiSql.instant(r,"CreatedAt")),digest(nonce),session);
+                r.getString("ClientState"),AiScope.fromMask(r.getInt("RequestedScopeMask")),AiSql.instant(r,"CreatedAt"),AiSql.instant(r,"CreatedAt").plusSeconds(3600)),digest(nonce),session);
         if(rows.size()>1) throw new SecurityException("Ambiguous OAuth transaction.");
         return rows.stream().findFirst();
     }

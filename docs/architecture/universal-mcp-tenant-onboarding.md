@@ -1,5 +1,15 @@
 # Universal MCP tenant onboarding
 
+## Current development direction — November 11, 2026
+
+The owner approved the simplified plan: PR A completes the narrow authorization and
+credential boundary; PR B demonstrates the stock-client CIMD connection; PR C adds DCR
+compatibility through the same authority model. The longer phased roadmap below is
+historical. [PR A's contract, implementation and trust boundary](universal-mcp-pr-a.md)
+govern the current work. No nine-pool runtime, signed catalog framework or per-lease
+exhaustive verification is required. Existing confinement enforcement, immutable
+bindings and production/activation gates remain in force. Only PR A is authorized now.
+
 Review date: November 9, 2026 (America/Denver). Source baseline:
 `c4800cb515e35edd79e6b55f1f61536bd17b3ebf`, current `codex/latest`, including #1943/#1944.
 The supplied original checkout was older; it was preserved. This is a proposed successor to the

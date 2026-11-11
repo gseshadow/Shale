@@ -6,13 +6,19 @@ package com.shale.data.security.ai;
 public final class AiCaseDataRequest implements AutoCloseable {
     private final VerifiedIntegrationContext authority;
     private final ProofDigest proof;
+    private final AiCaseDataAccess.Namespace namespace;
     private int users;
     private boolean ownerClosed;
     AiCaseDataRequest(VerifiedIntegrationContext authority, ProofDigest proof) {
+        this(authority, proof, AiCaseDataAccess.Namespace.LEGACY_V1);
+    }
+    AiCaseDataRequest(VerifiedIntegrationContext authority, ProofDigest proof, AiCaseDataAccess.Namespace namespace) {
+        this.namespace = java.util.Objects.requireNonNull(namespace);
         this.authority = java.util.Objects.requireNonNull(authority);
         this.proof = java.util.Objects.requireNonNull(proof);
     }
     public VerifiedIntegrationContext authority() { return authority; }
+    AiCaseDataAccess.Namespace namespace() { return namespace; }
     ProofDigest proof() { return proof; }
     synchronized Use retain() {
         if(ownerClosed)throw new SecurityException("Integration request is closed.");

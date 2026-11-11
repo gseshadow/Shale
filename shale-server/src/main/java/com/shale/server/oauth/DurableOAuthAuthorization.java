@@ -15,16 +15,27 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 
 /** Maintained-AS adapters over fixed SQL fields; no Java object serialization or raw credential persistence. */
 public final class DurableOAuthAuthorization implements OAuth2AuthorizationService {
-    private final AiOAuthTransactionStore store;
+    private final com.shale.data.security.ai.AiOAuthBrowserStore store;
     private final McpOAuthProperties properties;
     private final Supplier<HttpServletRequest> request;
-    public DurableOAuthAuthorization(AiOAuthTransactionStore store, McpOAuthProperties properties, Supplier<HttpServletRequest> request) {
+    public DurableOAuthAuthorization(com.shale.data.security.ai.AiOAuthBrowserStore store, McpOAuthProperties properties, Supplier<HttpServletRequest> request) {
         this.store=store; this.properties=properties; this.request=request;
     }
     public RegisteredClient findByClientId(String clientId) {
         var human=ShaleOAuthHuman.current();
         return store.loadClient(clientId).map(c->{
             if(c.tenant()!=human.tenant()) throw denied();
+            if(store.externalIdentity()) {
+                new CimdClientIdentifier(c.clientId());
+                if(!properties.issuer().equals(c.issuer()) || !properties.resource().equals(c.resource())) throw denied();
+                var builder=RegisteredClient.withId("cimd:"+c.tenant()+":"+c.integration()).clientId(c.clientId()).clientName(c.name())
+                        .clientAuthenticationMethod(cimdClientMethod(c.type()))
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                        .clientSettings(org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(true).build());
+                c.scopes().forEach(scope->builder.scope(scope.wireValue()));
+                c.redirects().forEach(builder::redirectUri);
+                return builder.build();
+            }
             var owner=new TenantBoundOAuthClientRepository.Owner(c.tenant(),c.integration());
             var registration=new com.shale.data.security.ai.AiIntegrationSecurityService.Registration(c.integration(),c.clientId(),c.scopes(),"ACTIVE",c.expiresAt(),c.version());
             var keys=c.keys().stream().map(k->new TenantBoundOAuthClientRepository.PinnedKey(owner,k.id(),k.rsa(),k.algorithm(),k.validFrom(),k.expiresAt(),null)).toList();
@@ -77,7 +88,7 @@ public final class DurableOAuthAuthorization implements OAuth2AuthorizationServi
                             "code_challenge_method","S256","code_challenge",intent.challenge())).build();
             return OAuth2Authorization.withRegisteredClient(client).id(intent.id().toString()).principalName(human.getName())
                     .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                    .attribute("consentExpiresAt",intent.createdAt().plusSeconds(3600).toString())
+                    .attribute("consentExpiresAt",intent.consentExpiresAt().toString())
                     .attribute("intentExpiresAt",intent.createdAt().plusSeconds(300).toString())
                     .attribute(Principal.class.getName(),ShaleOAuthHuman.authentication(human))
                     .attribute(OAuth2AuthorizationRequest.class.getName(),original).attribute("state",token).build();
@@ -118,5 +129,10 @@ public final class DurableOAuthAuthorization implements OAuth2AuthorizationServi
         return result;
     }
     static Set<String> wire(Set<AiScope> values) { return values.stream().map(AiScope::wireValue).collect(java.util.stream.Collectors.toUnmodifiableSet()); }
+    static org.springframework.security.oauth2.core.ClientAuthenticationMethod cimdClientMethod(String type) {
+        if("PUBLIC".equals(type))return org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE;
+        if("CONFIDENTIAL".equals(type))return org.springframework.security.oauth2.core.ClientAuthenticationMethod.PRIVATE_KEY_JWT;
+        throw denied();
+    }
     private static SecurityException denied() { return new SecurityException("OAuth binding unavailable."); }
 }

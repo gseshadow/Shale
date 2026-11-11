@@ -63,3 +63,5 @@ com.shale.data.security.ai.AiCaseDataV2MigrationContractTest
 
 com.shale.data.config.AiJdbcUrlTest
 com.shale.server.oauth.OAuthCodeBootstrapConfigurationTest
+com.shale.server.oauth.CimdBrowserBindingTest
+com.shale.server.oauth.CimdClientAuthenticationTest
