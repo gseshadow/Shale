@@ -1,0 +1,9 @@
+{
+  "remaining_fixture_databases": 0,
+  "remaining_fixture_logins": 0,
+  "owned_sql_container_removed": true,
+  "local_frontend_and_dns_stopped": true,
+  "passwords_tls_private_material_browser_and_client_caches_removed": true,
+  "raw_task_logs_removed_after_sanitized_evidence_capture": true,
+  "authoritative_attachment_retained": true
+}

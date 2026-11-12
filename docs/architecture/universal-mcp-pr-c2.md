@@ -123,3 +123,14 @@ that supported server profile explicit. RFC 7592 registration management is not
 implemented or advertised. Confidential registration accepts inline validated
 public RS256 JWKS only; remote JWKS/software statements and secret methods are
 outside this profile. Both public and confidential authorization require S256.
+
+## Verification closeout
+
+The final four authoritative C2 SQL scenarios pass, as do 126 focused security/
+compatibility tests, 19 consent-page tests and nine C1/C2 generation checks.
+Unmodified Hermes automatically registers via DCR from the MCP URL in two fresh
+profiles and completes the existing browser/approval/consent and Case tool flow.
+The same deployment also passes a fresh normal Hermes/CIMD flow and manual-client
+HTTP continuity. Actual evidence and remaining production gates are recorded in
+[C2 verification](../testing/universal-mcp-pr-c2-verification.md). Production remains
+OFF and no deployment/merge occurs.
