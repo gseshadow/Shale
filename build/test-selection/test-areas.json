@@ -396,6 +396,8 @@
         "com.shale.server.oauth.CimdBrowserBindingTest",
         "com.shale.server.oauth.CimdClientAuthenticationTest",
         "com.shale.server.oauth.DcrApplicationMetadataTest",
+        "com.shale.server.oauth.DcrRegistrationEndpointTest",
+        "com.shale.server.oauth.DcrConnectionConfigurationTest",
         "com.shale.server.mcp.McpCaseCompositionTest",
         "com.shale.server.mcp.McpProductionOffBootTest"
       ]

@@ -7,7 +7,7 @@ import com.shale.data.security.ai.AiDcrApplicationStore;
 import java.math.BigInteger;
 import java.util.*;
 
-/** Dormant C1 service. No endpoint, bean, tenant selection, CIMD document or credential issuance. */
+/** Validated DCR profile; no tenant selection, CIMD document or credential issuance. */
 public final class DcrApplicationRegistration {
     private final AiDcrApplicationStore registrar;
     public DcrApplicationRegistration(AiDcrApplicationStore registrar){this.registrar=Objects.requireNonNull(registrar);}
@@ -35,7 +35,7 @@ public final class DcrApplicationRegistration {
         return registrar.register(name,json.writeValueAsString(redirects),json.writeValueAsString(keys),confidential?2:1,AiScope.mask(scopes));
     }
     static void redirect(String value,boolean confidential) {
-        var uri=OAuthRedirectPolicy.registered(value,confidential);
+        var uri=OAuthRedirectPolicy.registeredDcr(value,confidential);
         for(String segment:uri.getPath().split("/",-1))if(segment.equals(".")||segment.equals(".."))throw invalid();
     }
     private static IllegalArgumentException invalid(){return new IllegalArgumentException("Validated DCR application metadata required.");}

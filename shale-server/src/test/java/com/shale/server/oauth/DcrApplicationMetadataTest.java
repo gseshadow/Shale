@@ -48,7 +48,7 @@ class DcrApplicationMetadataTest {
         var service=new DcrApplicationRegistration(new AiDcrApplicationStore(()->{fail("Invalid metadata must fail before SQL");return null;},PROPERTIES.issuer(),PROPERTIES.resource()));
         for(String method:Arrays.asList(null,"client_secret_basic","client_secret_post","private_key_jwt"))
             assertThrows(IllegalArgumentException.class,()->service.register("App",List.of("https://client.test/callback"),AiScope.fromMask(3),method,List.of()));
-        for(String uri:List.of("http://private.test/callback","https://client.test/callback?tenant=7","https://client.test/callback#fragment","https://client.test/../callback","http://localhost:8085/callback"))
+        for(String uri:List.of("http://private.test/callback","https://client.test/callback?tenant=7","https://client.test/callback#fragment","https://client.test/../callback"))
             assertThrows(IllegalArgumentException.class,()->service.register("App",List.of(uri),AiScope.fromMask(3),"none",List.of()),uri);
         assertThrows(IllegalArgumentException.class,()->service.register("App",List.of("https://client.test/callback"),Set.of(),"none",List.of()));
     }

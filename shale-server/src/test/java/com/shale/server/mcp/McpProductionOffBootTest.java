@@ -104,6 +104,8 @@ class McpProductionOffBootTest {
             assertInstanceOf(BearerTokenServerSessionResolver.class,context.getBean(ServerSessionResolver.class));
             assertInstanceOf(SqlDurableSessionStore.class,context.getBean(DurableSessionStore.class));
             assertInstanceOf(SqlRememberCredentialStore.class,context.getBean(RememberCredentialStore.class));
+            assertTrue(context.getBeansOfType(com.shale.server.oauth.DcrCapabilities.class).isEmpty());
+            assertFalse(context.containsBean("dcrVerifiedDevelopmentComposition"));
             assertTrue(context.getBeansOfType(McpAiCaseData.class).isEmpty());
             assertTrue(context.getBeansOfType(McpSearchHandler.class).isEmpty());
             assertTrue(context.getBeansOfType(McpOverviewHandler.class).isEmpty());
@@ -120,7 +122,7 @@ class McpProductionOffBootTest {
                     var response=client.send(HttpRequest.newBuilder(URI.create(origin+path)).timeout(Duration.ofSeconds(5)).GET().build(),HttpResponse.BodyHandlers.ofString());
                     assertEquals(401,response.statusCode(),"Ordinary route must retain its authentication boundary: "+path);
                 }
-                for(String path:List.of("/mcp","/oauth/mcp/token","/oauth/mcp/authorize")) {
+                for(String path:List.of("/mcp","/oauth/mcp/token","/oauth/mcp/authorize","/oauth/mcp/register")) {
                     var response=client.send(HttpRequest.newBuilder(URI.create(origin+path)).timeout(Duration.ofSeconds(5)).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
                     assertEquals(404,response.statusCode(),"Protocol must remain disabled: "+path);
                     assertFalse(response.body().contains("access_token"));

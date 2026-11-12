@@ -32,6 +32,16 @@ class AiDcrApplicationStoreTest {
         assertEquals("DcrRegistration[redacted]",registration.toString());
         for(var field:registration.getClass().getRecordComponents())assertFalse(field.getName().matches("(?i).*(tenant|grant|consent|credential|token).*"));
     }
+    @Test void c2RegistrationAndAdmissionDelegateToExplicitCapabilities() {
+        var jdbc=new Jdbc();var store=new AiDcrApplicationStore(jdbc,ISSUER,RESOURCE,AiExternalContract.DCR_V3);
+        store.register("Synthetic DCR","[\"https://client.test/callback\"]","[]",1,3);
+        assertEquals("{call dbo.AiDcrRegisterApplicationV3(?,?,?,?,?,?,?,?)}",jdbc.procedure);
+        jdbc.values.put("Allowed",true);jdbc.values.put("RetryAfter",23);jdbc.values.put("Enabled",true);
+        var admission=new AiDcrAdmissionStore(jdbc);assertTrue(admission.admit(new byte[32]).allowed());
+        assertEquals("{call dbo.AiDcrAdmissionV3(?,?)}",jdbc.procedure);assertEquals(2,jdbc.bindings.size());
+        assertTrue(admission.enabled());assertEquals("{call dbo.AiDcrStatusV3()}",jdbc.procedure);
+        assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(jdbc.source(),jdbc.source(),List.of(),"synthetic",ISSUER,RESOURCE,false,AiCaseDataAttestation.Contract.V2,AiExternalContract.EXTERNAL_V2).requireRegistryContract(AiExternalContract.DCR_V3));
+    }
     @Test void v2LookupAndAdministrativeMutationUseOnlyExplicitVersionedOperations() {
         var jdbc=new Jdbc();var store=new AiDcrApplicationStore(jdbc,ISSUER,RESOURCE);
         assertEquals(ID,store.prepare(new DcrClientIdentifier(ID)).identifier().value());

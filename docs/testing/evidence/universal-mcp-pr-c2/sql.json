@@ -1,0 +1,45 @@
+{
+  "fixture_sha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f",
+  "sql_server_version": "16.0.4315.2",
+  "edition": "Developer Edition (64-bit)",
+  "image_digest": "sha256:11927f5edc5122658e90b3a80ee36e8aef779310bf771415c1d89271859c73fd",
+  "tls": {
+    "encrypt": true,
+    "trustServerCertificate": false
+  },
+  "fresh_dcr_registry_asserted": true,
+  "dcr_phase": {
+    "database": "<disposable-nonce>",
+    "dcr_applications": 3,
+    "dcr_creation_audits": 3,
+    "cimd_applications": 0,
+    "cimd_families": 2,
+    "returned_resources": 7,
+    "cimd_handoffs": 6,
+    "matched_disclosures": 6,
+    "overview_handoffs": 4,
+    "phi_overviews": 5,
+    "released_quota": 8
+  },
+  "after_cimd_regression": {
+    "database": "<disposable-nonce>",
+    "dcr_applications": 3,
+    "dcr_creation_audits": 3,
+    "cimd_applications": 1,
+    "cimd_families": 3,
+    "returned_resources": 9,
+    "cimd_handoffs": 8,
+    "matched_disclosures": 8,
+    "overview_handoffs": 5,
+    "phi_overviews": 6,
+    "released_quota": 10
+  },
+  "historical_receipt_and_binding_equality_on_close": true,
+  "cleanup_after_live_deployment": {
+    "remaining_fixture_databases": 0,
+    "remaining_fixture_logins": 0
+  },
+  "successor_source_hash": "086cf01d99097a2a5a43d9e5a77fdf5a28443916c1795559e55aa2d8e97f0a13",
+  "installer_sha256": "d4db3343578aa68511f35ae0b2bfda7fb9bd8c50fb453fe6e9a843d510fbf2ed",
+  "direct_cimd_egress": "Not accepted; declared fresh-DNS/numeric-proxy test connector reused from PR B"
+}
