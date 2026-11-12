@@ -104,3 +104,41 @@ Cleanup passed: all task nonce databases/logins were absent after normal fixture
 historical receipt/binding assertions completed successfully. The disposable SQL container,
 listeners, TLS keys/certificates, passwords and client/browser credential caches were removed.
 The attached fixture's SHA-256 was reverified unchanged. No existing PR was merged or closed.
+
+## Final repository checks
+
+Selector base: `a81f0ecfc72c76303a8300f3ea24e0068159eb90`; areas: cases, security-data,
+server; modules: core/data/server. Its affected suite passed **265 tests** (2/137/126),
+zero failures/errors/skips, plus **5 deployment-binding tests**. The selector's full-suite
+suggestion is informational and comes from new development-harness paths; no broad SQL
+campaign or unrelated JavaFX suite was run. The relevant critical reactor passed 225 tests.
+
+Commands used (Maven shorthand below means the task-local Maven 3.9.11 binary,
+`-s work/maven-settings.xml -B -Dmaven.repo.local=/workspace/Shale/work/m2`, with the
+JDK 21 `JAVA_HOME` and `/etc/ssl/certs/java/cacerts` JVM trust):
+
+```text
+mvn -pl shale-server -am -Dtest=*OAuth*Test,Cimd*Test,Mcp*Test -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-server -am -Dtest=OAuthBrowserFilterTest,McpTransportTest -Dsurefire.failIfNoSpecifiedTests=false test
+python build/test-selection/select_tests.py --base a81f0ecfc72c76303a8300f3ea24e0068159eb90 --head HEAD --format json --output work/pr-b-selection.json --plan-output work/pr-b-selection-plan.json
+# Execute selected_maven_args from that plan, with the same Maven prefix.
+python -m unittest discover -s build/deployment-binding -p test_packet.py
+mvn -pl shale-server -am test
+npm run typecheck
+npm test -- OAuthConsent
+VITE_SHALE_API_BASE_URL=https://shale.test npm run build
+git diff --check
+```
+
+The six real SQL methods selected explicitly were:
+
+- `AiCimdAuthorizationLocalSqlServerTest#revocationAfterReadWithholdsDisclosureAndPreservesOtherTenant`
+- `AiCimdAuthorizationLocalSqlServerTest#admissionRejectsAdditiveDriftWithoutChangingHistoricalVerification`
+- `AiCimdOAuthLocalSqlServerTest#lifecycleTwoTenantIssuanceRotationAndLegacyExclusion`
+- `AiCimdOAuthLocalSqlServerTest#lifecycleRefreshReplayCommitsWholeFamilyRevocation`
+- `AiCimdOAuthLocalSqlServerTest#lifecycleChangedPublicationBlocksPendingCodeExchangeAndRefresh`
+- `AiCimdOAuthLocalSqlServerTest#lifecycleAuditFailureRollsBackExchangeRotationReplayAndRevocation`
+
+Only the new onboarding SQL candidate is added. Every previously tracked SQL script and
+packaged SQL resource is byte-for-byte unchanged from #1955. Audit integration uses the
+existing SQL schema and transaction owners; no new audit schema or receipt refresh is introduced.
