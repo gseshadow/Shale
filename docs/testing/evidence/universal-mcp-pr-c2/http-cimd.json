@@ -1,0 +1,231 @@
+[
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 401,
+    "ms": 3,
+    "phase": "final-cimd",
+    "rpc_method": "initialize",
+    "header_method": null,
+    "header_protocol": "2025-11-25",
+    "body_protocol": null,
+    "header_name": null
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-protected-resource/mcp",
+    "status": 200,
+    "ms": 2,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server/oauth/mcp",
+    "status": 200,
+    "ms": 15,
+    "phase": "final-cimd",
+    "metadata": {
+      "authorization_endpoint": "https://shale.test/oauth/mcp/authorize",
+      "revocation_endpoint_auth_signing_alg_values_supported": [
+        "RS256"
+      ],
+      "code_challenge_methods_supported": [
+        "S256"
+      ],
+      "response_types_supported": [
+        "code"
+      ],
+      "grant_types_supported": [
+        "authorization_code",
+        "refresh_token"
+      ],
+      "revocation_endpoint": "https://shale.test/oauth/mcp/revoke",
+      "revocation_endpoint_auth_methods_supported": [
+        "none",
+        "private_key_jwt"
+      ],
+      "client_id_metadata_document_supported": true,
+      "registration_endpoint": "https://shale.test/oauth/mcp/register",
+      "token_endpoint_auth_methods_supported": [
+        "none",
+        "private_key_jwt"
+      ],
+      "authorization_response_iss_parameter_supported": true,
+      "issuer": "https://shale.test/oauth/mcp",
+      "token_endpoint_auth_signing_alg_values_supported": [
+        "RS256"
+      ],
+      "scopes_supported": [
+        "cases.search",
+        "cases.overview.read"
+      ],
+      "token_endpoint": "https://shale.test/oauth/mcp/token"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/mcp/authorize",
+    "status": 302,
+    "ms": 7,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "status": 200,
+    "ms": 101,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/me",
+    "status": 200,
+    "ms": 62,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/onboarding",
+    "status": 200,
+    "ms": 402,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/approval",
+    "status": 200,
+    "ms": 79,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/onboarding",
+    "status": 200,
+    "ms": 76,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/mcp/authorize",
+    "status": 200,
+    "ms": 194,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/mcp/consent",
+    "status": 200,
+    "ms": 170,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/authorize",
+    "status": 200,
+    "ms": 229,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/token",
+    "status": 200,
+    "ms": 77,
+    "phase": "final-cimd"
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 404,
+    "ms": 6602,
+    "phase": "final-cimd",
+    "rpc_method": "initialize",
+    "header_method": null,
+    "header_protocol": "2025-11-25",
+    "body_protocol": null,
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 6461,
+    "phase": "final-cimd",
+    "rpc_method": "server/discover",
+    "header_method": "server/discover",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 6482,
+    "phase": "final-cimd",
+    "rpc_method": "tools/list",
+    "header_method": "tools/list",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 404,
+    "ms": 6210,
+    "phase": "final-cimd",
+    "rpc_method": "initialize",
+    "header_method": null,
+    "header_protocol": "2025-11-25",
+    "body_protocol": null,
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 5798,
+    "phase": "final-cimd",
+    "rpc_method": "server/discover",
+    "header_method": "server/discover",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 6150,
+    "phase": "final-cimd",
+    "rpc_method": "tools/list",
+    "header_method": "tools/list",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 6246,
+    "phase": "final-cimd",
+    "rpc_method": "tools/call",
+    "header_method": "tools/call",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": "search_cases"
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 6604,
+    "phase": "final-cimd",
+    "rpc_method": "tools/call",
+    "header_method": "tools/call",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": "get_case_overview"
+  }
+]

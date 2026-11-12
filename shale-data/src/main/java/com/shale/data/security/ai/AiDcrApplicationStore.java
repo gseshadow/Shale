@@ -10,10 +10,17 @@ import java.util.*;
 public final class AiDcrApplicationStore {
     private final DbSessionProvider db;
     private final String issuer, resource;
+    private final AiExternalContract contract;
     public AiDcrApplicationStore(DbSessionProvider db, String issuer, String resource) {
+        this(db,issuer,resource,AiExternalContract.EXTERNAL_V2);
+    }
+    public AiDcrApplicationStore(DbSessionProvider db,String issuer,String resource,AiExternalContract contract) {
+        if(contract==AiExternalContract.CIMD_V1)throw new IllegalArgumentException("DCR contract required.");
+        this.contract=Objects.requireNonNull(contract);
         this.db = Objects.requireNonNull(db); this.issuer = issuer; this.resource = resource;
         AiIntegrationSecurityService.configuredHttps(issuer); AiIntegrationSecurityService.configuredHttps(resource);
     }
+    public AiExternalContract contract(){return contract;}
     public record Registration(DcrClientIdentifier identifier, Instant issuedAt, AiApplicationRegistryService.Application application) {
         @Override public String toString() { return "DcrRegistration[redacted]"; }
     }
@@ -27,7 +34,7 @@ public final class AiDcrApplicationStore {
         if (name == null || name.isBlank() || name.length() > 200 || validatedRedirects == null || validatedRedirects.length() > 16384 ||
                 validatedPublicKeys == null || validatedPublicKeys.length() > 8192 || (methods != 1 && methods != 2) || scopes < 1 || scopes > 3)
             throw new IllegalArgumentException("Bounded validated DCR metadata required.");
-        return AiSql.one(AiSql.call(db, "AiDcrRegisterApplicationV2", r -> new Registration(
+        return AiSql.one(AiSql.call(db, contract==AiExternalContract.DCR_V3?"AiDcrRegisterApplicationV3":"AiDcrRegisterApplicationV2", r -> new Registration(
                 new DcrClientIdentifier(r.getString("ClientId")), AiSql.instant(r, "IssuedAt"), application(r)),
                 issuer, resource, name, validatedRedirects, validatedPublicKeys, methods, scopes, UUID.randomUUID()));
     }

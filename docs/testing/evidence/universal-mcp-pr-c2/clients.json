@@ -1,0 +1,51 @@
+{
+  "endpoint": "https://shale.test/mcp",
+  "primary": {
+    "name": "NousResearch Hermes Agent",
+    "commit": "74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5",
+    "reported_version": "git.74dde23",
+    "source_modified": false,
+    "python": "3.14.7",
+    "mcp_sdk": "2.3.0",
+    "registration": "DCR",
+    "fresh_profiles": 2,
+    "command": "hermes mcp add shale --url https://shale.test/mcp --auth oauth --connect-timeout 300",
+    "supplied_client_id": false,
+    "supplied_metadata_url": false,
+    "supplied_scopes": false,
+    "supplied_protocol_option": false,
+    "server_advertisement": "DCR-only: CIMD metadata advertisement disabled by operator; CIMD lifecycle remains available",
+    "outcome": "Automatic registration, existing login, administrator approval, separate consent, tokens, modern discovery and both Case tools in each tenant"
+  },
+  "cimd_regression": {
+    "name": "Hermes Agent",
+    "commit": "74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5",
+    "fresh_profile": true,
+    "registration": "CIMD",
+    "client_id": "https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json",
+    "server_advertisement": "Normal CIMD plus DCR metadata",
+    "supplied_client_id": false,
+    "outcome": "Existing login, separate approval/consent and both Case tools"
+  },
+  "additional_client": {
+    "name": "mcp-remote",
+    "version": "0.16.6",
+    "npm_integrity": "sha512-QqlBqut/oeDUFwrB/Igs5vGikWSn6h5iM+7TCmiTGJAIuS3OJjzThWGjKLLtAz+NnLozvs2c2wGDkAXpzHepqw==",
+    "source_modified": false,
+    "url_only_default": "Discovery, automatic DCR, browser approval/consent and tokens succeeded; default legacy MCP transport failed",
+    "documented_auto_mode": "Unmodified --protocol auto completed both Case tools; supplemental, not URL-only evidence"
+  },
+  "additional_inspection": {
+    "name": "MCP Inspector",
+    "npm_release": "2.15.0",
+    "package_reported_version": "2.13.0",
+    "scope": "Source inspection only; ad-hoc default protocol is legacy, so not counted as runtime acceptance"
+  },
+  "browser": {
+    "engine": "Firefox",
+    "playwright": "1.62.0",
+    "tls_verification": true,
+    "headless_opener": "Test harness opens the stock CLI printed URL; no OAuth implementation or client source changes"
+  },
+  "production_contacted": false
+}

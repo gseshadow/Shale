@@ -34,7 +34,7 @@ public final class AiCimdCaseData implements AutoCloseable {
         this.issuer=issuer; this.resource=resource;
         AiIntegrationSecurityService.configuredHttps(issuer);
         AiIntegrationSecurityService.configuredHttps(resource);
-        try(var stream=getClass().getResourceAsStream(contract==AiExternalContract.CIMD_V1?"/ai/cimd-authorization-v1-catalog.sql":"/ai/external-authorization-v2-catalog.sql")) {
+        try(var stream=getClass().getResourceAsStream(contract.authorizationResource())) {
             if(stream==null)throw unavailable();
             verification=new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         } catch(Exception failure) { throw unavailable(); }

@@ -118,3 +118,27 @@ it.each([{tenant:8},{user:81},{client_id:'https://evil.public.org/client.json'},
   await screen.findByRole('alert');expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(screen.queryByRole('button',{name:'Approve tenant application'})).toBeNull();
 });
+
+it('DCR uses the existing administrator approval, then a separate explicit consent and exact localhost callback', async () => {
+  const client = 'dcr.' + 'a'.repeat(64), redirect = 'http://localhost:3334/oauth/callback';
+  const request = new URLSearchParams({client_id: client, redirect_uri: redirect, state: 'exact', scope: 'cases.search cases.overview.read'}).toString();
+  const state = {...pending(true), client_id: client};
+  fetchMock.mockResolvedValueOnce(response(state));
+  const complete = vi.fn();
+  render(<OAuthConsent token="web-token" user={user} request={request} onComplete={complete}/>);
+  const approval = await screen.findByRole('button', {name: 'Approve tenant application'});
+  expect(screen.queryByRole('button', {name: 'Approve access'})).toBeNull();
+  fetchMock.mockResolvedValueOnce(response({...state, state: 'APPROVED'}))
+    .mockResolvedValueOnce(response({...state, state: 'APPROVED'}))
+    .mockResolvedValueOnce(response({redirect: `${apiBaseUrl()}/oauth/mcp/consent?client_id=${client}&state=server-nonce`}))
+    .mockResolvedValueOnce(response({...details(), client_id: client}));
+  fireEvent.click(approval);
+  await screen.findByRole('button', {name: 'Approve access'});
+  expect(complete).not.toHaveBeenCalled();
+  const target = redirect + '?code=synthetic-code&state=exact';
+  fetchMock.mockResolvedValueOnce(response({redirect: target}));
+  fireEvent.click(screen.getByRole('button', {name: 'Approve access'}));
+  await waitFor(() => expect(complete).toHaveBeenCalledWith(target));
+  expect(() => callbackTarget(target, redirect, 'exact')).toThrow();
+  expect(() => callbackTarget(target.replace(':3334', ':3335'), redirect, 'exact', client)).toThrow();
+});
