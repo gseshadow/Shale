@@ -10,14 +10,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /** Browser transport only. Human authority still comes exclusively from the durable WEB bearer. */
 final class OAuthBrowserFilter extends OncePerRequestFilter {
     private final String webOrigin;
+    private final boolean cimd;
     OAuthBrowserFilter(String webOrigin, McpOAuthProperties properties) {
+        this(webOrigin,properties,false);
+    }
+    OAuthBrowserFilter(String webOrigin,McpOAuthProperties properties,boolean cimd) {
+        this.cimd=cimd;
         // Reuse canonical HTTPS origin and production/test separation rules. Never use Host/Forwarded.
         this.webOrigin = webOrigin == null ? null : new McpOAuthProperties(webOrigin, properties.identity(), false).publicOrigin();
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        if (!path.equals("/oauth/mcp/authorize") && !path.equals("/oauth/mcp/consent")) {
+        if (!path.equals("/oauth/mcp/authorize") && !path.equals("/oauth/mcp/consent") &&
+                !(cimd&&(path.equals("/oauth/mcp/onboarding")||path.equals("/oauth/mcp/approval")))) {
             chain.doFilter(request, response); return;
         }
         response.setHeader("Cache-Control", "no-store");

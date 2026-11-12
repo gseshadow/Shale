@@ -94,6 +94,16 @@ final class McpGate extends OncePerRequestFilter {
                         rpc.method().isEmpty() || rpc.method().length()>128) {
                     rpc(response,400,null,-32600,"Invalid request");return;
                 }
+                // Let an unmodified auto-negotiating client discover this modern-only server.
+                // Reject a valid legacy handshake; never dispatch it or relax modern tool headers.
+                if(rpc.method().equals("initialize") && request.getHeader("Mcp-Method")==null &&
+                        rpc.params() instanceof Map<?,?> parameters &&
+                        parameters.get("protocolVersion") instanceof String version &&
+                        Set.of("2025-03-26","2025-06-18","2025-11-25").contains(version) &&
+                        (request.getHeader("MCP-Protocol-Version")==null || version.equals(request.getHeader("MCP-Protocol-Version"))) &&
+                        parameters.get("capabilities") instanceof Map<?,?> && parameters.get("clientInfo") instanceof Map<?,?>) {
+                    rpc(response,404,rpc.id(),-32601,"Method not found");return;
+                }
             } else if (!(message instanceof JsonRpc.JSONRPCNotification notification) ||
                     !notification.method().equals("notifications/cancelled") ||
                     !notification.method().equals(request.getHeader("Mcp-Method")) ||

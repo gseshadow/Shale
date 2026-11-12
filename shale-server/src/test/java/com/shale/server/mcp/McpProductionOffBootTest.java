@@ -42,6 +42,31 @@ class McpProductionOffBootTest {
         previous.forEach((key,value)->{if(value==null)System.clearProperty(key);else System.setProperty(key,value);});
     }
 
+    @Test void embeddedServletRegistrationReachesExistingChallengeAndLeavesApiUnchanged()throws Exception {
+        try(var context=new SpringApplicationBuilder(ShaleServerApplication.class).profiles("dev").run(
+                "--server.port=0","--server.address=127.0.0.1","--shale.ai.oauth.identity=TEST",
+                "--shale.ai.oauth.public-origin=https://shale.test","--shale.ai.enabled=true","--shale.ai.mcp.enabled=true",
+                "--shale.ai.cimd.enabled=false","--shale.ai.mcp.case-data-composition-enabled=false",
+                "--shale.ai.mcp.search-cases-enabled=false","--shale.ai.mcp.get-case-overview-enabled=false",
+                "--shale.ai.oauth.composition-enabled=false","--shale.ai.oauth.authorization-enabled=false",
+                "--shale.ai.oauth.exchange-enabled=false","--shale.ai.oauth.bootstrap.jdbc-url=jdbc:sqlserver://127.0.0.1:9;databaseName=Unused",
+                "--shale.ai.oauth.bootstrap.username=synthetic","--shale.ai.oauth.bootstrap.password=synthetic")) {
+            int port=((WebServerApplicationContext)context).getWebServer().getPort();
+            try(var client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
+                String origin="http://127.0.0.1:"+port;
+                var denied=client.send(HttpRequest.newBuilder(URI.create(origin+"/mcp")).timeout(Duration.ofSeconds(5))
+                        .header("Content-Type","application/json").header("Accept","application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString("{}")).build(),HttpResponse.BodyHandlers.ofString());
+                assertEquals(401,denied.statusCode(),"Actual REQUEST/ASYNC dispatch must reach the existing security gate, not an unguarded SDK servlet");
+                assertEquals("Bearer resource_metadata=\"https://shale.test/.well-known/oauth-protected-resource/mcp\"",denied.headers().firstValue("WWW-Authenticate").orElseThrow());
+                var prm=client.send(HttpRequest.newBuilder(URI.create(origin+"/.well-known/oauth-protected-resource/mcp")).GET().build(),HttpResponse.BodyHandlers.ofString());
+                assertEquals(200,prm.statusCode());assertTrue(prm.body().contains("cases.overview.read"));
+                var health=client.send(HttpRequest.newBuilder(URI.create(origin+"/api/health")).GET().build(),HttpResponse.BodyHandlers.ofString());
+                assertEquals(200,health.statusCode(),"Namespace registration must leave ordinary Shale authentication intact");
+            }
+        }
+    }
+
     @ParameterizedTest @ValueSource(strings={"azure","prod"})
     void fullProductionBootStartsWithoutAiConfigurationAndKeepsProtocolClosed(String profile, org.springframework.boot.test.system.CapturedOutput output)throws Exception {
         var before = java.time.ZoneId.systemDefault();

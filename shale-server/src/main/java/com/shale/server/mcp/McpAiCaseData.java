@@ -30,9 +30,12 @@ final class McpAiCaseData {
         ready(System.nanoTime()+10_000_000_000L);
     }
     void ready(long deadline) {
-        new AiCaseDataAttestation(new McpJdbcDeadline(data,deadline),new McpJdbcDeadline(verifier,deadline),
+        attestation(deadline).verify();
+    }
+    AiCaseDataAttestation attestation(long deadline) {
+        return new AiCaseDataAttestation(new McpJdbcDeadline(data,deadline),new McpJdbcDeadline(verifier,deadline),
                 forbidden.stream().map(d->(DataSource)new McpJdbcDeadline(d,deadline)).toList(),database,identity.issuer(),identity.resource(),
-                identity.identity()==McpOAuthProperties.Identity.PRODUCTION,contract).verify();
+                identity.identity()==McpOAuthProperties.Identity.PRODUCTION,contract);
     }
     AiCaseDataRequest authenticate(String token,long deadline) {
         ready(deadline);

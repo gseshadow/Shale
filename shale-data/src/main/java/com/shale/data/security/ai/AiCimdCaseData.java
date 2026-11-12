@@ -83,6 +83,9 @@ public final class AiCimdCaseData implements AutoCloseable {
         if(request.namespace()!=AiCaseDataAccess.Namespace.CIMD_V1)throw unavailable();
         return new AiCaseDataAccess(data.apply(deadline),data,request);
     }
+    public boolean accepts(AiCaseDataRequest request) {
+        return request!=null&&request.namespace()==AiCaseDataAccess.Namespace.CIMD_V1;
+    }
 
     private void identity(Connection c,String role,long deadline)throws SQLException {
         c.setNetworkTimeout(Runnable::run,millis(deadline));

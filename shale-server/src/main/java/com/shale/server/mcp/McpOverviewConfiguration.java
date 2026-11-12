@@ -7,9 +7,14 @@ import org.springframework.context.annotation.*;
 @Configuration(proxyBeanMethods=false)
 @ConditionalOnProperty(name={"shale.ai.mcp.enabled","shale.ai.enabled","shale.ai.mcp.get-case-overview-enabled"},havingValue="true")
 public class McpOverviewConfiguration {
-    @Bean McpOverviewHandler mcpOverviewHandler(McpCaseCompositionPolicy policy,McpAiCaseData data) {
+    McpOverviewHandler mcpOverviewHandler(McpCaseCompositionPolicy policy,McpAiCaseData data) {
+        return mcpOverviewHandler(policy,data,null);
+    }
+    @Bean McpOverviewHandler mcpOverviewHandler(McpCaseCompositionPolicy policy,McpAiCaseData data,
+            org.springframework.beans.factory.ObjectProvider<com.shale.data.security.ai.AiCimdCaseData> cimd) {
         policy.requireHandler("shale.ai.mcp.get-case-overview-enabled");
         data.ready(System.nanoTime()+10_000_000_000L);
-        return new McpOverviewHandler(data::reader);
+        var external=cimd==null?null:cimd.getIfAvailable();
+        return new McpOverviewHandler((deadline,request)->external!=null&&external.accepts(request)?external.reader(request,deadline):data.reader(deadline,request));
     }
 }

@@ -29,10 +29,25 @@ import java.util.Map;
 /** The only Spring security chain. Unmatched Shale routes retain their controller/service authority. */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@org.springframework.context.annotation.Import(OAuthCodeBootstrapConfiguration.class)
+@org.springframework.context.annotation.Import({OAuthCodeBootstrapConfiguration.class,CimdConnectionConfiguration.class})
 @EnableConfigurationProperties(McpOAuthProperties.class)
 public class McpOAuthSecurityConfiguration {
     private Map<Control, Value> startupControls = Map.of();
+
+    /** Boot's security servlet auto-configuration is not a dependency of this composition.
+     * Delegate lazily to the existing chains, only for their owned namespaces, on both dispatches. */
+    @Bean
+    org.springframework.boot.web.servlet.FilterRegistrationBean<org.springframework.web.filter.DelegatingFilterProxy> mcpOAuthServletSecurity() {
+        var registration=new org.springframework.boot.web.servlet.FilterRegistrationBean<>(
+                new org.springframework.web.filter.DelegatingFilterProxy("springSecurityFilterChain"));
+        registration.setName("mcpOAuthServletSecurity");
+        registration.addUrlPatterns("/mcp","/.well-known/oauth-protected-resource/*","/oauth/mcp","/oauth/mcp/*",
+                "/.well-known/oauth-authorization-server","/.well-known/oauth-authorization-server/*");
+        registration.setDispatcherTypes(jakarta.servlet.DispatcherType.REQUEST,jakarta.servlet.DispatcherType.ASYNC);
+        registration.setAsyncSupported(true);
+        registration.setOrder(-100);
+        return registration;
+    }
 
     /** Values passed to the constructed security gate, never credentials or OAuth origin. */
     public Map<Control, Value> startupControls() { return startupControls; }
@@ -44,11 +59,18 @@ public class McpOAuthSecurityConfiguration {
             org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.DurableSessionStore> sessions,
             org.springframework.beans.factory.ObjectProvider<com.shale.server.runtime.RuntimeConnectionProvider> connections,
             @org.springframework.beans.factory.annotation.Qualifier("oauthCodeBootstrap") org.springframework.beans.factory.ObjectProvider<com.shale.core.runtime.DbSessionProvider> bootstrap,
-            org.springframework.beans.factory.ObjectProvider<HttpServletRequest> currentRequest) throws Exception {
+            org.springframework.beans.factory.ObjectProvider<HttpServletRequest> currentRequest,
+            org.springframework.beans.factory.ObjectProvider<CimdOAuthLifecycle> cimdLifecycle,
+            org.springframework.beans.factory.ObjectProvider<CimdServices> cimdServices,
+            org.springframework.beans.factory.ObjectProvider<CimdApplicationAccess> cimdApplications,
+            org.springframework.beans.factory.ObjectProvider<com.shale.data.security.ai.AiCimdCaseData> cimdCase) throws Exception {
         boolean authorizationEnabled=environment.getProperty("shale.ai.oauth.authorization-enabled",Boolean.class,false);
         if(authorizationEnabled && !properties.compositionEnabled()) throw new IllegalArgumentException("OAuth composition required.");
         boolean exchangeEnabled=environment.getProperty("shale.ai.oauth.exchange-enabled",Boolean.class,false);
         if(exchangeEnabled && !properties.compositionEnabled()) throw new IllegalArgumentException("OAuth composition required.");
+        boolean cimd=environment.getProperty("shale.ai.cimd.enabled",Boolean.class,false);
+        if(cimd)cimdCase.getObject(); // Verify the actual Case composition before advertising CIMD.
+        var external=cimd?new CimdOAuthProviders(cimdLifecycle.getObject(),currentRequest::getObject):null;
         var exchange=exchangeEnabled ? new OAuthCodeExchange(bootstrap.getObject(),connections.getObject(),properties,currentRequest::getObject) : null;
         var revocation=exchangeEnabled ? new OAuthRevocation(bootstrap.getObject(),connections.getObject(),properties,currentRequest::getObject) : null;
         DurableOAuthAuthorization durable;
@@ -60,7 +82,9 @@ public class McpOAuthSecurityConfiguration {
                 try { return connections.getObject().openConnection(new com.shale.server.runtime.ServerPrincipal(human.user(),human.tenant(),null)); }
                 catch(java.sql.SQLException unavailable) { throw new IllegalStateException("OAuth runtime connection unavailable."); }
             },true,properties.issuer(),properties.resource());
-            durable=new DurableOAuthAuthorization(store,properties,currentRequest::getObject);
+            com.shale.data.security.ai.AiOAuthBrowserStore browser=cimd?
+                    new CimdBrowserRouting(store,cimdServices.getObject(),cimdLifecycle.getObject(),currentRequest::getObject):store;
+            durable=new DurableOAuthAuthorization(browser,properties,currentRequest::getObject);
         } else { durable=null; humans=null; }
         if (properties.identity() != McpOAuthProperties.Identity.PRODUCTION &&
                 !environment.acceptsProfiles(Profiles.of("local", "dev", "test")))
@@ -86,6 +110,7 @@ public class McpOAuthSecurityConfiguration {
                 .authorizeHttpRequests(authorize -> {
                     if(exchangeEnabled) authorize.requestMatchers("/oauth/mcp/token","/oauth/mcp/revoke").authenticated();
                     if(authorizationEnabled) authorize.requestMatchers("/oauth/mcp/authorize").authenticated();
+                    if(cimd)authorize.requestMatchers("/oauth/mcp/onboarding","/oauth/mcp/approval").authenticated();
                     authorize.anyRequest().denyAll();
                 });
 
@@ -108,9 +133,9 @@ public class McpOAuthSecurityConfiguration {
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2AuthorizationCodeAuthenticationConverter());
                                 converters.add(new org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2RefreshTokenAuthenticationConverter());
                             })
-                            .authenticationProviders(providers -> { providers.clear(); if(exchange!=null) providers.add(exchange.codes()); }))
+                            .authenticationProviders(providers -> { providers.clear(); if(external!=null)providers.add(external.grants());if(exchange!=null) providers.add(exchange.codes()); }))
                     .tokenRevocationEndpoint(endpoint -> endpoint
-                            .authenticationProviders(providers -> {providers.clear();if(revocation!=null)providers.add(revocation.credentials());})
+                            .authenticationProviders(providers -> {providers.clear();if(external!=null)providers.add(external.revocations());if(revocation!=null)providers.add(revocation.credentials());})
                             .errorResponseHandler((req,res,failure)-> {
                                 var error=((org.springframework.security.oauth2.core.OAuth2AuthenticationException)failure).getError().getErrorCode();
                                 res.setStatus(error.equals("server_error")?500:error.equals("invalid_client")?401:400);
@@ -127,10 +152,11 @@ public class McpOAuthSecurityConfiguration {
                             })
                             .authenticationProviders(providers -> {
                                 providers.clear();
+                                if(external!=null)providers.add(external.clients());
                                 if(revocation!=null) providers.add(revocation.clients());
                                 if(exchange!=null) providers.add(exchange.clients());
                             }))
-                    .authorizationEndpoint(endpoint -> endpoint.consentPage("/oauth/mcp/consent")
+                    .authorizationEndpoint(endpoint -> endpoint.consentPage(properties.issuer()+"/consent")
                             .authorizationResponseHandler((req,res,authentication)-> {
                                 var result=(org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken)authentication;
                                 String target=org.springframework.web.util.UriComponentsBuilder.fromUriString(result.getRedirectUri())
@@ -166,9 +192,9 @@ public class McpOAuthSecurityConfiguration {
                     }))));
         }
         // The gate precedes AS processing. Explicit exchange enables opaque code/refresh issuance and authenticated family revocation.
-        if(durable!=null) http.addFilterBefore(new OAuthBrowserFilter(environment.getProperty("shale.ai.oauth.browser-origin"),properties), SecurityContextHolderFilter.class);
-        http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled), SecurityContextHolderFilter.class);
-        if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable),SecurityContextHolderFilter.class);
+        if(durable!=null) http.addFilterBefore(new OAuthBrowserFilter(environment.getProperty("shale.ai.oauth.browser-origin"),properties,cimd), SecurityContextHolderFilter.class);
+        http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled,cimd), SecurityContextHolderFilter.class);
+        if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable,cimd?cimdApplications.getObject():null),SecurityContextHolderFilter.class);
         var chain = http.build();
         startupControls = Map.of(Control.OAUTH_COMPOSITION, Value.of(properties.compositionEnabled()),
                 Control.OAUTH_AUTHORIZATION, Value.of(authorizationEnabled),
@@ -178,29 +204,29 @@ public class McpOAuthSecurityConfiguration {
 
     private static final class FoundationGate extends OncePerRequestFilter {
         private final McpOAuthProperties properties;
-        private final boolean authorizationEnabled,exchangeEnabled;
+        private final boolean authorizationEnabled,exchangeEnabled,cimd;
         private final org.springframework.http.converter.json.JacksonJsonHttpMessageConverter metadata =
                 new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter();
-        private FoundationGate(McpOAuthProperties properties,boolean authorizationEnabled,boolean exchangeEnabled) { this.properties=properties; this.authorizationEnabled=authorizationEnabled; this.exchangeEnabled=exchangeEnabled; }
+        private FoundationGate(McpOAuthProperties properties,boolean authorizationEnabled,boolean exchangeEnabled,boolean cimd) { this.properties=properties; this.authorizationEnabled=authorizationEnabled; this.exchangeEnabled=exchangeEnabled;this.cimd=cimd; }
         @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
                 throws ServletException, IOException {
             response.setHeader("Cache-Control", "no-store");
             if (properties.compositionEnabled() && "GET".equals(request.getMethod()) &&
                     request.getRequestURI().substring(request.getContextPath().length()).equals(OAuthMetadataContract.AUTHORIZATION_SERVER_PATH)) {
-                metadata.write(OAuthMetadataContract.authorizationServer(properties,authorizationEnabled,exchangeEnabled), org.springframework.http.MediaType.APPLICATION_JSON,
+                metadata.write(OAuthMetadataContract.authorizationServer(properties,authorizationEnabled,exchangeEnabled,cimd), org.springframework.http.MediaType.APPLICATION_JSON,
                         new org.springframework.http.server.ServletServerHttpResponse(response));
                 return;
             }
             String path=request.getRequestURI().substring(request.getContextPath().length());
             if(exchangeEnabled && path.equals("/oauth/mcp/revoke") && "POST".equals(request.getMethod())) {
-                try {OAuthRevocation.validateRequest(request);chain.doFilter(request,response);}
-                catch(org.springframework.security.oauth2.core.OAuth2AuthenticationException failure) {
+                try {OAuthRevocation.validateRequest(request,cimd&&CimdOAuthProviders.external(request.getParameter("client_id")));chain.doFilter(request,response);}
+                catch(org.springframework.security.oauth2.core.OAuth2AuthenticationException | SecurityException | IllegalArgumentException failure) {
                     response.setStatus(400);response.setContentType("application/json");response.getWriter().write("{\"error\":\"invalid_request\"}");
                 }
                 return;
             }
             if(exchangeEnabled && path.equals("/oauth/mcp/token") && "POST".equals(request.getMethod())) {
-                try { OAuthCodeExchange.validateRequest(request,properties); chain.doFilter(request,response); }
+                try { OAuthCodeExchange.validateRequest(request,properties,cimd&&CimdOAuthProviders.external(request.getParameter("client_id"))); chain.doFilter(request,response); }
                 catch(org.springframework.security.oauth2.core.OAuth2AuthenticationException failure) {
                     response.setStatus(400); response.setContentType("application/json");
                     response.getWriter().write("{\"error\":\""+failure.getError().getErrorCode()+"\"}");
@@ -208,6 +234,9 @@ public class McpOAuthSecurityConfiguration {
                     response.setStatus(400); response.setContentType("application/json"); response.getWriter().write("{\"error\":\"invalid_request\"}");
                 }
                 return;
+            }
+            if(cimd && (path.equals("/oauth/mcp/onboarding")||path.equals("/oauth/mcp/approval")) && request.getMethod().equals("POST")) {
+                chain.doFilter(request,response);return;
             }
             if(authorizationEnabled && ((path.equals("/oauth/mcp/authorize") && (request.getMethod().equals("GET") || request.getMethod().equals("POST"))) ||
                     (path.equals("/oauth/mcp/consent") && request.getMethod().equals("GET")))) {

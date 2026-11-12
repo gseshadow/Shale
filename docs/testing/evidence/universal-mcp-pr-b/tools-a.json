@@ -1,0 +1,18 @@
+[
+  {
+    "tool": "search_cases",
+    "ms": 4792,
+    "returnedCaseIds": [
+      100
+    ],
+    "correlationId": "fafb7364-d984-4733-ab6a-a236ba004b88"
+  },
+  {
+    "tool": "get_case_overview",
+    "ms": 4716,
+    "returnedCaseIds": [
+      100
+    ],
+    "correlationId": "1d805938-8641-41c1-9d66-85b015e84c6b"
+  }
+]

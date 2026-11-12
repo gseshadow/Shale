@@ -50,6 +50,18 @@ class OAuthBrowserFilterTest {
             assertEquals(method.equals("DELETE")?403:204,response.getStatus());
         }
     }
+    @Test void cimdApprovalRoutesKeepTheSameOriginAndPreflightBoundary()throws Exception {
+        var enabled=new OAuthBrowserFilter("https://app.test",properties,true);
+        for(String path:java.util.List.of("/oauth/mcp/onboarding","/oauth/mcp/approval")) {
+            var attack=new MockHttpServletRequest("POST",path);attack.addHeader("Origin","https://evil.test");
+            var denied=new MockHttpServletResponse();enabled.doFilter(attack,denied,(q,s)->fail("Foreign origin reached tenant approval"));
+            assertEquals(403,denied.getStatus());
+            var preflight=new MockHttpServletRequest("OPTIONS",path);preflight.addHeader("Origin","https://app.test");
+            preflight.addHeader("Access-Control-Request-Method","POST");preflight.addHeader("Access-Control-Request-Headers","authorization,content-type");
+            var response=new MockHttpServletResponse();enabled.doFilter(preflight,response,(q,s)->fail("Preflight reached SQL"));
+            assertEquals(204,response.getStatus());assertNull(response.getHeader("Access-Control-Allow-Credentials"));
+        }
+    }
     @Test void missingBrowserConfigurationPreservesBearerOnlySurfaceAndTokenEndpointIsUntouched() throws Exception {
         var request = new MockHttpServletRequest("GET", "/oauth/mcp/authorize");request.addHeader("Accept","text/html");
         var response = new MockHttpServletResponse();

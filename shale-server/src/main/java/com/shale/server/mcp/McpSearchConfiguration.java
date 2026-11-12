@@ -7,9 +7,14 @@ import org.springframework.context.annotation.*;
 @Configuration(proxyBeanMethods=false)
 @ConditionalOnProperty(name={"shale.ai.mcp.enabled","shale.ai.enabled","shale.ai.mcp.search-cases-enabled"},havingValue="true")
 public class McpSearchConfiguration {
-    @Bean McpSearchHandler mcpSearchHandler(McpCaseCompositionPolicy policy,McpAiCaseData data) {
+    McpSearchHandler mcpSearchHandler(McpCaseCompositionPolicy policy,McpAiCaseData data) {
+        return mcpSearchHandler(policy,data,null);
+    }
+    @Bean McpSearchHandler mcpSearchHandler(McpCaseCompositionPolicy policy,McpAiCaseData data,
+            org.springframework.beans.factory.ObjectProvider<com.shale.data.security.ai.AiCimdCaseData> cimd) {
         policy.requireHandler("shale.ai.mcp.search-cases-enabled");
         data.ready(System.nanoTime()+10_000_000_000L);
-        return new McpSearchHandler(data::reader);
+        var external=cimd==null?null:cimd.getIfAvailable();
+        return new McpSearchHandler((deadline,request)->external!=null&&external.accepts(request)?external.reader(request,deadline):data.reader(deadline,request));
     }
 }
