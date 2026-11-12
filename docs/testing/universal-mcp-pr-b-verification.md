@@ -142,3 +142,7 @@ The six real SQL methods selected explicitly were:
 Only the new onboarding SQL candidate is added. Every previously tracked SQL script and
 packaged SQL resource is byte-for-byte unchanged from #1955. Audit integration uses the
 existing SQL schema and transaction owners; no new audit schema or receipt refresh is introduced.
+
+Actual tenant B browser screens (synthetic identity only):
+[tenant application approval](evidence/universal-mcp-pr-b/tenant-approval.png), followed by
+[separate user consent](evidence/universal-mcp-pr-b/user-consent.png).
