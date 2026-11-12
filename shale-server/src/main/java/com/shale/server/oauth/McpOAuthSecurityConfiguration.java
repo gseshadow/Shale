@@ -29,7 +29,7 @@ import java.util.Map;
 /** The only Spring security chain. Unmatched Shale routes retain their controller/service authority. */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@org.springframework.context.annotation.Import({OAuthCodeBootstrapConfiguration.class,CimdConnectionConfiguration.class,DcrConnectionConfiguration.class})
+@org.springframework.context.annotation.Import({OAuthCodeBootstrapConfiguration.class,CimdConnectionConfiguration.class,DcrConnectionConfiguration.class,CimdRuntimeConfiguration.class})
 @EnableConfigurationProperties(McpOAuthProperties.class)
 public class McpOAuthSecurityConfiguration {
     private Map<Control, Value> startupControls = Map.of();

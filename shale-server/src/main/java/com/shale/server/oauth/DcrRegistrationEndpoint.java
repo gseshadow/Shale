@@ -12,7 +12,7 @@ import tools.jackson.databind.*;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.json.JsonFactory;
 
-/** RFC 7591 development endpoint. No tenant identity or authority is accepted. */
+/** RFC 7591 endpoint behind explicit runtime eligibility. No tenant identity or authority is accepted. */
 final class DcrRegistrationEndpoint {
     static final int MAX_BYTES=32768;
     private final DcrApplicationRegistration registration;
@@ -26,7 +26,7 @@ final class DcrRegistrationEndpoint {
         res.setHeader("Cache-Control","no-store");res.setHeader("Pragma","no-cache");
         res.setCharacterEncoding("UTF-8");res.setContentType("application/json");
         try {
-            // Never trust caller-supplied X-Forwarded-For. This dev composition uses the socket peer.
+            // Never trust caller-supplied X-Forwarded-For. The source budget uses the socket peer; Azure ingress/NAT acceptance is separate.
             byte[] peer=MessageDigest.getInstance("SHA-256").digest(Objects.requireNonNull(req.getRemoteAddr()).getBytes(StandardCharsets.UTF_8));
             var rate=admission.admit(peer);
             if(!rate.allowed()){error(res,429,"invalid_client_metadata",rate.retryAfter());return;}

@@ -47,7 +47,7 @@ class OAuthMetadataTest {
         assertThrows(IllegalStateException.class,()->OAuthMetadataContract.authorizationServer(p,true,false,true));
         assertThrows(IllegalStateException.class,()->OAuthMetadataContract.authorizationServer(p,false,true,true));
     }
-    @Test void dcrAdvertisementRequiresCompleteDevelopmentComposition() {
+    @Test void dcrAdvertisementRequiresCompleteEligibleComposition() {
         var p=new McpOAuthProperties("https://shale.test",McpOAuthProperties.Identity.TEST,true);
         assertEquals(p.issuer()+"/register",OAuthMetadataContract.authorizationServer(p,true,true,true,true).get("registration_endpoint"));
         assertFalse(OAuthMetadataContract.authorizationServer(p,true,true,true,false).containsKey("registration_endpoint"));
@@ -55,7 +55,9 @@ class OAuthMetadataTest {
         assertFalse(OAuthMetadataContract.authorizationServer(p,true,true,false,true).containsKey("client_id_metadata_document_supported"));
         assertThrows(IllegalStateException.class,()->OAuthMetadataContract.authorizationServer(p,false,true,false,true));
         var production=new McpOAuthProperties("https://shale.example",McpOAuthProperties.Identity.PRODUCTION,true);
-        assertThrows(IllegalStateException.class,()->OAuthMetadataContract.authorizationServer(production,true,true,true,true));
+        assertEquals(production.issuer()+"/register",OAuthMetadataContract.authorizationServer(production,true,true,true,true).get("registration_endpoint"));
+        assertThrows(IllegalStateException.class,()->OAuthMetadataContract.authorizationServer(
+                new McpOAuthProperties("https://shale.example",McpOAuthProperties.Identity.PRODUCTION,false),true,true,true,true));
     }
     @Test void bootBindingFailsClosedForInvalidOriginOrCrossProfileIdentity() {
         var runner = new WebApplicationContextRunner().withUserConfiguration(McpOAuthSecurityConfiguration.class);

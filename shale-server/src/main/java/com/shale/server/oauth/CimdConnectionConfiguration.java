@@ -5,26 +5,20 @@ import org.springframework.boot.autoconfigure.condition.*;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.*;
 
-/** Default-OFF development composition only; no production activation or datasource fallback. */
+/** Default-OFF composition; production requires explicit capabilities and live SQL verification. */
 @Configuration(proxyBeanMethods=false)
 @ConditionalOnProperty(name="shale.ai.cimd.enabled",havingValue="true")
 public class CimdConnectionConfiguration {
-    @Bean static org.springframework.beans.factory.config.BeanFactoryPostProcessor cimdDevelopmentBoundary(Environment env) {
+    @Bean static org.springframework.beans.factory.config.BeanFactoryPostProcessor cimdRuntimeBoundary(Environment env) {
         return factory->{
-            if(!env.acceptsProfiles(Profiles.of("test","dev","local"))||env.acceptsProfiles(Profiles.of("prod","azure")))
-                throw new IllegalStateException("CIMD connection activation is limited to explicit disposable development profiles.");
-            for(String flag:java.util.List.of("shale.ai.enabled","shale.ai.mcp.enabled","shale.ai.oauth.composition-enabled",
-                    "shale.ai.oauth.authorization-enabled","shale.ai.oauth.exchange-enabled"))
-                if(!env.getProperty(flag,Boolean.class,false))throw new IllegalStateException("Complete OAuth/MCP composition required for CIMD.");
+            CimdRuntimeEligibility.require(env, false);
         };
     }
     @Bean(destroyMethod="close") @ConditionalOnMissingBean(CimdMetadataService.class)
     CimdMetadataService cimdMetadata(McpOAuthProperties identity) {
-        if(identity.identity()==McpOAuthProperties.Identity.PRODUCTION)throw new IllegalStateException("Separate development CIMD identity required.");
         return new CimdMetadataService(identity.issuer());
     }
     @Bean CimdOAuthLifecycle cimdLifecycle(CimdServices services,CimdMetadataService metadata,McpOAuthProperties identity,Environment env,org.springframework.beans.factory.ObjectProvider<DcrCapabilities> dcr) {
-        if(identity.identity()==McpOAuthProperties.Identity.PRODUCTION)throw new IllegalStateException("Separate development CIMD identity required.");
         return new CimdOAuthLifecycle(metadata,services.metadata(),services.resolver(),services.neutral(),services.issuer(),identity,java.time.Clock.systemUTC(),env.getProperty("shale.ai.dcr.enabled",Boolean.class,false)?dcr.getObject().metadata():null);
     }
     @Bean CimdApplicationAccess cimdApplications(CimdServices services,CimdMetadataService metadata,CimdOAuthLifecycle lifecycle) {
