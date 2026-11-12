@@ -1,0 +1,41 @@
+{
+  "baselineHead": "f7707887f06ab87cd55ed8eff21ee3b4a2128796",
+  "workload": "one manual baseline + one CIMD baseline + four simultaneous CIMD Overviews + one CIMD probe; unchanged ten-second HTTP budget; no DDL or concurrent regression workload",
+  "before": {
+    "cimdMonitorBlockedSamples": 970,
+    "samplingIntervalMs": 20,
+    "catalog": {
+      "batchCount": 22,
+      "minMs": 528,
+      "maxMs": 1456,
+      "sumMs": 15780
+    },
+    "cimdreview": {
+      "batchCount": 4,
+      "minMs": 271,
+      "maxMs": 861,
+      "sumMs": 2799
+    }
+  },
+  "after": {
+    "cimdMonitorBlockedSamples": 0,
+    "samplingIntervalMs": 20,
+    "catalog": {
+      "batchCount": 26,
+      "minMs": 528,
+      "maxMs": 1472,
+      "sumMs": 20138
+    },
+    "cimdreview": {
+      "batchCount": 6,
+      "minMs": 813,
+      "maxMs": 1125,
+      "sumMs": 5883
+    }
+  },
+  "closedBeforeShutdown": {
+    "before": true,
+    "after": false
+  },
+  "caveat": "One small local sample, not Azure capacity acceptance or a latency SLA. Monitor wait estimate is sampling-based."
+}

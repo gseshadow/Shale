@@ -174,3 +174,9 @@ reconstruction. This existing fail-closed rule is preserved. Run the final accep
 sequentially on a rebuilt disposable instance, without concurrent schema/capability
 mutation tests. Record both observations; do not claim load/SLA acceptance or hide the
 failure by changing deadlines, catalog verification placement or automatic recovery.
+
+The bounded stabilization review narrows the `AiCimdCaseData` instance monitor to
+closed-state checks/updates so independent JDBC verifications cannot block other
+verified requests' reader-state checks. Startup/admission verification placement,
+per-request checks, failure withdrawal, SQL authority and deadlines remain unchanged.
+See [measured review and deployment acceptance check](../testing/universal-mcp-pr-b-stabilization.md).

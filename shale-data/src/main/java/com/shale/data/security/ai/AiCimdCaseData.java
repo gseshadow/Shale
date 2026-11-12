@@ -33,8 +33,8 @@ public final class AiCimdCaseData implements AutoCloseable {
     }
 
     /** Unchanged predecessor verification followed by the complete additive checks. */
-    public synchronized void ready(long deadline) {
-        if(closed)throw unavailable();
+    public void ready(long deadline) {
+        synchronized(this) { if(closed)throw unavailable(); }
         String stage="PREDECESSOR";
         try {
             checkDeadline(deadline);
@@ -65,8 +65,12 @@ public final class AiCimdCaseData implements AutoCloseable {
                 }
             }
             checkDeadline(deadline);
+            // Verification is independent per request. Never hold the state monitor across
+            // JDBC: another admission must not block an already-verified request's reader.
+            // A failure/close in another verifier still withdraws this in-flight admission.
+            synchronized(this) { if(closed)throw unavailable(); }
         } catch(Exception failure) {
-            closed=true;
+            synchronized(this) { closed=true; }
             int code=failure instanceof SQLException sql?sql.getErrorCode():0;
             throw new IllegalStateException("CIMD verification failed closed; stage="+stage+"; sqlCode="+code);
         }
