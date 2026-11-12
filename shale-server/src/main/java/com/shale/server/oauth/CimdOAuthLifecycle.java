@@ -6,9 +6,8 @@ import java.time.*;
 import java.util.*;
 import java.util.function.Function;
 
-/** Isolated composition candidate: no Spring bean or production identity fallback.
- * A future runtime attestor must supply four independent confined identity factories.
- * All metadata comes through PR 2; current governed publication must match exactly. */
+/** PR A lifecycle composed by the explicit default-OFF CIMD connection. No legacy identity fallback.
+ * Metadata is retrieved through PR 2 and must match the governed SQL publication exactly. */
 public final class CimdOAuthLifecycle {
     private final CimdMetadataService metadata;
     private final AiCimdOAuthStore publisher,resolver,neutral;
@@ -42,7 +41,11 @@ public final class CimdOAuthLifecycle {
         var delegate=store.browser(()->ShaleOAuthHuman.current().session());
         return new AiOAuthBrowserStore(){
             @Override public boolean externalIdentity(){return true;}
-            @Override public Optional<AiOAuthTransactionStore.Client> loadClient(String client){prepare(new CimdClientIdentifier(client));return delegate.loadClient(client);}
+            @Override public Optional<AiOAuthTransactionStore.Client> loadClient(String client){
+                var publication=prepare(new CimdClientIdentifier(client));
+                return delegate.loadClient(client).map(c->new AiOAuthTransactionStore.Client(c.tenant(),c.integration(),c.clientId(),publication.name(),
+                        c.type(),c.scopes(),c.expiresAt(),c.version(),c.issuer(),c.resource(),c.redirects(),c.keys()));
+            }
             @Override public void begin(UUID id,UUID web,String client,String redirect,String challenge,String state,Set<com.shale.core.security.ai.AiScope> scopes,String nonce){prepare(new CimdClientIdentifier(client));delegate.begin(id,web,client,redirect,challenge,state,scopes,nonce);}
             @Override public Optional<AiOAuthTransactionStore.Intent> findIntent(String nonce,UUID web){var found=delegate.findIntent(nonce,web);found.ifPresent(intent->prepare(new CimdClientIdentifier(intent.clientId())));return found;}
             @Override public void approve(UUID id,UUID web,Set<com.shale.core.security.ai.AiScope> scopes){delegate.approve(id,web,scopes);}
@@ -50,21 +53,35 @@ public final class CimdOAuthLifecycle {
             @Override public void deny(UUID id,UUID web){delegate.deny(id,web);}
         };
     }
-    public AiOAuthCredentialStore.Tokens redeem(String client,String code,String redirect,String verifier,String method,String assertion) {
-        var id=new CimdClientIdentifier(client);prepare(id);
-        var store=issuers.apply(resolver.resolve(code,client,"CODE").orElseThrow(CimdOAuthLifecycle::denied));
-        var selected=store.clientProof(code,client,"CODE");
+    record Exchange(AiCimdOAuthStore store,String client,String method,CimdClientAuthentication.Assertion proof,
+                    CimdMetadataService.Snapshot snapshot) {
+        @Override public String toString(){return "CimdExchange[redacted]";}
+    }
+    Exchange authenticateExchange(String client,String credential,String kind,String method,String assertion) {
+        var id=new CimdClientIdentifier(client);var snapshot=prepare(id);
+        var store=issuers.apply(resolver.resolve(credential,client,kind).orElseThrow(CimdOAuthLifecycle::denied));
+        var selected=store.clientProof(credential,client,kind);
         var proof=CimdClientAuthentication.verify(id,selected,method,assertion,properties.issuer()+"/token",clock);
-        return store.redeem(code,client,redirect,verifier,proof==null?null:proof.keyId(),proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
+        return new Exchange(store,client,selected.method(),proof,snapshot);
+    }
+    AiOAuthCredentialStore.Tokens redeem(Exchange exchange,String code,String redirect,String verifier) {
+        var proof=exchange.proof();
+        return exchange.store().redeem(code,exchange.client(),redirect,verifier,proof==null?null:proof.keyId(),proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
+    }
+    AiOAuthCredentialStore.Tokens refresh(Exchange exchange,String refresh) {
+        var proof=exchange.proof();
+        return exchange.store().refresh(refresh,exchange.client(),proof==null?null:proof.keyId(),proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
+    }
+    public AiOAuthCredentialStore.Tokens redeem(String client,String code,String redirect,String verifier,String method,String assertion) {
+        return redeem(authenticateExchange(client,code,"CODE",method,assertion),code,redirect,verifier);
     }
     public AiOAuthCredentialStore.Tokens refresh(String client,String refresh,String method,String assertion) {
-        var id=new CimdClientIdentifier(client);prepare(id);
-        var store=issuers.apply(resolver.resolve(refresh,client,"REFRESH").orElseThrow(CimdOAuthLifecycle::denied));
-        var proof=CimdClientAuthentication.verify(id,store.clientProof(refresh,client,"REFRESH"),method,assertion,properties.issuer()+"/token",clock);
-        return store.refresh(refresh,client,proof==null?null:proof.keyId(),proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
+        return refresh(authenticateExchange(client,refresh,"REFRESH",method,assertion),refresh);
     }
-    /** Known credentials remain owner-bound; unknown credentials authenticate without a tenant lookup. */
-    public void revoke(String client,String credential,String method,String assertion) {
+    record Revocation(String client,byte[] digest,String method,String kid,CimdClientAuthentication.Assertion proof,CimdMetadataService.Snapshot snapshot) {
+        @Override public String toString(){return "CimdRevocation[redacted]";}
+    }
+    Revocation authenticateRevocation(String client,String method,String assertion) {
         var id=new CimdClientIdentifier(client);var snapshot=prepare(id);
         if(!snapshot.methods().contains(method))throw denied();
         String kid=null;AiCimdOAuthStore.ClientProof selected;
@@ -77,11 +94,16 @@ public final class CimdOAuthLifecycle {
             selected=new AiCimdOAuthStore.ClientProof(method,null,kid,key.rsa(),Instant.EPOCH,snapshot.expiresAt());
         } else throw denied();
         var proof=CimdClientAuthentication.verify(id,selected,method,assertion,properties.issuer()+"/revoke",clock);
-        byte[] digest=HexFormat.of().parseHex(snapshot.revision());
-        var owner=resolver.resolve(credential,client,"REVOKE");
-        if(owner.isPresent())issuers.apply(owner.get()).revoke(credential,client,digest,method,kid,proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
-        else neutral.revokeUnknown(client,digest,method,kid,proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
+        return new Revocation(client,HexFormat.of().parseHex(snapshot.revision()),method,kid,proof,snapshot);
     }
-
+    void revoke(Revocation revocation,String credential) {
+        var proof=revocation.proof();var owner=resolver.resolve(credential,revocation.client(),"REVOKE");
+        if(owner.isPresent())issuers.apply(owner.get()).revoke(credential,revocation.client(),revocation.digest(),revocation.method(),revocation.kid(),proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
+        else neutral.revokeUnknown(revocation.client(),revocation.digest(),revocation.method(),revocation.kid(),proof==null?null:proof.jti(),proof==null?null:proof.issuedAt(),proof==null?null:proof.expiresAt());
+    }
+    /** Known credentials remain owner-bound; unknown credentials never select a tenant. */
+    public void revoke(String client,String credential,String method,String assertion) {
+        revoke(authenticateRevocation(client,method,assertion),credential);
+    }
     private static SecurityException denied(){return new SecurityException("CIMD authorization unavailable.");}
 }

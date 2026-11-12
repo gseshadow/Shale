@@ -1,0 +1,20 @@
+{
+  "client": "NousResearch Hermes Agent",
+  "reportedVersion": "git.74dde23",
+  "baseVersion": "unknown",
+  "commit": "74dde239c8a9a5ae72af1c68b9e74d0b6aa798a5",
+  "dirty": false,
+  "python": "3.14.7",
+  "mcpSdk": "2.3.0",
+  "registrationMethod": "CIMD",
+  "externalClientId": "https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json",
+  "suppliedOAuthId": false,
+  "suppliedMetadataUrl": false,
+  "suppliedScopes": false,
+  "suppliedProtocol": false,
+  "endpoint": "https://shale.test/mcp",
+  "command": "hermes mcp add shale --url https://shale.test/mcp --auth oauth --connect-timeout 300",
+  "outcome": "OAuth and modern discovery/tools listing completed by stock CLI; authorized tool calls completed by unchanged Hermes handlers invoked through the thin test driver",
+  "productionContacted": false,
+  "deploymentGap": "Default direct DNS/TCP egress was not accepted; declared test resolver/CONNECT seams were used"
+}

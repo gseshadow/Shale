@@ -1,0 +1,51 @@
+[
+  {
+    "label": "manual-baseline",
+    "status": 200,
+    "returnedCase": 100,
+    "isError": false,
+    "ms": 2645
+  },
+  {
+    "label": "cimd-baseline",
+    "status": 200,
+    "returnedCase": 100,
+    "isError": false,
+    "ms": 5105
+  },
+  {
+    "label": "parallel-0",
+    "status": 200,
+    "returnedCase": 100,
+    "isError": false,
+    "ms": 8288
+  },
+  {
+    "label": "parallel-1",
+    "status": 200,
+    "returnedCase": 100,
+    "isError": false,
+    "ms": 7587
+  },
+  {
+    "label": "parallel-2",
+    "status": 200,
+    "returnedCase": 100,
+    "isError": false,
+    "ms": 8557
+  },
+  {
+    "label": "parallel-3",
+    "status": 200,
+    "returnedCase": 100,
+    "isError": false,
+    "ms": 7792
+  },
+  {
+    "label": "after-batch",
+    "status": 200,
+    "returnedCase": 100,
+    "isError": false,
+    "ms": 4450
+  }
+]

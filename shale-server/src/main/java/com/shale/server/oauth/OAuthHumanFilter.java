@@ -12,7 +12,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 final class OAuthHumanFilter extends OncePerRequestFilter {
     private final ShaleOAuthHuman humans;
     private final DurableOAuthAuthorization authorizations;
-    OAuthHumanFilter(ShaleOAuthHuman humans, DurableOAuthAuthorization authorizations) { this.humans=humans; this.authorizations=authorizations; }
+    private final CimdApplicationAccess applications;
+    OAuthHumanFilter(ShaleOAuthHuman humans, DurableOAuthAuthorization authorizations) { this(humans,authorizations,null); }
+    OAuthHumanFilter(ShaleOAuthHuman humans,DurableOAuthAuthorization authorizations,CimdApplicationAccess applications) { this.humans=humans; this.authorizations=authorizations;this.applications=applications; }
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
         if(request.getRequestURI().substring(request.getContextPath().length()).equals("/oauth/mcp/token") || OAuthRevocation.matches(request)) {
             chain.doFilter(request,response); return;
@@ -24,7 +26,9 @@ final class OAuthHumanFilter extends OncePerRequestFilter {
             var identity=humans.authenticate(request);
             SecurityContextHolder.getContext().setAuthentication(ShaleOAuthHuman.authentication(identity));
             String path=request.getRequestURI().substring(request.getContextPath().length());
-            Set<String> allowed= "POST".equals(request.getMethod()) ? Set.of("client_id","state","scope") :
+            boolean onboarding=applications!=null&&path.equals("/oauth/mcp/onboarding"),decision=applications!=null&&path.equals("/oauth/mcp/approval");
+            Set<String> allowed= onboarding?Set.of("client_id","scope"):decision?Set.of("client_id","scope","approval_id","approval_version","decision"):
+                    "POST".equals(request.getMethod()) ? Set.of("client_id","state","scope") :
                     path.endsWith("/consent") ? Set.of("client_id","state","scope") : Set.of("client_id","response_type","redirect_uri","resource","scope","state","code_challenge","code_challenge_method");
             if(request.getParameterMap().size()>allowed.size()) throw new IllegalArgumentException();
             for(var entry:request.getParameterMap().entrySet()) {
@@ -36,7 +40,22 @@ final class OAuthHumanFilter extends OncePerRequestFilter {
                 }
                 if(consentScopes && new HashSet<>(List.of(entry.getValue())).size()!=entry.getValue().length) throw new IllegalArgumentException();
             }
-            if(path.equals("/oauth/mcp/consent")) {
+            if(onboarding||decision) {
+                if(!"POST".equals(request.getMethod()))throw new IllegalArgumentException();
+                var scopes=java.util.EnumSet.noneOf(com.shale.core.security.ai.AiScope.class);
+                for(String value:Optional.ofNullable(request.getParameterValues("scope")).orElse(new String[0]))scopes.add(com.shale.core.security.ai.AiScope.parse(value));
+                if(onboarding&&scopes.isEmpty())throw new IllegalArgumentException();
+                Map<String,Object> result;
+                if(onboarding)result=applications.request(request.getParameter("client_id"),scopes);
+                else {
+                    String version=request.getParameter("approval_version");
+                    if(version==null||!version.matches("[0-9a-f]{16}"))throw new IllegalArgumentException();
+                    result=applications.decide(request.getParameter("client_id"),UUID.fromString(request.getParameter("approval_id")),
+                            HexFormat.of().parseHex(version),request.getParameter("decision"),scopes);
+                }
+                new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter().write(result,org.springframework.http.MediaType.APPLICATION_JSON,
+                        new org.springframework.http.server.ServletServerHttpResponse(response));
+            } else if(path.equals("/oauth/mcp/consent")) {
                 if(!"GET".equals(request.getMethod())) throw new IllegalArgumentException();
                 var pending=authorizations.findByToken(request.getParameter("state"),new org.springframework.security.oauth2.server.authorization.OAuth2TokenType("state"));
                 if(pending==null) throw new IllegalArgumentException();

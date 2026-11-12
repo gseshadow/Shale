@@ -68,6 +68,19 @@ class CimdMetadataTest {
                 "[\"https://callback.public.org/callback\"]","["+seventeen+"]"))));
     }
 
+    @Test void numericProfileDiscardsOnlyPairedStrictLocalhostAliases() {
+        String template = "{\"client_id\":\""+ID.value()+"\",\"redirect_uris\":[\"http://127.0.0.1:27890/callback\",\"%s\"]}";
+        assertEquals(List.of("http://127.0.0.1:27890/callback"),
+                CimdMetadata.parse(ID,bytes(template.formatted("http://localhost:27890/callback"))).redirects());
+        for(String alias:List.of("http://localhost:27891/callback","http://localhost:27890/other",
+                "http://localhost:27890/callback?x=1","http://localhost:27890/callback#x",
+                "http://user@localhost:27890/callback","http://localhost:27890/a/../callback",
+                "http://localhost:27890/%63allback","https://localhost:27890/callback"))
+            assertThrows(IllegalArgumentException.class,()->CimdMetadata.parse(ID,bytes(template.formatted(alias))),alias);
+        assertThrows(IllegalArgumentException.class,()->com.shale.server.oauth.OAuthRedirectPolicy.registered("http://localhost:27890/callback",false),
+                "Discarding an advertised alias must never authorize that redirect");
+    }
+
     @Test void keyProfileRejectsPrivateWeakAmbiguousOrRemoteFallbackMaterial() throws Exception {
         var key=new RSAKeyGenerator(2048).keyID("current").algorithm(com.nimbusds.jose.JWSAlgorithm.RS256).generate();
         String publicKey=key.toPublicJWK().toJSONString();

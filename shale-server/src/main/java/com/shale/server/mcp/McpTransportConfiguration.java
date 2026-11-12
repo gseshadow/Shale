@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 @Configuration(proxyBeanMethods=false)
-@Import({McpSearchConfiguration.class,McpOverviewConfiguration.class})
+@Import({McpSearchConfiguration.class,McpOverviewConfiguration.class,McpCimdConfiguration.class})
 @EnableConfigurationProperties({McpTransportProperties.class,McpOAuthProperties.class})
 public class McpTransportConfiguration {
     private McpCaseCompositionPolicy startupPolicy;
@@ -94,7 +94,7 @@ public class McpTransportConfiguration {
     }
     @Bean @Order(0)
     SecurityFilterChain mcpTransportChain(HttpSecurity http, McpTransportProperties transport, McpOAuthProperties identity,
-            Environment env, ObjectProvider<AiAccessTokenValidator> validators, ObjectProvider<DeadlineAccess> bounded, ObjectProvider<McpAiCaseData> confined, McpCaseCompositionPolicy policy) throws Exception {
+            Environment env, ObjectProvider<AiAccessTokenValidator> validators, ObjectProvider<DeadlineAccess> bounded, ObjectProvider<McpAiCaseData> confined, McpCaseCompositionPolicy policy, ObjectProvider<com.shale.data.security.ai.AiCimdCaseData> cimd) throws Exception {
         policy.requireTransport();
         transport.validate(identity);
         http.securityMatcher(request -> {
@@ -111,7 +111,14 @@ public class McpTransportConfiguration {
         http.addFilterBefore(new McpGate(transport,identity,globalEnabled,
                 (token,deadline)->{
                     var protectedData=confined.getIfAvailable();
-                    if(protectedData!=null)return protectedData.authenticate(token,deadline);
+                    if(protectedData!=null) {
+                        try {return protectedData.authenticate(token,deadline);}
+                        catch(SecurityException absentLegacyProof) {
+                            var external=cimd.getIfAvailable();
+                            if(external==null)throw absentLegacyProof;
+                            return external.authenticate(token,deadline);
+                        }
+                    }
                     if(policy.production())throw new SecurityException("Confined ACCESS required.");
                     var fixture=validators.getIfAvailable();
                     return fixture!=null?fixture.validate(token):bounded.getObject().validate(token,deadline);

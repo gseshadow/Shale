@@ -1,0 +1,242 @@
+{
+  "assertedChecks": [
+    {
+      "check": "tenant B refresh",
+      "status": 200
+    },
+    {
+      "check": "foreign tenant Case isError without disclosure",
+      "status": 200
+    },
+    {
+      "check": "tenant A refresh rotation",
+      "status": 200
+    },
+    {
+      "check": "rotated Case disclosure",
+      "status": 200
+    },
+    {
+      "check": "ordinary user approval change rejected",
+      "status": 401
+    },
+    {
+      "check": "foreign administrator approval change rejected",
+      "status": 401
+    },
+    {
+      "check": "tenant A approval revoked",
+      "status": 200
+    },
+    {
+      "check": "existing tenant A access rejected",
+      "status": 401
+    },
+    {
+      "check": "tenant A refresh after approval revocation rejected",
+      "status": 400
+    },
+    {
+      "check": "tenant B Case remains available",
+      "status": 200
+    },
+    {
+      "check": "tenant B credential revocation",
+      "status": 200
+    }
+  ],
+  "actualHttp": [
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/token",
+      "status": 200,
+      "ms": 225
+    },
+    {
+      "method": "POST",
+      "path": "/mcp",
+      "status": 200,
+      "ms": 5072,
+      "rpc_method": "tools/call",
+      "header_method": "tools/call",
+      "header_protocol": "2026-07-28",
+      "body_protocol": "2026-07-28",
+      "header_name": "get_case_overview"
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/token",
+      "status": 200,
+      "ms": 59
+    },
+    {
+      "method": "POST",
+      "path": "/mcp",
+      "status": 200,
+      "ms": 4783,
+      "rpc_method": "tools/call",
+      "header_method": "tools/call",
+      "header_protocol": "2026-07-28",
+      "body_protocol": "2026-07-28",
+      "header_name": "get_case_overview"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "ms": 91
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/onboarding",
+      "status": 200,
+      "ms": 44
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/approval",
+      "status": 401,
+      "ms": 23
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "ms": 85
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/onboarding",
+      "status": 200,
+      "ms": 34
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "ms": 95
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/approval",
+      "status": 401,
+      "ms": 22
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/approval",
+      "status": 200,
+      "ms": 79
+    },
+    {
+      "method": "POST",
+      "path": "/mcp",
+      "status": 401,
+      "ms": 4564,
+      "rpc_method": "tools/call",
+      "header_method": "tools/call",
+      "header_protocol": "2026-07-28",
+      "body_protocol": "2026-07-28",
+      "header_name": "get_case_overview"
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/token",
+      "status": 400,
+      "ms": 42
+    },
+    {
+      "method": "POST",
+      "path": "/mcp",
+      "status": 200,
+      "ms": 4437,
+      "rpc_method": "tools/call",
+      "header_method": "tools/call",
+      "header_protocol": "2026-07-28",
+      "body_protocol": "2026-07-28",
+      "header_name": "get_case_overview"
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/revoke",
+      "status": 200,
+      "ms": 83
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "ms": 109
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/onboarding",
+      "status": 200,
+      "ms": 250
+    },
+    {
+      "method": "GET",
+      "path": "/oauth/mcp/authorize",
+      "status": 200,
+      "ms": 187
+    },
+    {
+      "method": "GET",
+      "path": "/oauth/mcp/consent",
+      "status": 200,
+      "ms": 106
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/authorize",
+      "status": 200,
+      "ms": 174
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/token",
+      "status": 200,
+      "ms": 47
+    },
+    {
+      "method": "POST",
+      "path": "/mcp",
+      "status": 200,
+      "ms": 4667,
+      "rpc_method": "tools/call",
+      "header_method": "tools/call",
+      "header_protocol": "2026-07-28",
+      "body_protocol": "2026-07-28",
+      "header_name": "get_case_overview"
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/revoke",
+      "status": 200,
+      "ms": 34
+    },
+    {
+      "method": "POST",
+      "path": "/mcp",
+      "status": 401,
+      "ms": 4387,
+      "rpc_method": "tools/call",
+      "header_method": "tools/call",
+      "header_protocol": "2026-07-28",
+      "body_protocol": "2026-07-28",
+      "header_name": "get_case_overview"
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/token",
+      "status": 400,
+      "ms": 58
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/mcp/revoke",
+      "status": 200,
+      "ms": 51
+    }
+  ]
+}

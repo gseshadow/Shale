@@ -1,0 +1,6 @@
+[
+  "stock authorization URL opened",
+  "real SQL password login and pending tenant approval",
+  "explicit administrator approval; separate user consent presented",
+  "explicit user consent returned code to stock callback"
+]

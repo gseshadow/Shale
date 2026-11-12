@@ -21,7 +21,7 @@ class OAuthMetadataTest {
                 "grant_types_supported", List.of(), "token_endpoint_auth_methods_supported", List.of()),
                 OAuthMetadataContract.authorizationServer(properties));
         assertEquals(Map.of("resource", "https://shale.example/mcp",
-                "authorization_servers", List.of("https://shale.example/oauth/mcp")),
+                "authorization_servers", List.of("https://shale.example/oauth/mcp"), "scopes_supported", List.of("cases.search","cases.overview.read")),
                 OAuthMetadataContract.protectedResource(properties));
     }
 
@@ -38,6 +38,15 @@ class OAuthMetadataTest {
         assertEquals(OAuthMetadataContract.authorizationServer(properties),OAuthMetadataContract.authorizationServer(properties,false));
     }
 
+    @Test void cimdAdvertisementRequiresCompleteLifecycleAndNeverAdvertisesDcr() {
+        var p=new McpOAuthProperties("https://shale.test",McpOAuthProperties.Identity.TEST,true);
+        assertFalse(OAuthMetadataContract.authorizationServer(p,true,true).containsKey("client_id_metadata_document_supported"));
+        var metadata=OAuthMetadataContract.authorizationServer(p,true,true,true);
+        assertEquals(true,metadata.get("client_id_metadata_document_supported"));
+        assertFalse(metadata.containsKey("registration_endpoint"));
+        assertThrows(IllegalStateException.class,()->OAuthMetadataContract.authorizationServer(p,true,false,true));
+        assertThrows(IllegalStateException.class,()->OAuthMetadataContract.authorizationServer(p,false,true,true));
+    }
     @Test void bootBindingFailsClosedForInvalidOriginOrCrossProfileIdentity() {
         var runner = new WebApplicationContextRunner().withUserConfiguration(McpOAuthSecurityConfiguration.class);
         for (String origin : List.of("http://shale.example", "https://shale.example/", "https://shale.example?host=evil"))

@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Selected real SQL authorization + production Case routing, including admission verification.
@@ -38,6 +40,50 @@ class AiCimdAuthorizationLocalSqlServerTest extends AiCimdOAuthLocalSqlServerTes
     AiCimdCaseData composition() {
         return new AiCimdCaseData(deadline->attestation(),deadline->source("cimd"),
                 deadline->source("cimdreview"),db,ISSUER,RESOURCE);
+    }
+    @Test void concurrentAdmissionsRunIndependentVerificationWithoutHoldingReaderStateMonitor()throws Exception {
+        var armed=new AtomicBoolean();var calls=new AtomicInteger();
+        var entered=new CountDownLatch(2);var release=new CountDownLatch(1);
+        try(var composition=new AiCimdCaseData(deadline->{
+            if(armed.get()) { calls.incrementAndGet();entered.countDown();awaitVerification(release,deadline); }
+            return attestation();
+        },deadline->source("cimd"),deadline->source("cimdreview"),db,ISSUER,RESOURCE);
+            var workers=Executors.newFixedThreadPool(2)) {
+            armed.set(true);
+            var first=workers.submit(()->composition.ready(System.nanoTime()+8_000_000_000L));
+            var second=workers.submit(()->composition.ready(System.nanoTime()+8_000_000_000L));
+            try {assertTrue(entered.await(2,TimeUnit.SECONDS),"Each admission must reach its own verifier; JDBC must not hold the reader-state monitor.");}
+            finally {release.countDown();}
+            first.get(10,TimeUnit.SECONDS);second.get(10,TimeUnit.SECONDS);
+            assertEquals(2,calls.get(),"Concurrent requests must not share or cache a positive verification.");
+        } finally {release.countDown();}
+    }
+    @Test void concurrentVerificationFailureWithdrawsAnAlreadyRunningVerifier()throws Exception {
+        var armed=new AtomicBoolean();var calls=new AtomicInteger();
+        var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+        try(var composition=new AiCimdCaseData(deadline->{
+            if(armed.get()) {
+                if(calls.incrementAndGet()!=1)throw new IllegalStateException("Synthetic verification failure.");
+                entered.countDown();awaitVerification(release,deadline);
+            }
+            return attestation();
+        },deadline->source("cimd"),deadline->source("cimdreview"),db,ISSUER,RESOURCE);
+            var worker=Executors.newSingleThreadExecutor()) {
+            armed.set(true);
+            var first=worker.submit(()->composition.ready(System.nanoTime()+8_000_000_000L));
+            try {
+                assertTrue(entered.await(2,TimeUnit.SECONDS),"First independent verification must start.");
+                assertThrows(IllegalStateException.class,()->composition.ready(System.nanoTime()+8_000_000_000L));
+            } finally {release.countDown();}
+            var failure=assertThrows(ExecutionException.class,()->first.get(10,TimeUnit.SECONDS));
+            assertInstanceOf(IllegalStateException.class,failure.getCause(),"An in-flight verifier must observe withdrawal before admission succeeds.");
+            assertThrows(IllegalStateException.class,()->composition.ready(System.nanoTime()+8_000_000_000L));
+            assertEquals(2,calls.get(),"Withdrawal must persist until reconstruction, without another verification or retry.");
+        } finally {release.countDown();}
+    }
+    private static void awaitVerification(CountDownLatch release,long deadline) {
+        try {if(!release.await(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS))throw new IllegalStateException("Verification deadline.");}
+        catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException("Interrupted verification.");}
     }
     void audit(UUID invocation,int tenant,int user,long caseId,int expectedPhi)throws Exception {
         try(var c=owner(db)) {

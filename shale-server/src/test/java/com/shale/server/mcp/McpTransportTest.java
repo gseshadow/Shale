@@ -120,6 +120,15 @@ class McpTransportTest {
         var unknown=send(request("private-java-exception-name"));assertEquals(404,unknown.getStatus());
         assertFalse(unknown.getContentAsString().contains("private-java-exception-name"));
     }
+    @Test void legacyAutoNegotiationGetsMethodNotFoundOnlyAfterAuthentication()throws Exception {
+        for(String version:List.of("2025-03-26","2025-06-18","2025-11-25")) {
+            var r=request("initialize");r.removeHeader("Mcp-Method");r.removeHeader("MCP-Protocol-Version");r.addHeader("MCP-Protocol-Version",version);
+            r.setContent(("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\""+version+"\",\"capabilities\":{},\"clientInfo\":{\"name\":\"stock\",\"version\":\"1\"}}}").getBytes());
+            var response=send(r);assertEquals(404,response.getStatus());assertTrue(response.getContentAsString().contains("-32601"));
+            assertFalse(response.getContentAsString().contains("supportedVersions"),"No legacy handshake result or compatibility session");
+            r.removeHeader("Authorization");assertEquals(401,send(r).getStatus(),"Compatibility rejection cannot bypass ACCESS admission");
+        }
+    }
     @Test void bodyAndParserAdversarialBoundariesFailDeterministically()throws Exception {
         var valid=body("server/discover",McpGate.PROTOCOL);
         for(String body:List.of("","{","[]","null","{}",valid+"{}",valid.replace("2.0","1.0"),valid.replace("\"id\":\"one\"","\"id\":null"),
@@ -142,11 +151,14 @@ class McpTransportTest {
         }
         var r=request("server/discover");r.addHeader("Content-Encoding","gzip");assertEquals(400,send(r).getStatus());
     }
-    @Test void protectedResourceMetadataIsCanonicalAndContainsNoScopeOrTenantInventory()throws Exception {
+    @Test void protectedResourceMetadataPublishesSupportedScopesWithoutTenantInventory()throws Exception {
         var r=new MockHttpServletRequest("GET",com.shale.server.oauth.OAuthMetadataContract.PROTECTED_RESOURCE_PATH);
         r.addHeader("Host","attacker.invalid");r.addHeader("X-Forwarded-Proto","http");var response=send(r);
         assertEquals(200,response.getStatus());assertEquals(com.shale.server.oauth.OAuthMetadataContract.protectedResource(identity),
                 McpTransportConfiguration.mapper().getJsonMapper().readValue(response.getContentAsString(),Map.class));
+        var claims=McpTransportConfiguration.mapper().getJsonMapper().readValue(response.getContentAsString(),Map.class);
+        assertEquals(Set.of("resource","authorization_servers","scopes_supported"),claims.keySet());
+        assertEquals(List.of("cases.search","cases.overview.read"),claims.get("scopes_supported"));
     }
     @Test void sdkPayloadLoggingIsDeniedEvenUnderDebug() {
         var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger("io.modelcontextprotocol.modern.JsonRpc");

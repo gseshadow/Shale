@@ -28,6 +28,14 @@ class CimdRetrievalTest {
     }
     @AfterEach void teardown() throws Exception { service.close(); fixture.close(); }
 
+    @Test void developmentIssuerIsOnlyAnExactBindingAndDoesNotAuthorizePrivateFetches() {
+        try(var development=new CimdMetadataService("https://shale.test/oauth/mcp",clock,fixture.transport())) {
+            assertEquals("https://shale.test/oauth/mcp",development.retrieve(ID).issuer());
+            for(String privateUrl:List.of("https://shale.test/client.json","https://127.0.0.1/client.json"))
+                assertThrows(IllegalArgumentException.class,()->development.retrieve(new CimdClientIdentifier(privateUrl)));
+            assertEquals(1,fixture.dialed.size(),"Permitting a development issuer must not relax outbound SSRF policy");
+        }
+    }
     @Test void trustedHttpsProducesImmutableIssuerScopedSnapshotWithoutAmbientCredentials() {
         var old=ProxySelector.getDefault();
         ProxySelector.setDefault(new ProxySelector() {

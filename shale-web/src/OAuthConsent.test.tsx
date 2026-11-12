@@ -82,3 +82,39 @@ it('does not retry a decision whose response is lost',async()=>{
   fireEvent.click(screen.getByRole('button',{name:'Approve access'}));await screen.findByRole('alert');
   expect(fetchMock).toHaveBeenCalledTimes(3);expect(screen.queryByRole('button',{name:'Approve access'})).toBeNull();
 });
+
+const external = 'https://metadata.public.org/client.json';
+const externalRequest = new URLSearchParams({client_id:external,redirect_uri:'http://127.0.0.1:27890/callback',state:'exact',scope:'cases.search cases.overview.read'}).toString();
+const pending = (admin:boolean) => ({client_id:external,client_name:'Stock client',tenant:7,user:72,admin,state:'PENDING',approval_id:'00000000-0000-0000-0000-000000000001',approval_version:'0000000000000001'});
+it('requires explicit tenant approval and then separate user consent for CIMD',async()=>{
+  fetchMock.mockResolvedValueOnce(response(pending(true)));
+  const complete=vi.fn();
+  render(<OAuthConsent token="web-token" user={user} request={externalRequest} onComplete={complete}/>);
+  const approval=await screen.findByRole('button',{name:'Approve tenant application'});
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button',{name:'Approve access'})).toBeNull();
+  fetchMock.mockResolvedValueOnce(response({...pending(true),state:'APPROVED'}))
+    .mockResolvedValueOnce(response({...pending(true),state:'APPROVED'}))
+    .mockResolvedValueOnce(response({redirect:`${apiBaseUrl()}/oauth/mcp/consent?client_id=${encodeURIComponent(external)}&state=server-nonce`}))
+    .mockResolvedValueOnce(response({...details(),client_id:external}));
+  fireEvent.click(approval);fireEvent.click(approval);
+  await screen.findByRole('button',{name:'Approve access'});
+  expect(fetchMock).toHaveBeenCalledTimes(5);
+  const decision=new URLSearchParams(fetchMock.mock.calls[1][1]?.body as string);
+  expect(decision.get('decision')).toBe('APPROVE');expect(decision.get('client_id')).toBe(external);
+  expect(decision.has('tenant')).toBe(false);expect(decision.has('user')).toBe(false);
+  expect(complete).not.toHaveBeenCalled();
+});
+it('ordinary users can check approval but cannot approve an application',async()=>{
+  fetchMock.mockResolvedValueOnce(response(pending(false)));
+  render(<OAuthConsent token="web-token" user={user} request={externalRequest}/>);
+  await screen.findByRole('button',{name:'Check approval'});
+  expect(screen.queryByRole('button',{name:'Approve tenant application'})).toBeNull();
+  expect(screen.queryByRole('button',{name:'Approve access'})).toBeNull();
+});
+it.each([{tenant:8},{user:81},{client_id:'https://evil.public.org/client.json'},{admin:'true'}])('rejects mismatched onboarding %s',async invalid=>{
+  fetchMock.mockResolvedValueOnce(response({...pending(true),...invalid}));
+  render(<OAuthConsent token="web-token" user={user} request={externalRequest}/>);
+  await screen.findByRole('alert');expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button',{name:'Approve tenant application'})).toBeNull();
+});

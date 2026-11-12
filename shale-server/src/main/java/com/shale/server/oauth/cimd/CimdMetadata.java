@@ -8,6 +8,7 @@ import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
 import java.nio.*;
+import java.net.URI;
 import java.nio.charset.*;
 import java.security.*;
 import java.security.interfaces.RSAPublicKey;
@@ -75,17 +76,30 @@ final class CimdMetadata {
         if (n.has("response_types") && !strings(n,"response_types",8).contains("code")) throw CimdDestination.invalid();
         if (n.has("code_challenge_methods_supported") && !strings(n,"code_challenge_methods_supported",8).equals(Set.of("S256"))) throw CimdDestination.invalid();
         var redirects=new ArrayList<>(strings(n,"redirect_uris",16));
+        var accepted=new ArrayList<String>();
         for (String redirect:redirects) {
             if (redirect.chars().anyMatch(c -> c<=32 || c>=127)) throw CimdDestination.invalid();
+            // Some native publications include localhost aliases alongside numeric callbacks.
+            // Shale implements the numeric profile only: ignore a strict paired alias, never
+            // register/accept it or normalize an actual authorization redirect into another URI.
+            URI alternative;
+            try {alternative=URI.create(redirect);}catch(IllegalArgumentException invalid){throw CimdDestination.invalid();}
+            if(!keyed&&"http".equals(alternative.getScheme())&&"localhost".equals(alternative.getHost())&&
+                    alternative.getPort()>0&&alternative.getPort()<=65535&&alternative.getRawUserInfo()==null&&
+                    alternative.getRawQuery()==null&&alternative.getRawFragment()==null&&!alternative.getRawPath().isEmpty()&&
+                    alternative.normalize().equals(alternative)&&!redirect.contains("%")&&!redirect.contains("*")&&
+                    redirects.contains("http://127.0.0.1:"+alternative.getPort()+alternative.getRawPath()))continue;
             var uri=OAuthRedirectPolicy.registered(redirect, keyed);
             if ("https".equals(uri.getScheme())) CimdDestination.url(redirect);
+            accepted.add(redirect);
         }
+        if(accepted.isEmpty())throw CimdDestination.invalid();
         boolean inline=n.has("jwks"), remote=n.has("jwks_uri");
         if (inline && remote || keyed && !inline && !remote || !keyed && (inline || remote)) throw CimdDestination.invalid();
         String url=remote?string(n,"jwks_uri",2048):null;
         if (url!=null) CimdDestination.url(url);
         var keys=inline?keys(n.get("jwks")):List.<CimdMetadataService.SigningKey>of();
-        return new Parsed(name,List.copyOf(redirects),Set.copyOf(methods),Set.copyOf(grants),keys,url);
+        return new Parsed(name,List.copyOf(accepted),Set.copyOf(methods),Set.copyOf(grants),keys,url);
     }
     static List<CimdMetadataService.SigningKey> keys(JsonNode n) {
         if (!n.isObject() || n.size()!=1 || !n.has("keys") || !n.get("keys").isArray() || n.get("keys").isEmpty() || n.get("keys").size()>2) throw CimdDestination.invalid();

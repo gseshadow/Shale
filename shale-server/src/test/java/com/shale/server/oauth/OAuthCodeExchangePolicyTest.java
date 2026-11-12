@@ -44,6 +44,15 @@ class OAuthCodeExchangePolicyTest {
         }
         r.setParameter("refresh_token","a","b");assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties));
     }
+    @Test void externalIdentifiersRequireExplicitCimdSelectionAndRemainExact() {
+        var r=request();String external="https://metadata.public.org/oauth/client.json";r.setParameter("client_id",external);
+        assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties));
+        assertDoesNotThrow(()->OAuthCodeExchange.validateRequest(r,properties,true));
+        assertEquals(external,r.getParameter("client_id"));
+        for(String invalid:List.of("http://metadata.public.org/client.json","https://metadata.public.org/","client")) {
+            r.setParameter("client_id",invalid);assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties,true));
+        }
+    }
     @Test void s256UsesRfc7636VectorAndRejectsMalformedVerifiers() {
         assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",AiOAuthExchangeStore.challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"));
         for(String v:List.of("","short","x".repeat(42),"x".repeat(129),"!".repeat(43),"é".repeat(43),"x".repeat(43)+"=")) assertThrows(SecurityException.class,()->AiOAuthExchangeStore.challenge(v));

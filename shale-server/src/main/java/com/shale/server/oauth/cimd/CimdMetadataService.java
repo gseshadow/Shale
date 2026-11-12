@@ -47,7 +47,9 @@ public final class CimdMetadataService implements AutoCloseable {
         this(issuer,clock,https,System::nanoTime);
     }
     CimdMetadataService(String issuer, Clock clock, CimdHttps https, LongSupplier cacheTime) {
-        CimdDestination.url(issuer); this.issuer=issuer; this.clock=clock; this.https=https; this.cacheTime=cacheTime;
+        // Issuer is an exact cache/credential binding, never an outbound destination.
+        // Development issuers may use .test; every actual fetch still requires CimdDestination.
+        new CimdClientIdentifier(issuer); this.issuer=issuer; this.clock=clock; this.https=https; this.cacheTime=cacheTime;
     }
 
     public Snapshot retrieve(CimdClientIdentifier id) {

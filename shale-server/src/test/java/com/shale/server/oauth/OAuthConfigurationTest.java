@@ -17,7 +17,7 @@ class OAuthConfigurationTest {
                 List.of("https://shale.example/api"), List.of("https://attacker.example/mcp")))
             assertThrows(IllegalArgumentException.class, () -> properties.validateResources(values), values.toString());
         assertThrows(IllegalArgumentException.class, () -> properties.validateResources(null));
-        assertEquals(Map.of("resource", properties.resource(), "authorization_servers", List.of(properties.issuer())),
+        assertEquals(Map.of("resource", properties.resource(), "authorization_servers", List.of(properties.issuer()), "scopes_supported", List.of("cases.search","cases.overview.read")),
                 OAuthMetadataContract.protectedResource(properties));
     }
 

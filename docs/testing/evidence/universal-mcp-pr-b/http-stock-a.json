@@ -1,0 +1,173 @@
+[
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 401,
+    "ms": 48,
+    "rpc_method": "initialize",
+    "header_method": null,
+    "header_protocol": "2025-11-25",
+    "body_protocol": null,
+    "header_name": null
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-protected-resource/mcp",
+    "status": 200,
+    "ms": 23
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server/oauth/mcp",
+    "status": 200,
+    "ms": 21
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/mcp/authorize",
+    "status": 302,
+    "ms": 6
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "status": 200,
+    "ms": 205
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/me",
+    "status": 200,
+    "ms": 75
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/onboarding",
+    "status": 200,
+    "ms": 361
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/approval",
+    "status": 200,
+    "ms": 126
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/onboarding",
+    "status": 200,
+    "ms": 55
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/mcp/authorize",
+    "status": 200,
+    "ms": 339
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/mcp/consent",
+    "status": 200,
+    "ms": 147
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/authorize",
+    "status": 200,
+    "ms": 296
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/mcp/token",
+    "status": 200,
+    "ms": 217
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 404,
+    "ms": 4936,
+    "rpc_method": "initialize",
+    "header_method": null,
+    "header_protocol": "2025-11-25",
+    "body_protocol": null,
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 4634,
+    "rpc_method": "server/discover",
+    "header_method": "server/discover",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 4703,
+    "rpc_method": "tools/list",
+    "header_method": "tools/list",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 404,
+    "ms": 4476,
+    "rpc_method": "initialize",
+    "header_method": null,
+    "header_protocol": "2025-11-25",
+    "body_protocol": null,
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 4472,
+    "rpc_method": "server/discover",
+    "header_method": "server/discover",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 4446,
+    "rpc_method": "tools/list",
+    "header_method": "tools/list",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": null
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 4744,
+    "rpc_method": "tools/call",
+    "header_method": "tools/call",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": "search_cases"
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "status": 200,
+    "ms": 4705,
+    "rpc_method": "tools/call",
+    "header_method": "tools/call",
+    "header_protocol": "2026-07-28",
+    "body_protocol": "2026-07-28",
+    "header_name": "get_case_overview"
+  }
+]

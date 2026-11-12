@@ -16,6 +16,12 @@ class OAuthRevocationPolicyTest {
             assertDoesNotThrow(()->OAuthRevocation.validateRequest(r),"Presented credential syntax is not an existence signal");
         }
     }
+    @Test void externalRevocationRequiresExplicitNamespaceWithoutChangingLegacyValidation() {
+        var r=request("unknown");r.setParameter("client_id","https://metadata.public.org/client.json");
+        assertThrows(RuntimeException.class,()->OAuthRevocation.validateRequest(r));
+        assertDoesNotThrow(()->OAuthRevocation.validateRequest(r,true));
+        r.setParameter("client_id","http://metadata.public.org/client.json");assertThrows(RuntimeException.class,()->OAuthRevocation.validateRequest(r,true));
+    }
     @Test void rejectsCallerAuthoritySecretsHeadersQueriesDuplicatesAndUnboundedForms() {
         for(String extra:List.of("tenant_id","user_id","integration_id","session_id","resource","scope","client_secret","jwks_uri")) {
             var r=request("opaque");r.setParameter(extra,"sentinel");assertThrows(RuntimeException.class,()->OAuthRevocation.validateRequest(r),extra);

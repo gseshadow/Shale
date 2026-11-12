@@ -1,0 +1,12 @@
+{
+  "environment": "managed Cloud workspace, not Azure deployment network",
+  "observationsCurrent": true,
+  "azureOutboundIdentities": 0,
+  "defaultFetcher": "unmodified CimdMetadataService and CimdHttps; no test resolver/connector",
+  "result": "failed closed",
+  "elapsedIncludingJvmTlsInitializationMs": 5208,
+  "metadataBudgetMs": 5000,
+  "azureDeploymentAcceptance": "not executed; actual slot/network identity unavailable",
+  "insecureFallbackAdded": false,
+  "acceptanceProcedure": "docs/testing/universal-mcp-pr-b-stabilization.md#precise-azure-egress-acceptance-check-not-executed-here"
+}

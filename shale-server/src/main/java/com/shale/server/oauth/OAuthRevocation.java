@@ -85,6 +85,9 @@ final class OAuthRevocation {
         }
     }; }
     static void validateRequest(HttpServletRequest req) {
+        validateRequest(req,false);
+    }
+    static void validateRequest(HttpServletRequest req,boolean external) {
         if(!"POST".equals(req.getMethod())||req.getContentType()==null||
                 !req.getContentType().split(";",2)[0].equalsIgnoreCase("application/x-www-form-urlencoded")||
                 req.getHeader("Authorization")!=null||req.getQueryString()!=null||req.getContentLengthLong()>16384)throw OAuthCodeExchange.error("invalid_request");
@@ -93,6 +96,8 @@ final class OAuthRevocation {
             if(!allowed.contains(entry.getKey())||entry.getValue().length!=1||entry.getValue()[0]==null||entry.getValue()[0].isBlank()||
                     entry.getValue()[0].length()>(entry.getKey().equals("client_assertion")?8192:2048))throw OAuthCodeExchange.error("invalid_request");
         }
-        if(req.getParameter("token")==null||req.getParameter("client_id")==null||!req.getParameter("client_id").matches("[A-Za-z0-9_-]{1,64}"))throw OAuthCodeExchange.error("invalid_request");
+        if(req.getParameter("token")==null||req.getParameter("client_id")==null)throw OAuthCodeExchange.error("invalid_request");
+        if(external)new CimdClientIdentifier(req.getParameter("client_id"));
+        else if(!req.getParameter("client_id").matches("[A-Za-z0-9_-]{1,64}"))throw OAuthCodeExchange.error("invalid_request");
     }
 }

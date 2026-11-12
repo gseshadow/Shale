@@ -41,6 +41,15 @@ public final class OAuthMetadataContract {
     }
 
     public static Map<String, Object> protectedResource(McpOAuthProperties properties) {
-        return Map.of("resource", properties.resource(), "authorization_servers", List.of(properties.issuer()));
+        return Map.of("resource", properties.resource(), "authorization_servers", List.of(properties.issuer()),
+                "scopes_supported",List.of("cases.search","cases.overview.read"));
+    }
+    public static Map<String,Object> authorizationServer(McpOAuthProperties properties,boolean authorizationEnabled,boolean exchangeEnabled,boolean cimd) {
+        var claims=new java.util.LinkedHashMap<>(authorizationServer(properties,authorizationEnabled,exchangeEnabled));
+        if(cimd) {
+            if(!authorizationEnabled||!exchangeEnabled)throw new IllegalStateException("Complete CIMD lifecycle required.");
+            claims.put("client_id_metadata_document_supported",true);
+        }
+        return Map.copyOf(claims);
     }
 }
