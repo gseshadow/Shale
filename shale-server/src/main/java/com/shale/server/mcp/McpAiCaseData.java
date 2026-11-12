@@ -14,15 +14,20 @@ final class McpAiCaseData {
     private final String database;
     private final McpOAuthProperties identity;
     private final AiCaseDataAttestation.Contract contract;
+    private final AiExternalContract externalContract;
     McpAiCaseData(Environment env,McpOAuthProperties identity,DataSources sources) {
         this(configuredData(env,sources),source(env,"shale.ai.data.verifier"),
                 List.of(sources.auth(),sources.runtime(),source(env,"shale.ai.oauth.bootstrap")),
-                env.getRequiredProperty("shale.ai.data.database"),identity,contract(env));
+                env.getRequiredProperty("shale.ai.data.database"),identity,contract(env),env.getProperty("shale.ai.dcr.enabled",Boolean.class,false)?AiExternalContract.DCR_V3:AiExternalContract.CIMD_V1);
     }
     McpAiCaseData(DataSource data,DataSource verifier,List<DataSource> forbidden,String database,McpOAuthProperties identity) {
         this(data,verifier,forbidden,database,identity,AiCaseDataAttestation.Contract.V1);
     }
     McpAiCaseData(DataSource data,DataSource verifier,List<DataSource> forbidden,String database,McpOAuthProperties identity,AiCaseDataAttestation.Contract contract) {
+        this(data,verifier,forbidden,database,identity,contract,AiExternalContract.CIMD_V1);
+    }
+    McpAiCaseData(DataSource data,DataSource verifier,List<DataSource> forbidden,String database,McpOAuthProperties identity,AiCaseDataAttestation.Contract contract,AiExternalContract externalContract) {
+        this.externalContract=java.util.Objects.requireNonNull(externalContract);
         this.contract=java.util.Objects.requireNonNull(contract);
         this.data=java.util.Objects.requireNonNull(data);this.verifier=java.util.Objects.requireNonNull(verifier);
         this.forbidden=List.copyOf(forbidden);this.database=java.util.Objects.requireNonNull(database);this.identity=java.util.Objects.requireNonNull(identity);
@@ -35,7 +40,7 @@ final class McpAiCaseData {
     AiCaseDataAttestation attestation(long deadline) {
         return new AiCaseDataAttestation(new McpJdbcDeadline(data,deadline),new McpJdbcDeadline(verifier,deadline),
                 forbidden.stream().map(d->(DataSource)new McpJdbcDeadline(d,deadline)).toList(),database,identity.issuer(),identity.resource(),
-                identity.identity()==McpOAuthProperties.Identity.PRODUCTION,contract);
+                identity.identity()==McpOAuthProperties.Identity.PRODUCTION,contract,externalContract);
     }
     AiCaseDataRequest authenticate(String token,long deadline) {
         ready(deadline);

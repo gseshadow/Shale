@@ -23,9 +23,9 @@ public class CimdConnectionConfiguration {
         if(identity.identity()==McpOAuthProperties.Identity.PRODUCTION)throw new IllegalStateException("Separate development CIMD identity required.");
         return new CimdMetadataService(identity.issuer());
     }
-    @Bean CimdOAuthLifecycle cimdLifecycle(CimdServices services,CimdMetadataService metadata,McpOAuthProperties identity) {
+    @Bean CimdOAuthLifecycle cimdLifecycle(CimdServices services,CimdMetadataService metadata,McpOAuthProperties identity,Environment env,org.springframework.beans.factory.ObjectProvider<DcrCapabilities> dcr) {
         if(identity.identity()==McpOAuthProperties.Identity.PRODUCTION)throw new IllegalStateException("Separate development CIMD identity required.");
-        return new CimdOAuthLifecycle(metadata,services.metadata(),services.resolver(),services.neutral(),services.issuer(),identity,java.time.Clock.systemUTC());
+        return new CimdOAuthLifecycle(metadata,services.metadata(),services.resolver(),services.neutral(),services.issuer(),identity,java.time.Clock.systemUTC(),env.getProperty("shale.ai.dcr.enabled",Boolean.class,false)?dcr.getObject().metadata():null);
     }
     @Bean CimdApplicationAccess cimdApplications(CimdServices services,CimdMetadataService metadata,CimdOAuthLifecycle lifecycle) {
         return new CimdApplicationAccess(services,metadata,lifecycle);

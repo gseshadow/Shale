@@ -1,0 +1,18 @@
+[
+  {
+    "tool": "search_cases",
+    "milliseconds": 6298,
+    "is_error": false,
+    "returned_synthetic_case_ids": [
+      100
+    ]
+  },
+  {
+    "tool": "get_case_overview",
+    "milliseconds": 6617,
+    "is_error": false,
+    "returned_synthetic_case_ids": [
+      100
+    ]
+  }
+]

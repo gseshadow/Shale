@@ -1,0 +1,71 @@
+[
+  {
+    "check": "HTTP tenant B refresh",
+    "status": 200,
+    "ms": 187
+  },
+  {
+    "check": "tenant B cannot disclose tenant A Case",
+    "status": 200,
+    "isError": true,
+    "ms": 6598
+  },
+  {
+    "check": "HTTP SQL refresh rotation",
+    "status": 200,
+    "ms": 59
+  },
+  {
+    "check": "rotated credential audited Case disclosure",
+    "status": 200,
+    "ms": 6127
+  },
+  {
+    "check": "ordinary user cannot revoke/approve tenant application",
+    "status": 401
+  },
+  {
+    "check": "tenant B administrator cannot change tenant A approval",
+    "status": 401
+  },
+  {
+    "check": "current tenant A administrator revokes approval via HTTP",
+    "status": 200
+  },
+  {
+    "check": "approval revocation blocks existing access",
+    "status": 401,
+    "ms": 6055
+  },
+  {
+    "check": "approval revocation blocks refresh",
+    "status": 400
+  },
+  {
+    "check": "tenant B survives tenant A approval revocation",
+    "status": 200,
+    "ms": 5922
+  },
+  {
+    "check": "HTTP credential family revocation",
+    "status": 200
+  },
+  {
+    "check": "revoked credential denied",
+    "status": 401,
+    "ms": 6108
+  },
+  {
+    "check": "revoked family refresh denied",
+    "status": 400
+  },
+  {
+    "check": "unknown credential revocation is the same empty 200",
+    "status": 200
+  },
+  {
+    "check": "existing manual client Case HTTP continuity",
+    "status": 200,
+    "ms": 2413
+  }
+]

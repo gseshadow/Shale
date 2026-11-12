@@ -29,7 +29,7 @@ import java.util.Map;
 /** The only Spring security chain. Unmatched Shale routes retain their controller/service authority. */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@org.springframework.context.annotation.Import({OAuthCodeBootstrapConfiguration.class,CimdConnectionConfiguration.class})
+@org.springframework.context.annotation.Import({OAuthCodeBootstrapConfiguration.class,CimdConnectionConfiguration.class,DcrConnectionConfiguration.class})
 @EnableConfigurationProperties(McpOAuthProperties.class)
 public class McpOAuthSecurityConfiguration {
     private Map<Control, Value> startupControls = Map.of();
@@ -61,6 +61,7 @@ public class McpOAuthSecurityConfiguration {
             @org.springframework.beans.factory.annotation.Qualifier("oauthCodeBootstrap") org.springframework.beans.factory.ObjectProvider<com.shale.core.runtime.DbSessionProvider> bootstrap,
             org.springframework.beans.factory.ObjectProvider<HttpServletRequest> currentRequest,
             org.springframework.beans.factory.ObjectProvider<CimdOAuthLifecycle> cimdLifecycle,
+            org.springframework.beans.factory.ObjectProvider<DcrCapabilities> dcrCapabilities,
             org.springframework.beans.factory.ObjectProvider<CimdServices> cimdServices,
             org.springframework.beans.factory.ObjectProvider<CimdApplicationAccess> cimdApplications,
             org.springframework.beans.factory.ObjectProvider<com.shale.data.security.ai.AiCimdCaseData> cimdCase) throws Exception {
@@ -69,6 +70,8 @@ public class McpOAuthSecurityConfiguration {
         boolean exchangeEnabled=environment.getProperty("shale.ai.oauth.exchange-enabled",Boolean.class,false);
         if(exchangeEnabled && !properties.compositionEnabled()) throw new IllegalArgumentException("OAuth composition required.");
         boolean cimd=environment.getProperty("shale.ai.cimd.enabled",Boolean.class,false);
+        boolean dcr=environment.getProperty("shale.ai.dcr.enabled",Boolean.class,false);
+        if(dcr&&!cimd)throw new IllegalStateException("Complete external lifecycle required for DCR.");
         if(cimd)cimdCase.getObject(); // Verify the actual Case composition before advertising CIMD.
         var external=cimd?new CimdOAuthProviders(cimdLifecycle.getObject(),currentRequest::getObject):null;
         var exchange=exchangeEnabled ? new OAuthCodeExchange(bootstrap.getObject(),connections.getObject(),properties,currentRequest::getObject) : null;
@@ -173,7 +176,7 @@ public class McpOAuthSecurityConfiguration {
                                     var client=durable.findByClientId(result.getClientId());
                                     if(client!=null && result.getRedirectUri()!=null) {
                                         OAuthRedirectPolicy.validate(result.getRedirectUri(),client.getRedirectUris(),
-                                                !client.getClientAuthenticationMethods().contains(org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE));
+                                                !client.getClientAuthenticationMethods().contains(org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE),client.getClientId());
                                         String target=org.springframework.web.util.UriComponentsBuilder.fromUriString(result.getRedirectUri())
                                                 .queryParam("error","access_denied").queryParam("state","{state}").queryParam("iss","{iss}")
                                                 .encode().buildAndExpand(result.getState(),properties.issuer()).toUriString();
@@ -193,7 +196,7 @@ public class McpOAuthSecurityConfiguration {
         }
         // The gate precedes AS processing. Explicit exchange enables opaque code/refresh issuance and authenticated family revocation.
         if(durable!=null) http.addFilterBefore(new OAuthBrowserFilter(environment.getProperty("shale.ai.oauth.browser-origin"),properties,cimd), SecurityContextHolderFilter.class);
-        http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled,cimd), SecurityContextHolderFilter.class);
+        http.addFilterBefore(new FoundationGate(properties,authorizationEnabled,exchangeEnabled,cimd,()->cimd&&environment.getProperty("shale.ai.cimd.metadata-advertisement-enabled",Boolean.class,true),dcr?new DcrRegistrationEndpoint(dcrCapabilities.getObject()):null), SecurityContextHolderFilter.class);
         if(durable!=null) http.addFilterAfter(new OAuthHumanFilter(humans,durable,cimd?cimdApplications.getObject():null),SecurityContextHolderFilter.class);
         var chain = http.build();
         startupControls = Map.of(Control.OAUTH_COMPOSITION, Value.of(properties.compositionEnabled()),
@@ -205,19 +208,22 @@ public class McpOAuthSecurityConfiguration {
     private static final class FoundationGate extends OncePerRequestFilter {
         private final McpOAuthProperties properties;
         private final boolean authorizationEnabled,exchangeEnabled,cimd;
+        private final java.util.function.BooleanSupplier advertiseCimd;
+        private final DcrRegistrationEndpoint dcr;
         private final org.springframework.http.converter.json.JacksonJsonHttpMessageConverter metadata =
                 new org.springframework.http.converter.json.JacksonJsonHttpMessageConverter();
-        private FoundationGate(McpOAuthProperties properties,boolean authorizationEnabled,boolean exchangeEnabled,boolean cimd) { this.properties=properties; this.authorizationEnabled=authorizationEnabled; this.exchangeEnabled=exchangeEnabled;this.cimd=cimd; }
+        private FoundationGate(McpOAuthProperties properties,boolean authorizationEnabled,boolean exchangeEnabled,boolean cimd,java.util.function.BooleanSupplier advertiseCimd,DcrRegistrationEndpoint dcr) { this.advertiseCimd=advertiseCimd;this.dcr=dcr; this.properties=properties; this.authorizationEnabled=authorizationEnabled; this.exchangeEnabled=exchangeEnabled;this.cimd=cimd; }
         @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
                 throws ServletException, IOException {
             response.setHeader("Cache-Control", "no-store");
             if (properties.compositionEnabled() && "GET".equals(request.getMethod()) &&
                     request.getRequestURI().substring(request.getContextPath().length()).equals(OAuthMetadataContract.AUTHORIZATION_SERVER_PATH)) {
-                metadata.write(OAuthMetadataContract.authorizationServer(properties,authorizationEnabled,exchangeEnabled,cimd), org.springframework.http.MediaType.APPLICATION_JSON,
+                metadata.write(OAuthMetadataContract.authorizationServer(properties,authorizationEnabled,exchangeEnabled,advertiseCimd.getAsBoolean(),dcr!=null&&dcr.enabled()), org.springframework.http.MediaType.APPLICATION_JSON,
                         new org.springframework.http.server.ServletServerHttpResponse(response));
                 return;
             }
             String path=request.getRequestURI().substring(request.getContextPath().length());
+            if(dcr!=null && path.equals("/oauth/mcp/register") && "POST".equals(request.getMethod())) { dcr.handle(request,response);return; }
             if(exchangeEnabled && path.equals("/oauth/mcp/revoke") && "POST".equals(request.getMethod())) {
                 try {OAuthRevocation.validateRequest(request,cimd&&CimdOAuthProviders.external(request.getParameter("client_id")));chain.doFilter(request,response);}
                 catch(org.springframework.security.oauth2.core.OAuth2AuthenticationException | SecurityException | IllegalArgumentException failure) {

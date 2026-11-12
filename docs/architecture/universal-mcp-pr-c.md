@@ -1,5 +1,9 @@
 # Universal MCP PR C — DCR security dependency
 
+C2 now implements the development-gated RFC 7591 endpoint over verified C1.
+See [C2 contract](universal-mcp-pr-c2.md) and its acceptance evidence. The original
+investigation below is historical; production remains OFF and undeployed.
+
 PR C1 now has an implementation candidate for this dependency; see
 [source-aware compatibility contract](universal-mcp-pr-c1.md). Its real SQL
 acceptance now passes all four authored scenarios against the verified private
