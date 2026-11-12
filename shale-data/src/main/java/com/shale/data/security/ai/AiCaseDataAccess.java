@@ -16,6 +16,16 @@ import static com.shale.data.security.ai.IntegrationAccessAudit.*;
 /** Confined SQL boundary: no Case DAO/port or ordinary runtime identity is available here.
  * SQL owns all transactions; Java drains completion and closes before encoding/handoff. */
 public final class AiCaseDataAccess implements IntegrationCaseReader {
+    /** Trusted composition selects once at authentication; requests retain it through cleanup. */
+    public enum Namespace {
+        LEGACY_V1, CIMD_V1;
+        String procedure(String root) {
+            if (!Set.of("AiDataAuthenticateV1", "AiDataSearchCasesV1", "AiDataGetCaseOverviewV1",
+                    "AiDataAuthorizeCaseHandoffV1", "AiDataRecordCaseFailureV1", "AiDataFinishCaseQuotaV1").contains(root))
+                throw new IllegalArgumentException("Unknown Case procedure.");
+            return this == LEGACY_V1 ? root : "AiCimdData" + root.substring("AiData".length());
+        }
+    }
     private static final Semaphore ACTIVE = new Semaphore(5);
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(AiCaseDataAccess.class);
     private final DataSource data;
@@ -36,6 +46,11 @@ public final class AiCaseDataAccess implements IntegrationCaseReader {
     }
 
     public static AiCaseDataRequest authenticate(DataSource data, String token, String issuer, String resource, long admissionDeadline) {
+        return authenticate(data, token, issuer, resource, admissionDeadline, Namespace.LEGACY_V1);
+    }
+    public static AiCaseDataRequest authenticate(DataSource data, String token, String issuer, String resource,
+                                               long admissionDeadline, Namespace namespace) {
+        Objects.requireNonNull(namespace);
         byte[] digest;
         try { digest=AiOAuthCredentialStore.digest(token); } catch(RuntimeException invalid) { throw denied(); }
         ProofDigest proof=new ProofDigest(digest);
@@ -46,7 +61,7 @@ public final class AiCaseDataAccess implements IntegrationCaseReader {
             if(remaining<=0 || Thread.currentThread().isInterrupted()) throw denied();
             UUID invocation=UUID.randomUUID(),correlation=UUID.randomUUID();
             var contexts=new ArrayList<VerifiedIntegrationContext>();
-            rpc(data,proof,invocation,correlation,"AiDataAuthenticateV1",5,(index,rows)-> {
+            rpc(data,proof,invocation,correlation,namespace.procedure("AiDataAuthenticateV1"),5,(index,rows)-> {
                 while(rows.next()) {
                     if(!invocation.equals(AiSql.uuid(rows,"InvocationId")) || !correlation.equals(AiSql.uuid(rows,"CorrelationId"))
                             || !issuer.equals(rows.getString("Issuer")) || !resource.equals(rows.getString("Resource"))) throw denied();
@@ -56,7 +71,7 @@ public final class AiCaseDataAccess implements IntegrationCaseReader {
                 }
             },Instant.now().plusNanos(Math.min(10_000_000_000L,remaining)));
             if(contexts.size()!=1 || System.nanoTime()>=admissionDeadline || Thread.currentThread().isInterrupted()) throw denied();
-            var result=new AiCaseDataRequest(contexts.getFirst(),proof);retained=true;return result;
+            var result=new AiCaseDataRequest(contexts.getFirst(),proof,namespace);retained=true;return result;
         } catch(Exception unavailable) { throw denied(); }
         finally { if(!retained)proof.close(); }
     }
@@ -88,7 +103,7 @@ public final class AiCaseDataAccess implements IntegrationCaseReader {
             var rows=new ArrayList<MinimizedCaseOverview>();
             var receipts=new ArrayList<Receipt>();
             phase=Reason.READ;
-            rpc(data,request.proof(),i.invocationId(),i.correlationId(),i.operation()==IntegrationInvocation.Operation.SEARCH?"AiDataSearchCasesV1":"AiDataGetCaseOverviewV1",i.timeoutSeconds(),(index,r)-> {
+            rpc(data,request.proof(),i.invocationId(),i.correlationId(),request.namespace().procedure(i.operation()==IntegrationInvocation.Operation.SEARCH?"AiDataSearchCasesV1":"AiDataGetCaseOverviewV1"),i.timeoutSeconds(),(index,r)-> {
                 if(index==0) while(r.next()) { if(rows.size()>=10)throw failure(Outcome.UNAVAILABLE,Reason.READ);rows.add(map(r)); }
                 else if(index==1) while(r.next()) receipts.add(receipt(i,r));
                 else throw failure(Outcome.UNAVAILABLE,Reason.READ);
@@ -105,7 +120,7 @@ public final class AiCaseDataAccess implements IntegrationCaseReader {
             if(full<0 || full>(i.operation()==IntegrationInvocation.Operation.SEARCH?65536:32768))throw failure(Outcome.UNAVAILABLE,Reason.OVERSIZED);
             i.check();phase=Reason.AUTHORITY;
             long started=monotonic.getAsLong();var permits=new ArrayList<Long>();
-            rpc(data,request.proof(),i.invocationId(),i.correlationId(),"AiDataAuthorizeCaseHandoffV1",i.timeoutSeconds(),(index,r)-> {
+            rpc(data,request.proof(),i.invocationId(),i.correlationId(),request.namespace().procedure("AiDataAuthorizeCaseHandoffV1"),i.timeoutSeconds(),(index,r)-> {
                 if(index!=0)throw failure(Outcome.DENIED,Reason.AUTHORITY);
                 while(r.next()) {
                     verifyIds(i,r);
@@ -129,10 +144,10 @@ public final class AiCaseDataAccess implements IntegrationCaseReader {
         boolean interrupted=Thread.interrupted();long until=System.nanoTime()+3_000_000_000L;
         try {
             DataSource bounded=cleanup.apply(until);
-            try { rpc(bounded,request.proof(),i.invocationId(),i.correlationId(),"AiDataRecordCaseFailureV1",3,(n,r)->{while(r.next()){}},
+            try { rpc(bounded,request.proof(),i.invocationId(),i.correlationId(),request.namespace().procedure("AiDataRecordCaseFailureV1"),3,(n,r)->{while(r.next()){}},
                     i.operation().tool(),fault.outcome().name(),fault.reason().name(),nullable(page,Types.INTEGER),nullable(requested,Types.BIGINT)); }
             catch(Exception unavailable) { LOG.error("INTEGRATION_ACCESS_AUDIT_OUTAGE"); }
-            if(System.nanoTime()<until) try { rpc(bounded,request.proof(),i.invocationId(),i.correlationId(),"AiDataFinishCaseQuotaV1",Math.max(1,(int)((until-System.nanoTime())/1_000_000_000L)),(n,r)->{while(r.next()){} }); }
+            if(System.nanoTime()<until) try { rpc(bounded,request.proof(),i.invocationId(),i.correlationId(),request.namespace().procedure("AiDataFinishCaseQuotaV1"),Math.max(1,(int)((until-System.nanoTime())/1_000_000_000L)),(n,r)->{while(r.next()){} }); }
             catch(Exception unavailable) { LOG.warn("INTEGRATION_QUOTA_RELEASE_UNAVAILABLE"); }
         } finally { if(interrupted)Thread.currentThread().interrupt(); }
     }

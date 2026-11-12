@@ -10,6 +10,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Routing/failure tests only. These doubles cannot establish Azure SQL permission semantics. */
 class AiCaseDataAttestationTest {
+    // Possessive repetition keeps inspection of large generated SQL batches off the Java call stack.
+    private static final java.util.regex.Pattern REGISTRY_SERVER_CHECK=java.util.regex.Pattern.compile(
+            "declare @registryservercheck nvarchar\\(max\\)=n'((?:[^']|'')*+)';\\s*exec\\(@registryservercheck\\);",
+            java.util.regex.Pattern.DOTALL);
+
+    @Test void registryPlatformInspectionHandlesLargeEscapedBatchesWithoutHidingFollowingSql() {
+        for(String newline:List.of("\n","\r\n")) {
+            String body=("SELECT N''escaped'';"+newline).repeat(4096)+"SELECT * FROM sys.server_principals;";
+            String batch="declare @registryservercheck nvarchar(max)=n'"+body+"';"+newline+
+                    "exec(@registryservercheck);"+newline+"SELECT * FROM sys.server_permissions;";
+            var dynamic=REGISTRY_SERVER_CHECK.matcher(batch);
+            assertTrue(dynamic.find(),"Large generated platform batches must remain inspectable without stack overflow.");
+            assertEquals(body,dynamic.group(1),"Only the complete escaped dynamic string may be excluded from Azure inspection.");
+            assertEquals(newline+"SELECT * FROM sys.server_permissions;",dynamic.replaceFirst(""),
+                    "Unconditional server catalog access after platform dispatch must remain visible to inspection.");
+        }
+    }
     @Test void platformsMustBePositivelyIdentified()throws Exception {
         for(int edition:List.of(2,3,4,8))assertEquals(AiCaseDataAttestation.Platform.SQL_SERVER_OR_MI,AiCaseDataAttestation.platform(connection(q->rows(edition))));
         assertEquals(AiCaseDataAttestation.Platform.AZURE_SQL_DATABASE,AiCaseDataAttestation.platform(connection(q->rows(5))));
@@ -128,7 +145,7 @@ class AiCaseDataAttestationTest {
                 // SQL Server metadata lives in a dynamic ELSE branch; Azure must never compile/issue it.
                 assertTrue(sql.contains("if @registryedition=5 begin"));
                 assertTrue(sql.contains("end else begin"));
-                var dynamic=java.util.regex.Pattern.compile("declare @registryservercheck nvarchar\\(max\\)=n'((?:[^']|'')*)';\\s*exec\\(@registryservercheck\\);",java.util.regex.Pattern.DOTALL).matcher(sql);
+                var dynamic=REGISTRY_SERVER_CHECK.matcher(sql);
                 assertTrue(dynamic.find(),"Explicit platform dispatch required: "+path);
                 assertTrue(dynamic.group(1).contains("sys.server_principals"));
                 sql=dynamic.replaceFirst("");

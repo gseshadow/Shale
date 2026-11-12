@@ -393,6 +393,8 @@
         "com.shale.server.oauth.OAuthRevocationPolicyTest",
         "com.shale.server.oauth.PinnedClientAssertionTest",
         "com.shale.server.oauth.OAuthAuthorizationFlowTest",
+        "com.shale.server.oauth.CimdBrowserBindingTest",
+        "com.shale.server.oauth.CimdClientAuthenticationTest",
         "com.shale.server.mcp.McpCaseCompositionTest",
         "com.shale.server.mcp.McpProductionOffBootTest"
       ]
@@ -516,6 +518,7 @@
         "build/auth-verification/**",
         "build/phase1r-verification/**",
         "build/sql-confinement/**",
+        "shale-data/src/main/resources/ai/cimd-authorization-v1-catalog.sql",
         "build/deployment-binding/**",
         "docs/sql/phase1r/**",
         "**/Phase1R*.java",

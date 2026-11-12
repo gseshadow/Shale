@@ -11,6 +11,16 @@ import java.lang.reflect.*;
 
 /** JDBC fault evidence supplements, and never substitutes for, the restricted-login SQL proofs. */
 class AiCaseDataAccessTest {
+    @Test void authenticatedNamespaceOwnsReadHandoffAndFailureCleanupWithoutFallback() {
+        for(var namespace:AiCaseDataAccess.Namespace.values()) {
+            var success=new Fixture(namespace);success.run();
+            assertEquals(List.of(namespace.procedure("AiDataGetCaseOverviewV1"),namespace.procedure("AiDataAuthorizeCaseHandoffV1")),success.procedures);
+            var failed=new Fixture(namespace);failed.fault="uncertain";
+            assertThrows(IntegrationReadException.class,failed::run);
+            assertEquals(List.of(namespace.procedure("AiDataGetCaseOverviewV1"),namespace.procedure("AiDataRecordCaseFailureV1"),namespace.procedure("AiDataFinishCaseQuotaV1")),failed.procedures);
+            assertThrows(IllegalArgumentException.class,()->namespace.procedure("AiDataArbitrarySql"));
+        }
+    }
     @Test void commitDrainAndCloseConsumeHandoffLifetimeAndNoCleanupRunsAfterSuccess()throws Exception {
         var f=new Fixture();
         var result=f.run();assertTrue(result.size()>0);assertEquals(List.of("read","read-close","encode","gate","gate-close"),f.events);
@@ -33,11 +43,13 @@ class AiCaseDataAccessTest {
         final DataSource data,cleanup;
         final AtomicLong clock=new AtomicLong();final AtomicInteger cleanups=new AtomicInteger();
         final List<String> events=new ArrayList<>();final AiCaseDataRequest request;
+        final List<String> procedures=new ArrayList<>();
         String fault="";long remaining=500,elapsedOnGateClose=0;
-        Fixture() {
+        Fixture() { this(AiCaseDataAccess.Namespace.LEGACY_V1); }
+        Fixture(AiCaseDataAccess.Namespace namespace) {
             var c=IntegrationCaseReadTest.context(7,72);
             var authority=new VerifiedIntegrationContext(7,72,c.integrationId(),c.grantId(),c.delegatedSessionId(),c.effectiveScopes(),null,c.oauthClientId(),null,c.credentialId(),c.issuer(),c.resource(),1,1,1,1,Instant.now().plusSeconds(30),UUID.randomUUID(),UUID.randomUUID());
-            byte[] proof=new byte[32];Arrays.fill(proof,(byte)19);request=new AiCaseDataRequest(authority,new ProofDigest(proof));
+            byte[] proof=new byte[32];Arrays.fill(proof,(byte)19);request=new AiCaseDataRequest(authority,new ProofDigest(proof),namespace);
             AtomicInteger sequence=new AtomicInteger();
             data=proxy(DataSource.class,(p,m,a)->m.getName().equals("getConnection")?lease(sequence.getAndIncrement()==0?"read":"gate"):zero(m));
             cleanup=proxy(DataSource.class,(p,m,a)->m.getName().equals("getConnection")?lease("cleanup"):zero(m));
@@ -61,7 +73,11 @@ class AiCaseDataAccessTest {
             });
             return proxy(Connection.class,(p,m,a)->switch(m.getName()) {
                 case "getAutoCommit"->true;
-                case "prepareCall"->statement;
+                case "prepareCall"->{
+                    String sql=(String)a[0];
+                    var match=java.util.regex.Pattern.compile("dbo\\.(\\w+)").matcher(sql);
+                    assertTrue(match.find());procedures.add(match.group(1));yield statement;
+                }
                 case "close"->{if(!kind.equals("cleanup"))events.add(kind+"-close");if(kind.equals("gate"))clock.set(elapsedOnGateClose);if(kind.equals("read")&&fault.equals("close"))throw new SQLException("synthetic close");yield null;}
                 default->zero(m);
             });

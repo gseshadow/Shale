@@ -78,6 +78,59 @@ class AiApplicationConfinementLocalSqlServerTest extends AiCaseDataLocalSqlServe
         try(Connection c=owner(db)){sql(c,"UPDATE dbo.AiProductCapability SET Enabled=0 WHERE Id=1");sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr3-confinement-prepare.sql")));sql(c,Files.readString(Path.of("../docs/sql/ai-integration/universal-pr3.sql")));}
         attachApplicationRoles();
     }
+    /** Diagnostic evidence for PR 4's SQL dependency, not an accepted CIMD issuance path.
+     * Owner-only activation deliberately models the unsafe shortcut of routing a CIMD approval
+     * through the legacy opaque client. Production approval must remain SUSPENDED. */
+    @Test void legacyFamilyCannotServeAsCimdRevisionBinding() throws Exception {
+        installCompatibility();
+        Map<String,String> originalReceipts;
+        String originalBinding;
+        try(Connection c=owner(db)){
+            originalReceipts=receipts(c);originalBinding=binding(c);
+            sql(c,"UPDATE dbo.AiProductCapability SET Enabled=1 WHERE Id=1");
+        }
+        var app=publishApplication();
+        var memberA=new AiTenantApplicationService(provider("tenant",7,72));
+        var memberB=new AiTenantApplicationService(provider("tenant",8,82));
+        var pendingA=memberA.request(app.applicationId(),app.rowVersion(),com.shale.core.security.ai.AiScope.fromMask(3));
+        var pendingB=memberB.request(app.applicationId(),app.rowVersion(),com.shale.core.security.ai.AiScope.fromMask(3));
+        var a=new AiTenantApplicationService(provider("tenant",7,71)).decide(pendingA.approvalId(),pendingA.rowVersion(),AiTenantApplicationService.Decision.APPROVE,com.shale.core.security.ai.AiScope.fromMask(3),1);
+        var b=new AiTenantApplicationService(provider("tenant",8,81)).decide(pendingB.approvalId(),pendingB.rowVersion(),AiTenantApplicationService.Decision.APPROVE,com.shale.core.security.ai.AiScope.fromMask(3),1);
+        AiIntegrationSecurityService.Registration registrationA,registrationB;
+        try(Connection c=owner(db)) {
+            assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiIntegrationRegistration WHERE IntegrationId IN('"+a.integrationId()+"','"+b.integrationId()+"') AND Status='SUSPENDED'"),
+                    "The real approval implementation must keep both integrations dormant.");
+            // Deliberately unsafe disposable-only adapter, never production code or a migration.
+            for(var approval:List.of(a,b)) {
+                sql(c,"UPDATE dbo.AiIntegrationRegistration SET Status='ACTIVE' WHERE IntegrationId='"+approval.integrationId()+"'");
+                sql(c,"INSERT dbo.AiIntegrationRedirect(ShaleClientId,IntegrationId,Position,RedirectUri) SELECT ShaleClientId,IntegrationId,1,N'"+CALLBACK+"' FROM dbo.AiIntegrationRegistration WHERE IntegrationId='"+approval.integrationId()+"'");
+            }
+            registrationA=controls(7,71).inspectRegistrations().stream().filter(r->r.integrationId().equals(a.integrationId())).findFirst().orElseThrow();
+            registrationB=controls(8,81).inspectRegistrations().stream().filter(r->r.integrationId().equals(b.integrationId())).findFirst().orElseThrow();
+        }
+        String accessA=issueWithRegistration(7,72,registrationA),accessB=issueWithRegistration(8,82,registrationB);
+        byte[] changedDigest=new byte[32];changedDigest[0]=1;
+        var revised=new AiApplicationRegistryService(()->{try{return connection("publisher",null,null);}catch(SQLException e){throw new IllegalStateException(e);}},ISSUER,RESOURCE)
+                .publishCimd("https://vendor.test/oauth/client.json",changedDigest,1,false,app.rowVersion());
+        assertEquals(app.revision()+1,revised.revision());
+        try(Connection c=owner(db)) {
+            assertEquals(2,count(c,"SELECT COUNT(*) FROM dbo.AiTenantApplicationApproval p JOIN dbo.AiExternalApplication e ON e.ApplicationId=p.ApplicationId WHERE p.State='APPROVED' AND p.ApplicationRevision<>e.Revision"),
+                    "The probe requires stale approvals in both tenants.");
+        }
+        // Source/permission acceptance does not establish application-revision eligibility.
+        identitiesAttestation().verify();attestation().verify();
+        for(var entry:List.of(Map.entry(accessA,7),Map.entry(accessB,8)))try(var request=authenticate(entry.getKey())) {
+            assertEquals(entry.getValue().intValue(),request.authority().shaleClientId(),"Legacy proof must retain tenant isolation even in this diagnostic.");
+            var invocation=IntegrationInvocation.overview(request.authority(),System.nanoTime()+8_000_000_000L);
+            long ownCase=entry.getValue()==7?100L:200L;
+            assertTrue(new AiCaseDataAccess(source("ai"),source("ai"),request).overview(invocation,ownCase,DisclosureBuffer::size).size()>0,
+                    "Dependency probe: a legacy credential has no CIMD application-revision check; do not wire this shortcut.");
+        }
+        try(Connection c=owner(db)) {
+            assertEquals(originalReceipts,receipts(c),"The dependency probe must not refresh any receipt.");
+            assertEquals(originalBinding,binding(c),"The dependency probe must preserve every immutable binding value.");
+        }
+    }
     void attachApplicationRoles()throws Exception {try(Connection c=owner(db)){sql(c,"ALTER ROLE AiApplicationPublisher ADD MEMBER ["+prefix+"_publisher]; ALTER ROLE AiApplicationTenant ADD MEMBER ["+prefix+"_tenant]");}}
     AiRegistryIdentityAttestation identitiesAttestation(){return new AiRegistryIdentityAttestation(source("publisher"),source("tenant"),source("catalog"),db);}
     AiApplicationRegistryService.Application publishApplication() {
