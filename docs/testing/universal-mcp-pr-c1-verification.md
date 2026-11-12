@@ -74,7 +74,7 @@ The four authored scenarios cover:
    counts; independent tenant A/B approvals and explicit consent; issuance;
    real restricted Case reads/cross-tenant denial; rejection by CIMD-only/manual
    paths; existing CIMD and manual Case continuity.
-2. Refresh, tenant-specific approval revocation, other-tenant continuity,
+2. Refresh, known/unknown credential revocation, tenant-specific approval revocation, other-tenant continuity,
    application disablement/revision invalidation and manual continuity.
 3. Actual V1 rejection, explicit successor acceptance, catalog drift refusal,
    historical receipt and binding equality.
@@ -98,5 +98,38 @@ generation tests.
 
 ## Final repository checks
 
-Affected-suite, critical-reactor and final preservation results are recorded
-after execution. No pending check is counted as passing.
+The selector chose **cases, security-data and server**, limited to core/data/server
+modules. Those areas cover the request-owned Case namespace, registry/identity/
+audit contracts and OAuth/browser lookup behavior changed here. Its emitted
+affected Maven arguments passed **231 tests** (2/141/88), zero failures/errors/
+skips. Its Python commands passed **5 deployment-binding checks** and **5 C1
+generation checks**. SQL opt-in classes executed no SQL scenario; their absence
+from a Maven failure count does not close acceptance.
+
+The relevant local critical reactor passed **236 tests** (6/134/96), zero
+failures/errors/skips:
+
+```text
+python build/test-selection/select_tests.py \
+  --base f18574784d2bf8064c7df09cefb4386a310f5b52 --head HEAD --format json \
+  --output work/pr-c1-selection.json --plan-output work/pr-c1-selection-plan.json
+# Execute selected_maven_args and python_command_args from that plan.
+mvn -s work/maven-settings.xml -B -Dmaven.repo.local=/workspace/Shale/work/m2 \
+  -pl shale-server -am test
+git diff --check
+```
+
+The informational full-suite recommendation comes from registering the two new
+unit classes in the critical/area manifests. No broad historical SQL, unrelated
+UI or full-suite campaign was run. Selector unit tests passed as recorded above.
+After final source review removed a redundant unused anonymous-adapter helper,
+the directly relevant store/browser/metadata checks passed again: **14 tests**,
+zero failures/errors/skips; all data/server test sources, including the four
+authored SQL scenarios, compiled. No real SQL execution is inferred from that.
+
+Final preservation review compared SHA-256 of all **273 baseline artifacts**
+under `docs/sql`, `shale-data/src/main/resources/ai`, `build/sql-confinement` and
+`build/deployment-binding` to the base commit: **zero changed predecessor
+artifacts**. New successor files are additive. Changed-file-to-test review and
+diff whitespace checks passed. Audit integration uses the existing schema and
+transaction owners; runtime audit rollback remains part of the blocked SQL tests.

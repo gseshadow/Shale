@@ -52,11 +52,7 @@ public final class AiCimdOAuthStore implements AiOAuthBrowserStore {
         var delegate=this;
         return new AiOAuthBrowserStore(){
             private void requireWeb(UUID web){if(!Objects.equals(originalWeb.get(),web))throw new SecurityException("Original WEB session required.");}
-            public AiExternalContract contract(){return contract;}
-    private <T> List<T> call(String procedure,AiSql.Mapper<T> mapper,Object... args) {
-        return AiSql.call(db,contract.procedure(procedure),mapper,args);
-    }
-    @Override public boolean externalIdentity(){return true;}
+            @Override public boolean externalIdentity(){return true;}
             @Override public Optional<AiOAuthTransactionStore.Client> loadClient(String id){return delegate.loadClient(id,originalWeb.get());}
             @Override public void begin(UUID id,UUID web,String client,String redirect,String challenge,String state,Set<AiScope> scopes,String nonce){requireWeb(web);delegate.begin(id,web,client,redirect,challenge,state,scopes,nonce);}
             @Override public Optional<AiOAuthTransactionStore.Intent> findIntent(String nonce,UUID web){requireWeb(web);return delegate.findIntent(nonce,web);}

@@ -103,10 +103,16 @@ class AiDcrApplicationLocalSqlServerTest extends AiCimdAuthorizationLocalSqlServ
             assertThrows(RuntimeException.class,()->disclosure(cases,ta.accessToken(),7,72,100));disclosure(cases,rotated.accessToken(),8,82,200);
         }
         assertThrows(RuntimeException.class,()->external("v2issuer",7,72).refresh(ta.refreshToken(),client,null,null,null,null));
-        dcr("v2admin").changeState(registration.application().applicationId(),true,registration.application().rowVersion());
-        assertThrows(RuntimeException.class,()->dcr("v2stored").prepare(registration.identifier()));
+        byte[] digest=dcr("v2stored").prepare(registration.identifier()).digest();
+        external("v2issuer",8,82).revoke(rotated.refreshToken(),client,digest,"none",null,null,null,null);
+        external("v2neutral",null,null).revokeUnknown(client,digest,"none",null,null,null,null);
         assertThrows(RuntimeException.class,()->external("v2issuer",8,82).refresh(rotated.refreshToken(),client,null,null,null,null));
         try(var cases=externalCases()){assertThrows(RuntimeException.class,()->disclosure(cases,rotated.accessToken(),8,82,200));}
+        var fresh=dcrRedeem(client,dcrConsent(client,8,82));
+        dcr("v2admin").changeState(registration.application().applicationId(),true,registration.application().rowVersion());
+        assertThrows(RuntimeException.class,()->dcr("v2stored").prepare(registration.identifier()));
+        assertThrows(RuntimeException.class,()->external("v2issuer",8,82).refresh(fresh.refreshToken(),client,null,null,null,null));
+        try(var cases=externalCases()){assertThrows(RuntimeException.class,()->disclosure(cases,fresh.accessToken(),8,82,200));}
         manualRead();
     }
     @Test void dcrSuccessorRejectsDriftWithoutChangingHistoricalReceipts()throws Exception {
