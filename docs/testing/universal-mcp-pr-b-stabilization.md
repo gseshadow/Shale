@@ -173,3 +173,48 @@ small workload. Actual Azure egress acceptance remains **pending/blocking for de
 no merge/deployment/production-activation approval is inferred. Larger-load capacity
 remains unmeasured; the observed four-request result is not an SLA or a reason to extend
 deadlines. Stop this review at these findings rather than expanding the architecture.
+
+The Azure operator can use JShell on the exact release runtime classpath for step 2
+(no Spring startup, SQL or feature activation):
+
+```java
+import com.shale.server.oauth.CimdClientIdentifier;
+import com.shale.server.oauth.cimd.CimdMetadataService;
+try (var service = new CimdMetadataService("https://api.myshale.com/oauth/mcp")) {
+    long started = System.nanoTime();
+    var snapshot = service.retrieve(new CimdClientIdentifier(
+        "https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json"));
+    long elapsedMs = (System.nanoTime() - started) / 1_000_000;
+    if (elapsedMs > 5000) throw new IllegalStateException("Metadata budget exceeded");
+    System.out.println("PASS metadataMs=" + elapsedMs
+        + " redirects=" + snapshot.redirects().size() + " methods=" + snapshot.methods());
+}
+```
+
+Use the slot's unchanged trust configuration; do not set trust-all flags or substitute
+resolver/connector implementations. An exception is a failed acceptance check. The
+issuer string above is only a cache/identity binding; this code fetches the vendor
+metadata URL, not the Shale production endpoint.
+
+Final local critical core/data/server reactor: **225 passed**, zero skips. The selector
+was based on `f7707887`; its affected suite ran without SQL opt-in, so it did not repeat
+historical database scenarios. The three selected real-SQL methods above are the only
+SQL regression executions in this review, in addition to the two small measurement
+fixtures. The metadata and authorization sources are otherwise unchanged.
+
+The current selector affected suite passed **155 tests** (core 2, data 137, server 16),
+zero failures/errors/skips. Commands used were the existing task-local Maven/JDK 21
+prefix with:
+
+```text
+mvn -pl shale-data -am -Dtest=AiCaseDataAccessTest,IntegrationCaseReadTest,AiCaseDataAttestationTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-server -am -Dtest=CimdRetrievalTest,CimdMetadataTest,CimdConnectionConfigurationTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,OAuthBrowserFilterTest,McpTransportTest,McpProductionOffBootTest -Dsurefire.failIfNoSpecifiedTests=false test
+python build/test-selection/select_tests.py --base f7707887f06ab87cd55ed8eff21ee3b4a2128796 --head HEAD --format json
+# Execute the emitted selected_maven_args without SQL opt-in.
+mvn -pl shale-server -am test
+git diff --check
+```
+
+Real SQL ran with the existing disposable opt-in, verified fixture hash and trusted TLS,
+using `-Dtest=AiCimdAuthorizationLocalSqlServerTest#` followed by exactly the three method
+names above joined with `+`. No full-suite profile, deployment or production action ran.

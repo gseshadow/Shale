@@ -146,3 +146,8 @@ existing SQL schema and transaction owners; no new audit schema or receipt refre
 Actual tenant B browser screens (synthetic identity only):
 [tenant application approval](evidence/universal-mcp-pr-b/tenant-approval.png), followed by
 [separate user consent](evidence/universal-mcp-pr-b/user-consent.png).
+
+The subsequent [bounded stabilization review](universal-mcp-pr-b-stabilization.md)
+reproduces and corrects the shared-monitor timeout while retaining all checks and
+original deadlines. It also specifies the still-pending actual Azure egress acceptance
+check; no production fallback or activation is added.
