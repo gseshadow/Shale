@@ -108,7 +108,9 @@ for suffix in ('Code', 'Refresh', 'Revocation'):
     marker = ' AND x.ExternalClientId=@External'
     guard = " AND EXISTS(SELECT 1 FROM dbo.AiExternalApplication e WHERE e.ApplicationId=x.ApplicationId AND e.Source='CIMD')\n"
     assert original[old].count(marker) == 1
-    changed[old] = original[old].replace(marker, guard + marker).replace('CREATE PROCEDURE', 'ALTER PROCEDURE', 1)
+    # SQL Server persists an ALTERed module's definition with CREATE, even
+    # though deployment must use ALTER to preserve object IDs and grants.
+    changed[old] = original[old].replace(marker, guard + marker)
     modules[rename[old]] = transform(original[old]).replace(marker,
         ' AND EXISTS(SELECT 1 FROM dbo.AiExternalApplication e WHERE e.ApplicationId=x.ApplicationId AND ' + provenance('e') + ')\n' + marker)
 
@@ -170,7 +172,7 @@ platform = platform.replace("N''AiApplicationPublisher'',N''AiApplicationTenant'
 platform = platform.replace("DATABASE_PRINCIPAL_ID(N''AiApplicationPublisher''),DATABASE_PRINCIPAL_ID(N''AiApplicationTenant'')", ','.join("DATABASE_PRINCIPAL_ID(N''"+r+"'')" for r in roles))
 grants = ','.join('(' + quote(role) + ',' + quote(p) + ')' for role, entries in roles.items() for p in entries)
 actual_pins = '\n'.join(
-    f"IF NOT EXISTS(SELECT 1 FROM sys.sql_modules m JOIN sys.objects o ON o.object_id=m.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE o.object_id=OBJECT_ID(N'dbo.{n}') AND COALESCE(o.principal_id,s.principal_id)=1 AND m.uses_ansi_nulls=1 AND m.uses_quoted_identifier=1 AND {'m.execute_as_principal_id=-2' if 'WITH EXECUTE AS OWNER' in b else 'm.execute_as_principal_id IS NULL'} AND HASHBYTES('SHA2_256',m.definition)=0x{sha(b)}) OR EXISTS(SELECT 1 FROM sys.crypt_properties WHERE major_id=OBJECT_ID(N'dbo.{n}')) THROW 59600,'C1 reviewed module drift.',1;"
+    f"IF NOT EXISTS(SELECT 1 FROM sys.sql_modules m JOIN sys.objects o ON o.object_id=m.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE o.object_id=OBJECT_ID(N'dbo.{n}') AND COALESCE(o.principal_id,s.principal_id)=1 AND m.uses_ansi_nulls=1 AND m.uses_quoted_identifier=1 AND {'m.execute_as_principal_id=-2' if 'WITH EXECUTE AS OWNER' in b else 'm.execute_as_principal_id IS NULL'} AND HASHBYTES('SHA2_256',m.definition)=0x{sha(b)}) OR EXISTS(SELECT 1 FROM sys.crypt_properties WHERE major_id=OBJECT_ID(N'dbo.{n}')) THROW 59600,'C1 reviewed module drift: {n}.',1;"
     for n, b in {**modules, **changed}.items())
 
 receipt = """DECLARE @C1ConstraintId int,@C1ConstraintDefinition nvarchar(max),@C1HistoricalHash binary(32),@C1CatalogHash binary(32);
@@ -191,7 +193,10 @@ SET @C1State=@C1State+(SELECT CONCAT(Id,CONVERT(varchar(64),SourceHash,2),CONVER
 checks = f"""SET NOCOUNT ON;
 IF NOT EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiExternalCompatibilityV2') AND name=N'DcrCompatV2.Source' AND CONVERT(binary(32),value)=0x{source}) THROW 59600,'Reviewed C1 successor required; no fallback.',1;
 {receipt}
-IF @C1ConstraintId IS NULL OR @C1ConstraintDefinition IS NULL OR @C1HistoricalHash IS NULL OR @C1CatalogHash IS NULL THROW 59600,'Incomplete C1 receipt.',1;
+IF @C1ConstraintId IS NULL THROW 59600,'Incomplete C1 receipt: predecessor constraint ID.',1;
+IF @C1ConstraintDefinition IS NULL THROW 59600,'Incomplete C1 receipt: predecessor constraint definition.',1;
+IF @C1HistoricalHash IS NULL THROW 59600,'Incomplete C1 receipt: historical snapshot.',1;
+IF @C1CatalogHash IS NULL THROW 59600,'Incomplete C1 receipt: catalog seal.',1;
 IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE name=N'CK_AiExternalApplication_Source' AND parent_object_id=OBJECT_ID(N'dbo.AiExternalApplication') AND is_disabled=0 AND is_not_trusted=0
  AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(definition,N'[',N''),N']',N''),N'(',N''),N')',N''),N' ',N'') COLLATE Latin1_General_100_BIN2=N'Source=''CIMD''ORSource=''DCR''') THROW 59600,'C1 source constraint drift.',1;
 {actual_pins}
@@ -213,9 +218,9 @@ SET @C1Graph=@C1Graph+(SELECT CONCAT(OBJECT_NAME(c.object_id),N':',c.column_id,N
 SET @C1Graph=@C1Graph+(SELECT CONCAT(OBJECT_NAME(o.parent_object_id),N':',o.name,N':',o.type,N':',ch.definition,N':',ch.is_disabled,N':',ch.is_not_trusted,N':',dc.definition,N':',fk.referenced_object_id,N':',fk.is_disabled,N':',fk.is_not_trusted,N':',fk.delete_referential_action,N':',fk.update_referential_action,N';') AS [text()] FROM sys.objects o LEFT JOIN sys.check_constraints ch ON ch.object_id=o.object_id LEFT JOIN sys.default_constraints dc ON dc.object_id=o.object_id LEFT JOIN sys.foreign_keys fk ON fk.object_id=o.object_id WHERE OBJECT_NAME(o.parent_object_id) IN(SELECT Name FROM @C1Objects) ORDER BY o.object_id FOR XML PATH(''),TYPE).value('.','nvarchar(max)');
 SET @C1Graph=@C1Graph+(SELECT CONCAT(f.constraint_object_id,N':',f.constraint_column_id,N':',f.parent_column_id,N':',f.referenced_column_id,N';') AS [text()] FROM sys.foreign_key_columns f WHERE OBJECT_NAME(f.parent_object_id) IN(SELECT Name FROM @C1Objects) ORDER BY f.constraint_object_id,f.constraint_column_id FOR XML PATH(''),TYPE).value('.','nvarchar(max)');
 SET @C1Graph=@C1Graph+(SELECT CONCAT(i.object_id,N':',i.name,N':',i.is_unique,N':',i.is_disabled,N':',i.filter_definition,N':',c.column_id,N':',c.key_ordinal,N':',c.is_included_column,N';') AS [text()] FROM sys.indexes i JOIN sys.index_columns c ON c.object_id=i.object_id AND c.index_id=i.index_id WHERE OBJECT_NAME(i.object_id) IN(SELECT Name FROM @C1Objects) ORDER BY i.object_id,i.index_id,c.column_id FOR XML PATH(''),TYPE).value('.','nvarchar(max)');
-SET @C1Graph=@C1Graph+(SELECT CONCAT(object_id,N':',column_id,N':',definition,N';') AS [text()] FROM sys.computed_columns WHERE OBJECT_NAME(object_id) IN(SELECT Name FROM @C1Objects) ORDER BY object_id,column_id FOR XML PATH(''),TYPE).value('.','nvarchar(max)');
+SET @C1Graph=@C1Graph+COALESCE((SELECT CONCAT(object_id,N':',column_id,N':',definition,N';') AS [text()] FROM sys.computed_columns WHERE OBJECT_NAME(object_id) IN(SELECT Name FROM @C1Objects) ORDER BY object_id,column_id FOR XML PATH(''),TYPE).value('.','nvarchar(max)'),N'');
 SET @C1Graph=@C1Graph+(SELECT CONCAT(p.class,N':',p.major_id,N':',p.minor_id,N':',p.grantee_principal_id,N':',p.grantor_principal_id,N':',p.permission_name,N':',p.state,N';') AS [text()] FROM sys.database_permissions p WHERE p.class=1 AND OBJECT_NAME(p.major_id) IN(SELECT Name FROM @C1Objects) OR p.grantee_principal_id IN({','.join('DATABASE_PRINCIPAL_ID('+quote(r)+')' for r in roles)}) ORDER BY p.class,p.major_id,p.minor_id,p.grantee_principal_id,p.permission_name FOR XML PATH(''),TYPE).value('.','nvarchar(max)');
-IF HASHBYTES('SHA2_256',@C1Graph)<>@C1CatalogHash THROW 59600,'C1 catalog drift; never refresh receipts.',1;
+IF @C1Graph IS NULL OR HASHBYTES('SHA2_256',@C1Graph)<>@C1CatalogHash THROW 59600,'C1 catalog drift; never refresh receipts.',1;
 """
 
 registry = (RES / 'registry-confinement-v1-catalog.sql').read_text()
@@ -235,7 +240,7 @@ for name, body in changed.items():
 # Validate actual new source above, then reconstruct only these old definitions
 # for the historical OAuth fingerprint. No opaque source is read from a receipt.
 projection = 'CASE ' + ' '.join('WHEN o.name=' + quote(n) + ' THEN ' + quote(original[n]) for n in changed) + ' ELSE m.definition END'
-additive = '\n'.join(line.replace('m.definition', projection) if 'SET @C4bCatalog=' in line and 'm.definition' in line else line for line in additive.splitlines()) + '\n'
+additive = '\n'.join(line.replace('m.definition', projection) if 'SET @C4bCatalog=' in line and 'FROM sys.objects o' in line and 'm.definition' in line else line for line in additive.splitlines()) + '\n'
 snapshot_check = historical_state.replace("(SELECT CONCAT(Id,Issuer,Resource,Contract,JavaTimeZone,SqlTimeZone) AS [text()] FROM dbo.AiCaseDataDeployment ORDER BY Id FOR XML PATH(''),TYPE).value('.','nvarchar(max)')", '(SELECT BindingState FROM @CimdEvidence)')
 snapshot_check = snapshot_check.replace("(SELECT CONCAT(Id,CONVERT(varchar(64),SourceHash,2),CONVERT(varchar(64),BeforeHash,2),CONVERT(varchar(64),CatalogHash,2)) AS [text()] FROM dbo.AiCimdProofReceiptV1 ORDER BY Id FOR XML PATH(''),TYPE).value('.','nvarchar(max)')", '(SELECT ProofState FROM @CimdEvidence)')
 snapshot_check = snapshot_check.replace("(SELECT CONCAT(Id,CONVERT(varchar(64),SourceHash,2),CONVERT(varchar(64),BeforeHash,2),CONVERT(varchar(64),CatalogHash,2)) AS [text()] FROM dbo.AiCimdOAuthReceiptV1 ORDER BY Id FOR XML PATH(''),TYPE).value('.','nvarchar(max)')", '(SELECT CONCAT(1,CONVERT(varchar(64),OAuthSource,2),CONVERT(varchar(64),OAuthBefore,2),CONVERT(varchar(64),OAuthCatalog,2)) FROM @CimdEvidence)')
@@ -273,8 +278,8 @@ for key, value in props.items():
     install += f"DECLARE @property{key} sql_variant={value}; EXEC sys.sp_addextendedproperty @name=N'DcrCompatV2.{key}',@value=@property{key},@level0type=N'SCHEMA',@level0name=N'dbo',@level1type=N'PROCEDURE',@level1name=N'AiExternalCompatibilityV2';\n"
 # Seal only the NEW contract once, after exact source and permission checks.
 sealing = checks[checks.index('DECLARE @C1Objects'):]
-sealing = sealing[:sealing.index("IF HASHBYTES('SHA2_256',@C1Graph)")]
-install += execute(actual_pins + '\n' + sealing + "\nDECLARE @seal binary(32)=HASHBYTES('SHA2_256',@C1Graph); EXEC sys.sp_addextendedproperty @name=N'DcrCompatV2.Catalog',@value=@seal,@level0type=N'SCHEMA',@level0name=N'dbo',@level1type=N'PROCEDURE',@level1name=N'AiExternalCompatibilityV2';", 'C1Seal')
+sealing = sealing[:sealing.index("IF @C1Graph IS NULL OR HASHBYTES('SHA2_256',@C1Graph)")]
+install += execute(actual_pins + '\n' + sealing + "\nIF @C1Graph IS NULL THROW 59600,'C1 catalog material missing.',1;\nDECLARE @seal binary(32)=HASHBYTES('SHA2_256',@C1Graph); EXEC sys.sp_addextendedproperty @name=N'DcrCompatV2.Catalog',@value=@seal,@level0type=N'SCHEMA',@level0name=N'dbo',@level1type=N'PROCEDURE',@level1name=N'AiExternalCompatibilityV2';", 'C1Seal')
 install += '/* C1_FINAL_VERIFY */\n' + execute(checks + registry, 'C1FinalRegistry') + execute(checks + additive, 'C1FinalOAuth')
 install += "COMMIT TRANSACTION;\nEND TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK TRANSACTION; THROW; END CATCH;\n"
 emit(SQL / 'universal-pr-c1-external-v2.sql', install)

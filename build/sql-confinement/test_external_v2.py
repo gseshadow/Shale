@@ -53,6 +53,20 @@ class ExternalV2GenerationTest(unittest.TestCase):
         result=prepare.split(' SELECT e.ExternalClientId,m.*',1)[1]
         self.assertNotIn('p.ShaleClientId',result)
 
+    def test_altered_locator_pins_match_sql_persisted_create_form(self):
+        install=(SQL/'universal-pr-c1-external-v2.sql').read_text()
+        registry=(RES/'registry-external-v2-catalog.sql').read_text()
+        found=[]
+        for match in re.finditer(r"EXEC\(N'((?:[^']|'')*)'\);",install,re.S):
+            altered=match[1].replace("''", "'")
+            if not altered.startswith('ALTER PROCEDURE dbo.AiCimdResolve'):
+                continue
+            found.append(altered)
+            persisted=altered.replace('ALTER PROCEDURE','CREATE PROCEDURE',1)
+            digest=hashlib.sha256(persisted.encode('utf-16le')).hexdigest()
+            self.assertIn("HASHBYTES('SHA2_256',m.definition)=0x"+digest,registry)
+        self.assertEqual(3,len(found),'All three tightened locators need persisted-source pins')
+
     def test_successor_checks_actual_delta_before_historical_projection(self):
         registry = (RES / 'registry-external-v2-catalog.sql').read_text()
         additive = (RES / 'external-authorization-v2-catalog.sql').read_text()
@@ -60,12 +74,15 @@ class ExternalV2GenerationTest(unittest.TestCase):
             self.assertIn('Reviewed C1 successor required; no fallback', text)
             self.assertIn('C1 reviewed module drift', text)
             self.assertIn('C1 catalog drift; never refresh receipts', text)
+            self.assertIn("IF @C1Graph IS NULL OR HASHBYTES('SHA2_256',@C1Graph)",text)
         self.assertLess(registry.index('C1 source constraint drift'), registry.index('THEN @C1ConstraintDefinition'))
         self.assertIn('THEN @C1ConstraintId ELSE o.object_id', registry)
         self.assertIn("name=N'Shale.UniversalMcpPR3'", registry)
         self.assertIn('Historical receipt/binding changed', additive)
         self.assertIn('CIMD proof catalog/source or predecessor drift', additive)
         self.assertIn('CIMD OAuth receipt drift', additive)
+        trigger_line=next(line for line in additive.splitlines() if 'SET @C4bCatalog=' in line and 'FROM sys.triggers t' in line)
+        self.assertNotIn('WHEN o.name=',trigger_line)
         self.assertNotIn('TRY BEGIN', registry)
 
     def test_new_roots_share_records_but_cimd_publish_still_rejects_dcr(self):

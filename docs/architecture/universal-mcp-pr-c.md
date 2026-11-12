@@ -2,7 +2,8 @@
 
 PR C1 now has an implementation candidate for this dependency; see
 [source-aware compatibility contract](universal-mcp-pr-c1.md). Its real SQL
-acceptance remains unverified while the private authoritative fixture is absent.
+acceptance now passes all four authored scenarios against the verified private
+authoritative fixture; see [C1 verification](../testing/universal-mcp-pr-c1-verification.md).
 The report below records the original PR C investigation. No DCR HTTP endpoint
 or production capability is added by C1.
 
@@ -32,8 +33,8 @@ currently register a distinct DCR application into that path:
 | Registry verification | `shale-data/src/main/resources/ai/registry-confinement-v1-catalog.sql` hashes constraint definitions and module definitions; compares the result to `Shale.UniversalMcpPR3` and `Shale.RegistryConfinementV1.Catalog`. | Simply broadening the source constraint or changing these procedures is detected as drift. |
 | Admission | `AiCaseDataAttestation.verify` executes that registry verifier when registry objects are present; `AiCimdCaseData.verify` runs the predecessor and additive OAuth verification. | An unreviewed source change withdraws Case readiness, including the existing composition. |
 
-These are source-inspection findings. No SQL error, successful SQL execution,
-or live catalog mutation is claimed in this environment. The checked-in SQL
+These were source-inspection findings from the original PR C investigation.
+The later C1 disposable SQL results are recorded separately above. The checked-in SQL
 generation tests independently confirm that the reviewed artifacts and their
 predecessors remain unchanged; they do not establish runtime DCR acceptance.
 

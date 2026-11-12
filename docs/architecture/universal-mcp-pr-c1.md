@@ -52,9 +52,12 @@ is written to audit metadata.
 
 ## Verification status
 
-The candidate compiles and has focused unit/generation coverage. **Real SQL
-acceptance is unverified**: the private authoritative fixture is absent. Results
-and exact commands are recorded in [C1 verification](../testing/universal-mcp-pr-c1-verification.md).
+The four authored scenarios passed against the SHA-256-verified authoritative
+fixture in disposable SQL Server: **4 passed, 0 failures/errors/skips**. Six C1
+generation checks also passed. Results, demonstrated successor corrections and
+remaining deployment requirements are recorded in
+[C1 verification](../testing/universal-mcp-pr-c1-verification.md). Native Azure
+and HTTP/stock-client acceptance remain unexecuted; C2 has not begun.
 
 ## Exact SQL delta
 
@@ -124,6 +127,23 @@ predecessor to select that same contract, and pins the request-owned
 `EXTERNAL_V2` Case namespace through read, handoff and cleanup. No failed
 contract retries another version. Startup/admission verification placement and
 original request deadlines remain unchanged.
+
+## Disposable SQL corrections
+
+Executing the authoritative fixture exposed three defects in this C1 successor
+only. The corrected generator pins the persisted `CREATE PROCEDURE` definition
+of the three locators while continuing to install them with `ALTER PROCEDURE`
+so object IDs and grants survive. An empty computed-column XML projection now
+contributes an empty string rather than nulling the catalog digest; missing
+catalog material is explicitly rejected at sealing and verification. The fixed
+historical locator projection applies only to the procedure-object query,
+leaving the trigger query and its alias unchanged. Static module/receipt errors
+identify the failed pin without including data values.
+
+These corrections change the new C1 installer and successor resources only.
+Historical verifiers, SQL files, receipts and deployment bindings are unchanged;
+there is no additional SQL contract or authority change beyond the four objects
+listed above.
 
 ## Capability and deployment boundary
 
