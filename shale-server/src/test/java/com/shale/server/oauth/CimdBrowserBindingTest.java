@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Adapter contract only: SQL durability is covered by the separate real JDBC suite. */
 class CimdBrowserBindingTest {
     static final String CLIENT="https://vendor.test/Exact%2Fclient.json",CALLBACK="https://client.test/callback";
+    String clientId=CLIENT;
     final UUID integration=UUID.randomUUID(),tx=UUID.randomUUID(),web=UUID.randomUUID();
     final ShaleOAuthHuman.Identity human=new ShaleOAuthHuman.Identity(7,72,web);
     final Set<AiScope> scopes=AiScope.fromMask(3);
@@ -25,16 +26,16 @@ class CimdBrowserBindingTest {
     DurableOAuthAuthorization durable;
     @BeforeEach void setup(){
         SecurityContextHolder.getContext().setAuthentication(ShaleOAuthHuman.authentication(human));
-        request.setParameter("client_id",CLIENT);request.setParameter("state",nonce);
-        var client=new AiOAuthTransactionStore.Client(7,integration,CLIENT,"External application","PUBLIC",scopes,Instant.now().plusSeconds(3600),new AiIntegrationSecurityService.RowVersion(new byte[8]),"https://shale.test/oauth/mcp","https://shale.test/mcp",Set.of(CALLBACK),List.of());
+        request.setParameter("client_id",clientId);request.setParameter("state",nonce);
+        var client=new AiOAuthTransactionStore.Client(7,integration,clientId,"External application","PUBLIC",scopes,Instant.now().plusSeconds(3600),new AiIntegrationSecurityService.RowVersion(new byte[8]),"https://shale.test/oauth/mcp","https://shale.test/mcp",Set.of(CALLBACK),List.of());
         AiOAuthBrowserStore store=new AiOAuthBrowserStore(){
             @Override public boolean externalIdentity(){return true;}
-            @Override public Optional<AiOAuthTransactionStore.Client> loadClient(String id){return CLIENT.equals(id)?Optional.of(client):Optional.empty();}
+            @Override public Optional<AiOAuthTransactionStore.Client> loadClient(String id){return clientId.equals(id)?Optional.of(client):Optional.empty();}
             @Override public void begin(UUID id,UUID session,String external,String redirect,String s256,String state,Set<AiScope> requested,String pending){
-                assertEquals(tx,id);assertEquals(web,session);assertEquals(CLIENT,external);assertEquals(CALLBACK,redirect);assertEquals(challenge,s256);assertEquals("exact state",state);assertEquals(nonce,pending);events.add("begin");
+                assertEquals(tx,id);assertEquals(web,session);assertEquals(clientId,external);assertEquals(CALLBACK,redirect);assertEquals(challenge,s256);assertEquals("exact state",state);assertEquals(nonce,pending);events.add("begin");
             }
             @Override public Optional<AiOAuthTransactionStore.Intent> findIntent(String pending,UUID session){
-                assertEquals(web,session);return nonce.equals(pending)?Optional.of(new AiOAuthTransactionStore.Intent(tx,7,72,integration,web,CLIENT,CALLBACK,challenge,"exact state",scopes,Instant.now(),consentDeadline)):Optional.empty();
+                assertEquals(web,session);return nonce.equals(pending)?Optional.of(new AiOAuthTransactionStore.Intent(tx,7,72,integration,web,clientId,CALLBACK,challenge,"exact state",scopes,Instant.now(),consentDeadline)):Optional.empty();
             }
             @Override public void approve(UUID id,UUID session,Set<AiScope> accepted){assertEquals(tx,id);assertEquals(web,session);assertEquals(scopes,accepted);events.add("approve");}
             @Override public void complete(UUID id,UUID session,Set<AiScope> accepted,String code){assertEquals(tx,id);assertEquals(web,session);assertEquals(scopes,accepted);assertEquals(List.of("begin","approve"),events);events.add("complete");}
@@ -44,25 +45,28 @@ class CimdBrowserBindingTest {
     }
     @AfterEach void clear(){SecurityContextHolder.clearContext();}
     @Test void externalIdentitySurvivesFrameworkMappingIntentConsentAndCodeIssuance(){
-        var registered=durable.findByClientId(CLIENT);assertEquals(CLIENT,registered.getClientId());assertTrue(registered.getId().startsWith("cimd:7:"));
+        var registered=durable.findByClientId(clientId);assertEquals(clientId,registered.getClientId());assertTrue(registered.getId().startsWith((clientId.startsWith("dcr.")?"dcr":"cimd")+":7:"));
         assertTrue(registered.getClientSettings().isRequireProofKey());assertTrue(registered.getClientSettings().isRequireAuthorizationConsent());
-        var original=OAuth2AuthorizationRequest.authorizationCode().authorizationUri("https://shale.test/oauth/mcp/authorize").clientId(CLIENT).redirectUri(CALLBACK).state("exact state")
+        var original=OAuth2AuthorizationRequest.authorizationCode().authorizationUri("https://shale.test/oauth/mcp/authorize").clientId(clientId).redirectUri(CALLBACK).state("exact state")
                 .scopes(DurableOAuthAuthorization.wire(scopes)).additionalParameters(Map.of("code_challenge_method","S256","code_challenge",challenge)).build();
         var pending=OAuth2Authorization.withRegisteredClient(registered).id(tx.toString()).principalName(human.getName()).authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .attribute(OAuth2AuthorizationRequest.class.getName(),original).attribute("state",nonce).build();
         durable.save(pending);assertEquals(List.of("begin"),events,"Loading and beginning must not create consent/code.");
         var restored=durable.findByToken(nonce,new OAuth2TokenType("state"));
         assertEquals(consentDeadline.toString(),restored.getAttribute("consentExpiresAt"),"The browser must show the SQL-clipped deadline.");
-        OAuth2AuthorizationRequest restoredRequest=restored.getAttribute(OAuth2AuthorizationRequest.class.getName());assertEquals(CLIENT,restoredRequest.getClientId());
+        OAuth2AuthorizationRequest restoredRequest=restored.getAttribute(OAuth2AuthorizationRequest.class.getName());assertEquals(clientId,restoredRequest.getClientId());
         assertNull(durable.consents().findById(registered.getId(),human.getName()),"Prior consent never bypasses this explicit decision.");
         var consent=OAuth2AuthorizationConsent.withId(registered.getId(),human.getName());DurableOAuthAuthorization.wire(scopes).forEach(consent::scope);durable.consents().save(consent.build());
         var issued=OAuth2Authorization.from(pending).authorizedScopes(DurableOAuthAuthorization.wire(scopes)).token(new OAuth2AuthorizationCode("c".repeat(43),Instant.now(),Instant.now().plusSeconds(60))).build();durable.save(issued);
         assertEquals(List.of("begin","approve","complete"),events);
     }
+    @Test void storedDcrIdentityUsesTheSameExplicitConsentAndExactCodeBinding(){
+        clientId="dcr."+"a".repeat(64);setup();externalIdentitySurvivesFrameworkMappingIntentConsentAndCodeIssuance();
+    }
     @Test void unauthenticatedAndForeignTenantAuthorityCannotLoadExternalClient(){
-        SecurityContextHolder.clearContext();assertThrows(SecurityException.class,()->durable.findByClientId(CLIENT));
+        SecurityContextHolder.clearContext();assertThrows(SecurityException.class,()->durable.findByClientId(clientId));
         SecurityContextHolder.getContext().setAuthentication(ShaleOAuthHuman.authentication(new ShaleOAuthHuman.Identity(8,82,UUID.randomUUID())));
-        assertThrows(SecurityException.class,()->durable.findByClientId(CLIENT));assertTrue(events.isEmpty());
+        assertThrows(SecurityException.class,()->durable.findByClientId(clientId));assertTrue(events.isEmpty());
     }
     @Test void unknownClientTypeCannotDowngradeToPublicAuthentication(){
         assertEquals(org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE,DurableOAuthAuthorization.cimdClientMethod("PUBLIC"));
@@ -70,6 +74,6 @@ class CimdBrowserBindingTest {
         for(String type:Arrays.asList(null,"UNKNOWN","public","CONFIDENTIAL "))assertThrows(SecurityException.class,()->DurableOAuthAuthorization.cimdClientMethod(type));
     }
     @Test void alteredExternalIdentityDoesNotNormalizeOrFallBackToManualClient(){
-        assertNull(durable.findByClientId(CLIENT.replace("%2F","%2f")));assertNull(durable.findByClientId("manual-client"));assertTrue(events.isEmpty());
+        assertNull(durable.findByClientId(clientId.replace("%2F","%2f")));assertNull(durable.findByClientId("manual-client"));assertTrue(events.isEmpty());
     }
 }

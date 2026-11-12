@@ -9,7 +9,12 @@ import static com.shale.data.security.ai.AiIntegrationSecurityService.RowVersion
 public final class AiCimdOnboardingStore {
     private final DbSessionProvider db;
     private final String issuer,resource;
+    private final AiExternalContract contract;
     public AiCimdOnboardingStore(DbSessionProvider db,String issuer,String resource) {
+        this(db,issuer,resource,AiExternalContract.CIMD_V1);
+    }
+    public AiCimdOnboardingStore(DbSessionProvider db,String issuer,String resource,AiExternalContract contract) {
+        this.contract=Objects.requireNonNull(contract);
         this.db=Objects.requireNonNull(db);this.issuer=issuer;this.resource=resource;
         AiIntegrationSecurityService.configuredHttps(issuer);AiIntegrationSecurityService.configuredHttps(resource);
     }
@@ -20,7 +25,8 @@ public final class AiCimdOnboardingStore {
         @Override public String toString(){return "CimdOnboardingState[redacted]";}
     }
     public State find(String external,UUID originalWeb) {
-        return AiSql.one(AiSql.call(db,"AiCimdGetOnboardingV1",r->{
+        contract.requireWireNamespace(external);
+        return AiSql.one(AiSql.call(db,contract.procedure("AiCimdGetOnboardingV1"),r->{
             String application=r.getString("ApplicationId"),approval=r.getString("ApprovalId");
             return new State(r.getBoolean("IsAdmin"),application==null?null:new AiApplicationRegistryService.Application(
                     UUID.fromString(application),r.getLong("Revision"),r.getBoolean("Disabled"),new RowVersion(r.getBytes("ApplicationVersion"))),

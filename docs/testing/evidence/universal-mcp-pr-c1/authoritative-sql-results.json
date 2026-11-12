@@ -1,0 +1,91 @@
+{
+  "scope": "PR #1957 C1 authoritative disposable SQL acceptance; no C2 or production activity",
+  "finished_at_utc": "2026-11-12T18:27:15Z",
+  "fixture": {
+    "name": "authoritative-candidate.sql",
+    "sha256": "4b64b50da531ebc6a2eb9dc26c6555ef555621df371fe9d8a5cf994fb6e8417f",
+    "verified_before_first_sql_connection": true,
+    "imported_unchanged": true
+  },
+  "sql": {
+    "product_version": "16.0.4315.2",
+    "edition": "Developer Edition (64-bit)",
+    "image": "mcr.microsoft.com/mssql/server:2022-latest",
+    "image_digest": "sha256:11927f5edc5122658e90b3a80ee36e8aef779310bf771415c1d89271859c73fd",
+    "endpoint": "127.0.0.1:15433",
+    "tls": {
+      "encrypt": true,
+      "trustServerCertificate": false,
+      "hostNameInCertificate": "localhost",
+      "task_local_certificate_truststore": true
+    }
+  },
+  "selection": "AiDcrApplicationLocalSqlServerTest#dcr*",
+  "result": {
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "170.199"
+  },
+  "scenarios": [
+    {
+      "name": "dcrNeutralCreationTwoTenantConsentAndCredentialSeparation",
+      "seconds": "47.646",
+      "result": "passed"
+    },
+    {
+      "name": "dcrSuccessorRejectsDriftWithoutChangingHistoricalReceipts",
+      "seconds": "34.699",
+      "result": "passed"
+    },
+    {
+      "name": "dcrRegistrationAuditFailureRollsBackAllApplicationRecords",
+      "seconds": "32.518",
+      "result": "passed"
+    },
+    {
+      "name": "dcrTenantRevocationAndApplicationRevisionInvalidateOnlyTheirAuthority",
+      "seconds": "54.403",
+      "result": "passed"
+    }
+  ],
+  "sanitized_sql_assertions": [
+    "DCR registration with product authority OFF leaves approval + grant + session + external credential counts unchanged.",
+    "Independent tenant 7 and 8 approvals have distinct integrations; original WEB sessions and separate explicit consents yield tenant-bound credentials.",
+    "Restricted DCR Case reads succeed for tenant 7 / Case 100 and tenant 8 / Case 200; tenant 7 credential cannot disclose Case 200.",
+    "Approved stored metadata survives pending expiry; unused expired metadata is refused; neutral direct tenant-table SELECT fails with SQL error 229.",
+    "DCR credential is rejected by manual and CIMD-only paths; old CIMD code locator returns no DCR row; existing CIMD and manual Case reads succeed.",
+    "Refresh succeeds; tenant 7 approval revocation denies its access and refresh while tenant 8 access continues.",
+    "Known credential and unknown-token revocation execute; revoked family access and refresh fail; application disablement/revision invalidates a fresh family.",
+    "Unchanged V1 verifier rejects the V2 registry; explicitly selected successor accepts; injected column drift fails; restored schema accepts.",
+    "Historical receipt values and immutable deployment binding compare equal after successor installation and drift test.",
+    "Injected global-audit insert failure rolls back DCR application and metadata insertion; successor accepts after fault trigger removal."
+  ],
+  "generation_checks": {
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "historical_preservation": {
+    "base": "f18574784d2bf8064c7df09cefb4386a310f5b52",
+    "baseline_artifact_count": 273,
+    "changed_baseline_artifacts": []
+  },
+  "cleanup": {
+    "remaining_fixture_databases": 0,
+    "remaining_fixture_logins": 0,
+    "container_removal": "completed",
+    "private_tls_and_password_files_removed": true
+  },
+  "not_executed": [
+    "Native Azure SQL acceptance",
+    "DCR HTTP endpoint / discovery / rate-limit acceptance (C2)",
+    "Stock MCP-client browser interoperability (requires C2)",
+    "Production SQL, deployment, activation, merge"
+  ],
+  "redaction": "No credentials, tokens, private SQL fixture contents, generated identifiers, metadata bodies, or raw Surefire environment properties included.",
+  "successor_source_hash": "b1bb5f12c138d59136da3d31ddb7dcaf1113d82375a12502a9f4bbe0d272c25d",
+  "installer_sha256": "838574bb89483bcb9b243b8e70206ea3a3e6b66deb5bf2b694a2f6327e98b9be"
+}

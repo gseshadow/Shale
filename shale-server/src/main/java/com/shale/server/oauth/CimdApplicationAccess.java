@@ -22,12 +22,14 @@ final class CimdApplicationAccess {
     Map<String,Object> request(String external,Set<AiScope> scopes) {
         if(!admission.tryAcquire())throw new IllegalStateException("Onboarding admission unavailable.");
         try {
-            var id=new CimdClientIdentifier(external);var snapshot=metadata.retrieve(id);
+            var id=new OAuthApplicationIdentifier(external);var snapshot=lifecycle.inspect(id);
+            if(!snapshot.scopes().containsAll(scopes))throw new SecurityException("Registered scope ceiling required.");
             var projection=services.onboarding().apply(owner());
             var state=projection.find(external,ShaleOAuthHuman.current().session());
             int methods=(snapshot.methods().contains("none")?1:0)|(snapshot.methods().contains("private_key_jwt")?2:0);
             byte[] digest=HexFormat.of().parseHex(snapshot.revision());
             if(state.application()==null) {
+                if(id.source()==OAuthApplicationIdentifier.Source.DCR)throw new SecurityException("Stored DCR registration required.");
                 try {services.publisher().publishCimd(external,digest,methods,false,null);}
                 catch(IllegalStateException raced){
                     // A single reload handles concurrent first publication; no identity/version guessing.
@@ -37,6 +39,7 @@ final class CimdApplicationAccess {
             }
             if(state.application().disabled())throw new SecurityException("Application disabled.");
             if(!Arrays.equals(digest,state.digest())||methods!=state.methods()) {
+                if(id.source()==OAuthApplicationIdentifier.Source.DCR)throw new SecurityException("Current immutable DCR revision required.");
                 // Publishing validated changed bytes invalidates old tenant approvals immediately.
                 // RowVer prevents racing a disablement from restoring a disabled application.
                 try {services.publisher().publishCimd(external,digest,methods,false,state.application().rowVersion());}
@@ -58,7 +61,8 @@ final class CimdApplicationAccess {
         } finally {admission.release();}
     }
     Map<String,Object> decide(String external,UUID approval,byte[] expected,String decision,Set<AiScope> scopes) {
-        var id=new CimdClientIdentifier(external);var snapshot=metadata.retrieve(id);
+        var id=new OAuthApplicationIdentifier(external);var snapshot=lifecycle.inspect(id);
+        if(!snapshot.scopes().containsAll(scopes))throw new SecurityException("Registered scope ceiling required.");
         var projection=services.onboarding().apply(owner());
         var state=projection.find(external,ShaleOAuthHuman.current().session());
         if(!state.admin()||state.approval()==null||!state.approval().approvalId().equals(approval))
@@ -78,7 +82,7 @@ final class CimdApplicationAccess {
         if(approval.applicationRevision()!=state.application().revision()||!approval.expiresAt().isAfter(Instant.now()))return "APPROVAL_REVIEW_REQUIRED";
         return approval.state();
     }
-    private static Map<String,Object> view(CimdMetadataService.Snapshot metadata,AiCimdOnboardingStore.State state,String status) {
+    private static Map<String,Object> view(OAuthApplicationMetadata metadata,AiCimdOnboardingStore.State state,String status) {
         var human=ShaleOAuthHuman.current();var result=new LinkedHashMap<String,Object>();
         result.put("client_id",metadata.identifier().value());result.put("client_name",metadata.name());
         result.put("state",status);result.put("admin",state.admin());result.put("tenant",human.tenant());result.put("user",human.user());

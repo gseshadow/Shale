@@ -14,6 +14,10 @@ final class CimdClientAuthentication {
         @Override public String toString(){return "CimdAssertion[redacted]";}
     }
     static Assertion verify(CimdClientIdentifier client,ClientProof selected,String method,String assertion,String endpoint,Clock clock) {
+        return verify(client.value(),selected,method,assertion,endpoint,clock);
+    }
+    static Assertion verify(String exactClient,ClientProof selected,String method,String assertion,String endpoint,Clock clock) {
+        new OAuthApplicationIdentifier(exactClient);
         if("none".equals(selected.method())) {
             if(!"none".equals(method)||assertion!=null||selected.keyId()!=null||selected.rsa()!=null)throw denied();
             return null;
@@ -26,7 +30,7 @@ final class CimdClientAuthentication {
             if(!JWSAlgorithm.RS256.equals(h.getAlgorithm())||!selected.kid().equals(h.getKeyID())||h.getJWKURL()!=null||h.getX509CertURL()!=null||h.getJWK()!=null||h.getX509CertChain()!=null||h.getCriticalParams()!=null||!h.getCustomParams().isEmpty())throw denied();
             if(!jwt.verify(new RSASSAVerifier(selected.rsa())))throw denied();
             var c=jwt.getJWTClaimsSet();
-            if(!client.value().equals(c.getIssuer())||!client.value().equals(c.getSubject())||!List.of(endpoint).equals(c.getAudience())||c.getIssueTime()==null||c.getExpirationTime()==null||c.getJWTID()==null||c.getJWTID().isBlank()||c.getJWTID().length()>256)throw denied();
+            if(!exactClient.equals(c.getIssuer())||!exactClient.equals(c.getSubject())||!List.of(endpoint).equals(c.getAudience())||c.getIssueTime()==null||c.getExpirationTime()==null||c.getJWTID()==null||c.getJWTID().isBlank()||c.getJWTID().length()>256)throw denied();
             var issued=c.getIssueTime().toInstant();var expires=c.getExpirationTime().toInstant();
             if(issued.isAfter(now)||!expires.isAfter(now)||!expires.isAfter(issued)||Duration.between(issued,expires).compareTo(Duration.ofSeconds(60))>0||(c.getNotBeforeTime()!=null&&c.getNotBeforeTime().toInstant().isAfter(now)))throw denied();
             return new Assertion(selected.keyId(),c.getJWTID(),issued,expires);

@@ -26,9 +26,9 @@ public final class DurableOAuthAuthorization implements OAuth2AuthorizationServi
         return store.loadClient(clientId).map(c->{
             if(c.tenant()!=human.tenant()) throw denied();
             if(store.externalIdentity()) {
-                new CimdClientIdentifier(c.clientId());
+                var identifier=new OAuthApplicationIdentifier(c.clientId());
                 if(!properties.issuer().equals(c.issuer()) || !properties.resource().equals(c.resource())) throw denied();
-                var builder=RegisteredClient.withId("cimd:"+c.tenant()+":"+c.integration()).clientId(c.clientId()).clientName(c.name())
+                var builder=RegisteredClient.withId(identifier.source().name().toLowerCase(java.util.Locale.ROOT)+":"+c.tenant()+":"+c.integration()).clientId(c.clientId()).clientName(c.name())
                         .clientAuthenticationMethod(cimdClientMethod(c.type()))
                         .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                         .clientSettings(org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(true).build());

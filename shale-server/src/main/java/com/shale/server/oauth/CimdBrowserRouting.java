@@ -18,7 +18,7 @@ final class CimdBrowserRouting implements AiOAuthBrowserStore {
     @Override public boolean externalIdentity(){return CimdOAuthProviders.external(request.get().getParameter("client_id"));}
     private AiOAuthBrowserStore delegate() {
         if(!externalIdentity())return legacy;
-        new CimdClientIdentifier(request.get().getParameter("client_id"));
+        new OAuthApplicationIdentifier(request.get().getParameter("client_id"));
         var human=ShaleOAuthHuman.current();
         return lifecycle.browser(services.browser().apply(new AiOAuthExchangeStore.Owner(human.tenant(),human.user())));
     }

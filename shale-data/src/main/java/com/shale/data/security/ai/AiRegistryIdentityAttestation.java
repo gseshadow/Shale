@@ -11,10 +11,15 @@ import java.util.*;
 public final class AiRegistryIdentityAttestation {
     private final DataSource publisher,tenant,catalog;
     private final String database,verification;
+    private final AiExternalContract contract;
     public AiRegistryIdentityAttestation(DataSource publisher,DataSource tenant,DataSource catalog,String database) {
+        this(publisher,tenant,catalog,database,AiExternalContract.CIMD_V1);
+    }
+    public AiRegistryIdentityAttestation(DataSource publisher,DataSource tenant,DataSource catalog,String database,AiExternalContract contract) {
+        this.contract=Objects.requireNonNull(contract);
         this.publisher=Objects.requireNonNull(publisher);this.tenant=Objects.requireNonNull(tenant);
         this.catalog=Objects.requireNonNull(catalog);this.database=Objects.requireNonNull(database);
-        try(var stream=getClass().getResourceAsStream("/ai/registry-confinement-v1-catalog.sql")) {
+        try(var stream=getClass().getResourceAsStream(Objects.requireNonNull(contract).registryResource())) {
             if(stream==null)throw new IllegalStateException();verification=new String(stream.readAllBytes(),StandardCharsets.UTF_8);
         }catch(Exception missing){throw refused();}
     }
@@ -27,6 +32,8 @@ public final class AiRegistryIdentityAttestation {
                     ||!reviewer.server.equals(p.server)||!reviewer.server.equals(t.server)||reviewer.id<=4
                     ||Arrays.equals(p.sid,t.sid)||Arrays.equals(p.sid,reviewer.sid)||Arrays.equals(t.sid,reviewer.sid))throw refused();
             if(count(review,"SELECT HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','VIEW DEFINITION')")!=1)throw refused();
+            int successorObjects=count(review,"SELECT COUNT(*) FROM sys.objects WHERE schema_id=SCHEMA_ID('dbo') AND name IN('AiExternalCompatibilityV2','AiDcrMetadataV2','AiExternalControlV2')");
+            if(contract==AiExternalContract.CIMD_V1?successorObjects!=0:successorObjects!=3)throw refused();
             // Presence is mandatory here. A legacy-only Case deployment is not registry readiness.
             if(count(review,"SELECT COUNT(*) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID('dbo.AiCaseDataInvocation') AND name='Shale.RegistryConfinementV1.Required'")!=1)throw refused();
             try(var s=statement(review);var r=s.executeQuery("SELECT name FROM sys.user_token")) {

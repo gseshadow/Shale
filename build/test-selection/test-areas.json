@@ -395,6 +395,7 @@
         "com.shale.server.oauth.OAuthAuthorizationFlowTest",
         "com.shale.server.oauth.CimdBrowserBindingTest",
         "com.shale.server.oauth.CimdClientAuthenticationTest",
+        "com.shale.server.oauth.DcrApplicationMetadataTest",
         "com.shale.server.mcp.McpCaseCompositionTest",
         "com.shale.server.mcp.McpProductionOffBootTest"
       ]
@@ -496,7 +497,8 @@
     },
     "security-data": {
       "python_tests": [
-        "python -m unittest discover -s build/deployment-binding -p test_packet.py"
+        "python -m unittest discover -s build/deployment-binding -p test_packet.py",
+        "python -m unittest discover -s build/sql-confinement -p test_external_v2.py"
       ],
       "modules": [
         "shale-core",
@@ -519,6 +521,8 @@
         "build/phase1r-verification/**",
         "build/sql-confinement/**",
         "shale-data/src/main/resources/ai/cimd-authorization-v1-catalog.sql",
+        "shale-data/src/main/resources/ai/registry-external-v2-catalog.sql",
+        "shale-data/src/main/resources/ai/external-authorization-v2-catalog.sql",
         "build/deployment-binding/**",
         "docs/sql/phase1r/**",
         "**/Phase1R*.java",
@@ -574,7 +578,8 @@
         "com.shale.data.security.ai.AiCaseDataAccessTest",
         "com.shale.data.security.ai.AiCaseDataMigrationContractTest",
         "com.shale.data.security.ai.AiCaseDataV2MigrationContractTest",
-        "com.shale.data.security.ai.AiCaseDataAttestationTest"
+        "com.shale.data.security.ai.AiCaseDataAttestationTest",
+        "com.shale.data.security.ai.AiDcrApplicationStoreTest"
       ]
     },
     "notifications": {

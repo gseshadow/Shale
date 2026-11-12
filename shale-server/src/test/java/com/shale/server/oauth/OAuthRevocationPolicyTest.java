@@ -20,6 +20,9 @@ class OAuthRevocationPolicyTest {
         var r=request("unknown");r.setParameter("client_id","https://metadata.public.org/client.json");
         assertThrows(RuntimeException.class,()->OAuthRevocation.validateRequest(r));
         assertDoesNotThrow(()->OAuthRevocation.validateRequest(r,true));
+        r.setParameter("client_id","dcr."+"a".repeat(64));
+        assertThrows(RuntimeException.class,()->OAuthRevocation.validateRequest(r));
+        assertDoesNotThrow(()->OAuthRevocation.validateRequest(r,true));
         r.setParameter("client_id","http://metadata.public.org/client.json");assertThrows(RuntimeException.class,()->OAuthRevocation.validateRequest(r,true));
     }
     @Test void rejectsCallerAuthoritySecretsHeadersQueriesDuplicatesAndUnboundedForms() {

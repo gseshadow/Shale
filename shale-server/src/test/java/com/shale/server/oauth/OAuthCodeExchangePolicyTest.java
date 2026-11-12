@@ -44,11 +44,15 @@ class OAuthCodeExchangePolicyTest {
         }
         r.setParameter("refresh_token","a","b");assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties));
     }
-    @Test void externalIdentifiersRequireExplicitCimdSelectionAndRemainExact() {
+    @Test void externalIdentifiersRequireExplicitNamespaceSelectionAndRemainExact() {
         var r=request();String external="https://metadata.public.org/oauth/client.json";r.setParameter("client_id",external);
         assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties));
         assertDoesNotThrow(()->OAuthCodeExchange.validateRequest(r,properties,true));
         assertEquals(external,r.getParameter("client_id"));
+        String dcr="dcr."+"a".repeat(64);r.setParameter("client_id",dcr);
+        assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties));
+        assertDoesNotThrow(()->OAuthCodeExchange.validateRequest(r,properties,true));
+        assertEquals(dcr,r.getParameter("client_id"));
         for(String invalid:List.of("http://metadata.public.org/client.json","https://metadata.public.org/","client")) {
             r.setParameter("client_id",invalid);assertThrows(RuntimeException.class,()->OAuthCodeExchange.validateRequest(r,properties,true));
         }

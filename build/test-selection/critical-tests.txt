@@ -65,3 +65,5 @@ com.shale.data.config.AiJdbcUrlTest
 com.shale.server.oauth.OAuthCodeBootstrapConfigurationTest
 com.shale.server.oauth.CimdBrowserBindingTest
 com.shale.server.oauth.CimdClientAuthenticationTest
+com.shale.server.oauth.DcrApplicationMetadataTest
+com.shale.data.security.ai.AiDcrApplicationStoreTest

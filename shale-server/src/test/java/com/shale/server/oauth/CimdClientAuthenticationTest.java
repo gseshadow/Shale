@@ -30,6 +30,14 @@ class CimdClientAuthenticationTest {
         var proof=CimdClientAuthentication.verify(CLIENT,selected,"private_key_jwt",valid(),ENDPOINT,CLOCK);
         assertEquals(selected.keyId(),proof.keyId());assertEquals("CimdAssertion[redacted]",proof.toString());
     }
+    @Test void dcrAssertionUsesTheExactStoredWireIdentityAndCannotImpersonateCimd()throws Exception {
+        String dcr="dcr."+"a".repeat(64);
+        String assertion=signed(dcr,dcr,ENDPOINT,selected.kid(),NOW,NOW.plusSeconds(60));
+        assertEquals(selected.keyId(),CimdClientAuthentication.verify(dcr,selected,"private_key_jwt",assertion,ENDPOINT,CLOCK).keyId());
+        assertThrows(SecurityException.class,()->CimdClientAuthentication.verify(CLIENT,selected,"private_key_jwt",assertion,ENDPOINT,CLOCK));
+        assertThrows(SecurityException.class,()->CimdClientAuthentication.verify(dcr,selected,"private_key_jwt",valid(),ENDPOINT,CLOCK));
+        assertThrows(SecurityException.class,()->CimdClientAuthentication.verify(dcr,selected,"none",null,ENDPOINT,CLOCK));
+    }
     @Test void clientMethodNeverDowngradesOrAcceptsUnexpectedAssertion()throws Exception {
         assertThrows(SecurityException.class,()->CimdClientAuthentication.verify(CLIENT,selected,"none",null,ENDPOINT,CLOCK));
         var publicClient=new ClientProof("none",null,null,null,null,null);

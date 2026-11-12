@@ -97,7 +97,7 @@ final class OAuthRevocation {
                     entry.getValue()[0].length()>(entry.getKey().equals("client_assertion")?8192:2048))throw OAuthCodeExchange.error("invalid_request");
         }
         if(req.getParameter("token")==null||req.getParameter("client_id")==null)throw OAuthCodeExchange.error("invalid_request");
-        if(external)new CimdClientIdentifier(req.getParameter("client_id"));
+        if(external)new OAuthApplicationIdentifier(req.getParameter("client_id"));
         else if(!req.getParameter("client_id").matches("[A-Za-z0-9_-]{1,64}"))throw OAuthCodeExchange.error("invalid_request");
     }
 }

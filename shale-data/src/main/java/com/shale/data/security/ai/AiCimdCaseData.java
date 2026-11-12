@@ -15,17 +15,26 @@ public final class AiCimdCaseData implements AutoCloseable {
     private final LongFunction<DataSource> data, catalog;
     private final String database, issuer, resource, verification;
     private boolean closed;
+    private final AiExternalContract contract;
+    private final AiCaseDataAccess.Namespace namespace;
 
     public AiCimdCaseData(LongFunction<AiCaseDataAttestation> predecessor,
                           LongFunction<DataSource> data, LongFunction<DataSource> catalog,
                           String database, String issuer, String resource) {
+        this(predecessor,data,catalog,database,issuer,resource,AiExternalContract.CIMD_V1);
+    }
+    public AiCimdCaseData(LongFunction<AiCaseDataAttestation> predecessor,
+                          LongFunction<DataSource> data, LongFunction<DataSource> catalog,
+                          String database, String issuer, String resource,AiExternalContract contract) {
+        this.contract=Objects.requireNonNull(contract);
+        this.namespace=contract==AiExternalContract.CIMD_V1?AiCaseDataAccess.Namespace.CIMD_V1:AiCaseDataAccess.Namespace.EXTERNAL_V2;
         this.predecessor=Objects.requireNonNull(predecessor);
         this.data=Objects.requireNonNull(data); this.catalog=Objects.requireNonNull(catalog);
         this.database=Objects.requireNonNull(database);
         this.issuer=issuer; this.resource=resource;
         AiIntegrationSecurityService.configuredHttps(issuer);
         AiIntegrationSecurityService.configuredHttps(resource);
-        try(var stream=getClass().getResourceAsStream("/ai/cimd-authorization-v1-catalog.sql")) {
+        try(var stream=getClass().getResourceAsStream(contract==AiExternalContract.CIMD_V1?"/ai/cimd-authorization-v1-catalog.sql":"/ai/external-authorization-v2-catalog.sql")) {
             if(stream==null)throw unavailable();
             verification=new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         } catch(Exception failure) { throw unavailable(); }
@@ -38,12 +47,13 @@ public final class AiCimdCaseData implements AutoCloseable {
         String stage="PREDECESSOR";
         try {
             checkDeadline(deadline);
-            predecessor.apply(deadline).verify();
+            var previous=predecessor.apply(deadline);
+            previous.requireRegistryContract(contract);previous.verify();
             checkDeadline(deadline);
             stage="IDENTITY";
             try(Connection review=catalog.apply(deadline).getConnection();
                 Connection caller=data.apply(deadline).getConnection()) {
-                identity(caller,"AiCimdCaseRuntimeV1",deadline);
+                identity(caller,contract==AiExternalContract.CIMD_V1?"AiCimdCaseRuntimeV1":"AiExternalCaseRuntimeV2",deadline);
                 identity(review,"AiCimdAuthorizationCatalogV1",deadline);
                 if(AiCaseDataAttestation.platform(caller)!=AiCaseDataAttestation.platform(review))throw unavailable();
                 if(!server(caller).equals(server(review)))throw unavailable();
@@ -79,16 +89,16 @@ public final class AiCimdCaseData implements AutoCloseable {
     public AiCaseDataRequest authenticate(String token,long deadline) {
         ready(deadline);
         return AiCaseDataAccess.authenticate(data.apply(deadline),token,issuer,resource,deadline,
-                AiCaseDataAccess.Namespace.CIMD_V1);
+                namespace);
     }
 
     public IntegrationCaseReader reader(AiCaseDataRequest request,long deadline) {
         synchronized(this) { if(closed)throw unavailable(); }
-        if(request.namespace()!=AiCaseDataAccess.Namespace.CIMD_V1)throw unavailable();
+        if(request.namespace()!=namespace)throw unavailable();
         return new AiCaseDataAccess(data.apply(deadline),data,request);
     }
     public boolean accepts(AiCaseDataRequest request) {
-        return request!=null&&request.namespace()==AiCaseDataAccess.Namespace.CIMD_V1;
+        return request!=null&&request.namespace()==namespace;
     }
 
     private void identity(Connection c,String role,long deadline)throws SQLException {
