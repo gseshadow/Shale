@@ -1,0 +1,32 @@
+{
+  "selected_areas": [
+    "cases",
+    "security-data",
+    "server"
+  ],
+  "selected_modules": [
+    "shale-core",
+    "shale-data",
+    "shale-server"
+  ],
+  "full_suite": true,
+  "escalation_reasons": [
+    "build/test-selection/critical-tests.txt: parent build, module graph, selector, workflow, or Codex test infrastructure",
+    "build/test-selection/test-areas.json: parent build, module graph, selector, workflow, or Codex test infrastructure",
+    "build/universal-mcp-pr-c2/README.md: unknown production path",
+    "build/universal-mcp-pr-c2/SqlEvidence.java: unknown production path",
+    "build/universal-mcp-pr-c2/browser.py: unknown production path",
+    "build/universal-mcp-pr-c2/capture-browser-url.py: unknown production path",
+    "build/universal-mcp-pr-c2/dns.py: unknown production path",
+    "build/universal-mcp-pr-c2/front.py: unknown production path",
+    "build/universal-mcp-pr-c2/hermes-tool.py: unknown production path",
+    "build/universal-mcp-pr-c2/http-regressions.py: unknown production path",
+    "build/universal-mcp-pr-c2/registration-abuse.py: unknown production path",
+    "build/universal-mcp-pr-c2/src/com/shale/server/mcp/DcrConnectionServer.java: unknown production path",
+    "build/universal-mcp-pr-c2/src/com/shale/server/oauth/cimd/LiveMetadata.java: unknown production path",
+    "build/universal-mcp-pr-c2/stock-driver.py: unknown production path",
+    "shale-data/src/main/resources/ai/authorization-dcr-v3-catalog.sql: unknown production path",
+    "shale-data/src/main/resources/ai/registry-dcr-v3-catalog.sql: unknown production path"
+  ],
+  "execution": "Focused mapped contracts only, per requested compatibility scope; no broad critical/affected/full historical campaign."
+}

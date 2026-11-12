@@ -23,7 +23,7 @@ public final class CimdOAuthLifecycle {
     public CimdOAuthLifecycle(CimdMetadataService metadata,AiCimdOAuthStore publisher,AiCimdOAuthStore resolver,AiCimdOAuthStore neutral,
             Function<AiOAuthExchangeStore.Owner,AiCimdOAuthStore> issuers,McpOAuthProperties properties,Clock clock,AiDcrApplicationStore storedDcr) {
         this.storedDcr=storedDcr;
-        if(storedDcr!=null&&(publisher.contract()!=AiExternalContract.EXTERNAL_V2||resolver.contract()!=AiExternalContract.EXTERNAL_V2||neutral.contract()!=AiExternalContract.EXTERNAL_V2))throw denied();
+        if(storedDcr!=null&&(publisher.contract()==AiExternalContract.CIMD_V1||resolver.contract()!=publisher.contract()||neutral.contract()!=publisher.contract()))throw denied();
         this.metadata=Objects.requireNonNull(metadata);this.publisher=Objects.requireNonNull(publisher);this.resolver=Objects.requireNonNull(resolver);
         this.neutral=Objects.requireNonNull(neutral);this.issuers=Objects.requireNonNull(issuers);this.properties=properties;this.clock=clock;
     }
@@ -78,7 +78,7 @@ public final class CimdOAuthLifecycle {
     }
     /** Reuse the maintained browser/consent adapter and original Shale WEB authentication. */
     public AiOAuthBrowserStore browser(AiCimdOAuthStore store) {
-        if(storedDcr!=null&&store.contract()!=AiExternalContract.EXTERNAL_V2)throw denied();
+        if(storedDcr!=null&&store.contract()!=publisher.contract())throw denied();
         var delegate=store.browser(()->ShaleOAuthHuman.current().session());
         return new AiOAuthBrowserStore(){
             @Override public boolean externalIdentity(){return true;}
@@ -101,7 +101,7 @@ public final class CimdOAuthLifecycle {
     Exchange authenticateExchange(String client,String credential,String kind,String method,String assertion) {
         var id=new OAuthApplicationIdentifier(client);var snapshot=prepare(id);
         var store=issuers.apply(resolver.resolve(credential,client,kind).orElseThrow(CimdOAuthLifecycle::denied));
-        if(id.source()==OAuthApplicationIdentifier.Source.DCR&&store.contract()!=AiExternalContract.EXTERNAL_V2)throw denied();
+        if(id.source()==OAuthApplicationIdentifier.Source.DCR&&store.contract()!=publisher.contract())throw denied();
         var selected=store.clientProof(credential,client,kind);
         var proof=CimdClientAuthentication.verify(id.value(),selected,method,assertion,properties.issuer()+"/token",clock);
         return new Exchange(store,client,selected.method(),proof,snapshot);

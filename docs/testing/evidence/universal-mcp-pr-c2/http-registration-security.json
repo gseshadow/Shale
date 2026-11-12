@@ -1,0 +1,55 @@
+[
+  {
+    "check": "unsupported RFC default auth",
+    "status": 400,
+    "error": "invalid_client_metadata"
+  },
+  {
+    "check": "invalid redirect",
+    "status": 400,
+    "error": "invalid_redirect_uri"
+  },
+  {
+    "check": "caller identity rejected",
+    "status": 400,
+    "error": "invalid_client_metadata"
+  },
+  {
+    "check": "oversized request",
+    "status": 413,
+    "error": "invalid_client_metadata"
+  },
+  {
+    "check": "public RS256 private_key_jwt registration",
+    "status": 201,
+    "method": "private_key_jwt",
+    "private_material_submitted": false
+  },
+  {
+    "check": "durable source abuse limit",
+    "statuses": [
+      400,
+      400,
+      400,
+      400,
+      400,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429
+    ],
+    "positive_retry_after_asserted": true
+  }
+]

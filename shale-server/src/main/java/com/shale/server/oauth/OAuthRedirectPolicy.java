@@ -7,7 +7,9 @@ import java.util.Set;
 public final class OAuthRedirectPolicy {
     private OAuthRedirectPolicy() {}
 
-    public static URI registered(String value, boolean confidential) {
+    public static URI registered(String value, boolean confidential) { return registered(value,confidential,false); }
+    static URI registeredDcr(String value,boolean confidential) {return registered(value,confidential,true);}
+    private static URI registered(String value, boolean confidential,boolean dcr) {
         if (value == null || value.length() > 2048) throw invalid();
         URI uri;
         try { uri = URI.create(value); } catch (IllegalArgumentException failure) { throw invalid(); }
@@ -15,14 +17,18 @@ public final class OAuthRedirectPolicy {
                 uri.getRawFragment() != null || uri.getRawPath().isEmpty() ||
                 !uri.normalize().equals(uri) || value.contains("*") || value.contains("%") ||
                 uri.getPort() == 0 || uri.getPort() > 65535 ||
-                !("https".equals(uri.getScheme()) || (!confidential && nativeLoopback(uri)))) throw invalid();
+                !("https".equals(uri.getScheme()) || (!confidential && (nativeLoopback(uri)||(dcr&&"http".equals(uri.getScheme())&&"localhost".equals(uri.getHost())&&uri.getPort()>0))))) throw invalid();
         return uri;
     }
 
     public static void validate(String requested, Set<String> registered, boolean confidential) {
-        URI target = registered(requested, confidential);
+        validate(requested,registered,confidential,null);
+    }
+    public static void validate(String requested,Set<String> registered,boolean confidential,String clientId) {
+        boolean dcr=clientId!=null&&clientId.matches("dcr\\.[0-9a-f]{64}");
+        URI target = registered(requested, confidential,dcr);
         for (String value : registered) {
-            URI approved = registered(value, confidential);
+            URI approved = registered(value, confidential,dcr);
             if (value.equals(requested)) return;
             if (!confidential && nativeLoopback(approved) && nativeLoopback(target) &&
                     approved.getHost().equals(target.getHost()) &&

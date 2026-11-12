@@ -17,7 +17,7 @@ public final class OAuthAuthorizationRequestPolicy implements Consumer<OAuth2Aut
         var client = context.getRegisteredClient();
         try {
             OAuthRedirectPolicy.validate(request.getRedirectUri(), client.getRedirectUris(),
-                    !client.getClientAuthenticationMethods().contains(ClientAuthenticationMethod.NONE));
+                    !client.getClientAuthenticationMethods().contains(ClientAuthenticationMethod.NONE),client.getClientId());
             if(request.getState()==null || request.getState().isEmpty() || request.getState().length()>512 || request.getScopes().isEmpty())
                 throw new IllegalArgumentException("Explicit bounded state and scopes required.");
             request.getScopes().forEach(com.shale.core.security.ai.AiScope::parse);

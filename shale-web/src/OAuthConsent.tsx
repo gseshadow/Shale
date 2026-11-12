@@ -27,10 +27,11 @@ export async function oauthRequest(token: string, path: string, body?: URLSearch
     return JSON.parse(await response.boundedText(16384)) as unknown;
   } finally { window.clearTimeout(deadline); controller.abort(); }
 }
-export function callbackTarget(value: unknown, redirect: string | null, state: string | null): string {
+const isDcr = (id: string | null) => !!id && /^dcr\.[0-9a-f]{64}$/.test(id);
+export function callbackTarget(value: unknown, redirect: string | null, state: string | null, clientId: string | null = null): string {
   if (typeof value !== 'string' || !redirect || !state) throw new Error(failed);
   const url = new URL(value), target = new URL(redirect);
-  if (target.protocol !== 'https:' && !(target.protocol === 'http:' && ['127.0.0.1', '[::1]'].includes(target.hostname))) throw new Error(failed);
+  if (target.protocol !== 'https:' && !(target.protocol === 'http:' && (['127.0.0.1', '[::1]'].includes(target.hostname) || (isDcr(clientId) && target.hostname === 'localhost' && !!target.port)))) throw new Error(failed);
   if (url.origin !== target.origin || url.pathname !== target.pathname || url.hash || url.username || url.password
       || url.searchParams.getAll('state').length !== 1 || url.searchParams.get('state') !== state) throw new Error(failed);
   return value;
@@ -54,7 +55,7 @@ export function OAuthConsent({ token, user, request, onComplete = url => window.
     const params = new URLSearchParams(request);
     void (async () => {
       if (!request || request.length > 16384) throw new Error(failed);
-      if (params.get('client_id')?.startsWith('https://')) {
+      if ((params.get('client_id')?.startsWith('https://') || isDcr(params.get('client_id')))) {
         const body = new URLSearchParams({ client_id: params.get('client_id')! });
         const scopes = (params.get('scope') ?? '').split(/\s+/).filter(Boolean);
         if (!scopes.length || scopes.some(scope => !permissions[scope])) throw new Error(failed);
@@ -108,7 +109,7 @@ export function OAuthConsent({ token, user, request, onComplete = url => window.
       const result = await oauthRequest(token, '/oauth/mcp/authorize', body) as { redirect?: unknown };
       if (!current()) return;
       const params = new URLSearchParams(request);
-      onComplete(callbackTarget(result.redirect, params.get('redirect_uri'), params.get('state')));
+      onComplete(callbackTarget(result.redirect, params.get('redirect_uri'), params.get('state'), consent.client_id));
     } catch { if (current()) setError(failed); }
   }
   return <main className="login-page"><section className="login-panel settings-page">

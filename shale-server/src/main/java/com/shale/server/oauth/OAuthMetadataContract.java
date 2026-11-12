@@ -52,4 +52,14 @@ public final class OAuthMetadataContract {
         }
         return Map.copyOf(claims);
     }
+    public static Map<String,Object> authorizationServer(McpOAuthProperties properties,boolean authorizationEnabled,boolean exchangeEnabled,boolean cimd,boolean dcr) {
+        var claims=new java.util.LinkedHashMap<>(authorizationServer(properties,authorizationEnabled,exchangeEnabled,cimd));
+        if(dcr) {
+            if(!authorizationEnabled||!exchangeEnabled||properties.identity()==McpOAuthProperties.Identity.PRODUCTION)
+                throw new IllegalStateException("Complete verified development DCR required.");
+            claims.put("registration_endpoint",properties.issuer()+"/register");
+        }
+        return Map.copyOf(claims);
+    }
+
 }

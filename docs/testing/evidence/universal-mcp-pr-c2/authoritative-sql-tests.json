@@ -1,0 +1,33 @@
+{
+  "selection": "AiDcrEndpointLocalSqlServerTest#c2*",
+  "final_installer_source_hash": "086cf01d99097a2a5a43d9e5a77fdf5a28443916c1795559e55aa2d8e97f0a13",
+  "totals": {
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "215.44"
+  },
+  "scenarios": [
+    {
+      "name": "c2AuditRollbackAndHistoricalVerification",
+      "seconds": "48.252",
+      "result": "passed"
+    },
+    {
+      "name": "c2RefreshRevocationAndRevision",
+      "seconds": "67.614",
+      "result": "passed"
+    },
+    {
+      "name": "c2TwoTenantAuthorityAndLegacyIsolation",
+      "seconds": "56.612",
+      "result": "passed"
+    },
+    {
+      "name": "c2DurableAdmissionSerializesConcurrentReplicasAndRetainsApprovedMetadata",
+      "seconds": "42.0",
+      "result": "passed"
+    }
+  ]
+}
