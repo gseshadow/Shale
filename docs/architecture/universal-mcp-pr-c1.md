@@ -140,7 +140,12 @@ Providers are supplied explicitly; C1 adds no automatic runtime wiring.
 The registrar can create only bounded neutral metadata, with a race-safe
 cumulative 5,000-DCR-record ceiling. It cannot read/approve tenants, mutate an
 existing identity, or issue credentials. The separate metadata reader renews a
-cache from stored immutable metadata; it does not accept replacement bytes. The
+cache from stored immutable metadata; it does not accept replacement bytes. Its
+source-pinned owner context performs one exact-application historical-use
+existence check across tenant approvals, following the existing bounded
+pretenant projection pattern. This prevents tenant RLS from hiding retention
+eligibility from a neutral lease. It returns only public application metadata,
+no tenant identifier or record, and grants no direct tenant-table read. The
 separate administrator changes disablement/revision with RowVer and atomic
 global audit. Reenablement advances revision and cannot restore old approval or
 credentials. Existing tenant administrators use unchanged approval services;

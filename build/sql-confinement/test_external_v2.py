@@ -47,6 +47,11 @@ class ExternalV2GenerationTest(unittest.TestCase):
         for table in ('AiTenantApplicationApproval', 'AiDelegationGrant', 'AiDelegatedSession', 'AiCimdCredentialV1', 'AiOAuthCredential'):
             self.assertNotIn('INSERT dbo.' + table, register)
         self.assertIn("INSERT dbo.AiExternalControlV2 VALUES(1,0)", text)
+        prepare=text.split('CREATE PROCEDURE dbo.AiDcrPrepareMetadataV2',1)[1]
+        self.assertIn('WITH EXECUTE AS OWNER',prepare)
+        self.assertIn('p.IntegrationId IS NOT NULL',prepare)
+        result=prepare.split(' SELECT e.ExternalClientId,m.*',1)[1]
+        self.assertNotIn('p.ShaleClientId',result)
 
     def test_successor_checks_actual_delta_before_historical_projection(self):
         registry = (RES / 'registry-external-v2-catalog.sql').read_text()

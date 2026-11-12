@@ -84,6 +84,17 @@ class AiDcrApplicationLocalSqlServerTest extends AiCimdAuthorizationLocalSqlServ
         }
         assertThrows(IllegalArgumentException.class,()->new AiApplicationRegistryService(()->{throw new AssertionError("DCR cannot reach CIMD publication SQL");},ISSUER,RESOURCE).publishCimd(client,new byte[32],1,false,null));
         var a=approve(registration,7,72,71);var b=approve(registration,8,82,81);assertNotEquals(a.integrationId(),b.integrationId());
+        var unused=register();
+        // Only this nonce fixture ages public metadata to exercise retention.
+        // Restore its immutable trigger before any restricted runtime operation.
+        try(var c=owner(db)){
+            sql(c,"DISABLE TRIGGER dbo.AiDcrImmutableMetadataV2 ON dbo.AiDcrMetadataV2");
+            try{sql(c,"UPDATE dbo.AiDcrMetadataV2 SET CreatedAt=DATEADD(day,-2,CreatedAt),PendingExpiresAt=DATEADD(day,-2,PendingExpiresAt)");}
+            finally{sql(c,"ENABLE TRIGGER dbo.AiDcrImmutableMetadataV2 ON dbo.AiDcrMetadataV2");}
+        }
+        assertEquals(client,dcr("v2stored").prepare(registration.identifier()).identifier().value(),"A neutral reader must retain an approved identity beyond pending expiry");
+        assertThrows(IllegalStateException.class,()->dcr("v2stored").prepare(unused.identifier()),"Never-used pending identity must expire");
+        try(var c=connection("v2stored",null,null)){assertEquals(229,assertThrows(SQLException.class,()->sql(c,"SELECT TOP(0) * FROM dbo.AiTenantApplicationApproval")).getErrorCode(),"Public metadata projection grants no direct tenant access");}
         var fa=dcrConsent(client,7,72);var fb=dcrConsent(client,8,82);var ta=dcrRedeem(client,fa);var tb=dcrRedeem(client,fb);
         try(var cases=externalCases()){
             disclosure(cases,ta.accessToken(),7,72,100);disclosure(cases,tb.accessToken(),8,82,200);

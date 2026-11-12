@@ -101,6 +101,7 @@ END;
 GO
 /* Public metadata only; original stored bytes renew a cache, never a supplied document. */
 CREATE PROCEDURE dbo.AiDcrPrepareMetadataV2 @External nvarchar(max),@Issuer nvarchar(max),@Resource nvarchar(max)
+WITH EXECUTE AS OWNER
 AS BEGIN
  SET NOCOUNT ON; SET XACT_ABORT ON;
  IF @@TRANCOUNT<>0 OR (@@OPTIONS & 2)<>0 OR SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL
@@ -114,6 +115,8 @@ AS BEGIN
  AND Issuer=@Issuer COLLATE Latin1_General_100_BIN2 AND DATALENGTH(Issuer)=DATALENGTH(@Issuer)
  AND Resource=@Resource COLLATE Latin1_General_100_BIN2 AND DATALENGTH(Resource)=DATALENGTH(@Resource) AND Source='DCR' AND Disabled=0;
  IF NOT EXISTS(SELECT 1 FROM dbo.AiDcrMetadataV2 m JOIN dbo.AiExternalApplication e ON e.ApplicationId=m.ApplicationId AND e.Revision=m.ApplicationRevision AND e.MetadataDigest=m.MetadataDigest
+ /* Neutral retention checks only existence of historical use for this exact public application.
+    Owner context is the established bounded pretenant projection pattern. It returns no tenant data. */
  WHERE m.ApplicationId=@a AND m.ApplicationRevision=@r AND (m.PendingExpiresAt>@now OR EXISTS(SELECT 1 FROM dbo.AiTenantApplicationApproval p WHERE p.ApplicationId=@a AND p.IntegrationId IS NOT NULL)))
  THROW 59601,'Current DCR metadata unavailable.',1;
  UPDATE p SET FreshUntil=DATEADD(minute,4,@now) FROM dbo.AiCimdPublicationV1 p

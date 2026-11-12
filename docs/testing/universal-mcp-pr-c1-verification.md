@@ -73,7 +73,9 @@ The four authored scenarios cover:
 1. Neutral registration while product authority is OFF; unchanged authority-row
    counts; independent tenant A/B approvals and explicit consent; issuance;
    real restricted Case reads/cross-tenant denial; rejection by CIMD-only/manual
-   paths; existing CIMD and manual Case continuity.
+   paths; existing CIMD and manual Case continuity; retention of an approved
+   identity after pending expiry and refusal of expired never-used metadata,
+   without granting the neutral reader direct tenant-table access.
 2. Refresh, known/unknown credential revocation, tenant-specific approval revocation, other-tenant continuity,
    application disablement/revision invalidation and manual continuity.
 3. Actual V1 rejection, explicit successor acceptance, catalog drift refusal,
@@ -122,8 +124,13 @@ git diff --check
 The informational full-suite recommendation comes from registering the two new
 unit classes in the critical/area manifests. No broad historical SQL, unrelated
 UI or full-suite campaign was run. Selector unit tests passed as recorded above.
-After final source review removed a redundant unused anonymous-adapter helper,
-the directly relevant store/browser/metadata checks passed again: **14 tests**,
+Final review also corrected the neutral public-metadata retention operation to
+use the established bounded owner-context projection pattern for its one
+exact-application historical-use existence check. Tenant RLS and direct table
+permissions are unchanged; no tenant data is returned. The authored SQL retention
+regression remains unexecuted along with the other SQL scenarios. The affected
+and critical suites passed again after that correction. The directly relevant
+store/attestation/browser/metadata checks passed again: **27 tests**,
 zero failures/errors/skips; all data/server test sources, including the four
 authored SQL scenarios, compiled. No real SQL execution is inferred from that.
 
