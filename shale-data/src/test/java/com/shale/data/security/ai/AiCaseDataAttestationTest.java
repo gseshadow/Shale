@@ -138,10 +138,19 @@ class AiCaseDataAttestationTest {
         paths.add(java.nio.file.Path.of("src/main/resources/ai/confinement-catalog.sql"));
         paths.add(java.nio.file.Path.of("src/main/resources/ai/confinement-v2-catalog.sql"));
         paths.add(java.nio.file.Path.of("src/main/resources/ai/registry-confinement-v1-catalog.sql"));
+        paths.add(java.nio.file.Path.of("src/main/resources/ai/registry-external-v2-catalog.sql"));
+        paths.add(java.nio.file.Path.of("src/main/resources/ai/external-authorization-v2-catalog.sql"));
         assertTrue(paths.size()>10,"The Azure migration/verification inventory must not be empty");
         for(var path:paths) {
             String sql=java.nio.file.Files.readString(path).toLowerCase(Locale.ROOT);
-            if(Set.of("universal-pr3-confinement-verify.sql","registry-confinement-v1-catalog.sql").contains(path.getFileName().toString())) {
+            if(Set.of("registry-external-v2-catalog.sql","external-authorization-v2-catalog.sql").contains(path.getFileName().toString())) {
+                assertTrue(sql.contains("if @c1edition=5 begin"),"C1 retains explicit contained/boxed dispatch");
+                var c1=java.util.regex.Pattern.compile("declare @c1servercheck nvarchar\\(max\\)=n'((?:[^']|'')*+)';\\s*exec\\(@c1servercheck\\);",java.util.regex.Pattern.DOTALL).matcher(sql);
+                assertTrue(c1.find(),"C1 boxed catalog checks require a guarded dynamic batch");
+                assertTrue(c1.group(1).contains("sys.server_principals"));
+                sql=c1.replaceFirst("");
+            }
+            if(Set.of("universal-pr3-confinement-verify.sql","registry-confinement-v1-catalog.sql","registry-external-v2-catalog.sql").contains(path.getFileName().toString())) {
                 // SQL Server metadata lives in a dynamic ELSE branch; Azure must never compile/issue it.
                 assertTrue(sql.contains("if @registryedition=5 begin"));
                 assertTrue(sql.contains("end else begin"));

@@ -18,12 +18,16 @@ import static com.shale.data.security.ai.IntegrationAccessAudit.*;
 public final class AiCaseDataAccess implements IntegrationCaseReader {
     /** Trusted composition selects once at authentication; requests retain it through cleanup. */
     public enum Namespace {
-        LEGACY_V1, CIMD_V1;
+        LEGACY_V1, CIMD_V1, EXTERNAL_V2;
         String procedure(String root) {
             if (!Set.of("AiDataAuthenticateV1", "AiDataSearchCasesV1", "AiDataGetCaseOverviewV1",
                     "AiDataAuthorizeCaseHandoffV1", "AiDataRecordCaseFailureV1", "AiDataFinishCaseQuotaV1").contains(root))
                 throw new IllegalArgumentException("Unknown Case procedure.");
-            return this == LEGACY_V1 ? root : "AiCimdData" + root.substring("AiData".length());
+            return switch(this) {
+                case LEGACY_V1 -> root;
+                case CIMD_V1 -> "AiCimdData" + root.substring("AiData".length());
+                case EXTERNAL_V2 -> "AiExternalData" + root.substring("AiData".length()).replaceFirst("V1$","V2");
+            };
         }
     }
     private static final Semaphore ACTIVE = new Semaphore(5);

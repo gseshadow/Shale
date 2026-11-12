@@ -105,7 +105,7 @@ final class OAuthCodeExchange {
                     entry.getValue()[0].length()>(entry.getKey().equals("client_assertion")?8192:2048)) throw error("invalid_request");
         }
         for(String required:refresh?List.of("client_id","refresh_token","resource"):List.of("client_id","code","redirect_uri","resource","code_verifier")) if(req.getParameter(required)==null) throw error("invalid_request");
-        if(external)new CimdClientIdentifier(req.getParameter("client_id"));
+        if(external)new OAuthApplicationIdentifier(req.getParameter("client_id"));
         else if(!req.getParameter("client_id").matches("[A-Za-z0-9_-]{1,64}"))throw error("invalid_request");
         if(!req.getParameter(refresh?"refresh_token":"code").matches("[A-Za-z0-9_-]{43}")) throw error("invalid_request");
         properties.validateResources(List.of(req.getParameter("resource")));

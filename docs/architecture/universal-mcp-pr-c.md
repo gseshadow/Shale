@@ -1,5 +1,11 @@
 # Universal MCP PR C — DCR security dependency
 
+PR C1 now has an implementation candidate for this dependency; see
+[source-aware compatibility contract](universal-mcp-pr-c1.md). Its real SQL
+acceptance remains unverified while the private authoritative fixture is absent.
+The report below records the original PR C investigation. No DCR HTTP endpoint
+or production capability is added by C1.
+
 Status: **BLOCKED; DCR is not implemented or advertised.** This is a dependency
 report under the PR C instruction to document the smallest necessary security
 correction instead of expanding into another security architecture. It is not

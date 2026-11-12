@@ -14,7 +14,7 @@ final class CimdOAuthProviders {
     private final CimdOAuthLifecycle lifecycle;
     private final Supplier<HttpServletRequest> request;
     CimdOAuthProviders(CimdOAuthLifecycle lifecycle,Supplier<HttpServletRequest> request){this.lifecycle=lifecycle;this.request=request;}
-    static boolean external(String client) { return client!=null&&client.startsWith("https://"); }
+    static boolean external(String client) { return client!=null&&(client.startsWith("https://")||client.startsWith("dcr.")); }
     private static String method(HttpServletRequest req,OAuth2ClientAuthenticationToken converted) {
         if(!req.getParameter("client_id").equals(converted.getPrincipal()))throw new SecurityException();
         if(req.getParameter("client_assertion")!=null) {
@@ -30,9 +30,9 @@ final class CimdOAuthProviders {
         @Override public Authentication authenticate(Authentication input) {
             var req=request.get();if(!external(req.getParameter("client_id")))return null;
             try {
-                new CimdClientIdentifier(req.getParameter("client_id"));
+                var identifier=new OAuthApplicationIdentifier(req.getParameter("client_id"));
                 String method=method(req,(OAuth2ClientAuthenticationToken)input);
-                var registered=RegisteredClient.withId("cimd:"+req.getParameter("client_id")).clientId(req.getParameter("client_id"))
+                var registered=RegisteredClient.withId(identifier.source().name().toLowerCase(java.util.Locale.ROOT)+":"+req.getParameter("client_id")).clientId(req.getParameter("client_id"))
                         .clientAuthenticationMethod(new ClientAuthenticationMethod(method)).authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                         .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN);
                 if(OAuthRevocation.matches(req)) {

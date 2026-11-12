@@ -18,6 +18,7 @@ public final class AiCaseDataAttestation {
     private final String catalog;
     private final String registryCatalog;
     private final Contract contract;
+    private final AiExternalContract registryContract;
     public enum Contract { V1, V2 }
     public AiCaseDataAttestation(DataSource ai,DataSource verifier,List<DataSource> forbidden,String database,String issuer,String resource) {
         this(ai,verifier,forbidden,database,issuer,resource,false);
@@ -28,6 +29,10 @@ public final class AiCaseDataAttestation {
     }
     /** Explicit contract selection. No failed version may fall back to another verifier. */
     public AiCaseDataAttestation(DataSource ai,DataSource verifier,List<DataSource> forbidden,String database,String issuer,String resource,boolean productionInfrastructure,Contract contract) {
+        this(ai,verifier,forbidden,database,issuer,resource,productionInfrastructure,contract,AiExternalContract.CIMD_V1);
+    }
+    public AiCaseDataAttestation(DataSource ai,DataSource verifier,List<DataSource> forbidden,String database,String issuer,String resource,boolean productionInfrastructure,Contract contract,AiExternalContract registryContract) {
+        this.registryContract=Objects.requireNonNull(registryContract);
         this.contract=Objects.requireNonNull(contract);
         this.ai=Objects.requireNonNull(ai);this.verifier=Objects.requireNonNull(verifier);this.forbidden=List.copyOf(forbidden);
         this.productionInfrastructure=productionInfrastructure;
@@ -36,10 +41,13 @@ public final class AiCaseDataAttestation {
         try(var manifest=getClass().getResourceAsStream(prefix+"-modules.properties");var sql=getClass().getResourceAsStream(prefix+"-catalog.sql")) {
             if(manifest==null||sql==null)throw new IllegalStateException();definitions.load(manifest);catalog=new String(sql.readAllBytes(),StandardCharsets.UTF_8);
         } catch(Exception missing) { throw refused(); }
-        try(var extension=getClass().getResourceAsStream("/ai/registry-confinement-v1-catalog.sql")) {
+        try(var extension=getClass().getResourceAsStream(registryContract.registryResource())) {
             if(extension==null)throw new IllegalStateException();
             registryCatalog=new String(extension.readAllBytes(),StandardCharsets.UTF_8);
         } catch(Exception missing) { throw refused(); }
+    }
+    void requireRegistryContract(AiExternalContract expected) {
+        if(registryContract!=expected)throw refused();
     }
     public void verify() {
         String stage="PLATFORM";
@@ -137,6 +145,9 @@ public final class AiCaseDataAttestation {
             // Complete visibility belongs to the verifier, never to the AI data principal.
             try(var s=statement(review)) { boolean more=s.execute(catalog);while(true){if(more)try(var r=s.getResultSet()){while(r.next()){} }else if(s.getUpdateCount()==-1)break;more=s.getMoreResults(Statement.CLOSE_CURRENT_RESULT);} }
             stage="REGISTRY_COMPATIBILITY";
+            try(var s=statement(review);var r=s.executeQuery("SELECT COUNT(*) FROM sys.objects WHERE schema_id=SCHEMA_ID('dbo') AND name IN('AiExternalCompatibilityV2','AiDcrMetadataV2','AiExternalControlV2')")) {
+                if(!r.next()||(registryContract==AiExternalContract.CIMD_V1?r.getInt(1)!=0:r.getInt(1)!=3))throw refused();
+            }
             // The historical verifier remains authoritative for its original scope. A registry or
             // preparation marker additionally requires the closed, independently versioned graph.
             boolean registryPresent;
