@@ -409,7 +409,14 @@ def compare(expected_data, actual):
              [a['type'], a['bound'], a['ansi'], a['quoted'], a['executeAs']])
         same(f'function {name} signature',
              [dict(id=1, name=f['parameter'], systemType=56, userType=56, output=False)], a['parameters'])
-        same(f'function {name} dependencies', [], a['dependencies'])
+        dependencies, dependency_count = a.get('dependencies'), a.get('dependencyCount')
+        array_evidence = type(dependencies) is list
+        count_evidence = type(dependency_count) is int and dependency_count >= 0
+        check(array_evidence, f'function {name} dependencies: missing or non-array evidence')
+        check(count_evidence, f'function {name} dependencyCount: missing or invalid catalog count')
+        if array_evidence and count_evidence:
+            same(f'function {name} dependency count/array length', dependency_count, len(dependencies))
+        same(f'function {name} dependencies', [], dependencies)
     inventory('policies', expected_data['policies'], actual['policies'])
     inventory('ownership', expected_data['owners'], actual['owners'])
     bindings = []

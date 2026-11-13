@@ -32,15 +32,22 @@ DECLARE @Evidence nvarchar(max)=(SELECT
    p.system_type_id AS [systemType],p.user_type_id AS [userType],p.is_output AS [output]
    FROM sys.parameters p WHERE p.object_id=o.object_id
    ORDER BY p.parameter_id FOR JSON PATH,INCLUDE_NULL_VALUES)) AS [parameters],
-  JSON_QUERY((SELECT d.referenced_server_name AS [serverName],
+  dep.[DependencyCount] AS [dependencyCount],
+  /* Only an independently counted zero-row set may become []. Do not coalesce
+     a missing/invalid JSON result from a nonempty dependency query. */
+  JSON_QUERY(CASE WHEN dep.[DependencyCount]=0 THEN N'[]' ELSE
+   (SELECT d.referenced_server_name AS [serverName],
    d.referenced_database_name AS [databaseName],d.referenced_schema_name AS [schemaName],
    d.referenced_entity_name AS [entityName],d.referenced_minor_id AS [minorId],
    d.referenced_class_desc AS [classDescription],d.is_schema_bound_reference AS [bound],
    d.is_caller_dependent AS [callerDependent],d.is_ambiguous AS [ambiguous]
    FROM sys.sql_expression_dependencies d WHERE d.referencing_id=o.object_id
-   FOR JSON PATH,INCLUDE_NULL_VALUES)) AS [dependencies]
+   FOR JSON PATH,INCLUDE_NULL_VALUES) END) AS [dependencies]
   FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id
   JOIN sys.sql_modules m ON m.object_id=o.object_id
+  CROSS APPLY (SELECT COUNT_BIG(*) AS [DependencyCount]
+   FROM sys.sql_expression_dependencies counted
+   WHERE counted.referencing_id=o.object_id) dep
   WHERE o.object_id IN(OBJECT_ID(N'sec.fn_FilterByTenant'),OBJECT_ID(N'sec.fn_FilterByTenantOrGlobal'))
   ORDER BY o.name FOR JSON PATH,INCLUDE_NULL_VALUES)) AS [functions],
  JSON_QUERY((SELECT
