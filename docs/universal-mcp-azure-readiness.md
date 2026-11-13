@@ -232,6 +232,9 @@ Minimum Stage C acceptance, with sanitized evidence for the exact artifact/slot/
 
 ### Stage C — Isolated Azure acceptance (future, explicit environment/test authorization)
 
+Use the [isolated acceptance operator runbook](testing/universal-mcp-azure-acceptance-runbook.md)
+for the minimal target, ordered fixture packet, native test matrix and remaining input gaps.
+
 - [ ] Confirm no production DB/secret/data/traffic relationship; use synthetic tenants and hash-verified
   authoritative fixture. Rehearse the ordered SQL packet, contained role provisioning and binding here.
 - [ ] Run standalone actual-worker CIMD egress check first. Use the accepted disposable composition
