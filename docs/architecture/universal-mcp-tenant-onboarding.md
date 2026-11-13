@@ -411,3 +411,12 @@ integration and no consent or credentials; active OAuth remains disconnected. Th
 blocks installation alongside Case confinement until compatibility/successor review, preserving all
 historical receipts and immutable binding contracts. See its production prerequisites and
 [synthetic verification](../testing/universal-mcp-pr3-verification.md) before proposing deployment.
+
+## PR 4 security dependency review
+
+The [PR 4 OAuth binding dependency record](universal-mcp-pr4-security-dependency.md) reviews the
+legacy credential/Case proof path against the registry model and #1948's confinement supplement.
+PR 4 remains incomplete: activating a suspended approval and substituting its internal client ID
+does not establish a durable external application/approval revision binding. The record specifies
+the additive proof/verification dependency and distinguishes disposable diagnostic tests from CIMD
+lifecycle acceptance. No new OAuth wiring or CIMD advertisement is enabled by that review.
