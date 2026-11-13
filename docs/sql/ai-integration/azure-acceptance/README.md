@@ -267,3 +267,160 @@ keep every SQL/native opt-in absent.
 SQL syntax/catalog/permissions on native Azure, live origin routing/JVM-zone binding, real Boot/admission,
 browser/stock-client flows and cleanup. These results validate preparation only, not installation
 or Azure acceptance. The default fixture/Phase1R/normalization/binding/user/seed inputs remain blocked.
+
+## Stage 09 evidence comparison (read-only, fresh fixture only)
+
+Use [phase1r_evidence.py](../../../../build/azure-mcp-acceptance/phase1r_evidence.py)
+and [Collect-Phase1R.sql](../../../../build/azure-mcp-acceptance/Collect-Phase1R.sql)
+with the verified `d3780673acc68399af171e406fb3b481a899fe07` base plus this reviewed utility.
+The utility does not execute SQL, edit private inputs, approve normalization or invoke stages.
+The collector reads system catalogs only, never application/control rows, credential catalogs or
+another database. It reuses `target.sql` but deliberately omits the row-reading `owner.sql` fence;
+existing dbo/CONTROL visibility is checked directly. Keep the test app stopped, SQL/app controls
+OFF under the existing Stage 00-08 evidence, and exclude other schema/policy maintenance throughout
+collection and review. This comparison is point-in-time evidence, not a concurrency fence.
+
+### Generate expected evidence offline
+
+PowerShell 7, Python 3.9+ and JDK 21; run from the acceptance checkout root. Do not change the
+fixture bytes. This calls the unchanged `ExportFixture` / `CaseReadVerificationSafety.schema`,
+then interprets only the bounded security-policy grammar. No replacement importer is introduced.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+Set-Location 'C:\Eclipse\Workspace\shale-parent'
+git merge-base --is-ancestor 'd3780673acc68399af171e406fb3b481a899fe07' HEAD
+if ($LASTEXITCODE -ne 0) { throw 'STOP: verified base commit is not an ancestor' }
+# Retain this exact utility commit and independently review its diff from the verified base.
+git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'STOP: cannot identify utility checkout' }
+$Fixture = 'C:\ShalePrivateEvidence\authoritative-fixture-20261028\authoritative-candidate.sql'
+$Evidence = Join-Path (Get-Location) ('work/phase1r-review-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $Evidence | Out-Null
+$Expected = Join-Path $Evidence 'expected.json'
+$Capture = Join-Path $Evidence 'metadata.hex'
+$Report = Join-Path $Evidence 'report.json'
+python build/azure-mcp-acceptance/phase1r_evidence.py expected --fixture $Fixture --out $Expected
+if ($LASTEXITCODE -ne 0) { throw 'STOP: baseline generation failed' }
+```
+
+Expected: authoritative parser PASS, then baseline-generation PASS and expected-file SHA-256.
+The JSON contains both complete UTF-16LE definitions and the fixture's complete predicate/policy
+inventory. The exact fixture hash is pinned in the existing exporter and comparator. Source input
+and derived evidence remain private. Preserve the independently reviewed fixture/baseline review
+reference; this tool cannot establish who reviewed that source.
+
+The two tenant functions must be the fixture's expression-only, single-int-parameter functions.
+Any relational body, user-object dependency syntax, unsupported policy syntax or unexpected
+non-target count stops baseline generation, rather than inventing dependencies or skipping clauses.
+Dependencies must then be empty in the destination catalog. Byte differences, including line endings,
+are failures; there is no normalization switch. Function mismatches give the byte offset, lengths,
+hashes and next 32 bytes. Binding comparison unquotes identifiers but preserves case, ordered argument
+tokens, literals, predicate kind and operation; it counts duplicates and compares every policy's state.
+
+### Export once, then compare offline
+
+Select the already approved **ODBC SQLCMD** executable (not the unreviewed Go replacement), existing
+acceptance owner and existing approved route. The following is the sole SQL connection command;
+it pins the FQDN/database, validates TLS and prompts privately for the existing SQL-auth password.
+No `-P`, credential files, production connection, permission grant or owner-fence row read is used.
+
+```powershell
+$SqlcmdExe = Read-Host 'Approved Microsoft ODBC SQLCMD executable path'
+$OwnerUser = Read-Host 'Existing acceptance SQL owner username'
+if (Test-Path -LiteralPath $Capture) { throw 'STOP: use a new capture path' }
+& $SqlcmdExe -S 'tcp:shale.database.windows.net,1433' -d 'ShaleMcpAcceptance' `
+    -U $OwnerUser -N -b -V 16 -r 1 -l 30 -t 20 -x -X1 -f 65001 `
+    -h -1 -W -w 4096 -i 'build/azure-mcp-acceptance/Collect-Phase1R.sql' -o $Capture
+if ($LASTEXITCODE -ne 0) { throw 'STOP: export failed; preserve partial evidence, do not approve it' }
+python build/azure-mcp-acceptance/phase1r_evidence.py compare `
+    --expected $Expected --capture $Capture --report $Report
+if ($LASTEXITCODE -ne 0) { throw 'STOP: evidence comparison failed; inspect report.json' }
+Get-Content -LiteralPath $Report
+```
+
+The export uses bounded hex lines so definitions and ordered JSON cannot be silently truncated by
+SQLCMD long-cell settings. A malformed, incomplete or banner-contaminated capture fails closed.
+Reports and baselines use create-new semantics. Preserve a failed capture/report; use new paths
+for any separately justified recollection, never overwrite evidence or refresh hashes to bless drift.
+
+PASS requires byte-for-byte complete function equality; engine-equivalent flags/signatures;
+matching effective ownership, policy states, all 116 non-target bindings and the exact three target
+FILTERs; no target BLOCK/alternate policy, Phase1R receipt or invocation object; and built-in int
+target columns. All missing/extra bindings, including duplicates, are reported explicitly. Database-
+specific IDs are reconciled between raw and named catalog rows but excluded from portable binding
+comparison. The report recomputes the unchanged engine's UTF-16LE `p.* ... FOR JSON PATH` fingerprint,
+excluding all predicates on Users/auditLog/Statuses across all policies. This hash remains local
+to this database incarnation and is not a fixture-portable hash.
+
+STOP on any FAIL/unknown state, unsupported syntax, missing independent baseline provenance, wrong
+destination/collation/engine, changed supplied observation, unknown consumers or competing DDL.
+The collector intentionally cannot reconfirm control-table values or stopped-app state by reading
+application rows; retain the existing separate evidence. A PASS is evidence equivalence only:
+every report explicitly retains `normalizationApproved: false`.
+
+### Conditional private input preparation after independent approval
+
+Do not run this section until the report passes, an independent reviewer approves the evidence
+and the no-consumer normalization window, and those approvals are recorded against the expected,
+capture, report and utility-file hashes. No approval is inferred from matching supplied hashes.
+The following steps are for the operator; the comparator never performs them.
+
+```powershell
+$r = Get-Content -LiteralPath $Report -Raw | ConvertFrom-Json
+if ($r.outcome -cne 'PASS' -or @($r.discrepancies).Count -ne 0) { throw 'STOP: comparison did not pass' }
+$strict = $r.observedFunctionHashes.fn_FilterByTenant
+$overlay = $r.observedFunctionHashes.fn_FilterByTenantOrGlobal
+$other = $r.observedOtherPredicatesHash
+if ($strict -cne 'DCA29AC712CF8BE8BADBA8D62A324857EB73931C6B98367C656C6FD094738502' -or
+    $overlay -cne '8A33CF8C28F999A1118D6B225E38930861F3774D55E568453716616F79FB0AC3' -or
+    $other -cne '358C9071BFB302B94F48B64D5C92CD50DCF66AD5FC43402D2DF27557AC7DCD3E') {
+    throw 'STOP: supplied Stage 09 observation changed; reconcile separately'
+}
+$Packet = Join-Path (Get-Location) 'work/azure-mcp-acceptance'
+$normalize = Join-Path $Packet 'normalize.sql'
+$template = [IO.File]::ReadAllText('docs/sql/ai-integration/azure-acceptance/normalize.sql')
+if ([IO.File]::ReadAllText($normalize) -cne $template) {
+    throw 'STOP: private normalize.sql differs from the unapproved source template'
+}
+$phasePath = Join-Path $Packet 'phase1r.json'
+$oldPhase = Get-Content -LiteralPath $phasePath -Raw | ConvertFrom-Json -AsHashtable
+$keys = @('ReviewedStrictHash','ReviewedOverlayHash','ReviewedOtherPredicatesHash')
+if ($oldPhase.Count -ne 3 -or @($keys | Where-Object { -not $oldPhase.ContainsKey($_) -or $null -ne $oldPhase[$_] }).Count -ne 0) {
+    throw 'STOP: private Phase1R inputs no longer have their unapproved defaults'
+}
+# Only now, with independent approvals already recorded, make these two private edits.
+[ordered]@{ ReviewedStrictHash=$strict; ReviewedOverlayHash=$overlay; ReviewedOtherPredicatesHash=$other } |
+    ConvertTo-Json | Set-Content -LiteralPath $phasePath -Encoding utf8NoBOM
+[IO.File]::WriteAllText($normalize,
+    $template.Replace('@NormalizeApproved bit=0','@NormalizeApproved bit=1'), [Text.UTF8Encoding]::new($false))
+./build/azure-mcp-acceptance/Prepare-Packet.ps1 -PacketDirectory $Packet -AuthoritativeFixture $Fixture
+```
+
+Review the two private input changes and their SHA-256 values. Use the exact new rendered directory
+printed by `Prepare-Packet.ps1`, never a guessed/latest directory. Do not edit rendered SQL:
+
+```powershell
+$Rendered = Read-Host 'Exact newly printed rendered directory'
+$manifest = Import-Csv -LiteralPath (Join-Path $Rendered 'sha256.csv')
+Get-FileHash -LiteralPath $normalize,$phasePath -Algorithm SHA256
+foreach ($stage in @('09-normalize','10-phase1r-preflight','11-phase1r-apply','12-phase1r-postcheck')) {
+    $file = Join-Path $Rendered ($stage + '.sql')
+    $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+    $entry = @($manifest | Where-Object Stage -CEQ $stage)
+    if ($entry.Count -ne 1 -or $entry[0].SHA256 -cne $hash) { throw "STOP: manifest mismatch: $stage" }
+    [pscustomobject]@{ Stage=$stage; SHA256=$hash }
+}
+```
+
+Independently inspect the four rendered files: Stage 09 removes only the three exact FILTERs;
+10-12 contain the unchanged engine in PREFLIGHT/APPLY/POSTCHECK order with the exact reviewed
+hashes, acceptance database and collation. Keep the source commit, fixture review reference,
+physical-incarnation observation, evidence/input/rendered hashes and stage-specific approval record.
+Any edit invalidates its hash approval. No stage, including PREFLIGHT, is executed by this procedure.
+Leave `Invoke-Stage.ps1 -Execute`, deployment/start, SQL permissions, production and MCP activation
+outside this evidence review. There is no merge or commit operation.
+
+Audit compatibility: collection reads catalog metadata only; no sensitive application read or domain/
+administrative mutation occurs. Evidence files are private operator records. No application audit
+event, audit schema, permission or migration change is introduced.

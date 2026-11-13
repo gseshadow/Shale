@@ -1,0 +1,349 @@
+"""Offline Stage 09 review. Only expected() launches processes: existing javac/exporter, never SQL."""
+import argparse
+from collections import Counter
+import hashlib
+import json
+from pathlib import Path
+import re
+import subprocess
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXTURE = '4B64B50DA531EBC6A2EB9DC26C6555EF555621DF371FE9D8A5CF994FB6E8417F'
+FUNCTIONS = ('fn_FilterByTenant', 'fn_FilterByTenantOrGlobal')
+TARGETS = ('Users', 'auditLog', 'Statuses')
+
+
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest().upper()
+
+
+def tokens(sql):
+    """Bounded lexer: comments ignored, identifiers unquoted, literal bytes retained."""
+    result, i = [], 0
+    pattern = re.compile(r"\[(?:[^\]]|\]\])*\]|\"(?:[^\"]|\"\")*\"|N?'(?:[^']|'')*'|@[A-Za-z_][\w]*|[A-Za-z_][\w]*|\d+|[^\s]", re.I)
+    while i < len(sql):
+        if sql[i].isspace():
+            i += 1
+        elif sql.startswith('--', i):
+            end = sql.find('\n', i)
+            i = len(sql) if end < 0 else end
+        elif sql.startswith('/*', i):
+            depth, i = 1, i + 2
+            while depth and i < len(sql):
+                if sql.startswith('/*', i):
+                    depth, i = depth + 1, i + 2
+                elif sql.startswith('*/', i):
+                    depth, i = depth - 1, i + 2
+                else:
+                    i += 1
+            require(depth == 0, 'unterminated comment')
+        else:
+            m = pattern.match(sql, i)
+            require(m is not None, 'unsupported token')
+            value = m.group()
+            if value.startswith('['):
+                value = value[1:-1].replace(']]', ']')
+            elif value.startswith('"'):
+                value = value[1:-1].replace('""', '"')
+            result.append(value)
+            i = m.end()
+    return result
+
+
+class Cursor:
+    def __init__(self, values):
+        self.values, self.i = values, 0
+
+    def take(self):
+        require(self.i < len(self.values), 'unexpected end of RLS definition')
+        value = self.values[self.i]
+        self.i += 1
+        return value
+
+    def peek(self):
+        return self.values[self.i].upper() if self.i < len(self.values) else ''
+
+    def expect(self, value):
+        require(self.take().upper() == value.upper(), f'expected {value} in RLS definition')
+
+    def name(self):
+        a = self.take()
+        self.expect('.')
+        return [a, self.take()]
+
+
+def binding(c):
+    function = c.name()
+    c.expect('(')
+    args, arg = [], []
+    while c.peek() != ')':
+        value = c.take()
+        require(value != '(', 'nested predicate arguments require separate review')
+        if value == ',':
+            require(arg, 'empty predicate argument')
+            args.append(arg)
+            arg = []
+        else:
+            arg.append(value)
+    c.expect(')')
+    if arg:
+        args.append(arg)
+    return function, args
+
+
+def policy(values):
+    c = Cursor(values)
+    for word in ('CREATE', 'SECURITY', 'POLICY'):
+        c.expect(word)
+    name, predicates = c.name(), []
+    while c.peek() == 'ADD':
+        c.take()
+        kind = c.take().upper()
+        require(kind in ('FILTER', 'BLOCK'), 'unknown predicate kind')
+        c.expect('PREDICATE')
+        function, args = binding(c)
+        c.expect('ON')
+        target, operation = c.name(), None
+        if kind == 'BLOCK':
+            operation = c.take().upper() + ' ' + c.take().upper()
+            require(operation in ('AFTER INSERT', 'AFTER UPDATE', 'BEFORE UPDATE', 'BEFORE DELETE'), 'unknown BLOCK operation')
+        predicates.append(dict(policy=name, target=target, kind=kind, operation=operation,
+                               function=function, arguments=args))
+        if c.peek() == ',':
+            c.take()
+    c.expect('WITH')
+    c.expect('(')
+    options = {}
+    while True:
+        key = c.take().upper()
+        require(key in ('STATE', 'SCHEMABINDING') and key not in options, 'unsupported/duplicate policy option')
+        c.expect('=')
+        value = c.take().upper()
+        require(value in ('ON', 'OFF'), 'unknown policy state')
+        options[key] = value == 'ON'
+        if c.peek() != ',':
+            break
+        c.take()
+    c.expect(')')
+    if c.peek() == ';':
+        c.take()
+    require(c.peek() == '' and options.get('STATE') is True, 'unsupported policy suffix/state')
+    return dict(name=name, enabled=True, bound=options.get('SCHEMABINDING', True)), predicates
+
+
+def baseline(batches):
+    functions, policies, predicates, schemas = [], [], [], {'dbo': 'dbo'}
+    for batch in batches:
+        t = tokens(batch)
+        if [v.upper() for v in t[:2]] == ['CREATE', 'SCHEMA']:
+            require(len(t) in (3, 4, 5, 6), 'unsupported schema ownership')
+            rest = t[3:]
+            if rest and rest[-1] == ';':
+                rest = rest[:-1]
+            require(not rest or len(rest) == 2 and rest[0].upper() == 'AUTHORIZATION', 'unsupported schema ownership')
+            schemas[t[2]] = rest[1] if rest else 'dbo'  # fixture installed by dbo
+        if [v.upper() for v in t[:3]] == ['CREATE', 'SECURITY', 'POLICY']:
+            p, bindings = policy(t)
+            policies.append(p)
+            predicates.extend(bindings)
+        if [v.upper() for v in t[:2]] == ['CREATE', 'FUNCTION']:
+            c = Cursor(t[2:])
+            name = c.name()
+            if name not in [['sec', f] for f in FUNCTIONS]:
+                continue
+            c.expect('(')
+            parameter = c.take()
+            c.expect('int')
+            c.expect(')')
+            require(parameter.startswith('@'), 'unexpected function signature')
+            for word in ('RETURNS', 'TABLE', 'WITH', 'SCHEMABINDING', 'AS', 'RETURN'):
+                c.expect(word)
+            body = c.values[c.i:]
+            # These two fixture predicates are expression-only. Never guess dependency
+            # graphs for a new relational body or a user-defined function/type reference.
+            require(not any(v.upper() in ('FROM', 'JOIN', 'APPLY') for v in body)
+                    and '.' not in body, f'unsupported dependency syntax in {name}; STOP for review')
+            functions.append(dict(name=name, definitionHex=batch.encode('utf-16le').hex().upper(),
+                                  parameter=parameter))
+    require(sorted(f['name'][1] for f in functions) == sorted(FUNCTIONS), 'expected exactly two RLS functions')
+    require(len({tuple(p['name']) for p in policies}) == len(policies), 'duplicate policy')
+    require('sec' in schemas, 'missing sec schema ownership')
+    owners = []
+    objects = {tuple(p['name']) for p in policies} | {tuple(p['target']) for p in predicates}
+    objects |= {('sec', f) for f in FUNCTIONS} | {('dbo', t) for t in TARGETS}
+    for name in sorted(objects):
+        require(name[0] in schemas, f'unknown schema owner: {name[0]}')
+        owners.append(dict(name=list(name), schemaOwner=schemas[name[0]], owner=schemas[name[0]]))
+    result = dict(version=1, fixtureSha256=FIXTURE, functions=functions,
+                  policies=policies, predicates=predicates, owners=owners)
+    require(sum(p['target'] not in [['dbo', t] for t in TARGETS] for p in predicates) == 116,
+            'fixture must contain exactly 116 non-target predicates')
+    require(schemas['dbo'] == schemas['sec'] == 'dbo', 'Phase1R requires dbo schema ownership')
+    return result
+
+
+def expected(fixture, output):
+    require(sha(fixture.read_bytes()) == FIXTURE, 'authoritative fixture hash mismatch')
+    with tempfile.TemporaryDirectory(prefix='phase1r-', dir=output.parent) as tmp:
+        classes, export = Path(tmp) / 'classes', Path(tmp) / 'export.sql'
+        classes.mkdir()
+        subprocess.run(['javac', '-encoding', 'UTF-8', '-d', str(classes),
+                        str(ROOT / 'shale-data/src/test/java/com/shale/data/verification/CaseReadVerificationSafety.java'),
+                        str(ROOT / 'build/azure-mcp-acceptance/ExportFixture.java')], check=True)
+        subprocess.run(['java', '-cp', str(classes), 'com.shale.data.verification.ExportFixture',
+                        str(fixture), str(export)], check=True)
+        raw = re.findall(r'CONVERT\(nvarchar\(max\),0x([0-9a-f]+)\); EXEC sys.sp_executesql @FixtureBatch;',
+                         export.read_text(encoding='utf-8'))
+        require(raw, 'no parser-exported batches')
+        result = baseline([bytes.fromhex(h).decode('utf-16le') for h in raw])
+    with output.open('x', encoding='utf-8') as stream:
+        json.dump(result, stream, ensure_ascii=True, indent=2)
+    print(f'PASS baseline generated; SHA256={sha(output.read_bytes())}; not approval')
+
+
+def keyed(value):
+    return json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(',', ':'))
+
+
+def compare(expected_data, actual):
+    errors = []
+
+    def check(ok, message):
+        if not ok:
+            errors.append(message)
+
+    def same(label, want, got):
+        check(want == got, f'{label}: expected {keyed(want)}, actual {keyed(got)}')
+
+    def inventory(label, want, got):
+        missing, extra = Counter(map(keyed, want)), Counter(map(keyed, got))
+        for item, count in sorted((missing - extra).items()):
+            errors.append(f'{label}: missing {count} x {item}')
+        for item, count in sorted((extra - missing).items()):
+            errors.append(f'{label}: unexpected {count} x {item}')
+
+    same('baseline format', 1, expected_data['version'])
+    same('fixture hash', FIXTURE, expected_data['fixtureSha256'])
+    identity = actual['identity']
+    same('database', 'ShaleMcpAcceptance', identity['database'])
+    check(identity['server'] in ('shale', 'shale.database.windows.net'), 'unexpected logical server')
+    same('engine', 5, identity['engine'])
+    same('collation', 'SQL_Latin1_General_CP1_CI_AS', identity['collation'])
+    check(bool(identity['physical']), 'missing Azure physical incarnation')
+    same('Phase1R receipt count', 0, identity['receipts'])
+    same('invocation object', None, identity['invocation'])
+    same('function count', 2, len(actual['functions']))
+    hashes = {}
+    for f in expected_data['functions']:
+        name = f['name']
+        found = [a for a in actual['functions'] if a['name'] == name]
+        if len(found) != 1:
+            errors.append(f'function {name}: expected exactly one, found {len(found)}')
+            continue
+        a = found[0]
+        want, got = bytes.fromhex(f['definitionHex']), bytes.fromhex(a['definitionHex'])
+        if want != got:
+            offset = next((i for i, (x, y) in enumerate(zip(want, got)) if x != y), min(len(want), len(got)))
+            errors.append(f'function {name}: byte mismatch at offset {offset}; expected length={len(want)} SHA256={sha(want)}, actual length={len(got)} SHA256={sha(got)}; next 32 bytes expected={want[offset:offset+32].hex()} actual={got[offset:offset+32].hex()}')
+        same(f'function {name} byte length', len(got), a['byteLength'])
+        same(f'function {name} hash integrity', sha(got), a['hash'])
+        hashes[name[1]] = a['hash']
+        same(f'function {name} flags', ['IF', True, True, True, None],
+             [a['type'], a['bound'], a['ansi'], a['quoted'], a['executeAs']])
+        same(f'function {name} signature',
+             [dict(id=1, name=f['parameter'], systemType=56, userType=56, output=False)], a['parameters'])
+        same(f'function {name} dependencies', [], a['dependencies'])
+    inventory('policies', expected_data['policies'], actual['policies'])
+    inventory('ownership', expected_data['owners'], actual['owners'])
+    bindings = []
+    for p in actual['predicates']:
+        c = Cursor(tokens(p['definition']))
+        # Catalog predicates have one optional enclosing pair of parentheses.
+        wrapped = c.peek() == '('
+        if wrapped:
+            c.take()
+        function, args = binding(c)
+        if wrapped:
+            c.expect(')')
+        require(c.peek() == '', f'unsupported catalog predicate: {p["definition"]}')
+        bindings.append(dict(policy=p['policy'], target=p['target'], kind=p['kind'],
+                             operation=p['operation'], function=function, arguments=args))
+    inventory('predicate', expected_data['predicates'], bindings)
+    targets = [p for p in bindings if p['target'] in [['dbo', t] for t in TARGETS]]
+    required = [dict(policy=['sec', 'TenantFilter'], target=['dbo', t], kind='FILTER', operation=None,
+                     function=['sec', FUNCTIONS[t == 'Statuses']], arguments=[['ShaleClientId']]) for t in TARGETS]
+    inventory('target FILTER', required, targets)
+    other = [p for p in bindings if p not in targets]
+    same('non-target count', 116, len(other))
+    inventory('target columns', [dict(target=t, systemType=56, userType=56, computed=False) for t in TARGETS], actual['columns'])
+    local = json.loads(actual['otherJson'])
+    same('raw other inventory count', 116, len(local))
+    # Reconcile ID-bearing raw rows to every resolved OTHER binding; IDs never
+    # participate in cross-database comparison, but are not silently discarded.
+    resolved = [p for p in actual['predicates'] if p['target'] not in [['dbo', t] for t in TARGETS]]
+    inventory('raw/resolved other bindings',
+              [dict(policyId=p['policyId'], targetId=p['targetId'], predicateId=p['predicateId'],
+                    definition=p['definition'], kind=p['kind'], operation=p['operation']) for p in resolved],
+              [dict(policyId=p['object_id'], targetId=p['target_object_id'], predicateId=p['security_predicate_id'],
+                    definition=p['predicate_definition'], kind=p['predicate_type_desc'], operation=p.get('operation_desc')) for p in local])
+    same('other hash integrity', sha(actual['otherJson'].encode('utf-16le')), actual['otherHash'])
+    return dict(outcome='FAIL' if errors else 'PASS', discrepancies=errors,
+                fixtureSha256=FIXTURE, collectedUtc=identity.get('collectedUtc'),
+                otherPredicateCount=len(other), observedFunctionHashes=hashes,
+                observedOtherPredicatesHash=actual['otherHash'], physicalDatabase=identity['physical'],
+                normalizationApproved=False)
+
+
+def capture(path):
+    # SQLCMD output consists solely of bounded hex lines. Reject banners/errors,
+    # empty/truncated JSON, duplicate keys and concatenated/partial exports.
+    lines = path.read_text(encoding='utf-8-sig').splitlines()
+    parts = [line.strip() for line in lines if line.strip()]
+    require(parts and all(re.fullmatch('[0-9A-Fa-f]+', p) and len(p) % 2 == 0 for p in parts),
+            'capture must contain only complete hex lines')
+
+    def unique(pairs):
+        result = {}
+        for k, v in pairs:
+            require(k not in result, f'duplicate JSON key: {k}')
+            result[k] = v
+        return result
+    return json.loads(bytes.fromhex(''.join(parts)).decode('utf-16le'), object_pairs_hook=unique)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    e = commands.add_parser('expected')
+    e.add_argument('--fixture', type=Path, required=True)
+    e.add_argument('--out', type=Path, required=True)
+    c = commands.add_parser('compare')
+    c.add_argument('--expected', type=Path, required=True)
+    c.add_argument('--capture', type=Path, required=True)
+    c.add_argument('--report', type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        if args.command == 'expected':
+            expected(args.fixture, args.out)
+            return 0
+        report = compare(json.loads(args.expected.read_text(encoding='utf-8')), capture(args.capture))
+        report.update(expectedFileSha256=sha(args.expected.read_bytes()), captureSha256=sha(args.capture.read_bytes()))
+    except (ValueError, KeyError, TypeError, IndexError, OSError, subprocess.CalledProcessError) as error:
+        report = dict(outcome='FAIL', discrepancies=[str(error)], normalizationApproved=False)
+    if args.command == 'compare':
+        with args.report.open('x', encoding='utf-8') as stream:
+            json.dump(report, stream, indent=2)
+    print(report['outcome'])
+    for error in report['discrepancies']:
+        print(error)
+    return 0 if report['outcome'] == 'PASS' else 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
