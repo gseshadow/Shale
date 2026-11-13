@@ -33,14 +33,12 @@ stamp tenant/user context; ordinary credentials must never become fallback Case 
 
 ### Hard activation boundary
 
-`CimdConnectionConfiguration` and `DcrConnectionConfiguration` explicitly reject `azure`/`prod`
-and PRODUCTION identity. `OAuthMetadataContract` also refuses production DCR advertisement.
-Enabling flags on the existing Azure app therefore cannot provide a supported rollout.
-The enabled fixtures explicitly supply `CimdServices`, `CimdCaseConnections` and `DcrCapabilities`;
-production source has no corresponding complete provider wiring. Required capability separation,
-secret bindings, deadline decoration and DCR_V3 selection need a small, separately reviewed
-production composition change with tests. **Do not remove guards, combine dev+azure profiles,
-reuse fixture providers or deploy the test harness as a workaround.** No implementation is changed here.
+The reviewed #1960 baseline rejected `azure`/`prod` and lacked production capability wiring.
+The [runtime integration successor](architecture/universal-mcp-azure-runtime.md) replaces that
+source-level ban with explicit V2/DCR_V3 configuration, separate contained capability providers
+and existing live SQL verification. All controls remain default-OFF. This is not deployment or
+native Azure acceptance; the SQL, identity/binding, egress, ingress/NAT, browser, capacity and
+approval gates below remain open. Never mix dev+azure profiles or deploy fixture providers.
 
 ## 2. Exact prerequisites and SQL inventory
 
@@ -189,7 +187,7 @@ are `shale.ai.data.{jdbc-url,username,password,database,contract-version}` and
 `shale.ai.oauth.bootstrap.{jdbc-url,username,password}`. AI data aliases are
 `SHALE_AI_DATA_JDBC_URL`, `SHALE_AI_DATA_USERNAME`, `SHALE_AI_DATA_PASSWORD`.
 Keep encrypted certificate-validated SQL; protected JDBC URL options cannot override TLS/auth/MARS/timeouts.
-Universal provider bindings are not implemented: do not invent additional credentials/settings here.
+Universal provider keys/roles are specified in the [runtime contract](architecture/universal-mcp-azure-runtime.md#required-configuration-contract-future-authorized-configuration-only); no credentials or Azure settings are supplied here.
 
 Minimum Stage C acceptance, with sanitized evidence for the exact artifact/slot/configuration:
 
@@ -240,8 +238,8 @@ Minimum Stage C acceptance, with sanitized evidence for the exact artifact/slot/
   only within its supported separate test identity/profile; it proves Azure infrastructure behavior,
   not production Boot compatibility. Existing `.test`/`.localhost` identity restrictions mean an
   ordinary Azure hostname cannot simply replace the fixture origin.
-- [ ] Before production eligibility, separately implement/review the minimal supported Azure composition
-  and nonproduction acceptance identity path; repeat actual App Service Boot/ingress/SQL/browser/stock
+- [ ] Before production eligibility, review the supported [runtime composition](architecture/universal-mcp-azure-runtime.md)
+  and isolated nonproduction identity binding; run actual App Service Boot/ingress/SQL/browser/stock
   acceptance with that candidate and all checks in section 3. Do not bypass guards to reach this step.
 - [ ] Record exact client/SDK, artifact, SQL contracts, safe audit/count evidence, timings and cleanup;
   shut down test authority after acceptance. Production remains OFF throughout.

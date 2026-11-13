@@ -73,6 +73,7 @@ class McpProductionOffBootTest {
         try(var context=new SpringApplicationBuilder(ShaleServerApplication.class).profiles(profile).run(
                 "--server.port=0","--server.address=127.0.0.1","--shale.ai.oauth.identity=PRODUCTION",
                 "--shale.ai.enabled=false","--shale.ai.mcp.enabled=false",
+                "--shale.ai.cimd.enabled=false","--shale.ai.dcr.enabled=false",
                 "--shale.ai.mcp.case-data-composition-enabled=false",
                 "--shale.ai.mcp.search-cases-enabled=false","--shale.ai.mcp.get-case-overview-enabled=false",
                 "--shale.ai.oauth.composition-enabled=false","--shale.ai.oauth.authorization-enabled=false",
@@ -105,7 +106,11 @@ class McpProductionOffBootTest {
             assertInstanceOf(SqlDurableSessionStore.class,context.getBean(DurableSessionStore.class));
             assertInstanceOf(SqlRememberCredentialStore.class,context.getBean(RememberCredentialStore.class));
             assertTrue(context.getBeansOfType(com.shale.server.oauth.DcrCapabilities.class).isEmpty());
-            assertFalse(context.containsBean("dcrVerifiedDevelopmentComposition"));
+            assertTrue(context.getBeansOfType(com.shale.server.oauth.CimdServices.class).isEmpty());
+            assertTrue(context.getBeansOfType(CimdCaseConnections.class).isEmpty());
+            assertFalse(context.containsBean("cimdRuntimeConnections"));
+            assertFalse(context.containsBean("cimdLifecycle"));
+            assertFalse(context.containsBean("dcrVerifiedComposition"));
             assertTrue(context.getBeansOfType(McpAiCaseData.class).isEmpty());
             assertTrue(context.getBeansOfType(McpSearchHandler.class).isEmpty());
             assertTrue(context.getBeansOfType(McpOverviewHandler.class).isEmpty());

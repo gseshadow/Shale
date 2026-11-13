@@ -18,7 +18,7 @@ final class McpAiCaseData {
     McpAiCaseData(Environment env,McpOAuthProperties identity,DataSources sources) {
         this(configuredData(env,sources),source(env,"shale.ai.data.verifier"),
                 List.of(sources.auth(),sources.runtime(),source(env,"shale.ai.oauth.bootstrap")),
-                env.getRequiredProperty("shale.ai.data.database"),identity,contract(env),env.getProperty("shale.ai.dcr.enabled",Boolean.class,false)?AiExternalContract.DCR_V3:AiExternalContract.CIMD_V1);
+                env.getRequiredProperty("shale.ai.data.database"),identity,contract(env),com.shale.server.oauth.CimdRuntimeEligibility.contract(env));
     }
     McpAiCaseData(DataSource data,DataSource verifier,List<DataSource> forbidden,String database,McpOAuthProperties identity) {
         this(data,verifier,forbidden,database,identity,AiCaseDataAttestation.Contract.V1);
@@ -50,7 +50,8 @@ final class McpAiCaseData {
         return new AiCaseDataAccess(new McpJdbcDeadline(data,deadline),until->new McpJdbcDeadline(data,until),request);
     }
     private static DataSource configuredData(Environment env,DataSources sources) {
-        contract(env); // Reject missing/unknown version before allocating any pool.
+        contract(env); // Reject missing/unknown versions before allocating any pool.
+        com.shale.server.oauth.CimdRuntimeEligibility.contract(env);
         // Resolve every dedicated setting before allocating the independent pool.
         var config=new com.shale.data.config.Config(env::getProperty);
         com.shale.data.config.AiJdbcUrl.validate(config.aiCaseDataJdbcUrl());config.aiCaseDataUser();config.aiCaseDataPassword();
