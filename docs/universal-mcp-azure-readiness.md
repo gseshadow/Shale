@@ -235,6 +235,12 @@ Minimum Stage C acceptance, with sanitized evidence for the exact artifact/slot/
 Use the [isolated acceptance operator runbook](testing/universal-mcp-azure-acceptance-runbook.md)
 for the minimal target, ordered fixture packet, native test matrix and remaining input gaps.
 
+For the operator-confirmed fresh S0 `ShaleMcpAcceptance` database, see the
+[OFF-only installation packet](sql/ai-integration/azure-acceptance/README.md). It prepares explicit
+destination/empty-target checks, existing V2/CIMD/DCR_V3 migrations, contained identities and a
+mandatory origin/worker-zone binding pause. SQL execution and enabled acceptance remain separate
+approvals; sharing logical server `shale` leaves dedicated-server isolation evidence unmet.
+
 - [ ] Confirm no production DB/secret/data/traffic relationship; use synthetic tenants and hash-verified
   authoritative fixture. Rehearse the ordered SQL packet, contained role provisioning and binding here.
 - [ ] Run standalone actual-worker CIMD egress check first. Use the accepted disposable composition
