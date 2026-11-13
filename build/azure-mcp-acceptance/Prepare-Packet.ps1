@@ -64,6 +64,18 @@ function Expand-Sql([string]$path, [int]$depth = 0) {
 $target = [IO.File]::ReadAllText((Join-Path $templates 'target.sql'))
 $owner = [IO.File]::ReadAllText((Join-Path $templates 'owner.sql'))
 $fence = $target + "`n" + $owner + "`nGO`n"
+# XML methods in the V2 catalog chain require all seven options. Keep session
+# setup in reviewed SQL bytes, outside the immutable sources and module batches.
+$xmlQuerySession = @'
+SET ANSI_NULLS ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET QUOTED_IDENTIFIER ON;
+SET NUMERIC_ROUNDABORT OFF;
+GO
+'@
 $rendered = Join-Path $packet ('rendered-' + [guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($rendered)
 $manifest = @()
@@ -71,6 +83,10 @@ foreach ($stage in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stages.js
     $stageFence = $fence
     if ($stage.PSObject.Properties.Name -contains 'user') { $stageFence = $target + "`nGO`n" }
     $sql = ":on error exit`n" + $stageFence
+    $sourceSession = ''
+    if ($stage.name -cin @('13-v2-prerequisite','14-v2-install','15-v2-verify')) {
+        $sourceSession = $xmlQuerySession + "`n"
+    }
     foreach ($source in $stage.sources) {
         if ($source.StartsWith('private:')) {
             $body = Expand-Sql (Join-Path $packet $source.Substring(8))
@@ -94,7 +110,7 @@ foreach ($stage in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stages.js
             } else { $body = "THROW 59807,'STOP: independent fresh-fixture Phase1R hash review required.',1;" }
         } else { $body = Expand-Sql (Join-Path $repo $source) }
         # Bound each source on both sides. No app/tenant context is carried between source batches.
-        $sql += $body + "`nGO`n" + $stageFence
+        $sql += $sourceSession + $body + "`nGO`n" + $stageFence
     }
     # SQLCMD substitution is disabled on execution, so unresolved placeholders must never be shipped.
     if ($sql.Contains('$(')) { throw 'STOP: unresolved SQLCMD input.' }

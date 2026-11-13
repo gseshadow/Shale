@@ -483,3 +483,89 @@ outside this evidence review. There is no merge or commit operation.
 Audit compatibility: collection reads catalog metadata only; no sensitive application read or domain/
 administrative mutation occurs. Evidence files are private operator records. No application audit
 event, audit schema, permission or migration change is introduced.
+
+## Stage 13 XML session failure: offline preparation for stages 13-15
+
+Stages 00-12 and Phase1R POSTCHECK are operator-reported PASS. Stage 13 stopped with Msg 1934
+(`QUOTED_IDENTIFIER`) and wrapper exit 16. Preserve that failure, exact rendered SQL/client/wrapper
+hashes and completed-stage evidence. This section does not authorize a retry or replay of any stage.
+
+Stage 13's `FOR XML PATH(...), TYPE).value(...)` catalog assembly uses XML methods. Microsoft's
+[XML query requirements](https://learn.microsoft.com/en-us/sql/relational-databases/xml/retrieve-and-query-xml-data)
+specify this complete session set:
+
+| Option | Required value |
+| --- | --- |
+| ANSI_NULLS | ON |
+| ANSI_PADDING | ON |
+| ANSI_WARNINGS | ON |
+| ARITHABORT | ON |
+| CONCAT_NULL_YIELDS_NULL | ON |
+| QUOTED_IDENTIFIER | ON |
+| NUMERIC_ROUNDABORT | OFF |
+
+The [ODBC SQLCMD documentation](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility)
+states that QUOTED_IDENTIFIER defaults OFF unless `-I` is used. The guarded wrapper does not pass
+`-I`, and Stage 13 sets only NOCOUNT. Each wrapper invocation starts a new SQLCMD connection;
+settings from Stages 00-12 do not carry over. `-X1` also prevents reliance on SQLCMDINI startup
+scripts. Successful earlier stages do not establish this new connection's XML settings.
+
+Stage 14 embeds the same prerequisite and uses XML catalog methods. Its header sets only
+QUOTED_IDENTIFIER/ANSI_NULLS from the required set. Both Stage 15 sources (`verify.sql` and
+`phase3b8-confinement-verify.sql`) also use XML methods and do not establish the complete set.
+The renderer now puts all seven SETs plus a separate GO batch before **each source** in exactly
+`13-v2-prerequisite`, `14-v2-install` and `15-v2-verify`, after the original destination/owner guards.
+This keeps session setup inside the independently hashed stage file. No SQLCMD flag, TLS/auth,
+timeout, approval gate, transaction boundary or earlier-stage rendering is changed. No source,
+module/receipt bytes or prerequisite is changed. The canonical Case/RLS fingerprint remains
+`6e9182b6e9b75200a16d51dbd537ca8926b358d603220d287a9710ad6ca8063a`.
+The wrapper remains unchanged: the hashed preamble supplies all seven options without adding a
+second, unhashed SQL command or relying solely on `-I` for one option.
+
+### Offline re-render and independent hash review
+
+Use the reviewed utility checkout, PowerShell 7/JDK 21 and the original unchanged fixture. Reuse
+the existing private packet inputs; do not refill approval bits or alter any reviewed hash. The
+following records their hashes, renders offline, then checks that the inputs were preserved:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+Set-Location 'C:\Eclipse\Workspace\shale-parent'
+$Packet = Join-Path (Get-Location) 'work/azure-mcp-acceptance'
+$Fixture = 'C:\ShalePrivateEvidence\authoritative-fixture-20261028\authoritative-candidate.sql'
+$before = @{}
+foreach ($name in @('normalize.sql','phase1r.json','binding-inputs.sql','identities-foundation.sql','identities.sql','seed.sql')) {
+    $before[$name] = (Get-FileHash -LiteralPath (Join-Path $Packet $name) -Algorithm SHA256).Hash
+}
+git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'STOP: cannot record reviewed utility commit' }
+./build/azure-mcp-acceptance/Prepare-Packet.ps1 -PacketDirectory $Packet -AuthoritativeFixture $Fixture
+foreach ($name in $before.Keys) {
+    if ((Get-FileHash -LiteralPath (Join-Path $Packet $name) -Algorithm SHA256).Hash -cne $before[$name]) {
+        throw "STOP: private input changed: $name"
+    }
+}
+$Rendered = Read-Host 'Exact new rendered directory printed above'
+$manifest = Import-Csv -LiteralPath (Join-Path $Rendered 'sha256.csv')
+foreach ($stage in @('13-v2-prerequisite','14-v2-install','15-v2-verify')) {
+    $file = Join-Path $Rendered ($stage + '.sql')
+    $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+    $entry = @($manifest | Where-Object Stage -CEQ $stage)
+    if ($entry.Count -ne 1 -or $entry[0].SHA256 -cne $hash) { throw "STOP: manifest mismatch: $stage" }
+    [pscustomobject]@{ Stage=$stage; SHA256=$hash }
+}
+```
+
+An independent reviewer must inspect the three new files against the retained previous rendering:
+the only changes are seven-option SET/GO preambles before unchanged source bodies; both guard
+fences remain. Stage 15 has two preambles, one for each source. Inspect the exact canonical hash
+check, module/source/receipt checks and source order; do not regenerate any catalog fingerprint.
+Review the unchanged wrapper and its fixed destination, encryption/certificate validation,
+password prompt, `-b -V 16`, `-x -X1` and timeouts. Record the new three SHA-256 values and input/
+fixture/utility provenance in the private review record. A prior stage hash cannot authorize a
+corrected file; never hand-edit rendered SQL or reuse its old approved hash.
+
+Stop after preparation/review. Do not invoke `-Execute`, retry Stage 13, rerun completed Stages
+00-12 or proceed to 14-15 under this task. No catalog drift or native execution result is inferred
+from an offline packet test. RLS, permissions, production, deployment and MCP activation remain
+outside scope. Session setup requires no application audit event or audit/schema change.
