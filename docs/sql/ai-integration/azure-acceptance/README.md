@@ -270,11 +270,10 @@ or Azure acceptance. The default fixture/Phase1R/normalization/binding/user/seed
 
 ## Stage 09 evidence comparison (read-only, fresh fixture only)
 
-**Known baseline-scope failure, investigated against the hash-verified private fixture:**
-the current `expected` command parses the fixture alone but enforces the count observed after
-Stages 02-08. The diagnostic below deliberately still fails; do not use it to approve Stage 09.
-No expected JSON is written on this failure. A separately reviewed stage-aware expected inventory
-is needed to reconcile those already installed additions. Do not lower the 116-binding gate.
+The Stage 09 expected state combines the authoritative fixture with the exact predicate additions
+from Stages 02-08, in `stages.json` order. The fixture alone has 77 non-target bindings; the unchanged
+**116-binding requirement applies after composing the 39 migration additions**. The earlier
+fixture-only count failure was an expected-state scope error, not a reason to lower that requirement.
 
 The unchanged authoritative parser accepts 1,742 batches. All 80 fixture ADD PREDICATE clauses
 are parsed under `sec.TenantFilter`; there is no missing policy, unsupported SQL or fixture hash
@@ -292,32 +291,31 @@ previously supplied strict/overlay observations, without establishing approval.
 | Stages 05-07 additions | 0 | 0 | 0 |
 | Stage 08 additions, sec.TenantFilter | 2 | 4 | 6 |
 | Expected Stage 09 non-target bindings | 73 | 43 | 116 |
+| Complete Stage 09 inventory, including targets | 76 | 43 | 119 |
 
 Fixture BLOCK operations are eight AFTER INSERT, eight AFTER UPDATE and one BEFORE UPDATE.
 Stages 02-08 add thirteen AFTER INSERT and thirteen AFTER UPDATE blocks. Their 39 additions
 explain `77 + 39 = 116`; a count alone does not prove the corresponding live bindings or local hash.
 Evidence comes from `stages.json` and the ADD clauses in `phase3b1.sql` (27), `phase3b2b.sql` (3),
-`phase3b2c1.sql` (3) and `phase3b3.sql` (6), without executing any of them. This is an expected-state
-composition defect, not evidence of live RLS drift. The original fixture, exporter/parser and
-all comparator/security/count guards remain unchanged by the diagnostic patch.
+`phase3b2c1.sql` (3) and `phase3b3.sql` (6), without executing any of them. The other three sources
+are also checked; they add zero predicates. No predicate list is hardcoded or obtained from live SQL.
 
-To reproduce only the offline diagnostic in PowerShell 7 from the checkout containing this patch:
+All seven reviewed source files are SHA-256 pinned in the utility; `.gitattributes` preserves their
+LF bytes on Windows. The exact ordered manifest span between `01-fixture` and `09-normalize` must
+match. Changed source bytes, reordered/missing/extra sources, unsupported security SQL, duplicate or
+conflicting predicate slots/table definitions, or wrong counts fail closed. Do not refresh these
+source fingerprints to make drift pass; any source change needs independent review of this extractor.
+The parser supports only the reviewed literal `EXEC(N'ALTER SECURITY POLICY ...')` form and Stage
+02's exact `SET @sql`/`@policy` concatenation. It resolves that stage's sole enabled, schema-bound
+TenantFilter against the fixture's `sec.TenantFilter`. It interprets no general dynamic SQL and
+never executes a source. ADD clauses reuse the fixture binding parser, including ordered arguments.
 
-```powershell
-$Fixture = 'C:\ShalePrivateEvidence\authoritative-fixture-20261028\authoritative-candidate.sql'
-$Diagnostic = Join-Path (Get-Location) ('work/phase1r-diagnostic-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $Diagnostic | Out-Null
-python build/azure-mcp-acceptance/phase1r_evidence.py expected --fixture $Fixture `
-    --out (Join-Path $Diagnostic 'expected.json') 2>&1 |
-    Tee-Object -FilePath (Join-Path $Diagnostic 'diagnostic.txt')
-```
-
-Expected output: parser PASS; `total=80 target=3 non-target=77`; policy/type rows showing
-17 BLOCKs and 63 FILTERs; then FAIL and `exactly 116 non-target predicates; parsed 77` (exit 1).
-Only the fixture SHA-256 and parser are used, never SQLCMD or a database. The diagnostic does not
-alter expected counts, drop predicates, emit a partial approved baseline or write private inputs.
-Keep the existing collection/input-preparation instructions below blocked until the expected-state
-composition has been corrected and independently reviewed.
+The new target tables are derived from CREATE TABLE declarations in the same reviewed sources,
+checked for conflicts with the fixture/prior stages, and included in expected ownership checks.
+Function bytes, dependencies/signatures, policies and all existing comparison guards remain in
+force. Version 2 expected JSON records original fixture counts and each ordered migration's path,
+SHA-256 and parsed addition count. Comparison rechecks those sources and the complete migration
+bindings in the expected artifact. Version 1 artifacts fail; regenerate into a new private path.
 
 Use [phase1r_evidence.py](../../../../build/azure-mcp-acceptance/phase1r_evidence.py)
 and [Collect-Phase1R.sql](../../../../build/azure-mcp-acceptance/Collect-Phase1R.sql)
@@ -333,7 +331,8 @@ collection and review. This comparison is point-in-time evidence, not a concurre
 
 PowerShell 7, Python 3.9+ and JDK 21; run from the acceptance checkout root. Do not change the
 fixture bytes. This calls the unchanged `ExportFixture` / `CaseReadVerificationSafety.schema`,
-then interprets only the bounded security-policy grammar. No replacement importer is introduced.
+then parses the fixture bindings and the reviewed Stage 02-08 source additions. No replacement
+importer or SQL runner is introduced. Keep all seven source files and `stages.json` unchanged.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -353,11 +352,14 @@ python build/azure-mcp-acceptance/phase1r_evidence.py expected --fixture $Fixtur
 if ($LASTEXITCODE -ne 0) { throw 'STOP: baseline generation failed' }
 ```
 
-Expected: authoritative parser PASS, then baseline-generation PASS and expected-file SHA-256.
-The JSON contains both complete UTF-16LE definitions and the fixture's complete predicate/policy
-inventory. The exact fixture hash is pinned in the existing exporter and comparator. Source input
-and derived evidence remain private. Preserve the independently reviewed fixture/baseline review
-reference; this tool cannot establish who reviewed that source.
+Expected (exit 0): authoritative parser PASS with 1,742 batches; fixture counts `80 / 3 / 77`;
+per-stage addition counts `27, 3, 3, 0, 0, 0, 6`; Stage 09 counts `119 / 3 / 116`; then
+baseline-generation PASS and expected-file SHA-256. Counts are total / target / non-target.
+The JSON contains both complete UTF-16LE definitions and the composed predicate/policy/ownership
+inventory, plus source provenance. The exact fixture hash is pinned in the existing exporter and
+comparator. The fixture, expected JSON, captures and derived evidence remain private; never commit
+them. Preserve the independently reviewed fixture/migration review references and the exact expected
+file hash. Successful offline generation is not Azure evidence equivalence or normalization approval.
 
 The two tenant functions must be the fixture's expression-only, single-int-parameter functions.
 Any relational body, user-object dependency syntax, unsupported policy syntax or unexpected
@@ -396,7 +398,8 @@ for any separately justified recollection, never overwrite evidence or refresh h
 PASS requires byte-for-byte complete function equality; engine-equivalent flags/signatures;
 matching effective ownership, policy states, all 116 non-target bindings and the exact three target
 FILTERs; no target BLOCK/alternate policy, Phase1R receipt or invocation object; and built-in int
-target columns. All missing/extra bindings, including duplicates, are reported explicitly. Database-
+target columns. Complete bindings compare policy, target, kind, operation, function and ordered
+arguments; counts alone never pass. All missing/extra bindings, including duplicates, are reported explicitly. Database-
 specific IDs are reconciled between raw and named catalog rows but excluded from portable binding
 comparison. The report recomputes the unchanged engine's UTF-16LE `p.* ... FOR JSON PATH` fingerprint,
 excluding all predicates on Users/auditLog/Statuses across all policies. This hash remains local

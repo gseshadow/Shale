@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import subprocess
 import sys
+import shutil
 from contextlib import redirect_stdout
 from io import StringIO
 from unittest.mock import patch
@@ -17,7 +18,8 @@ SPEC.loader.exec_module(E)
 
 
 def unit_baseline(transform=lambda batches: batches, *, diagnostics=False,
-                  non_target_filters=115, block_operations=('AFTER UPDATE',)):
+                  non_target_filters=60,
+                  block_operations=('AFTER INSERT',) * 8 + ('AFTER UPDATE',) * 8 + ('BEFORE UPDATE',)):
     batches = ['CREATE SCHEMA sec AUTHORIZATION dbo;']
     for name in E.FUNCTIONS:
         batches.append(f'CREATE FUNCTION [sec].[{name}](@tenant int) RETURNS TABLE WITH SCHEMABINDING AS RETURN SELECT 1 AS Visible WHERE @tenant=CONVERT(int,SESSION_CONTEXT(N\'ShaleClientId\'));\r\n')
@@ -39,7 +41,8 @@ def catalog(baseline, offset=100):
                               parameters=[dict(id=1, name=f['parameter'], systemType=56, userType=56, output=False)]))
     predicates, raw = [], []
     for i, p in enumerate(baseline['predicates']):
-        definition = '([' + p['function'][0] + '].[' + p['function'][1] + ']([' + p['arguments'][0][0] + ']))'
+        args = ','.join(' '.join(a) for a in p['arguments'])
+        definition = '([' + p['function'][0] + '].[' + p['function'][1] + '](' + args + '))'
         row = dict(policy=p['policy'], target=p['target'], kind=p['kind'], operation=p['operation'],
                    definition=definition, policyId=offset, targetId=offset + i + 1, predicateId=i + 1)
         predicates.append(row)
@@ -62,17 +65,25 @@ class EvidenceTest(unittest.TestCase):
     def review(self):
         return E.compare(self.baseline, self.actual)
 
-    def test_fixture_count_diagnostic_precedes_unchanged_116_failure(self):
+    def test_fixture_and_composed_counts_precede_unchanged_116_gate(self):
         # Synthetic shape reproduces the measured fixture counts, not its SQL bytes.
         output = StringIO()
-        with redirect_stdout(output), self.assertRaisesRegex(ValueError, 'exactly 116.*parsed 77'):
-            unit_baseline(diagnostics=True, non_target_filters=60,
-                          block_operations=('AFTER INSERT',) * 8 + ('AFTER UPDATE',) * 8 + ('BEFORE UPDATE',))
+        with redirect_stdout(output):
+            result = unit_baseline(diagnostics=True)
         self.assertEqual([
             'Parsed fixture predicates: total=80 target=3 non-target=77',
             '  ["sec","TenantFilter"] BLOCK: total=17 target=0 non-target=17',
             '  ["sec","TenantFilter"] FILTER: total=63 target=3 non-target=60',
-        ], output.getvalue().splitlines())
+        ], output.getvalue().splitlines()[:3])
+        self.assertEqual([
+            'Parsed Stage 09 predicates: total=119 target=3 non-target=116',
+            '  ["sec","TenantFilter"] BLOCK: total=43 target=0 non-target=43',
+            '  ["sec","TenantFilter"] FILTER: total=76 target=3 non-target=73',
+        ], output.getvalue().splitlines()[-3:])
+        rows, sources = E.migration_inventory(result['policies'])
+        with patch.object(E, 'migration_inventory', return_value=(rows[:-1], sources)), \
+                self.assertRaisesRegex(ValueError, 'exactly 116.*parsed 115'):
+            unit_baseline()
 
     def test_diagnostic_groups_all_policies_types_and_preserves_duplicates(self):
         target = dict(policy=['sec', 'TenantFilter'], kind='FILTER', target=['dbo', 'Users'])
@@ -83,6 +94,105 @@ class EvidenceTest(unittest.TestCase):
             dict(policy=['sec', 'OtherPolicy'], kind='BLOCK', target=0, nonTarget=2),
             dict(policy=['sec', 'TenantFilter'], kind='FILTER', target=1, nonTarget=0),
         ], counts['byPolicyAndType'])
+
+    def test_reviewed_migrations_are_derived_in_manifest_order_with_new_owners(self):
+        rows, sources = E.migration_inventory(self.baseline['policies'])
+        self.assertEqual([27, 3, 3, 0, 0, 0, 6], [s['predicateCount'] for s in sources])
+        self.assertEqual([s[0] for s in E.STAGE_SOURCES], [s['stage'] for s in sources])
+        self.assertEqual((39, 13, 26), (len(rows), sum(r['kind'] == 'FILTER' for r in rows),
+                                       sum(r['kind'] == 'BLOCK' for r in rows)))
+        owners = {tuple(o['name']): o for o in self.baseline['owners']}
+        for row in rows:
+            self.assertIn(row, self.baseline['predicates'])
+            self.assertEqual('dbo', owners[tuple(row['target'])]['owner'])
+        self.assertEqual(77, self.baseline['fixtureCounts']['nonTarget'])
+        self.assertEqual(116, E.predicate_counts(self.baseline['predicates'])['nonTarget'])
+
+    def test_migration_parser_keeps_policy_target_kind_operation_function_and_ordered_args(self):
+        sql = "EXEC(N'ALTER SECURITY POLICY [sec].[TenantFilter] ADD BLOCK PREDICATE [sec].[F]([A], [B]) ON [dbo].[Unit] BEFORE DELETE;');"
+        rows, _ = E.migration_predicates(sql, ['sec', 'TenantFilter'])
+        self.assertEqual([dict(policy=['sec', 'TenantFilter'], target=['dbo', 'Unit'], kind='BLOCK',
+                               operation='BEFORE DELETE', function=['sec', 'F'], arguments=[['A'], ['B']])], rows)
+
+    def test_unsupported_security_sql_is_never_silently_ignored(self):
+        for sql in [
+            'ALTER SECURITY POLICY sec.TenantFilter ADD FILTER PREDICATE sec.F(A) ON dbo.T;',
+            "EXEC(N'ALTER SECURITY POLICY sec.TenantFilter WITH (STATE=OFF);');",
+            "EXEC(N'ALTER SECURITY POLICY sec.TenantFilter DROP FILTER PREDICATE ON dbo.T;');",
+            "EXEC(N'ALTER SECURITY POLICY sec.Other ADD FILTER PREDICATE sec.F(A) ON dbo.T;');",
+            "EXEC(N'ALTER SECURITY POLICY sec.TenantFilter ADD FILTER PREDICATE sec.F(A,) ON dbo.T;');",
+            "EXEC(N'ALTER SECURITY POLICY sec.TenantFilter ADD FILTER PREDICATE sec.F(A) ON dbo.T; SELECT 1;');",
+            "EXEC(N'ALTER SECURITY POLICY sec.TenantFilter ADD FILTER PREDICATE sec.F(A) ON dbo.T;' + @suffix);",
+            "SET @sql=N'ALTER SECURITY POLICY '+@other+N' ADD FILTER PREDICATE sec.F(A) ON dbo.T;'; EXEC sys.sp_executesql @sql;",
+            "EXEC(N'CREATE PROCEDURE dbo.P AS EXEC(N''ALTER SECURITY POLICY sec.TenantFilter WITH (STATE=OFF);'');');",
+        ]:
+            with self.subTest(sql=sql), self.assertRaises(ValueError):
+                E.migration_predicates(sql, ['sec', 'TenantFilter'])
+
+    def test_changed_missing_duplicated_or_unexpected_source_predicates_fail_hash_review(self):
+        source = E.ROOT / 'docs/sql/ai-integration/phase3b2b.sql'
+        original = source.read_text()
+        line = next(line for line in original.splitlines(keepends=True) if "EXEC(N'ALTER SECURITY POLICY" in line)
+        variants = [original.replace(line, '', 1), original + line,
+                    original + line.replace('AiAuthorizationTransaction', 'Unexpected'),
+                    original.replace('sec.fn_FilterByTenant(ShaleClientId)', 'sec.Other(ShaleClientId)', 1),
+                    original.replace('sec.fn_FilterByTenant(ShaleClientId)', 'sec.fn_FilterByTenant(WrongColumn)', 1),
+                    original.replace('AFTER INSERT;', 'BEFORE DELETE;', 1),
+                    original.replace('POLICY sec.TenantFilter ADD', 'POLICY sec.Other ADD', 1)]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for path in ['build/azure-mcp-acceptance/stages.json'] + [
+                    'docs/sql/ai-integration/' + file for _, file, _ in E.STAGE_SOURCES]:
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(E.ROOT / path, root / path)
+            target = root / source.relative_to(E.ROOT)
+            for variant in variants:
+                with self.subTest(variant=variants.index(variant)):
+                    self.assertNotEqual(original, variant)
+                    target.write_bytes(variant.encode('utf-8'))
+                    with self.assertRaisesRegex(ValueError, 'unreviewed migration source SHA256'):
+                        E.migration_inventory(self.baseline['policies'], root=root)
+            target.write_bytes(original.encode('utf-8'))
+            manifest_path = root / 'build/azure-mcp-acceptance/stages.json'
+            manifest = json.loads(manifest_path.read_text())
+            manifest[3], manifest[4] = manifest[4], manifest[3]
+            manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'source order/manifest differs'):
+                E.migration_inventory(self.baseline['policies'], root=root)
+
+    def test_duplicate_and_conflicting_binding_slots_fail_even_when_function_differs(self):
+        rows, _ = E.migration_inventory(self.baseline['policies'])
+        for replacement in [copy.deepcopy(rows[0]), dict(rows[0], function=['sec', 'Other'])]:
+            with self.assertRaisesRegex(ValueError, 'duplicate/conflicting predicate slot'):
+                E.unique_predicates(rows + [replacement])
+        # A fixture declaration conflicting with a migration table must also stop.
+        with self.assertRaisesRegex(ValueError, 'conflicting table definitions'):
+            unit_baseline(lambda batches: ['CREATE TABLE dbo.TenantAiIntegrationPolicy(Id int);'] + batches)
+
+    def test_complete_migration_inventory_comparison_rejects_catalog_and_expected_drift(self):
+        rows, _ = E.migration_inventory(self.baseline['policies'])
+        index = self.baseline['predicates'].index(rows[0])
+        for change in [lambda ps: ps.pop(index), lambda ps: ps.append(copy.deepcopy(ps[index])),
+                       lambda ps: ps[index].update(target=['dbo', 'Unexpected']),
+                       lambda ps: ps[index].update(function=['sec', 'Other']),
+                       lambda ps: ps[index].update(arguments=[['WrongColumn'], ['ShaleClientId']]),
+                       lambda ps: ps[index].update(operation='AFTER UPDATE'),
+                       lambda ps: ps[index].update(policy=['sec', 'Other'])]:
+            altered = copy.deepcopy(self.baseline)
+            change(altered['predicates'])
+            self.assertEqual('FAIL', E.compare(self.baseline, catalog(altered))['outcome'])
+            try:
+                report = E.compare(altered, catalog(altered))
+            except ValueError:  # malformed expected input: CLI also returns FAIL
+                continue
+            self.assertEqual('FAIL', report['outcome'], 'Expected-file edits cannot bless migration drift')
+
+    def test_policy_state_and_old_baseline_format_still_fail(self):
+        with self.assertRaisesRegex(ValueError, 'sole enabled schema-bound'):
+            unit_baseline(lambda batches: [b.replace('SCHEMABINDING=ON', 'SCHEMABINDING=OFF') for b in batches])
+        old = copy.deepcopy(self.baseline)
+        old['version'] = 1
+        self.assertEqual('FAIL', E.compare(old, self.actual)['outcome'])
 
     def test_complete_match_and_database_specific_id_remapping(self):
         first = self.review()
@@ -164,7 +274,7 @@ class EvidenceTest(unittest.TestCase):
                          ('RETURN SELECT', 'RETURN SELECT * FROM dbo.OtherTable WHERE'),
                          ('@tenant int', '@tenant bigint'),
                          ('AUTHORIZATION dbo', 'AUTHORIZATION OtherOwner'),
-                         ('dbo.Unit114', 'dbo.Users')]:
+                         ('dbo.Unit59', 'dbo.Users')]:
             with self.subTest(new=new), self.assertRaises(ValueError):
                 unit_baseline(lambda batches: [b.replace(old, new) for b in batches])
 
