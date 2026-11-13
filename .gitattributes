@@ -11,3 +11,4 @@ docs/sql/ai-integration/azure-acceptance/*.sql text eol=lf
 build/azure-mcp-acceptance/*.ps1 text eol=lf
 build/azure-mcp-acceptance/*.java text eol=lf
 build/azure-mcp-acceptance/*.json text eol=lf
+build/azure-mcp-acceptance/*.sql text eol=lf

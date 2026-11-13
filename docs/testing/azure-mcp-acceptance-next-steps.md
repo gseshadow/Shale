@@ -1,5 +1,11 @@
 # Shared Azure acceptance — next operator steps
 
+**18/51 continuation:** the [supervised local installer](../../build/azure-mcp-acceptance/README.md) now provides offline readiness,
+per-stage approvals and an append-only recovery ledger. Stage 15c requires a newly reviewed hash;
+completed stages stay completed. The pre-Stage-16 worker/JVM/timezone gate remains mandatory.
+This is preparation only, not authorization to retry SQL or start/deploy the app.
+
+
 **Preparation only, November 13, 2026.** Reviewed merged PR #1963 from `codex/latest`
 `17840f66`. No Azure discovery, start/restart, deployment, SQL connection, migration, user creation,
 firewall change or activation ran for this review. Production `shale-api` and database `Shale`
