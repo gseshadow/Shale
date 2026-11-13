@@ -1,5 +1,6 @@
 """Offline packaging/refusal tests. SQLCMD is always a mock; no SQL/Azure access."""
 import json
+import csv
 import hashlib
 import os
 from pathlib import Path
@@ -13,6 +14,11 @@ ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / 'build/azure-mcp-acceptance'
 SQL = ROOT / 'docs/sql/ai-integration/azure-acceptance'
 STAGES = json.loads((TOOL / 'stages.json').read_text())
+XML_STAGES = ('13-v2-prerequisite', '14-v2-install', '15-v2-verify')
+XML_SESSION = ''.join('SET ' + name + ' ' + value + ';\n' for name, value in (
+    ('ANSI_NULLS', 'ON'), ('ANSI_PADDING', 'ON'), ('ANSI_WARNINGS', 'ON'), ('ARITHABORT', 'ON'),
+    ('CONCAT_NULL_YIELDS_NULL', 'ON'), ('QUOTED_IDENTIFIER', 'ON'), ('NUMERIC_ROUNDABORT', 'OFF'),
+)) + 'GO\n'
 
 
 class PacketTest(unittest.TestCase):
@@ -71,6 +77,54 @@ class PacketTest(unittest.TestCase):
             for source in stage['sources']:
                 if ':' not in source:
                     self.assertTrue((ROOT / source).exists(), source)
+
+    def test_xml_catalog_stages_set_all_required_options_before_each_unchanged_source(self):
+        for stage in STAGES:
+            sql = (self.rendered / (stage['name'] + '.sql')).read_text()
+            if stage['name'] not in XML_STAGES:
+                self.assertNotIn(XML_SESSION, sql, 'Session patch must stay limited to stages 13-15')
+                continue
+            self.assertEqual(len(stage['sources']), sql.count(XML_SESSION))
+            for path in stage['sources']:
+                source = (ROOT / path).read_text()
+                start = sql.index(source)
+                self.assertTrue(sql[:start].endswith(XML_SESSION), path + ': seven SETs and GO must precede source')
+                prefix = sql[:start - len(XML_SESSION)]
+                self.assertIn('STOP: only ShaleMcpAcceptance is permitted.', prefix)
+                self.assertIn('STOP: existing database-local owner visibility required.', prefix)
+                self.assertTrue(prefix.endswith('GO\n'), 'Destination/owner guards must finish before session setup')
+            # Strip only the new setup: the rest must be the previous fenced packet.
+            previous = ':on error exit\n' + (SQL / 'target.sql').read_text() + '\n' + (SQL / 'owner.sql').read_text() + '\nGO\n'
+            fence = previous[len(':on error exit\n'):]
+            for path in stage['sources']:
+                previous += (ROOT / path).read_text() + '\nGO\n' + fence
+            self.assertEqual(previous, sql.replace(XML_SESSION, ''), 'Migration/module/fingerprint bytes must be unchanged')
+
+    def test_xml_session_changes_require_new_hash_approval_and_preserve_sqlcmd_contract(self):
+        output = self.packet / 'mock-xml-sqlcmd-arguments.json'
+        env = {key: value for key, value in os.environ.items()
+               if not re.match(r'^(SQLCMD|SQLCONNSTR_|SQLAZURECONNSTR_|SPRING_DATASOURCE|SHALE_(APP|RT|AUTH|SERVER|SUGGESTION))', key, re.I)}
+        env['OFFLINE_SQLCMD_ARGS'] = str(output)
+        with (self.rendered / 'sha256.csv').open() as stream:
+            manifest = {row['Stage']: row['SHA256'] for row in csv.DictReader(stream)}
+        for stage in XML_STAGES:
+            sql = self.rendered / (stage + '.sql')
+            previous = sql.read_text().replace(XML_SESSION, '').encode('utf-8')
+            args = ('-RenderedDirectory', str(self.rendered), '-Stage', stage, '-OperatorUser', 'offline_test_owner',
+                    '-Execute', '-Acknowledgement', 'EXECUTE_APPROVED_SHALE_MCP_ACCEPTANCE_STAGE')
+            if output.exists():
+                output.unlink()
+            self.run_ps('Invoke-Stage.ps1', *args, '-ApprovedSHA256', hashlib.sha256(previous).hexdigest(), success=False, env=env)
+            self.assertFalse(output.exists(), 'Previously approved hash must not dispatch corrected SQL')
+            current = hashlib.sha256(sql.read_bytes()).hexdigest()
+            self.assertEqual(current.upper(), manifest[stage])
+            self.run_ps('Invoke-Stage.ps1', *args, '-ApprovedSHA256', current, success=False, env=env)
+            # SQLCMD mock records arguments then throws; it can never connect.
+            actual = json.loads(output.read_text())
+            seconds = '600' if stage == '14-v2-install' else '20'
+            self.assertEqual(['-S', 'tcp:shale.database.windows.net,1433', '-d', 'ShaleMcpAcceptance',
+                              '-U', 'offline_test_owner', '-N', '-b', '-V', '16', '-r', '1', '-l', '30',
+                              '-t', seconds, '-x', '-X1', '-f', '65001', '-i', str(sql)], actual)
 
     def test_identity_templates_default_refuse_and_no_broad_roles(self):
         foundation = (SQL / 'identities-foundation.sql').read_text()
