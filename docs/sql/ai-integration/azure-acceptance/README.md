@@ -1,8 +1,10 @@
 # ShaleMcpAcceptance installation packet
 
 **PREPARATION ONLY. No Azure/SQL connection, migration, credential provisioning, deployment,
-firewall change or activation is authorized by this PR.** Source baseline: latest fetched
-`codex/latest`, `bf320bb352ebae6932a22b666c8ed9285eaed77a` (PR #1962).
+firewall change or activation is authorized by this PR.** Packet introduced in #1963 from
+`bf320bb352ebae6932a22b666c8ed9285eaed77a`; reconciled against latest fetched `codex/latest`
+`17840f66` (merged #1963). Current operator instructions and validation are in the
+[next-steps review](../../../testing/azure-mcp-acceptance-next-steps.md).
 
 This packet prepares existing migrations for the operator-confirmed fresh **Online Standard S0**
 `ShaleMcpAcceptance`, collation `SQL_Latin1_General_CP1_CI_AS`, on `shale.database.windows.net`,
@@ -34,12 +36,28 @@ Tools are in [build/azure-mcp-acceptance](../../../../build/azure-mcp-acceptance
 | Local fixture enables all controls and issues credentials | No enablement or credential issuance. Five SQL control tables remain OFF, tenant policy absent; synthetic rows only. Native SQLCMD catalog/principal checks are separate from future enabled Boot/client acceptance. |
 | SQL Server metadata dispatcher | Existing Azure platform branches/physical-incarnation identity and contained-user attestation. No new permission or timeout workaround for the historical native verifier failure. |
 
-The logical server is shared with production. This cannot meet the original runbook's dedicated
-nonproduction-server/no-shared-production-dependency requirement. The operator's fresh-DB confirmation
-supports preparing this exact packet, not waiving that evidence limit. Later execution needs explicit
-shared-server risk acceptance: existing firewall/network/admin/configuration and service dependencies
-remain shared. If the existing approved route is unavailable, STOP; do not change it. S0 is not a
-capacity guarantee. No production SQL inspection is needed or permitted.
+The operator deliberately selected shared SQL server `shale` and existing Linux B1 plan
+`shale-api-plan` for stopped test app `shale-mcp-acceptance` in group `Shale`. No dedicated group,
+plan, SQL server or SWA is required for this OFF-only phase. Production app `shale-api` and database
+`Shale` remain off-limits. Sharing carries B1 contention, server firewall/admin and platform risks;
+this cannot prove dedicated infrastructure isolation. No shared resource is cleanup-owned.
+Use only existing approved network paths and owner headroom/abort thresholds. See
+[concise next operator steps](../../../testing/azure-mcp-acceptance-next-steps.md) for exact metadata,
+stopped-app runtime/time-zone checks, SQLCMD/SSMS investigation and remaining gates.
+
+Exact proposed tuple (operator-supplied, not live route evidence):
+
+```text
+Origin   https://shale-mcp-acceptance.azurewebsites.net
+Issuer   https://shale-mcp-acceptance.azurewebsites.net/oauth/mcp
+Resource https://shale-mcp-acceptance.azurewebsites.net/mcp
+```
+
+The packet now copies [binding-inputs.sql](binding-inputs.sql), which supplies only these known
+values/server/database. [binding-target.sql](binding-target.sql) additionally rejects another DB/
+origin/issuer/resource. Java/SQL zones remain NULL, approvals zero and 28 samples absent; shared
+binding validation/one-time insertion/immutable-conflict refusal is unchanged. Existing private
+inputs are never overwritten: reconcile them explicitly and re-render/approve new hashes.
 
 ## Offline preparation and validation (PowerShell 7, JDK 21)
 
@@ -47,7 +65,8 @@ Run from the repository root in a private shell. Restrict the packet directory t
 it will eventually contain credential-bearing SQL, fixture derivatives and private binding inputs.
 No transcript, echo/input logging, shared drive or commit of `work/`. The private authoritative
 fixture is **not in this checkout**; acquire it through the approved existing channel, never reconstruct it.
-The nonproduction origin and actual worker zone are also pending; blocked stages are intentional.
+The test origin is supplied above; actual worker zone, SQL-zone mapping and live HTTPS route evidence
+remain pending. The stopped app cannot provide a current running-JVM observation.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -94,6 +113,12 @@ DATABASE visibility, no custom objects/users/roles/schemas, Stage 0 seven findin
 Unknown visibility is STOP, never an instruction to grant broader access or empty the database.
 
 Use the existing validated-TLS **ODBC SQLCMD** with reviewed support for `-N -b -V 16 -X1 -x -f 65001`.
+The operator has since reported Go SQLCMD v1.10.0 at `C:\Program Files\SqlCmd\sqlcmd.exe`
+and successful explicit `ShaleMcpAcceptance` SQL-auth connectivity, with interactive password.
+Earlier unavailable-database errors named other DBs and are not reproducible against this target;
+original cause is undetermined. This does not validate the ODBC packet flags or certificate settings.
+The wrapper resolves `sqlcmd` through PowerShell/PATH, so pin an approved ODBC executable in the
+private operator shell and confirm `Get-Command sqlcmd` resolves it before any later `-Execute`.
 Do not silently switch SQLCMD variants or weaken encryption if flags differ. The wrapper hardcodes
 `-S tcp:shale.database.windows.net,1433 -d ShaleMcpAcceptance`; no destination parameter exists.
 `-X1` blocks startup/environment scripts, `-x` disables variable substitution, password is interactive
@@ -135,8 +160,8 @@ each source (with GO isolation so CREATE PROCEDURE batch rules remain valid).
 | `10`–`12` | Fill private phase1r.json with independently reviewed strict/overlay/other-predicate SHA-256 values; re-render. Existing engine PREFLIGHT, APPLY, POSTCHECK, exact acceptance DB/collation. Blank inputs deliberately THROW. Never query/copy arbitrary live hashes to bless drift. |
 | `13`–`15` | V2 prerequisite, `phase3b8-confinement.sql`, `verify.sql` and V2 confinement verifier. Require all finding counts zero and V2 source/catalog receipts. Never substitute V1 phase3b7. |
 | `15a`–`15c` | Existing Oct 14 browser-auth modules; five contained foundation identities, synthetic tenant/user/Case rows. Imported DDL must supply session/instance/audit/remembered prerequisites. Missing prerequisite is STOP for review, not blind replay of production foundation/auth-cutover scripts. |
-| **PAUSE before 16** | Separate dormant deployment/worker diagnostics approval, correct ordinary prerequisites and all ten app controls false (optional CIMD advertisement false); no app is deployed by this packet. Obtain actual-worker `SHALE_JVM_STARTUP`, same-worker default-fetcher metadata probe PASS and BindingTimeZoneProbe's 28 samples. Canonical test origin/zone still unknown: do not proceed until available. |
-| `16`–`18` | Fill only private binding-inputs.sql: actual SQL server identity, `ShaleMcpAcceptance`, approved nonproduction origin, issuer=origin+/oauth/mcp, resource=origin+/mcp, actual Java/SQL zones, 28 rows and evidence/OFF confirmations. Existing preflight then separately approved one-time install then fresh postcheck. Approve bit defaults 0. Existing conflicting binding is STOP, no UPDATE/DELETE/rebind. Preserve receipt and tuple evidence. |
+| **PAUSE before 16** | Separate dormant deployment/worker diagnostics approval, correct ordinary prerequisites and all ten app controls false (optional CIMD advertisement false); no app is deployed by this packet. Obtain actual-worker `SHALE_JVM_STARTUP`, same-worker default-fetcher metadata probe PASS and BindingTimeZoneProbe's 28 samples. Use the exact test origin above; current worker zone/SQL mapping remain unknown. The test app is stopped: do not start/deploy under this preparation task. |
+| `16`–`18` | Fill only private binding-inputs.sql: actual SQL server identity, `ShaleMcpAcceptance`, the exact origin above, issuer=origin+/oauth/mcp, resource=origin+/mcp, actual Java/SQL zones, 28 rows and evidence/OFF confirmations. Existing preflight then separately approved one-time install then fresh postcheck. Approve bit defaults 0. Existing conflicting binding is STOP, no UPDATE/DELETE/rebind. Preserve receipt and tuple evidence. |
 | `19`–`20` | PR3 authority inventory, confinement prepare, registry install, PR3 and confinement verifiers at their historical version. |
 | `21`–`24` | Proof install/verify, OAuth install/verify, reviewer, onboarding. Controls remain OFF. |
 | `25`–`26` | Existing C1 EXTERNAL_V2 then C2 DCR_V3 installer, preserving predecessor receipts/binding. Do not rerun historical V1/C1 verifiers against the successor. |
@@ -206,14 +231,15 @@ Database was created for acceptance but cleanup is **not automatic**. Record own
 retention/backup/recovery requirements and whether to retain it for the remaining native campaign.
 After acceptance/abort, retain sanitized hashes/status/count/timing and required audit/binding/receipt
 history; obtain separate approval to revoke test authority and dispose of only the exact
-ShaleMcpAcceptance resource. Never delete the shared server, resource group, production DB or either
+ShaleMcpAcceptance resource. Never delete/change shared `shale-api-plan`, server `shale`, resource group `Shale`, production app
+`shale-api`, production DB or either
 existing copy/backup. A restoration/copy can change Azure physical-incarnation receipts: no receipt
 refresh/adoption to make a restore pass; re-review a fresh fixture installation separately.
 Destroy credential SQL copies, fixture derivatives and private test caches/logs under the approved
 retention plan. Confirm cleanup by successful inventory, not a failed read. Any FAIL/OPEN keeps
 Azure acceptance incomplete; no production activation or merge follows from an installed-OFF result.
 
-## Preparation validation recorded for this PR
+## Historical preparation validation recorded for PR #1963
 
 Offline on November 13, 2026: PowerShell 7.4.6, Temurin JDK 21.0.13+9, Maven 3.9.11.
 No SQLCMD client, SQL connection, migration, user creation, deployment or Azure CLI discovery ran.
@@ -238,6 +264,6 @@ No production Java was changed. Reproduce offline checks with your normal valida
 keep every SQL/native opt-in absent.
 
 **Unverified by design:** authoritative fixture import (private input absent), live empty target,
-SQL syntax/catalog/permissions on native Azure, actual origin/JVM-zone binding, real Boot/admission,
+SQL syntax/catalog/permissions on native Azure, live origin routing/JVM-zone binding, real Boot/admission,
 browser/stock-client flows and cleanup. These results validate preparation only, not installation
 or Azure acceptance. The default fixture/Phase1R/normalization/binding/user/seed inputs remain blocked.

@@ -20,7 +20,7 @@ foreach ($name in @('normalize.sql','identities-foundation.sql','identities.sql'
 }
 $bindingInputs = Join-Path $packet 'binding-inputs.sql'
 if (-not (Test-Path -LiteralPath $bindingInputs)) {
-    Copy-Item -LiteralPath (Join-Path $repo 'docs/sql/ai-integration/deployment-binding/inputs.sql') -Destination $bindingInputs
+    Copy-Item -LiteralPath (Join-Path $templates 'binding-inputs.sql') -Destination $bindingInputs
 }
 $phaseInputs = Join-Path $packet 'phase1r.json'
 if (-not (Test-Path -LiteralPath $phaseInputs)) {
@@ -49,7 +49,9 @@ function Expand-Sql([string]$path, [int]$depth = 0) {
     $text = [regex]::Replace($text, '(?m)^:r (.+)\r?$', {
         param($match)
         $include = $match.Groups[1].Value.Trim()
-        if ($include -eq 'docs/sql/ai-integration/deployment-binding/inputs.sql') { return Expand-Sql $bindingInputs ($depth+1) }
+        if ($include -eq 'docs/sql/ai-integration/deployment-binding/inputs.sql') {
+            return (Expand-Sql $bindingInputs ($depth+1)) + "`n" + [IO.File]::ReadAllText((Join-Path $templates 'binding-target.sql'))
+        }
         if ($include -notmatch '^docs/sql/[a-zA-Z0-9/_-]+\.sql$') { throw 'STOP: unexpected SQL include.' }
         return Expand-Sql (Join-Path $repo $include) ($depth+1)
     })

@@ -1,71 +1,55 @@
-# Isolated Azure Universal MCP acceptance
+# Azure Universal MCP acceptance on shared infrastructure
 
 **PREPARATION ONLY — execution NOT authorized; production OFF / NO-GO.**
-Baseline: `55deba6c6188c134a053af11c659b60230a1e948`, `codex/latest` including merged
+Historical matrix baseline: `55deba6c6188c134a053af11c659b60230a1e948`, `codex/latest` including merged
 [#1961](https://github.com/gseshadow/Shale/pull/1961). Read with the
 [readiness plan](../universal-mcp-azure-readiness.md) and
 [runtime configuration contract](../architecture/universal-mcp-azure-runtime.md).
 No Azure/SQL operation, deployment, setting change or activation was performed for this runbook.
 Every live step below requires separate authorization for the exact nonproduction scope.
 
-**November 13 preparation update:** the operator confirms a new synthetic `ShaleMcpAcceptance`
-database, Standard S0/Online with `SQL_Latin1_General_CP1_CI_AS`, on `shale.database.windows.net`.
-The [destination-specific installation packet](../sql/ai-integration/azure-acceptance/README.md)
-prepares PowerShell 7/validated-TLS SQLCMD stages with controls OFF. No live verification or
-installation has occurred. The shared production logical server does not meet the dedicated-server
-requirement below; execution needs explicit shared-server risk acceptance. Never delete the shared
-server or `Shale` resource group as fixture cleanup. Production `Shale` remains excluded.
+**Current operator-selected target — November 13:** `ShaleMcpAcceptance` S0 and stopped Linux
+App Service `shale-mcp-acceptance`, sharing SQL logical server `shale` and B1 plan `shale-api-plan`
+in resource group `Shale`. Origin: `https://shale-mcp-acceptance.azurewebsites.net`.
+The [installation packet](../sql/ai-integration/azure-acceptance/README.md) from merged #1963 and
+[concise next operator steps](azure-mcp-acceptance-next-steps.md) govern this exact test scope.
+These supplied facts are not fresh live verification. No separate resource group, plan, SQL server
+or Static Web App is required for SQL installation and dormant runtime/time-zone checks.
 
-## 1. Smallest useful target and execution prerequisites
+## 1. Actual target and execution prerequisites
 
-Use **one Linux Java 21 App Service worker, one fresh synthetic Azure SQL Database
-(EngineEdition 5) on a dedicated nonproduction logical server, and one nonproduction
-Static Web Apps frontend**. Reuse existing *nonproduction* plan/app/server/frontend only after
-isolation and ownership are evidenced; create missing resources only under later authorization.
-Do not use a slot of the production API, a production SQL server/database, a production web deployment,
-a database copy/backup containing real rows, production credentials or production DNS changes.
+Subscription `cd334e90-1e97-4b68-b4e3-80bf7b438546`; resource group `Shale`.
+Resource ID prefix: `/subscriptions/cd334e90-1e97-4b68-b4e3-80bf7b438546/resourceGroups/Shale/providers/`.
 
-A generated API `*.azurewebsites.net` HTTPS origin and a separate frontend HTTPS origin suffice;
-custom DNS, Front Door, another database framework and a new deployment system are unnecessary.
-Use existing nonproduction plan capacity when available. The archived Azure fixture used SQL S0;
-that is an evidenced starting candidate, **not** proof it can meet current verification/concurrency
-budgets. An App Service SKU and capacity have not been selected. Record/approve them before execution;
-if the chosen capacity fails, STOP rather than increasing request timeouts or skipping checks.
-One worker establishes single-worker acceptance only; multi-replica rollout needs a separate test.
-
-**Nothing currently identifies a suitable live target.** The
-[Nov 4 closeout](native-azure-diagnostic-closeout.md) found only production SQL and stopped its
-investigation. Do not resume its archived launcher/diagnostic campaign under this preparation task.
-
-Complete a nonsecret execution manifest before any connection or mutation:
-
-| Required input / permission | Current disposition |
+| Resource / input | Selected value / remaining evidence |
 | --- | --- |
-| Subscription/tenant, nonproduction resource group, full resource IDs and ownership | Missing |
-| App Service/plan/SKU/worker count, actual ingress and outbound route revision | Missing |
-| Dedicated nonproduction SQL logical-server FQDN, fresh database name/resource ID, tier/collation | Missing; require reviewed `SQL_Latin1_General_CP1_CI_AS` fixture compatibility |
-| Test API and frontend origins, TLS, browser workstation/callback reachability | Missing |
-| Resource read/deploy/configure/stop/cleanup rights limited to those nonproduction resources; existing Kudu/SSH access for worker probe | Not established; do not request subscription-wide privileges |
-| SQL fixture owner capable of reviewed DDL/contained-user provisioning in the fresh database; independent restricted identities | Not established; never give owner credentials to the app |
-| SQL network/firewall path for worker and operator; DNS/public TCP 443/trust for metadata on that worker | Not established; no broad “allow Azure services” or production firewall change implied |
-| Private fixture location, approved packet/source/artifact hashes, synthetic passwords, cleanup owner/deadline/cost approval | Fixture is not attached in this checkout; other inputs missing |
+| Test app | `Microsoft.Web/sites/shale-mcp-acceptance`, currently Stopped; observed Java 21 runtime, exact artifact, Linux configuration, HTTPS route and instance evidence pending |
+| Shared plan | `Microsoft.Web/serverfarms/shale-api-plan`, existing Linux B1; actual worker count/headroom and owner abort thresholds pending; no plan changes |
+| Shared SQL server / test DB | `shale.database.windows.net`; `Microsoft.Sql/servers/shale/databases/ShaleMcpAcceptance`, Standard S0/Online, `SQL_Latin1_General_CP1_CI_AS`; live empty-state and no-pool checks pending |
+| Exact issuer / resource | `https://shale-mcp-acceptance.azurewebsites.net/oauth/mcp` / `https://shale-mcp-acceptance.azurewebsites.net/mcp`; immutable initial tuple only after actual worker/SQL-zone mapping and approved evidence |
+| Browser UI | No SWA required now; full browser/stock-client acceptance still needs approved isolated HTTPS Shale login/consent UI, exact browser origin, deep links/CORS and callback reachability |
+| Scoped rights and credentials | Existing acceptance-only SQL owner, 17 independent contained app identities and test secrets; exact test-app operator access/rollback route, never production credentials |
+| Fixture and execution | Private fixture/hash, reviewed packet/source/JAR hashes, independent stage approvals, recovery/retention, cleanup owner/window, existing approved networking and installer-client/TLS compatibility review pending |
 
-Record exact IDs in a private cleanup manifest *before* creating anything, with separate lists of
-new versus reused resources. Retain approved nonproduction names as variables, never infer them
-from production examples. With execution authorization, these read-only metadata commands can
-confirm the selected targets; they are **not** commands to run now:
+Production database `Shale`, application `shale-api`, production credentials/data/DNS/traffic and
+existing copy/backup databases remain strictly excluded. No slot swaps or production settings copies.
+The selected plan/server are deliberately shared and are not cleanup-owned. Historical Nov 4's
+lack of a target is superseded only for these operator-supplied identifiers; native verification
+and the stopped diagnostic campaign remain open, not automatically authorized to resume.
 
-```bash
-az account show --query '{subscription:id,tenant:tenantId}' -o json
-az webapp show --resource-group "$ACCEPTANCE_RG" --name "$ACCEPTANCE_APP" \
-  --query '{id:id,state:state,httpsOnly:httpsOnly,host:defaultHostName,plan:serverFarmId}' -o json
-az webapp list-instances --resource-group "$ACCEPTANCE_RG" --name "$ACCEPTANCE_APP" -o json
-az sql db show --resource-group "$ACCEPTANCE_RG" --server "$ACCEPTANCE_SQL_SERVER" \
-  --name "$ACCEPTANCE_DB" --query '{id:id,status:status,sku:sku,collation:collation}' -o json
-```
+**Shared risks:** B1 CPU/memory/disk/network/SNAT and lifecycle/configuration dependencies can affect
+production. SQL server firewall/public/VNet/private endpoint rules and administrative authority
+span DBs; an open route is not SQL authorization. A standalone S0 has its own limits but server/
+network/platform dependencies remain. Use only existing routes, separate credentials and exact IDs;
+no firewall/security/plan changes, broad Azure-services rule, scaling or stress test. Begin serially,
+using existing owner monitoring/headroom thresholds; shared-load impact is STOP. One observed worker
+establishes only that worker's acceptance. Shared infrastructure cannot prove dedicated physical/
+administrative/network isolation, production capacity, an SLA or production-schema safety.
 
-STOP on a mismatched ID, shared production dependency, unknown ownership/permissions or failed read.
-Do not dump App Settings, process environments, publishing credentials or secrets to establish parity.
+For explicit read-only metadata commands, stopped-app/runtime/time-zone gates and SQLCMD/SSMS
+triage, use [next operator steps](azure-mcp-acceptance-next-steps.md). Failed reads are UNKNOWN.
+Do not dump App Settings, connection strings, process environments, publishing profiles or secrets.
+The app stays stopped in this preparation task; no runtime zone can be inferred from B1/Linux/OS UTC.
 
 ## 2. Source, fixture and SQL preparation
 
@@ -78,6 +62,7 @@ git rev-parse HEAD
 sha256sum "$AUTHORITATIVE_FIXTURE"
 mvn -B -pl shale-server -am clean package
 sha256sum shale-server/target/shale-server-*.jar
+# Later browser phase only, after an approved frontend serving path is selected:
 VITE_SHALE_API_BASE_URL="$ACCEPTANCE_ORIGIN" npm run build --prefix shale-web
 ```
 
@@ -104,7 +89,7 @@ restricted runtime request budgets remain separate. Use existing TLS-validated S
 | 2 | `phase3b1.sql` → `phase3b2b.sql` → `phase3b2c1.sql` → `phase3b2c2.sql` → `revocation.sql` → `phase3b2d.sql` → `phase3b3.sql`. |
 | 3 | Reviewed clean-room Phase 1R normalization/PREFLIGHT/APPLY/POSTCHECK and `phase3b8-confinement-prerequisite.sql`, as used by `AiCaseDataV2AuthoritativeLocalSqlServerTest.beforeConfinement` and the native setup helper. The candidate already contains three filters: do **not** blindly replay production auth/Phase 1R preflights over it. |
 | 4 | `phase3b8-confinement.sql`; `verify.sql` / `phase3b8-confinement-verify.sql`; contained ordinary/predecessor identities. Never substitute historical V1 `phase3b7-confinement.sql`. |
-| 5 | One initial `AiCaseDataDeployment` binding, Id=1, `case-read-v1`, exact **test** origin + `/oauth/mcp` and `/mcp`, actual worker JVM zone and approved SQL time-zone mapping. Use `deployment-binding/` discovery/preflight/install/postcheck and its 28 Java/SQL samples; inputs must be reviewed for this fixture. Never bind `shale.test` then update the immutable row to an Azure hostname. |
+| 5 | One initial `AiCaseDataDeployment` binding, Id=1, `case-read-v1`, origin `https://shale-mcp-acceptance.azurewebsites.net` + `/oauth/mcp` and `/mcp`, actual worker JVM zone and approved SQL time-zone mapping. Use `deployment-binding/` discovery/preflight/install/postcheck and its 28 Java/SQL samples; inputs must be reviewed for this fixture. Never bind `shale.test` then update the immutable row to an Azure hostname. |
 | 6 | `universal-pr3-confinement-prepare.sql` → `universal-pr3.sql`; `universal-pr3-authority-inventory.sql`, `universal-pr3-verify.sql`, `universal-pr3-confinement-verify.sql` at that version. |
 | 7 | `universal-pr4a-proof.sql` → `universal-pr4a-proof-verify.sql`; `universal-pr4b-oauth.sql` → `universal-pr4b-oauth-verify.sql`. |
 | 8 | `universal-pr-a-reviewer.sql` → `universal-pr-b-onboarding.sql` → `universal-pr-c1-external-v2.sql` → `universal-pr-c2-dcr-v3.sql`. |
@@ -150,21 +135,24 @@ methods/rows, fresh BCrypt test passwords and ordinary WEB session issuance. The
 **fixture-only**, never production targets. Start with no external approvals/grants/credentials;
 registration must not create any. Keep one independently provisioned synthetic manual client for continuity.
 
-**Missing execution packet:** there is no current turnkey Azure V3 seed/provisioning launcher.
+**Prepared destination packet:** [merged #1963](../sql/ai-integration/azure-acceptance/README.md)
+provides OFF-only stages for `ShaleMcpAcceptance`; it is not execution authorization or native PASS.
 `AiCaseDataAzureSqlDisposableSetupTest` fixes a `ShaleAzureReadOnly_<nonce>` name, five `azro_*`
 users and a `shale.test` binding; its read-only test selects the predecessor contract, not DCR_V3.
 The C2 launcher creates loopback server logins and enables fixture controls. Neither may be pointed
-at the App Service database or have its guards disabled. Before live execution, review a narrowly
-scoped destination-bound owner packet that reuses the above imports/installers/seed methods, supplies
+at the App Service database or have its guards disabled. Before live execution, complete/review the prepared destination-bound owner packet that reuses the above imports/installers/seed methods, supplies
 the 17 contained identities and the correct initial Azure binding. No runtime/SQL-security redesign
-is needed. Failure/uncertain commit means discard the exact owned fixture, not adoption or resealing.
+is needed. Failure/uncertain commit means STOP and preserve state for separately authorized reconciliation;
+no automatic discard/rebuild, adoption or resealing.
 
 ## 3. Dormant app, worker egress and supported startup
 
 Later, with explicit nonproduction deployment/configuration authorization, use the existing Kudu
 JAR upload path `/home/site/wwwroot/shale-server.jar`, startup
-`java -jar /home/site/wwwroot/shale-server.jar --spring.profiles.active=azure`, and existing Static
-Web Apps facilities for the matching web build. Do not trigger a production/main web publication.
+`java -jar /home/site/wwwroot/shale-server.jar --spring.profiles.active=azure`, for the exact test app. A frontend is unnecessary for dormant runtime/SQL preparation; later browser
+tests require the matching web build on an approved isolated HTTPS serving path. Static Web
+Apps is optional, and cohosting the React UI in this JAR is not established. Do not trigger a
+production/main web publication.
 Keep all ten app controls from the readiness plan false and all five installed SQL controls zero.
 PASS: ordinary `/api/health` 200, AI readiness disabled, no external providers/AI pool, MCP/OAuth
 POST routes closed (expected 404), no registration advertisement or issuance. Obtain the test worker's
@@ -286,7 +274,7 @@ retain stock library calls, protocol assertions, original authority and all prod
 | Actual SQL identities and denials | Exact own-user/public/role tokens, contained type/auth/session SID proof, distinct provider/predecessor/ordinary SIDs and exact server/database. Under restricted Case/reviewer/resolver identities, reviewed `SELECT TOP (0)` protected-table probes must be permission-denied, not syntax/network failures; no DML/DDL/impersonation or legacy/proof-namespace escape authority. Use current pinned catalogs and the native read-only test's denial methodology, not its incompatible launcher. |
 | Startup and each admission | Real production-profile Boot and protected requests must execute the existing complete V2 plus DCR_V3 checks. Capture bounded timings/stage outcomes with existing test seams; HTTP 200 alone is insufficient. Bad configuration/principal fails startup; revoked credential denies the next request without bypass or new budget. |
 | Durable disclosure/audit | Each positive synthetic disclosure has committed matching READ/ALLOWED_READ, RETURNED resource, consumed handoff and released quota; Overview adds required PHI read audit. Registration has one matching global creation audit; approval/consent/lifecycle changes retain transaction-bound tenant audits. No success after audit failure. Preserve exact receipt/binding values before/after. |
-| Focused parallel calls | Stable schema: one batch each at 1, 2, then 4 simultaneous Overviews, plus one mixed Search/Overview batch. Use four independently consented users (71/72 in A, 81/82 in B), one call/user, at most two per shared tenant integration. Current quota permits one live reservation/user, two/integration, five/tenant and 10 attempts/user/minute: reconcile existing usage and use fresh windows. Reuse the maintained Hermes handler or exact `http-regressions.py` MCP envelope/header equality through HTTPS. Synchronize launch; record end-to-end statuses/latencies under the unchanged 10 s server budget. All in-budget authorized calls pass within 10 s, no 5xx/504/withdrawal/missing audits/unreleased reservations; following probes pass. Test intentional quota exhaustion separately and expect refusal with no disclosure. Record per-call/max time, not an SLA; no concurrent revocation/catalog campaign. |
+| Focused parallel calls | Future shared-capacity approval/headroom and owner abort thresholds required; start serially. If 2/4 calls are unsafe, leave those acceptance gates OPEN rather than stress the shared B1. Stable schema: one batch each at 1, 2, then 4 simultaneous Overviews, plus one mixed Search/Overview batch. Use four independently consented users (71/72 in A, 81/82 in B), one call/user, at most two per shared tenant integration. Current quota permits one live reservation/user, two/integration, five/tenant and 10 attempts/user/minute: reconcile existing usage and use fresh windows. Reuse the maintained Hermes handler or exact `http-regressions.py` MCP envelope/header equality through HTTPS. Synchronize launch; record end-to-end statuses/latencies under the unchanged 10 s server budget. All in-budget authorized calls pass within 10 s, no 5xx/504/withdrawal/missing audits/unreleased reservations; following probes pass. Test intentional quota exhaustion separately and expect refusal with no disclosure. Record per-call/max time, not an SLA; no concurrent revocation/catalog campaign. |
 | Peer/NAT budget | Fresh SQL UTC window: 11 bounded invalid registrations from one socket peer; requests 1–10 are validation errors, 11th is 429 with positive Retry-After. Budget includes prior stock registration attempts: wait for a fresh window or reconcile counts. Two external clients behind one NAT/ingress may share that 10/min bucket; measure the actual worker peer attribution without logging raw addresses. Spoofed X-Forwarded-For must not reset the bucket. Unacceptable shared-client starvation is STOP pending explicit ingress/capacity decision. |
 | Independent durable limits | Fixed limits: 100 global, 10/source, 10/canonical-metadata fingerprint per UTC minute; accounting bounded to 1,024 rows. A single ingress peer cannot isolate fingerprint/global limits because peer throttling occurs first. Require reviewed native admission-store scenarios with distinct synthetic source digests (from existing C2 SQL tests), or real trusted peer diversity. Do not forge headers, disable peer limiting or claim all three limits passed from one 429. Cross-replica HTTP enforcement is untested with one worker. |
 | Retention/capacity | 5,000 cumulative identities, not a renewable pending capacity; after 24 h only never-approved public payload/cache is reclaimable. Identity/audit history and approved metadata survive. Reuse the C2 deterministic SQL scenarios for boundary/expiry/approval races rather than creating 5,000 HTTP registrations or waiting a day on the live worker. Native execution needs a destination-fenced adapter; otherwise these gates remain OPEN. |
@@ -308,7 +296,8 @@ coverage; startup/admission failures; cleanup confirmation. Distinguish reused l
 new native PASS, FAIL and OPEN. Never retain passwords, proofs, tokens, raw HAR/bodies, callback/
 state/code URLs, full SQL/exception dumps, IP addresses or browser/client caches in shared evidence.
 
-STOP immediately on a production reference, wrong resource/hash/schema/identity/binding, missing
+STOP immediately on any production app/DB/secret/data/traffic reference beyond the recorded shared
+plan/server metadata, shared-capacity/owner-threshold breach, wrong resource/hash/schema/identity/binding, missing
 permission/visibility, unexpected control state, TLS/SSRF failure, internal callback origin, tenant
 leak, successful unaudited operation, catalog withdrawal, deadline failure or incomplete cleanup.
 No broader permission, timeout increase, proxy test seam or older contract is an automatic repair.
@@ -319,12 +308,12 @@ until complete, turn test SQL/app controls OFF, drain/stop the test app. Roll ba
 retained compatible dormant JAR/configuration and verify closed endpoints. Do not uninstall SQL,
 erase audits/receipts, overwrite the binding or revive an older unrevocation-aware server.
 
-After retaining sanitized evidence, delete the **exact newly owned** test database/app/frontend/
-server or test resource group named in the cleanup manifest, only if that group contains solely
-this run's new resources. Reused nonproduction plans/servers are retained; remove only approved
-run-owned children/settings/network rules. Use resource-type-specific deletion/verification from
-the reviewed manifest; identifiers are missing, so no deletion command is prefilled here. Confirm
-absence by successful inventories, not a failed read. Reconcile partial creation/deletion before exit.
+After retaining sanitized evidence, obtain a separate cleanup/retention decision for only the exact
+test app `shale-mcp-acceptance` and DB `ShaleMcpAcceptance` if their ownership/disposition is verified.
+No cleanup is automatic and no deletion command is supplied. Always retain shared `shale-api-plan`,
+logical server `shale`, resource group `Shale` and all production/copy/backup resources. Do not remove
+shared network rules or settings. Confirm any authorized test-only cleanup by successful inventories,
+not a failed read; reconcile partial state before exit.
 Destroy test passwords/JWT keys, private fixture derivatives, browser/Hermes token directories,
 worker scratch JAR/classpath/probe files and raw logs; revoke remaining test credentials.
 
