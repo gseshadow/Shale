@@ -1,9 +1,31 @@
 # Shared offline validation and strict output interpretation; no connection on import.
 Set-StrictMode -Version Latest
+# These APIs also work on PowerShell 7.0 / .NET Core 3.1. The previous
+# HashData/ToHexString/OperatingSystem.IsWindows calls required newer .NET.
+function Get-TextSHA256([string]$Text) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($algorithm.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text))).Replace('-', '') }
+    finally { $algorithm.Dispose() }
+}
+function Get-SafeSqlErrorNumbers([object[]]$Lines) {
+    $text = ($Lines | ForEach-Object { [string]$_ }) -join "`n"
+    $numbers = [Collections.Generic.HashSet[int]]::new()
+    foreach ($match in [regex]::Matches($text, '(?im)^\s*(?:Password: ?)?Msg ([1-9][0-9]{0,9}),\s*Level [0-9]{1,2},\s*State [0-9]{1,3}(?:,|\s*$)')) {
+        $number = 0
+        if ([int]::TryParse($match.Groups[1].Value, [ref]$number)) { [void]$numbers.Add($number) }
+        if ($numbers.Count -ge 32) { break }
+    }
+    return @($numbers | Sort-Object)
+}
+function Write-SafeStageDiagnostic($Result) {
+    $exitText = if ($null -eq $Result.ExitCode) { 'UNKNOWN' } else { [string][int]$Result.ExitCode }
+    $numbers = @($Result.SqlErrorNumbers) -join ','
+    Write-Host "STOP: stage=$($Result.Stage) exit=$exitText SQL-errors=[$numbers] category=$($Result.FailureCode); independent reconciliation required."
+}
 function Assert-PrivatePath([string]$Path) {
     $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
     $full = [IO.Path]::GetFullPath($Path)
-    $comparison = if ([OperatingSystem]::IsWindows()) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    $comparison = if ([Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Runtime.InteropServices.OSPlatform]::Windows)) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
     if (-not $full.StartsWith((Join-Path $repo 'work') + [IO.Path]::DirectorySeparatorChar, $comparison)) { throw 'STOP: private work/ path required.' }
     # Refuse symlink/junction escape, including ancestors.
     $current = $full
@@ -46,6 +68,12 @@ function Read-SafeResult([object[]]$Lines, [string]$Stage, [int]$Parts) {
         if ($i+2 -ge $rows.Count -or $rows[$i+1] -notmatch '^[-| ]+$') { throw 'STOP: ambiguous finding header.' }
         $values = @($rows[$i+2].Split('|') | ForEach-Object Trim)
         if ($values.Count -ne $columns.Count) { throw 'STOP: incomplete finding row.' }
+        if ($i+3 -lt $rows.Count) {
+            $nextValues = @($rows[$i+3].Split('|') | ForEach-Object Trim)
+            if ($nextValues.Count -eq $columns.Count) {
+                foreach ($j in $indices) { if ($nextValues[$j] -match '^(?:[+-]?[0-9]+|NULL)$') { throw 'STOP: multiple finding rows are ambiguous.' } }
+            }
+        }
         foreach ($j in $indices) { if ($values[$j] -cne '0') { throw 'STOP: nonzero or malformed finding count.' }; $findings++; $findingNames += $columns[$j] }
     }
     $expectedFindings = switch ($Stage) {

@@ -110,8 +110,66 @@ this is not an additional completion gate. Direct offline acceptance tests cover
 critical reactor protects existing application/default-OFF behavior. No application production
 code, historical SQL installer, module resource, manifest order or receipt was modified.
 
-Results: **55 offline acceptance tests PASS**; **160 selector-affected Maven tests PASS**; the two selector Python checks pass **11 tests**;
+Initial implementation results: **55 offline acceptance tests PASS**; **160 selector-affected Maven tests PASS**; the two selector Python checks pass **11 tests**;
 **283 critical-reactor tests PASS**, zero failures,
 errors or skips. PowerShell AST parsing and Git whitespace checks PASS. The initial Maven
 download failure was resolved using the session proxy and existing CA trust, without repository
 build changes. No native SQL or Windows ODBC interactive integration result is claimed.
+
+
+## Final pre-merge review of PR #1970
+
+**Verdict: keep draft until local Windows console/ODBC checks pass.** This review runs on
+Linux; it cannot certify Windows hidden input or cancellation behavior. The guide provides
+`Test-WindowsConsoleCapture.ps1` (pwsh fixture) and `Test-WindowsOdbcPrompt.ps1` (the actual
+reviewed ODBC client against an owned, inert loopback listener). Neither uses Azure, a SQL
+server/query, real credentials, the private acceptance packet or Stage 15c. Record terminal,
+PowerShell version, approved client hash and observed hidden-input/Ctrl+C behavior locally.
+
+Findings corrected in the same PR:
+
+- PowerShell pipeline capture could hide the native prompt and native error preferences could
+  throw before collecting LASTEXITCODE. A .NET Process transport now pins the application,
+  inherits console stdin, drains stdout/stderr concurrently and obtains Process.ExitCode directly.
+  No password is handled by PowerShell, placed in argv/environment or saved to a file. Unsupported
+  hosts/redirected stdin are refused. The replacement prompt appears only after an actual English
+  Password: prefix is observed while the child runs; no premature password request on startup
+  failure. Unconfirmed prompts cannot produce a successful supervised stage.
+- Safe diagnostics retain the known stage ID, native exit code or UNKNOWN, at most 32 distinct
+  integer SQL error numbers from standard Msg/Level/State headers, and a closed failure category.
+  Messages, SQL, bodies, principals mentioned in errors, hashes and private result values are not
+  copied. A failed postcheck records execution exit and verification exit separately and leaves
+  the stage unresolved. Read-only failures before any stage are printed as safe diagnostics;
+  they never create a false completed-stage record.
+- A missing final ledger newline is now treated as interruption/corruption before any connection.
+  Multiple numeric rows under a single finding-count header fail closed. No failure/timeout,
+  interrupted client, zero-exit SQL error, malformed output or uncertain commit can advance/replay.
+- HashData/ToHexString/OperatingSystem.IsWindows were newer than the declared PowerShell 7.0
+  baseline. Compatible SHA256.ComputeHash and RuntimeInformation APIs now preserve identical
+  existing ledger digests. Existing rows without new diagnostic fields remain readable.
+
+The renderer, manifest, seed source, reconciliation SQL, destination/owner guards, SQLCMD security
+flags, query/login budgets and Stage 16 evidence gate are unchanged by this review. Tests retain
+all 18 completed synthetic-stage hashes and the existing 15c seven-SET correction. Existing private
+inputs, actual completed-stage evidence, credentials and DPAPI storage were not read or modified.
+
+Test impact: existing packet/approval/identity/SQLCMD tests and the supervised state-machine tests
+were reviewed before changes. New cases cover safe errors with exit 16 or exit 0, postcheck failure,
+old-ledger compatibility, missing newline, unconfirmed prompts and duplicate findings. Native-process
+checks launch only local pwsh fixtures: inherited stdin, literal argv, concurrent full pipes, startup
+failure, bounded safe parsing and a real no-newline prompt/hidden input under a Linux pseudo-terminal.
+The SQLCMD process seam remains mocked in installation simulations, including all 33 transitions.
+
+Cancellation cleanup is best effort in finally; force-kill, power loss or cleanup failure can leave
+an uncertain client/server outcome. The pending ledger is authoritative for STOP, never rollback.
+Exclude surviving clients/sessions and perform independently approved read-only verification before
+recording a recovery decision. Neither an exit code nor matching counts alone establishes a commit.
+No native Azure SQL execution, Stage 15c retry, app startup/enablement, production change or merge ran.
+
+Final review validation: **68 offline acceptance tests PASS** and **283 critical-reactor tests
+PASS**, zero failures/errors/skips. The strengthened pseudo-terminal echo/timing check also
+passed directly after its assertion update. PowerShell AST parsing and Git whitespace checks
+PASS. The selector run with `--base 48fa619d --head HEAD` selects no Maven feature area and
+requires the critical reactor; its unknown-build-path full-suite recommendation is informational.
+SQL opt-ins were removed from the Maven environment. The two Windows-specific manual probes
+and Windows Ctrl+C observation remain **NOT RUN**, and are the stated merge blocker.

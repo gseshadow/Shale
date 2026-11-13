@@ -32,13 +32,27 @@ class SupervisedTest(unittest.TestCase):
         self.fixture.write_text('Not an authoritative fixture; fingerprint is mocked, never imported.')
         self.client = self.packet / 'mock-client'
         self.client.write_text('Never executed')
+        self.mock_transport = self.packet / 'mock-native-transport.ps1'
+        self.mock_transport.write_text(r"""
+param([string]$Executable, [string[]]$Arguments, [switch]$RequireConsole)
+try {
+ $lines=@(& sqlcmd @Arguments 2>&1)
+ [pscustomobject]@{ExitCode=$LASTEXITCODE; Lines=$lines; PasswordPromptObserved=$global:offlinePromptConfirmed; PasswordInputReadyShown=$global:offlinePromptConfirmed; FailureCode=''}
+} catch { [pscustomobject]@{ExitCode=$null; Lines=@(); FailureCode='PROCESS_START_OR_INTERRUPTED'} }
+""")
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def ps(self, command, prelude='', success=True):
         # This is always defined, including parser-only and refusal tests.
-        code = "function global:sqlcmd { throw 'OFFLINE SQLCMD BLOCKED' }; " + prelude + '; ' + command
+        transport = ''
+        if hasattr(self, 'mock_transport'):
+            # Substitute ONLY the native process seam in this isolated test host.
+            # The production wrapper's hashes, destination/flags and approval gates
+            # still execute. The real native transport has separate process tests.
+            transport = "function global:Join-Path { param($Path,$ChildPath); if ($ChildPath -ceq 'Invoke-NativeSqlcmd.ps1') { " + quote(self.mock_transport) + " } else { Microsoft.PowerShell.Management\\Join-Path -Path $Path -ChildPath $ChildPath } }; "
+        code = transport + "function global:sqlcmd { throw 'OFFLINE SQLCMD BLOCKED' }; " + prelude + '; ' + command
         result = subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', code],
                                 cwd=ROOT, text=True, capture_output=True, env=os.environ.copy(), timeout=60)
         if (result.returncode == 0) != success:
@@ -102,6 +116,8 @@ class SupervisedTest(unittest.TestCase):
         for bad in ([], valid[:1], valid + valid, ['ACCEPTANCE_SOURCE_OK:wrong:1'],
                     valid + ['BadFindingCount', '---------------', '1'],
                     valid + ['BadFindingCount', '---------------', 'NULL'],
+                    valid + ['BadFindingCount', '---------------', '0', '1'],
+                    valid + ['BadFindingCount|Other', '---------------|----', '0|3', '1|4'],
                     valid + ['BadFindingCount'], valid + ['Msg 1934, Level 16']):
             self.parse(bad, success=False)
         self.parse(['ACCEPTANCE_SOURCE_OK:31-verifier-catalogs:1',
@@ -155,6 +171,7 @@ class SupervisedTest(unittest.TestCase):
 
     def driver(self, mode='ok', recovery=None, success=False):
         pre = r'''
+$global:offlinePromptConfirmed=(MODE -ne 'missing-prompt')
 $global:count=0; $global:seeded=(Test-Path -LiteralPath (Join-Path DIRECTORY 'mock-seeded')); $global:stageIndex=18
 $global:specs=@(Get-Content -LiteralPath STAGEFILE -Raw | ConvertFrom-Json)
 function global:Get-FileHash {
@@ -183,11 +200,14 @@ function global:sqlcmd {
  $file=$args[[array]::IndexOf($args,'-i')+1]
  [IO.File]::AppendAllText((Join-Path DIRECTORY 'mock-calls'),[IO.Path]::GetFileName($file)+"`n")
  if ($file -like '*reconcile.sql') {
+  if (MODE -eq 'postcheck-sql-error' -and $global:seeded) { $global:LASTEXITCODE=16; return 'Msg 50001, Level 16, State 1, SECRET_POSTCHECK NEVER_PRINT' }
   if (MODE -eq 'interrupt-after-commit' -and $global:seeded) { throw 'PRIVATE_INTERRUPTION NEVER_PRINT' }
   $counts=if ($global:seeded) {'2:4:3'} else {'0:0:0'}
   $global:LASTEXITCODE=0
   return ('ACCEPTANCE_SNAPSHOT:'+('A'*64)+':'+$counts)
  }
+ if (MODE -eq 'sql-error') { $global:LASTEXITCODE=16; 'Msg 1934, Level 16, State 1, Server PRIVATE'; return 'SECRET_BODY password_hash NEVER_PRINT' }
+ if (MODE -eq 'sql-error-zero') { $global:LASTEXITCODE=0; return 'Msg 1934, Level 16, State 1, Server SECRET_BODY NEVER_PRINT' }
  if (MODE -eq 'fail') { $global:LASTEXITCODE=16; return 'SECRET_PASSWORD $2b$12$ NEVER_PRINT' }
  if (MODE -eq 'timeout') { throw 'SECRET_TIMEOUT NEVER_PRINT' }
  $global:seeded=$true; [IO.File]::WriteAllText((Join-Path DIRECTORY 'mock-seeded'),'synthetic committed state'); $global:LASTEXITCODE=0
@@ -251,6 +271,46 @@ function global:sqlcmd {
         self.assertEqual(1, (self.rendered / 'mock-calls').read_text().count('15c-seed.sql'))
         self.driver()  # fresh explicit approval, never an automatic retry
         self.assertEqual('verified', self.records()[-1]['Kind'])
+
+    def test_unconfirmed_native_prompt_refuses_even_valid_snapshot_before_import(self):
+        result = self.driver('missing-prompt')
+        self.assertIn('category=NATIVE_PROMPT_UNCONFIRMED', result.stdout)
+        self.assertFalse((self.packet / 'supervised.jsonl').exists())
+        self.assertNotIn('15c-seed.sql', (self.rendered / 'mock-calls').read_text())
+
+    def test_sql_error_diagnostics_retain_only_number_exit_and_stage(self):
+        result = self.driver('sql-error')
+        self.assertIn('stage=15c-seed exit=16 SQL-errors=[1934]', result.stdout)
+        record = self.records()[-1]
+        self.assertEqual([1934], record['SqlErrorNumbers'])
+        self.assertEqual('SQL_ERROR', record['FailureCode'])
+        self.assertEqual(16, record['ExitCode'])
+        self.assertEqual('failed', record['Kind'])
+        combined = result.stdout + result.stderr + (self.packet / 'supervised.jsonl').read_text()
+        self.assertNotIn('NEVER_PRINT', combined)
+        self.assertNotIn('password_hash', combined)
+        self.driver()  # unresolved error never retries or advances
+        self.assertEqual(1, (self.rendered / 'mock-calls').read_text().count('15c-seed.sql'))
+
+    def test_postcheck_error_preserves_both_exits_and_uncertain_stage_outcome(self):
+        result = self.driver('postcheck-sql-error')
+        record = self.records()[-1]
+        self.assertEqual('15c-seed', record['Stage'])
+        self.assertEqual('failed', record['Kind'])
+        self.assertEqual(0, record['ExitCode'])
+        self.assertEqual(16, record['VerificationExitCode'])
+        self.assertEqual([50001], record['SqlErrorNumbers'])
+        self.assertEqual('POSTCHECK_SQL_ERROR', record['FailureCode'])
+        self.assertNotIn('NEVER_PRINT', result.stdout + result.stderr + (self.packet / 'supervised.jsonl').read_text())
+        self.driver()
+        self.assertEqual(1, (self.rendered / 'mock-calls').read_text().count('15c-seed.sql'))
+
+    def test_sql_error_header_stops_even_with_zero_native_exit(self):
+        self.driver('sql-error-zero')
+        record = self.records()[-1]
+        self.assertEqual(0, record['ExitCode'])
+        self.assertEqual([1934], record['SqlErrorNumbers'])
+        self.assertEqual('failed', record['Kind'])
 
     def test_verified_rollback_allows_new_independently_approved_hash_without_erasing_history(self):
         self.driver('fail')
@@ -323,7 +383,7 @@ function global:sqlcmd {
     def test_interruption_after_commit_can_be_independently_recovered_without_replay(self):
         result = self.driver('interrupt-after-commit')
         self.assertNotIn('NEVER_PRINT', result.stdout + result.stderr)
-        self.assertEqual('pending', self.records()[-1]['Kind'])
+        self.assertEqual('failed', self.records()[-1]['Kind'])
         self.driver()  # live state does not authorize a retry
         self.driver(recovery='VerifiedCommitted', success=True)
         self.assertEqual('verified', self.records()[-1]['Kind'])
@@ -351,6 +411,31 @@ function global:sqlcmd {
         linked.symlink_to(self.rendered, target_is_directory=True)
         self.rendered = linked
         self.assertIn('linked private path refused', self.readiness(success=False).stderr)
+
+    def test_existing_ledger_without_new_diagnostic_fields_remains_resumable(self):
+        self.driver('bad-hash')  # imports baseline, never dispatches seed
+        ledger = self.packet / 'supervised.jsonl'
+        outer = json.loads(ledger.read_text())
+        record = json.loads(outer['Payload'])
+        for field in ('SqlErrorNumbers', 'FailureCode', 'VerificationExitCode'):
+            record.pop(field)
+        payload = json.dumps(record, separators=(',', ':'))
+        digest = hashlib.sha256(('0' * 64 + payload).encode()).hexdigest().upper()
+        ledger.write_text(json.dumps({'Payload': payload, 'Hash': digest}) + '\n')
+        result = self.driver('bad-hash')
+        self.assertIn('independent hash approval mismatch', result.stderr)
+        self.assertNotIn('ledger corrupt', result.stderr)
+        self.assertEqual(1, len(self.records()))
+        self.assertNotIn('15c-seed.sql', (self.rendered / 'mock-calls').read_text())
+
+    def test_missing_ledger_newline_is_an_interruption_and_never_connects(self):
+        self.driver('bad-hash')
+        ledger = self.packet / 'supervised.jsonl'
+        ledger.write_text(ledger.read_text().rstrip('\n'))
+        before = (self.rendered / 'mock-calls').read_text()
+        result = self.driver()
+        self.assertIn('missing final newline', result.stderr)
+        self.assertEqual(before, (self.rendered / 'mock-calls').read_text())
 
     def test_corrupt_ledger_never_connects(self):
         (self.packet / 'supervised.jsonl').write_text('{truncated')

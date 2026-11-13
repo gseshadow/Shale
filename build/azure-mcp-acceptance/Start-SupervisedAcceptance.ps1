@@ -21,9 +21,10 @@ try {
     $script:previous = '0' * 64
     $events = @()
     if (Test-Path -LiteralPath $ledgerPath) {
+        if (-not [IO.File]::ReadAllText($ledgerPath).EndsWith("`n")) { throw 'STOP: ledger empty/truncated or missing final newline. Preserve evidence; do not execute.' }
         foreach ($line in [IO.File]::ReadAllLines($ledgerPath)) {
             try { $event = $line | ConvertFrom-Json; $payload = [string]$event.Payload
-                $digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($script:previous + $payload)))
+                $digest = (Get-TextSHA256 ($script:previous + $payload))
                 if ($event.Hash -cne $digest) { throw 'invalid chain' }
                 $record = $payload | ConvertFrom-Json
                 if ($record.Index -ne $events.Count -or $record.Kind -cnotin @('baseline','pending','verified','rolledback','failed')) { throw 'invalid sequence' }
@@ -31,10 +32,10 @@ try {
             } catch { throw 'STOP: ledger corrupt/truncated. Preserve evidence; do not execute.' }
         }
     }
-    function Append-Event([string]$Kind, [string]$Stage, [string]$Hash, [string]$Snapshot, [string]$Result = '', $ExitCode = $null) {
-        $record = [ordered]@{Index=$script:eventCount; Kind=$Kind; Stage=$Stage; SHA256=$Hash; Snapshot=$Snapshot; Result=$Result; ExitCode=$ExitCode; Utc=[DateTime]::UtcNow.ToString('o')}
+    function Append-Event([string]$Kind, [string]$Stage, [string]$Hash, [string]$Snapshot, [string]$Result = '', $ExitCode = $null, [int[]]$SqlErrorNumbers = @(), [string]$FailureCode = '', $VerificationExitCode = $null) {
+        $record = [ordered]@{Index=$script:eventCount; Kind=$Kind; Stage=$Stage; SHA256=$Hash; Snapshot=$Snapshot; Result=$Result; ExitCode=$ExitCode; SqlErrorNumbers=$SqlErrorNumbers; FailureCode=$FailureCode; VerificationExitCode=$VerificationExitCode; Utc=[DateTime]::UtcNow.ToString('o')}
         $payload = $record | ConvertTo-Json -Compress
-        $digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($script:previous + $payload)))
+        $digest = (Get-TextSHA256 ($script:previous + $payload))
         $line = ([ordered]@{Payload=$payload; Hash=$digest} | ConvertTo-Json -Compress) + "`n"
         $stream = [IO.File]::Open($ledgerPath, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::Read)
         try { $bytes=[Text.Encoding]::UTF8.GetBytes($line); $stream.Write($bytes); $stream.Flush($true) } finally { $stream.Dispose() }
@@ -42,7 +43,7 @@ try {
     }
     function Get-BaselineHash {
         $parts = @($stages[0..17] | ForEach-Object { $_.name + ':' + (Get-StageHash $dir $_.name) })
-        return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($parts -join "`n"))))
+        return (Get-TextSHA256 ($parts -join "`n"))
     }
     $script:eventCount=$events.Count
     $next=18
@@ -78,7 +79,7 @@ try {
         $now = Get-Command sqlcmd -CommandType Application -ErrorAction Stop
         if ($now.Source -cne $client.Source -or (Get-FileHash -LiteralPath $now.Source -Algorithm SHA256).Hash -cne $clientHash) { throw 'STOP: approved SQLCMD client changed.' }
     }
-    function Reconcile {
+    function Reconcile([string]$AfterStage = '', [string]$AfterHash = '', [string]$AfterResult = '', $AfterExitCode = $null) {
         $hash = Get-StageHash $dir 'reconcile'
         Write-Host "READ-ONLY destination shale.database.windows.net / ShaleMcpAcceptance; reconcile SHA256=$hash"
         Assert-Client
@@ -90,7 +91,16 @@ try {
         if ($script:reconcileApproved -ine $hash) { throw 'STOP: approved reconciliation bytes changed.' }
         $approved = $script:reconcileApproved
         $result = & (Join-Path $PSScriptRoot 'Invoke-Stage.ps1') -RenderedDirectory $dir -Stage '15c-seed' -OperatorUser $OperatorUser -ReadOnlyCheck -Supervised -Execute -ApprovedSHA256 $approved -Acknowledgement EXECUTE_APPROVED_SHALE_MCP_ACCEPTANCE_STAGE
-        if ($result.ExitCode -ne 0 -or $result.Result -notmatch '^ACCEPTANCE_SNAPSHOT:') { throw 'STOP: read-only reconciliation failed or output incomplete.' }
+        if ($result.ExitCode -ne 0 -or $result.Result -notmatch '^ACCEPTANCE_SNAPSHOT:') {
+            if ($AfterStage) {
+                # Execution exit and verification exit are different facts. A
+                # failed postcheck never converts a successful SQLCMD exit into
+                # proof of a committed stage or authorizes replay.
+                Append-Event 'failed' $AfterStage $AfterHash '' $AfterResult $AfterExitCode $result.SqlErrorNumbers ('POSTCHECK_' + $result.FailureCode) $result.ExitCode
+            }
+            Write-SafeStageDiagnostic $result
+            throw 'STOP: read-only reconciliation failed or output incomplete.'
+        }
         return $result.Result
     }
     $snapshot = Reconcile
@@ -141,10 +151,11 @@ try {
         Append-Event 'pending' $stage.name $hash $snapshot
         $result = & (Join-Path $PSScriptRoot 'Invoke-Stage.ps1') -RenderedDirectory $dir -Stage $stage.name -OperatorUser $user -Supervised -Execute -ApprovedSHA256 $approved -Acknowledgement EXECUTE_APPROVED_SHALE_MCP_ACCEPTANCE_STAGE
         if ($result.ExitCode -ne 0 -or $result.Result -notmatch '^PASS:') {
-            Append-Event 'failed' $stage.name $hash $snapshot 'FAILED_RESULT_OR_PROCESS' $result.ExitCode
+            Append-Event 'failed' $stage.name $hash $snapshot 'FAILED_RESULT_OR_PROCESS' $result.ExitCode $result.SqlErrorNumbers $result.FailureCode
+            Write-SafeStageDiagnostic $result
             throw 'STOP: stage failed or results incomplete; raw SQLCMD output suppressed. Independent recovery required.'
         }
-        $snapshot = Reconcile
+        $snapshot = Reconcile -AfterStage $stage.name -AfterHash $hash -AfterResult $result.Result -AfterExitCode $result.ExitCode
         if ($stage.name -ceq '15c-seed' -and $snapshot -notmatch ':2:4:3$') { throw 'STOP: seed outcome mismatch; reconcile independently.' }
         Append-Event 'verified' $stage.name $hash $snapshot $result.Result $result.ExitCode
         $next++

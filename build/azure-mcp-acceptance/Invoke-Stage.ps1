@@ -48,16 +48,34 @@ foreach ($item in Get-ChildItem Env:) {
 }
 if ($Supervised) {
     $sqlcmdArgs += @('-s','|','-W','-w','65535')
-    Write-Host "SQLCMD private authentication for $OperatorUser; enter its password at the native hidden input prompt."
+    Write-Host "Preparing SQLCMD authentication for $OperatorUser. Do not type until PASSWORD INPUT READY appears; raw native output is suppressed. Ctrl+C stops and requires reconciliation."
     $exitCode = $null
+    $captured = @()
+    $numbers = @()
+    $failure = 'PROCESS_START_OR_INTERRUPTED'
     try {
-        $captured = @(& sqlcmd @sqlcmdArgs 2>&1)
-        $exitCode = $LASTEXITCODE
-        if ($exitCode -ne 0) { throw 'SQLCMD failed' }
+        # Resolve an application explicitly: functions/aliases cannot replace the
+        # independently reviewed ODBC executable in a supervised session.
+        $client = Get-Command sqlcmd -CommandType Application -ErrorAction Stop
+        $capture = & (Join-Path $PSScriptRoot 'Invoke-NativeSqlcmd.ps1') -Executable $client.Source -Arguments $sqlcmdArgs -RequireConsole
+        $captured = @($capture.Lines)
+        if ($capture.ExitCode -is [int]) { $exitCode = $capture.ExitCode }
+        $numbers = @(Get-SafeSqlErrorNumbers $captured)
+        if ($capture.FailureCode) {
+            if ($capture.FailureCode -cin @('CONSOLE_REQUIRED','PROCESS_START_OR_INTERRUPTED','OUTPUT_LIMIT')) { $failure=$capture.FailureCode }
+            throw 'Transport unavailable'
+        }
+        if ($null -eq $exitCode) { throw 'Unknown process outcome' }
+        if ($numbers.Count) { $failure='SQL_ERROR'; throw 'SQL error' }
+        if ($exitCode -ne 0) { $failure='PROCESS_EXIT'; throw 'Process failed' }
+        if (-not $capture.PasswordPromptObserved -or -not $capture.PasswordInputReadyShown) { $failure='NATIVE_PROMPT_UNCONFIRMED'; throw 'Native prompt not confirmed' }
+        $failure = 'INVALID_RESULTS'
         $safe = Read-SafeResult $captured $Stage @($selected.sources).Count
-        [pscustomobject]@{ ExitCode=$exitCode; Result=$safe }
-    } catch { [pscustomobject]@{ ExitCode=$exitCode; Result='FAILED_RESULT_OR_PROCESS' } }
-    finally { $captured = $null }
+        [pscustomobject]@{ Stage=$Stage; ExitCode=$exitCode; Result=$safe; SqlErrorNumbers=@(); FailureCode='' }
+    } catch {
+        [pscustomobject]@{ Stage=$Stage; ExitCode=$exitCode; Result='FAILED_RESULT_OR_PROCESS'; SqlErrorNumbers=$numbers; FailureCode=$failure }
+    } finally { $captured=$null; $capture=$null }
+
     return
 }
 & sqlcmd @sqlcmdArgs

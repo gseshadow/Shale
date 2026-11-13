@@ -7,7 +7,7 @@ Offline test results are not Azure SQL or runtime acceptance.
 
 ## Prepare without changing the existing checkpoint
 
-Use PowerShell 7, JDK 21 and the independently reviewed Microsoft **ODBC SQLCMD**.
+Use an interactive Windows PowerShell 7 console (7.4 recommended), JDK 21 and the independently reviewed Microsoft **ODBC SQLCMD**.
 Use a private terminal without transcripts, SQLCMD/application environment overrides,
 shared output or input logging. Restrict the existing packet directory to the operator.
 Never enter passwords in command arguments; SQLCMD prompts for each connection.
@@ -60,9 +60,16 @@ Nothing in this PR authorizes the current failed Stage 15c to run.
 It prompts for the exact rendering, original fixture path and existing acceptance owner.
 It shows client/stage hashes and the fixed target, asks for independent hashes and exact
 approval phrases, then executes one approved stage through `Invoke-Stage.ps1`. No SQL is
-printed. Each SQLCMD connection still prompts privately for its principal's password.
+printed. Each SQLCMD connection reads its principal's password through the inherited native console.
+The wrapper prints PASSWORD INPUT READY only after observing the native English `Password:`
+prompt in captured output while the child is running. Until then, do not type a password.
+Native stdout/stderr are drained concurrently in memory, including prompts without a newline. Do not pipe stdin, use ISE/editor/remote hosts, supply
+`-P`, or set SQLCMDPASSWORD; unsupported/redirected-input hosts are refused.
 The initial read-only approval covers the identical reconciliation script for this session;
 each stage, each contained-principal boundary and continuation require separate approval.
+Only the stage identifier, native exit code (or UNKNOWN), bounded numeric SQL error identifiers
+and a closed failure category are shown on failure. SQL error messages/bodies and raw output
+are never logged. A missing final ledger newline is treated as an interruption, not repaired.
 Any different answer stops. `CONTINUE` only permits the next preview.
 
 First launch imports 18 completed stages only after retained independent evidence is
@@ -74,7 +81,9 @@ ambiguous output, drift or interruption stops immediately. Raw output is discard
 
 The private packet's `supervised.jsonl` is append-only, hash chained, flushed to disk and
 protected against concurrent runner sessions with `supervised.lock`. It contains only
-stage/hash, safe outcome/count summary, exit code, UTC time and metadata/count snapshot.
+stage/hash, safe outcome/count summary, exit code, numeric SQL error identifiers, closed
+failure category, UTC time and metadata/count snapshot. A failed postcheck also records its
+separate verification exit code: execution exit 0 never establishes commit success.
 Do not edit/delete/truncate it. Hash chaining detects corruption, not a malicious operator
 with write access; retain private backups and existing independent evidence.
 Relaunching verifies ledger order, completed hashes and live state before advancing.
@@ -129,6 +138,35 @@ and any app lifecycle or feature activation remain separate, unapproved work.
 python -m unittest discover -s build/azure-mcp-acceptance -p 'test_*.py' -v
 ```
 
-Tests use new disposable synthetic packets and a function that intercepts **every** SQLCMD
-call; they never open the operator's packet or connect to Azure. See
+Tests use new disposable synthetic packets and intercept the native SQLCMD process seam;
+separate native-process tests run only local pwsh fixtures. No test starts SQLCMD; they never open the operator's packet or connect to Azure. See
 [stage audit and limitations](../../docs/testing/azure-mcp-supervised-acceptance-review.md).
+
+## Required local Windows review before merge
+
+This Linux review cannot certify Windows console/ODBC hidden input or Ctrl+C cleanup.
+Keep PR #1970 a draft until these **SQL-free** checks pass in the actual Windows terminal
+with the intended PowerShell and independently reviewed ODBC executable:
+
+```powershell
+.\build\azure-mcp-acceptance\Test-WindowsConsoleCapture.ps1
+.\build\azure-mcp-acceptance\Test-WindowsOdbcPrompt.ps1 -SqlcmdExecutable (Read-Host 'Reviewed ODBC SQLCMD .exe path')
+```
+
+Both ask for the **public word OFFLINE**, never a real password or existing credential.
+Wait for PASSWORD INPUT READY before typing. If it never appears, press Ctrl+C and
+record the check as inconclusive; never type a credential at the returned PowerShell prompt.
+The first launches only a local pwsh fixture. The second owns an ephemeral loopback TCP
+listener which speaks no TDS and never authenticates: no SQL server, query, Azure endpoint
+or private packet is used. An ODBC login/prelogin failure is expected; a native password
+prompt must be observed in captured output, the input must remain invisible, and the
+operator must explicitly confirm that observation. Only version/hash/pass/exit metadata
+is printed; raw ODBC errors and entered characters are discarded.
+
+Also run the console fixture again and press Ctrl+C while it awaits input; confirm the
+terminal returns and the fixture child exits. The transport attempts child-tree cleanup
+in `finally`. Force-kill, power loss or failed cleanup cannot guarantee client termination
+or rollback; independently exclude surviving SQLCMD/SQL sessions before classifying a
+pending outcome. Never use Stage 15c or production as a prompt/cancellation test.
+These checks do not waive later separately authorized native SQL acceptance or the Stage
+16 worker/JVM/timezone gate. No live SQL execution is authorized by this guide/review.
