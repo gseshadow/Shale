@@ -7,3 +7,7 @@ shale-data/src/main/resources/ai/confinement*-modules.properties text eol=lf
 build/sql-confinement/*.sql text eol=lf
 build/sql-confinement/*.sha256 text eol=lf
 build/sql-confinement/reviewed-case-module-variants-v2.json text eol=lf
+docs/sql/ai-integration/azure-acceptance/*.sql text eol=lf
+build/azure-mcp-acceptance/*.ps1 text eol=lf
+build/azure-mcp-acceptance/*.java text eol=lf
+build/azure-mcp-acceptance/*.json text eol=lf

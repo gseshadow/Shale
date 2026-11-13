@@ -8,6 +8,14 @@ Baseline: `55deba6c6188c134a053af11c659b60230a1e948`, `codex/latest` including m
 No Azure/SQL operation, deployment, setting change or activation was performed for this runbook.
 Every live step below requires separate authorization for the exact nonproduction scope.
 
+**November 13 preparation update:** the operator confirms a new synthetic `ShaleMcpAcceptance`
+database, Standard S0/Online with `SQL_Latin1_General_CP1_CI_AS`, on `shale.database.windows.net`.
+The [destination-specific installation packet](../sql/ai-integration/azure-acceptance/README.md)
+prepares PowerShell 7/validated-TLS SQLCMD stages with controls OFF. No live verification or
+installation has occurred. The shared production logical server does not meet the dedicated-server
+requirement below; execution needs explicit shared-server risk acceptance. Never delete the shared
+server or `Shale` resource group as fixture cleanup. Production `Shale` remains excluded.
+
 ## 1. Smallest useful target and execution prerequisites
 
 Use **one Linux Java 21 App Service worker, one fresh synthetic Azure SQL Database
