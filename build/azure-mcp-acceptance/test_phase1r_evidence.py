@@ -7,6 +7,8 @@ import tempfile
 import unittest
 import subprocess
 import sys
+from contextlib import redirect_stdout
+from io import StringIO
 from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location('evidence', Path(__file__).with_name('phase1r_evidence.py'))
@@ -14,16 +16,18 @@ E = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(E)
 
 
-def unit_baseline(transform=lambda batches: batches):
+def unit_baseline(transform=lambda batches: batches, *, diagnostics=False,
+                  non_target_filters=115, block_operations=('AFTER UPDATE',)):
     batches = ['CREATE SCHEMA sec AUTHORIZATION dbo;']
     for name in E.FUNCTIONS:
         batches.append(f'CREATE FUNCTION [sec].[{name}](@tenant int) RETURNS TABLE WITH SCHEMABINDING AS RETURN SELECT 1 AS Visible WHERE @tenant=CONVERT(int,SESSION_CONTEXT(N\'ShaleClientId\'));\r\n')
     clauses = [f'ADD FILTER PREDICATE sec.{E.FUNCTIONS[t == "Statuses"]}(ShaleClientId) ON dbo.{t}' for t in E.TARGETS]
     # Distinct targets plus a BLOCK exercise both operation and duplicate accounting.
-    clauses += [f'ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.Unit{i}' for i in range(115)]
-    clauses += ['ADD BLOCK PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.Unit0 AFTER UPDATE']
+    clauses += [f'ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.Unit{i}' for i in range(non_target_filters)]
+    clauses += [f'ADD BLOCK PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.Unit{i} {operation}'
+                for i, operation in enumerate(block_operations)]
     batches.append('CREATE SECURITY POLICY sec.TenantFilter ' + ',\n'.join(clauses) + ' WITH (STATE=ON, SCHEMABINDING=ON);')
-    return E.baseline(transform(batches))
+    return E.baseline(transform(batches), diagnostics=diagnostics)
 
 
 def catalog(baseline, offset=100):
@@ -57,6 +61,28 @@ class EvidenceTest(unittest.TestCase):
 
     def review(self):
         return E.compare(self.baseline, self.actual)
+
+    def test_fixture_count_diagnostic_precedes_unchanged_116_failure(self):
+        # Synthetic shape reproduces the measured fixture counts, not its SQL bytes.
+        output = StringIO()
+        with redirect_stdout(output), self.assertRaisesRegex(ValueError, 'exactly 116.*parsed 77'):
+            unit_baseline(diagnostics=True, non_target_filters=60,
+                          block_operations=('AFTER INSERT',) * 8 + ('AFTER UPDATE',) * 8 + ('BEFORE UPDATE',))
+        self.assertEqual([
+            'Parsed fixture predicates: total=80 target=3 non-target=77',
+            '  ["sec","TenantFilter"] BLOCK: total=17 target=0 non-target=17',
+            '  ["sec","TenantFilter"] FILTER: total=63 target=3 non-target=60',
+        ], output.getvalue().splitlines())
+
+    def test_diagnostic_groups_all_policies_types_and_preserves_duplicates(self):
+        target = dict(policy=['sec', 'TenantFilter'], kind='FILTER', target=['dbo', 'Users'])
+        other = dict(policy=['sec', 'OtherPolicy'], kind='BLOCK', target=['dbo', 'Unit'])
+        counts = E.predicate_counts([target, other, other])
+        self.assertEqual((3, 1, 2), (counts['total'], counts['target'], counts['nonTarget']))
+        self.assertEqual([
+            dict(policy=['sec', 'OtherPolicy'], kind='BLOCK', target=0, nonTarget=2),
+            dict(policy=['sec', 'TenantFilter'], kind='FILTER', target=1, nonTarget=0),
+        ], counts['byPolicyAndType'])
 
     def test_complete_match_and_database_specific_id_remapping(self):
         first = self.review()

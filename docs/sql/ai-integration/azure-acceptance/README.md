@@ -270,6 +270,55 @@ or Azure acceptance. The default fixture/Phase1R/normalization/binding/user/seed
 
 ## Stage 09 evidence comparison (read-only, fresh fixture only)
 
+**Known baseline-scope failure, investigated against the hash-verified private fixture:**
+the current `expected` command parses the fixture alone but enforces the count observed after
+Stages 02-08. The diagnostic below deliberately still fails; do not use it to approve Stage 09.
+No expected JSON is written on this failure. A separately reviewed stage-aware expected inventory
+is needed to reconcile those already installed additions. Do not lower the 116-binding gate.
+
+The unchanged authoritative parser accepts 1,742 batches. All 80 fixture ADD PREDICATE clauses
+are parsed under `sec.TenantFilter`; there is no missing policy, unsupported SQL or fixture hash
+difference behind this count failure. The two full fixture function hashes also reproduce the
+previously supplied strict/overlay observations, without establishing approval.
+
+| Scope / policy | FILTER | BLOCK | Total |
+| --- | ---: | ---: | ---: |
+| Fixture, sec.TenantFilter | 63 | 17 | 80 |
+| Three target FILTERs, sec.TenantFilter | 3 | 0 | 3 |
+| Fixture non-target bindings, sec.TenantFilter | 60 | 17 | 77 |
+| Stage 02 additions, sec.TenantFilter | 9 | 18 | 27 |
+| Stage 03 additions, sec.TenantFilter | 1 | 2 | 3 |
+| Stage 04 additions, sec.TenantFilter | 1 | 2 | 3 |
+| Stages 05-07 additions | 0 | 0 | 0 |
+| Stage 08 additions, sec.TenantFilter | 2 | 4 | 6 |
+| Expected Stage 09 non-target bindings | 73 | 43 | 116 |
+
+Fixture BLOCK operations are eight AFTER INSERT, eight AFTER UPDATE and one BEFORE UPDATE.
+Stages 02-08 add thirteen AFTER INSERT and thirteen AFTER UPDATE blocks. Their 39 additions
+explain `77 + 39 = 116`; a count alone does not prove the corresponding live bindings or local hash.
+Evidence comes from `stages.json` and the ADD clauses in `phase3b1.sql` (27), `phase3b2b.sql` (3),
+`phase3b2c1.sql` (3) and `phase3b3.sql` (6), without executing any of them. This is an expected-state
+composition defect, not evidence of live RLS drift. The original fixture, exporter/parser and
+all comparator/security/count guards remain unchanged by the diagnostic patch.
+
+To reproduce only the offline diagnostic in PowerShell 7 from the checkout containing this patch:
+
+```powershell
+$Fixture = 'C:\ShalePrivateEvidence\authoritative-fixture-20261028\authoritative-candidate.sql'
+$Diagnostic = Join-Path (Get-Location) ('work/phase1r-diagnostic-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $Diagnostic | Out-Null
+python build/azure-mcp-acceptance/phase1r_evidence.py expected --fixture $Fixture `
+    --out (Join-Path $Diagnostic 'expected.json') 2>&1 |
+    Tee-Object -FilePath (Join-Path $Diagnostic 'diagnostic.txt')
+```
+
+Expected output: parser PASS; `total=80 target=3 non-target=77`; policy/type rows showing
+17 BLOCKs and 63 FILTERs; then FAIL and `exactly 116 non-target predicates; parsed 77` (exit 1).
+Only the fixture SHA-256 and parser are used, never SQLCMD or a database. The diagnostic does not
+alter expected counts, drop predicates, emit a partial approved baseline or write private inputs.
+Keep the existing collection/input-preparation instructions below blocked until the expected-state
+composition has been corrected and independently reviewed.
+
 Use [phase1r_evidence.py](../../../../build/azure-mcp-acceptance/phase1r_evidence.py)
 and [Collect-Phase1R.sql](../../../../build/azure-mcp-acceptance/Collect-Phase1R.sql)
 with the verified `d3780673acc68399af171e406fb3b481a899fe07` base plus this reviewed utility.

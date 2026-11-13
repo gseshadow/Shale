@@ -137,7 +137,21 @@ def policy(values):
     return dict(name=name, enabled=True, bound=options.get('SCHEMABINDING', True)), predicates
 
 
-def baseline(batches):
+def predicate_counts(predicates):
+    """Count parsed bindings without dropping duplicates or applying an approval."""
+    counts = Counter()
+    for p in predicates:
+        scope = 'target' if p['target'] in [['dbo', t] for t in TARGETS] else 'nonTarget'
+        counts[(tuple(p['policy']), p['kind'], scope)] += 1
+    groups = sorted({(policy, kind) for policy, kind, _ in counts})
+    rows = [dict(policy=list(policy), kind=kind,
+                 target=counts[policy, kind, 'target'], nonTarget=counts[policy, kind, 'nonTarget'])
+            for policy, kind in groups]
+    return dict(total=len(predicates), target=sum(r['target'] for r in rows),
+                nonTarget=sum(r['nonTarget'] for r in rows), byPolicyAndType=rows)
+
+
+def baseline(batches, diagnostics=False):
     functions, policies, predicates, schemas = [], [], [], {'dbo': 'dbo'}
     for batch in batches:
         t = tokens(batch)
@@ -182,8 +196,14 @@ def baseline(batches):
         owners.append(dict(name=list(name), schemaOwner=schemas[name[0]], owner=schemas[name[0]]))
     result = dict(version=1, fixtureSha256=FIXTURE, functions=functions,
                   policies=policies, predicates=predicates, owners=owners)
-    require(sum(p['target'] not in [['dbo', t] for t in TARGETS] for p in predicates) == 116,
-            'fixture must contain exactly 116 non-target predicates')
+    counts = predicate_counts(predicates)
+    if diagnostics:
+        print(f'Parsed fixture predicates: total={counts["total"]} target={counts["target"]} non-target={counts["nonTarget"]}')
+        for row in counts['byPolicyAndType']:
+            print(f'  {keyed(row["policy"])} {row["kind"]}: total={row["target"] + row["nonTarget"]} '
+                  f'target={row["target"]} non-target={row["nonTarget"]}')
+    require(counts['nonTarget'] == 116,
+            f'fixture must contain exactly 116 non-target predicates; parsed {counts["nonTarget"]}')
     require(schemas['dbo'] == schemas['sec'] == 'dbo', 'Phase1R requires dbo schema ownership')
     return result
 
@@ -201,7 +221,7 @@ def expected(fixture, output):
         raw = re.findall(r'CONVERT\(nvarchar\(max\),0x([0-9a-f]+)\); EXEC sys.sp_executesql @FixtureBatch;',
                          export.read_text(encoding='utf-8'))
         require(raw, 'no parser-exported batches')
-        result = baseline([bytes.fromhex(h).decode('utf-16le') for h in raw])
+        result = baseline([bytes.fromhex(h).decode('utf-16le') for h in raw], diagnostics=True)
     with output.open('x', encoding='utf-8') as stream:
         json.dump(result, stream, ensure_ascii=True, indent=2)
     print(f'PASS baseline generated; SHA256={sha(output.read_bytes())}; not approval')
