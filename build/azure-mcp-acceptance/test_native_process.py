@@ -85,7 +85,7 @@ exit 16
         code = '$r=& ' + quote(TOOL / 'Invoke-NativeSqlcmd.ps1') + ' -Executable ' + quote(self.directory / 'PRIVATE_NEVER_PRINT.exe') + " -Arguments @('dummy'); $r | ConvertTo-Json -Compress"
         result = self.ps(code)
         data = json.loads(result.stdout)
-        self.assertEqual('PROCESS_START_OR_INTERRUPTED', data['FailureCode'])
+        self.assertEqual('PROCESS_START_FAILED', data['FailureCode'])
         self.assertIsNone(data['ExitCode'])
         self.assertFalse(data['PasswordInputReadyShown'])
         self.assertNotIn('PRIVATE_NEVER_PRINT', result.stdout + result.stderr)
@@ -144,6 +144,38 @@ if ($word.ToString() -ceq 'OFFLINE') { [Console]::WriteLine('PUBLIC_INPUT_OK'); 
                 process.kill(); process.wait()
             else:
                 os.close(master)
+
+    def test_native_interrupt_exit_is_never_reported_as_normal_completion(self):
+        child = self.directory / 'interrupt.ps1'
+        child.write_text("[Console]::Error.WriteLine('PRIVATE_NEVER_PRINT'); exit 130")
+        code = '$r=& ' + quote(TOOL / 'Invoke-NativeSqlcmd.ps1') + ' -Executable ' + quote(self.pwsh)
+        code += ' -Arguments ' + ','.join(quote(a) for a in ('-NoLogo', '-NoProfile', '-File', child))
+        code += '; $r | ConvertTo-Json -Compress'
+        result = self.ps(code)
+        data = json.loads(result.stdout)
+        self.assertEqual('PROCESS_INTERRUPTED', data['FailureCode'])
+        self.assertEqual(130, data['ExitCode'])
+        self.assertTrue(data['HasExited'])
+        self.assertEqual([], data['Lines'])
+        self.assertNotIn('PRIVATE_NEVER_PRINT', result.stdout + result.stderr)
+
+    def test_watchdog_stops_a_missing_prompt_and_returns_safe_process_metadata(self):
+        child = self.directory / 'waiting.ps1'
+        child.write_text("[Console]::Error.WriteLine('PRIVATE_NEVER_PRINT'); Start-Sleep -Seconds 30")
+        code = '$r=& ' + quote(TOOL / 'Invoke-NativeSqlcmd.ps1') + ' -WatchdogSeconds 1 -Executable ' + quote(self.pwsh)
+        code += ' -Arguments ' + ','.join(quote(a) for a in ('-NoLogo', '-NoProfile', '-File', child))
+        code += "; [pscustomobject]@{Code=$r.FailureCode; Started=$r.Started; Exited=$r.HasExited; Timeout=$r.TimedOut; Prompt=$r.PasswordPromptObserved; Elapsed=$r.ElapsedMilliseconds; Lines=$r.Lines.Count} | ConvertTo-Json -Compress"
+        result = self.ps(code)
+        data = json.loads(result.stdout)
+        self.assertEqual('PROCESS_TIMEOUT', data['Code'])
+        self.assertTrue(data['Started'])
+        self.assertTrue(data['Exited'])
+        self.assertTrue(data['Timeout'])
+        self.assertFalse(data['Prompt'])
+        self.assertGreaterEqual(data['Elapsed'], 1000)
+        self.assertLess(data['Elapsed'], 15000)
+        self.assertEqual(0, data['Lines'])
+        self.assertNotIn('PRIVATE_NEVER_PRINT', result.stdout + result.stderr)
 
     def test_odbc_probe_can_only_use_its_owned_loopback_non_sql_listener(self):
         source = (TOOL / 'Test-WindowsOdbcPrompt.ps1').read_text()

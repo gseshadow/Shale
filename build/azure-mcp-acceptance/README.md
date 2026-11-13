@@ -170,3 +170,44 @@ or rollback; independently exclude surviving SQLCMD/SQL sessions before classify
 pending outcome. Never use Stage 15c or production as a prompt/cancellation test.
 These checks do not waive later separately authorized native SQL acceptance or the Stage
 16 worker/JVM/timezone gate. No live SQL execution is authorized by this guide/review.
+
+### Windows 11 / PowerShell 7.7.0 follow-up
+
+The operator-reported console fixture PASS is accepted. The supplied executable hash
+`D9DBD1A8BD26213747B246DEBA1E13663A7E1DEF530CD961D7582B41A5E27852`
+exactly matches Microsoft's published **Go SQLCMD v1.10.0 Windows amd64** binary. Its
+installation path does not identify the client family. Select the independently reviewed
+Microsoft **ODBC 17/18 SQLCMD** executable for the second probe and the installer.
+Do not adapt flags, pass a password through argv/environment, or use a credential fallback
+just to make Go SQLCMD work. The corrected probe rejects this known Go hash before any
+process/listener starts; other binaries must pass a bounded help-only identity check first.
+
+The probe now prints only client family/numeric version/hash and closed diagnostic fields:
+process started/exited, native exit or UNKNOWN, timeout, prompt observed/input-ready,
+loopback contact, elapsed milliseconds, output character counts, OS error number and
+transport/harness category. It never prints help text, raw errors, SQL or entered input.
+
+| Status | Meaning / next action |
+| --- | --- |
+| `WRONG_CLIENT_GO_SQLCMD` / `ODBC_CLIENT_NOT_CONFIRMED` | Select the actual reviewed ODBC client. No login probe/listener ran. |
+| `HELP_COMPLETED` | Expected help-only exit; no password prompt or server connection is expected in this phase. |
+| `MISSING_PROMPT_PROCESS_EXIT` | No captured prompt before exit. `loopbackAccepted=False` means the owned listener was not reached; True shows contact without a completed prompt path. Neither is proof of ODBC hidden-input compatibility. |
+| `TIMEOUT_BEFORE_PROMPT` / `TIMEOUT_AFTER_PROMPT` | The probe watchdog expired. Child cleanup is attempted; no automatic retry. |
+| `PROCESS_INTERRUPTED` | Native interrupt exit or cancellation; not an expected prelogin test result. |
+| `PROCESS_START_FAILURE` / `TRANSPORT_FAILURE` | Inspect the safe transport/OS code; no raw exception is needed. |
+| `HARNESS_FAILURE` | Listener start, accept, transport-call or cleanup failed; this is a test-harness failure, not a client compatibility verdict. |
+| `PROCESS_EXIT_BEFORE_LOOPBACK` | Prompt path occurred, but the client exited before contacting the owned listener. |
+| `PROMPT_OBSERVED_AFTER_PROCESS_EXIT` / `UNEXPECTED_SUCCESS` | Inconclusive or inconsistent; never type at the returned PowerShell prompt or treat this as PASS. |
+| `EXPECTED_PRELOGIN_FAILURE` | Prompt/input-ready observed, loopback reached and native exit nonzero; explicit hidden-input confirmation is still required before PASS. |
+
+The listener deliberately sends **no TDS/TLS/login response** and cannot authenticate.
+It is not a SQL server emulator: a client that needs a prelogin exchange before prompting
+cannot be certified by this test. Do not add a fake login acknowledgement or weaken TLS to
+force a prompt. Keep the PR blocked if the genuine ODBC probe remains inconclusive.
+Help has a five-second watchdog; the login probe has a 45-second watchdog and a local-only
+five-second login timeout. These probe limits do not change installer SQLCMD budgets or
+retry/recovery policy. No real credentials, private packet or Azure endpoint is involved.
+
+Before any later separately authorized installer run, ensure `Get-Command sqlcmd -CommandType
+Application` resolves the same approved ODBC executable/hash used by the probe. A successful
+explicit-path probe does not change PATH or replace the existing Go installation.

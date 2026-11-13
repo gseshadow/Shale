@@ -62,7 +62,7 @@ if ($Supervised) {
         if ($capture.ExitCode -is [int]) { $exitCode = $capture.ExitCode }
         $numbers = @(Get-SafeSqlErrorNumbers $captured)
         if ($capture.FailureCode) {
-            if ($capture.FailureCode -cin @('CONSOLE_REQUIRED','PROCESS_START_OR_INTERRUPTED','OUTPUT_LIMIT')) { $failure=$capture.FailureCode }
+            if ($capture.FailureCode -cin @('CONSOLE_REQUIRED','PROCESS_START_OR_INTERRUPTED','PROCESS_START_FAILED','PROCESS_CAPTURE_FAILED','PROCESS_INTERRUPTED','PROCESS_TIMEOUT','OUTPUT_LIMIT')) { $failure=$capture.FailureCode }
             throw 'Transport unavailable'
         }
         if ($null -eq $exitCode) { throw 'Unknown process outcome' }

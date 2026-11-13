@@ -5,7 +5,8 @@
 param(
     [Parameter(Mandatory)][string]$Executable,
     [Parameter(Mandatory)][string[]]$Arguments,
-    [switch]$RequireConsole
+    [switch]$RequireConsole,
+    [ValidateRange(0,600)][int]$WatchdogSeconds = 0
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -13,12 +14,31 @@ $process = $null
 $started = $false
 $stdout = $null
 $stderr = $null
-$failure = 'PROCESS_START_OR_INTERRUPTED'
+$failure = 'PROCESS_START_FAILED'
+$promptObserved = $false
+$promptShown = $false
+$timedOut = $false
+$osError = $null
+$streams = @()
+$clock = [Diagnostics.Stopwatch]::StartNew()
+function Stop-CapturedChild {
+    try { if ($process -and $started -and -not $process.HasExited) { $process.Kill($true); [void]$process.WaitForExit(5000) } } catch { }
+}
+function New-CaptureResult([string]$Code, [object[]]$Lines = @()) {
+    $exited=$false; $exit=$null
+    try { if ($started) { $exited=$process.HasExited; if ($exited) { $exit=$process.ExitCode } } } catch { }
+    $outLength=0; $errLength=0
+    if ($streams.Count -eq 2) { $outLength=$streams[0].Text.Length; $errLength=$streams[1].Text.Length }
+    [pscustomobject]@{ ExitCode=$exit; Lines=$Lines; Started=$started; HasExited=$exited;
+        TimedOut=$timedOut; ElapsedMilliseconds=$clock.ElapsedMilliseconds; OsErrorCode=$osError;
+        StdoutCharacters=$outLength; StderrCharacters=$errLength;
+        PasswordPromptObserved=$promptObserved; PasswordInputReadyShown=$promptShown; FailureCode=$Code }
+}
 try {
     # No password pipe, Read-Host credential, child environment credential, new
     # console or detached/background process. ODBC owns hidden password input.
     if ($RequireConsole -and ($Host.Name -cne 'ConsoleHost' -or [Console]::IsInputRedirected)) {
-        return [pscustomobject]@{ ExitCode=$null; Lines=@(); PasswordPromptObserved=$false; PasswordInputReadyShown=$false; FailureCode='CONSOLE_REQUIRED' }
+        return (New-CaptureResult 'CONSOLE_REQUIRED')
     }
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $Executable
@@ -34,6 +54,7 @@ try {
     $process.StartInfo = $info
     $started = $process.Start()
     if (-not $started) { throw 'Process did not start' }
+    $failure = 'PROCESS_CAPTURE_FAILED'
     # Read both pipes concurrently in chunks. ReadToEnd alone cannot reveal a
     # no-newline password prompt while SQLCMD is waiting for console input.
     $streams = @($process.StandardOutput,$process.StandardError) | ForEach-Object {
@@ -42,8 +63,11 @@ try {
     }
     $promptObserved = $false
     $promptShown = $false
-    $failure = 'PROCESS_START_OR_INTERRUPTED'
+    $failure = 'PROCESS_CAPTURE_FAILED'
     while (-not $process.HasExited -or @($streams | Where-Object { -not $_.Done }).Count) {
+        if ($WatchdogSeconds -gt 0 -and $clock.Elapsed.TotalSeconds -ge $WatchdogSeconds) {
+            $timedOut=$true; $failure='PROCESS_TIMEOUT'; throw 'Watchdog elapsed'
+        }
         foreach ($stream in $streams) {
             if ($stream.Done -or -not $stream.Task.IsCompleted) { continue }
             $count = $stream.Task.GetAwaiter().GetResult()
@@ -71,18 +95,27 @@ try {
     # Strip ONLY the exact native prompt prefix; all other output stays private.
     $stdout = [regex]::Replace($stdout, '\APassword: ?', '')
     $stderr = [regex]::Replace($stderr, '\APassword: ?', '')
-    [pscustomobject]@{ ExitCode=$process.ExitCode; Lines=@($stdout,$stderr); PasswordPromptObserved=$promptObserved; PasswordInputReadyShown=$promptShown; FailureCode='' }
+    if ($process.ExitCode -in @(-1073741510,130)) { $failure='PROCESS_INTERRUPTED'; throw 'Native interrupt exit' }
+    New-CaptureResult '' @($stdout,$stderr)
 } catch {
     # Never forward exception text, which can contain process output or paths.
-    [pscustomobject]@{ ExitCode=$null; Lines=@(); PasswordPromptObserved=$false; PasswordInputReadyShown=$false; FailureCode=$failure }
+    $exception=$_.Exception
+    for ($i=0; $i -lt 3 -and $exception; $i++) {
+        if ($exception -is [ComponentModel.Win32Exception]) { $osError=$exception.NativeErrorCode; break }
+        if ($exception -is [Management.Automation.PipelineStoppedException] -or $exception -is [OperationCanceledException]) { $failure='PROCESS_INTERRUPTED'; break }
+        $exception=$exception.InnerException
+    }
+    Stop-CapturedChild
+    New-CaptureResult $failure
 } finally {
     if ($process) {
         # Best-effort cleanup on ordinary Ctrl+C/pipeline cancellation. Force-kill
         # or power loss may prevent finally from running; never infer rollback.
         # A killed/lost client is NOT proof of rollback; the ledger stays pending.
-        try { if ($started -and -not $process.HasExited) { $process.Kill($true); [void]$process.WaitForExit(5000) } } catch { }
+        Stop-CapturedChild
         $process.Dispose()
     }
+    $clock.Stop()
     $stdout = $null
     $stderr = $null
     $streams = $null

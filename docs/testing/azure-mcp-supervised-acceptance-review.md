@@ -173,3 +173,60 @@ PASS. The selector run with `--base 48fa619d --head HEAD` selects no Maven featu
 requires the critical reactor; its unknown-build-path full-suite recommendation is informational.
 SQL opt-ins were removed from the Maven environment. The two Windows-specific manual probes
 and Windows Ctrl+C observation remain **NOT RUN**, and are the stated merge blocker.
+
+
+## Reported Windows probe failure: client identity investigation
+
+Operator evidence: Windows 11 / PowerShell 7.7.0 console fixture PASS, synthetic exit 17,
+SQL error 50001. The second probe did not show PASSWORD INPUT READY and returned its old
+generic inconclusive result. The supplied executable hash exactly matches `sqlcmd.exe`
+inside Microsoft's [Go SQLCMD v1.10.0 Windows amd64 release asset](https://github.com/microsoft/go-sqlcmd/releases/download/v1.10.0/sqlcmd-windows-amd64.zip):
+`D9DBD1A8BD26213747B246DEBA1E13663A7E1DEF530CD961D7582B41A5E27852`.
+The public asset was downloaded and hashed in scratch storage; no user executable/private
+file was read, modified or executed. This is a byte-identical Go client identification,
+not an inference from `C:\Program Files\SqlCmd` or the operator's ODBC label.
+
+The [v1.10.0 connection implementation](https://github.com/microsoft/go-sqlcmd/blob/v1.10.0/pkg/sqlcmd/sqlcmd.go)
+calls `promptPassword` before `sql.OpenDB(...).Conn(...)`. Its console uses
+[liner v1.2.2 PasswordPrompt](https://github.com/peterh/liner/blob/v1.2.2/line.go), which
+rejects redirected output (`ErrNotTerminalOutput`) before printing the prompt; unsupported
+terminal/width checks can also reject it. This explains why this Go binary can exit with
+no captured prompt before any TCP connection. The old probe did not retain exit/contact
+metadata, so no exact historical error message or native exit code is invented. Its result
+does not demonstrate that an ODBC client failed because of the inert listener.
+
+Corrections:
+
+- Reject the known Go hash before approval/process/listener; identify other clients using
+  `-X1 -?` only, with a five-second watchdog, closed family/numeric-version output and no
+  raw help output. Go, unknown clients and unreviewed tool major versions are refused before
+  login. No Go compatibility mode, auth fallback or weakened SQLCMD/TLS flag is introduced.
+- Record actual process start/exit, OS error number, timeout, prompt/input-ready state,
+  elapsed time and output lengths. Distinguish start failure, capture failure, interruption,
+  watchdog expiry and output overflow without exception text. The internal watchdog defaults
+  to disabled for installer calls, so all existing acceptance budgets remain unchanged.
+- The owned loopback listener remains non-TDS and unauthenticating. Log whether it was reached;
+  distinguish missing prompt/process exit, before/after-prompt timeout, transport failure and
+  harness start/accept/cleanup failures. Require prompt, input-ready, loopback contact, nonzero
+  exit and explicit hidden-input confirmation. Neither generic failure nor mere TCP contact
+  establishes a password test PASS. A deferred-prompt client cannot be certified by an inert
+  listener; do not fabricate a login exchange to make the test pass.
+
+Tests cover public-release hash identification, ODBC/Go/unknown help banners, a diagnostic
+matrix, real native timeout/start/pipe/prompt behavior, and the actual probe orchestration
+with only the platform gate and process seam substituted in an isolated test host. The
+orchestration tests bind their own loopback listener, send zero TDS bytes, assert help once /
+login at most once, and verify wrong clients never reach login. They do not start SQLCMD,
+connect to a SQL server, access real credentials or use the acceptance packet.
+
+Audit compatibility is unchanged: these are local operational metadata/probe records, no
+PHI/domain mutation, application audit row, schema, permission or production change. Renderer,
+manifest, seed source, reconciliation SQL, Stage 16 gate, SHA approvals and SQLCMD security
+controls remain intact. A genuine ODBC Windows probe still needs local verification; PR #1970
+remains draft. No acceptance stage, Azure SQL or production operation ran in this investigation.
+
+Latest probe correction verification: **78 offline acceptance tests PASS**, **283 critical-reactor
+tests PASS** (zero failures/errors/skips), PowerShell AST parsing and Git whitespace PASS. Selector
+`--base 6a5426b1 --head HEAD` selects no Maven feature area and requires the critical reactor; its
+full-suite suggestion remains informational. SQL opt-ins were removed. The operator's Windows
+console PASS is retained as reported evidence; a genuine ODBC 17/18 Windows probe is still pending.
