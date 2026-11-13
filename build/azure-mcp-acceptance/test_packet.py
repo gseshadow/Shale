@@ -1,5 +1,6 @@
 """Offline packaging/refusal tests. SQLCMD is always a mock; no SQL/Azure access."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -35,7 +36,7 @@ class PacketTest(unittest.TestCase):
         # A PowerShell function wins over every native SQLCMD on Windows and Linux.
         # Test failures can therefore never accidentally reach an installed real client.
         quoted = lambda value: "'" + str(value).replace("'", "''") + "'"
-        command = "function global:sqlcmd { if ($env:OFFLINE_SQLCMD_MARKER) { [IO.File]::WriteAllText($env:OFFLINE_SQLCMD_MARKER,'called') }; throw 'Offline tests prohibit SQLCMD' }; & " + quoted(TOOL / script)
+        command = "function global:sqlcmd { if ($env:OFFLINE_SQLCMD_ARGS) { [IO.File]::WriteAllText($env:OFFLINE_SQLCMD_ARGS, (ConvertTo-Json -InputObject @($args) -Compress)) }; if ($env:OFFLINE_SQLCMD_MARKER) { [IO.File]::WriteAllText($env:OFFLINE_SQLCMD_MARKER,'called') }; throw 'Offline tests prohibit SQLCMD' }; & " + quoted(TOOL / script)
         command += ' ' + ' '.join(arg if arg.startswith('-') else quoted(arg) for arg in args)
         result = subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command],
                                 cwd=ROOT, text=True, capture_output=True, env=env)
@@ -107,6 +108,61 @@ class PacketTest(unittest.TestCase):
         self.run_ps('Invoke-Stage.ps1', '-RenderedDirectory', str(self.rendered), '-Stage', '32-reviewer-catalog', '-OperatorUser', 'offline_owner', success=False, env=env)
         self.assertFalse(marker.exists())
 
+    def test_exact_test_origin_is_proposed_without_approving_binding(self):
+        origin = 'https://shale-mcp-acceptance.azurewebsites.net'
+        proposal = (self.packet / 'binding-inputs.sql').read_text()
+        self.assertIn("@BindOrigin nvarchar(max)=N'" + origin + "'", proposal)
+        self.assertIn("@BindJavaZone nvarchar(max)=NULL", proposal)
+        self.assertIn("@BindSqlZone nvarchar(max)=NULL", proposal)
+        for field in ('Approved', 'OffConfirmed', 'EvidenceConfirmed'):
+            self.assertIn('@Bind' + field + ' bit=0', proposal)
+        for stage in ('16-binding-preflight', '17-binding-install', '18-binding-postcheck'):
+            text = (self.rendered / (stage + '.sql')).read_text()
+            self.assertIn('THROW 59809', text)
+            self.assertIn("N'" + origin + "/oauth/mcp'", text)
+            self.assertIn("N'" + origin + "/mcp'", text)
+            self.assertIn('Existing binding conflicts', text)
+            self.assertNotIn(':r ', text)
+
+    def test_existing_private_binding_inputs_are_retained_with_new_target_guard(self):
+        path = self.packet / 'binding-inputs.sql'
+        original = path.read_text()
+        stale = original.replace('https://shale-mcp-acceptance.azurewebsites.net', 'https://old-origin.example')
+        try:
+            path.write_text(stale)
+            before = set(self.packet.glob('rendered-*'))
+            self.run_ps('Prepare-Packet.ps1', '-PacketDirectory', str(self.packet))
+            self.assertEqual(stale, path.read_text(), 'Private inputs must never be silently replaced')
+            new = next(iter(set(self.packet.glob('rendered-*')) - before))
+            rendered = (new / '17-binding-install.sql').read_text()
+            self.assertIn("@BindOrigin nvarchar(max)=N'https://old-origin.example'", rendered)
+            self.assertIn('THROW 59809', rendered)
+            self.assertIn("ISNULL(@BindOrigin,N''))<>CONVERT(varbinary(max),N'https://shale-mcp-acceptance.azurewebsites.net')", rendered)
+        finally:
+            path.write_text(original)
+
+    def test_future_execution_arguments_only_name_acceptance_and_preserve_tls(self):
+        # Mocked process dispatch only: no native SQLCMD executable or SQL connection.
+        output = self.packet / 'mock-sqlcmd-arguments.json'
+        env = {key: value for key, value in os.environ.items()
+               if not re.match(r'^(SQLCMD|SQLCONNSTR_|SQLAZURECONNSTR_|SPRING_DATASOURCE|SHALE_(APP|RT|AUTH|SERVER|SUGGESTION))', key, re.I)}
+        env['OFFLINE_SQLCMD_ARGS'] = str(output)
+        sql = self.rendered / '00-empty.sql'
+        self.run_ps('Invoke-Stage.ps1', '-RenderedDirectory', str(self.rendered), '-Stage', '00-empty',
+                    '-OperatorUser', 'offline_test_owner', '-Execute',
+                    '-ApprovedSHA256', hashlib.sha256(sql.read_bytes()).hexdigest(),
+                    '-Acknowledgement', 'EXECUTE_APPROVED_SHALE_MCP_ACCEPTANCE_STAGE', success=False, env=env)
+        args = json.loads(output.read_text())
+        self.assertEqual('tcp:shale.database.windows.net,1433', args[args.index('-S')+1])
+        self.assertEqual('ShaleMcpAcceptance', args[args.index('-d')+1])
+        for flag in ('-N', '-b', '-x', '-X1'):
+            self.assertIn(flag, args)
+        for flag in ('-C', '-P', '-E', '-G'):
+            self.assertNotIn(flag, args)
+        self.assertNotIn('Shale', args)
+        self.assertNotIn('Shale_Copy', args)
+        self.assertNotIn('auth-invocation-test', args)
+
     def test_untrusted_inputs_and_stale_fixture_are_refused(self):
         bad = self.packet / 'not-the-authoritative-fixture.sql'
         bad.write_text('CREATE TABLE UnsafeSubstitute(Id int);')
@@ -115,7 +171,7 @@ class PacketTest(unittest.TestCase):
         try:
             self.run_ps('Prepare-Packet.ps1', '-PacketDirectory', str(self.packet), success=False)
         finally:
-            (self.packet / 'binding-inputs.sql').write_text((ROOT / 'docs/sql/ai-integration/deployment-binding/inputs.sql').read_text())
+            (self.packet / 'binding-inputs.sql').write_text((SQL / 'binding-inputs.sql').read_text())
         (self.packet / 'fixture.sql').write_text('DO NOT TRUST AN OLD EXPORT')
         self.run_ps('Prepare-Packet.ps1', '-PacketDirectory', str(self.packet))
         self.assertNotIn('DO NOT TRUST', (self.packet / 'fixture.sql').read_text())

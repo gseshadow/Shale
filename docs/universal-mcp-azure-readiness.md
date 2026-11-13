@@ -150,10 +150,13 @@ fixture. An uncertain commit requires separately authorized discovery, not an au
 
 ## 3. Required Azure configuration and acceptance
 
-Keep the existing App Service, Azure SQL and Static Web Apps deployment facilities. No new proxy,
-database framework, pool topology or hosting service is proposed. A pre-existing isolated slot may
-be used only if its SQL, secrets, traffic and identity are demonstrably isolated; otherwise obtain an
-explicitly authorized nonproduction app/database. Never swap synthetic secrets/configuration into production.
+Use the selected test App Service `shale-mcp-acceptance` and synthetic `ShaleMcpAcceptance` DB,
+with independently scoped credentials/settings/traffic on shared B1 `shale-api-plan` and server `shale`.
+No dedicated group/plan or Static Web App is required for OFF-only SQL/runtime preparation. Later
+browser acceptance still requires an approved isolated HTTPS Shale UI and exact browser/CORS/
+callback evidence; SWA is one hosting option, not mandatory infrastructure. No new proxy, database
+framework or pool topology is proposed. Never use production `shale-api`, its slots, secrets, data,
+configuration or traffic as an acceptance target.
 
 For Stage B explicitly set the following effective Spring properties to `false` (do not rely on
 absence). Source defaults are false for all ten controls:
@@ -233,15 +236,21 @@ Minimum Stage C acceptance, with sanitized evidence for the exact artifact/slot/
 ### Stage C — Isolated Azure acceptance (future, explicit environment/test authorization)
 
 Use the [isolated acceptance operator runbook](testing/universal-mcp-azure-acceptance-runbook.md)
-for the minimal target, ordered fixture packet, native test matrix and remaining input gaps.
+for the selected shared target, ordered fixture packet, native test matrix and remaining input gaps.
 
 For the operator-confirmed fresh S0 `ShaleMcpAcceptance` database, see the
 [OFF-only installation packet](sql/ai-integration/azure-acceptance/README.md). It prepares explicit
 destination/empty-target checks, existing V2/CIMD/DCR_V3 migrations, contained identities and a
 mandatory origin/worker-zone binding pause. SQL execution and enabled acceptance remain separate
-approvals; sharing logical server `shale` leaves dedicated-server isolation evidence unmet.
+approvals. The operator deliberately selected stopped test app `shale-mcp-acceptance` at
+`https://shale-mcp-acceptance.azurewebsites.net`, group `Shale`, shared Linux B1 `shale-api-plan`
+and shared SQL server `shale`. No dedicated group/plan or SWA is required for OFF-only preparation.
+See [next operator steps](testing/azure-mcp-acceptance-next-steps.md) for exact metadata/runtime commands,
+shared-capacity/firewall limits and SQLCMD triage. This cannot prove dedicated infrastructure isolation;
+production `shale-api` and `Shale` remain off-limits.
 
-- [ ] Confirm no production DB/secret/data/traffic relationship; use synthetic tenants and hash-verified
+- [ ] Confirm no production app/DB/secret/data/traffic access; record the selected shared plan/server
+  dependencies, owner headroom/abort thresholds and existing routes. Use synthetic tenants and hash-verified
   authoritative fixture. Rehearse the ordered SQL packet, contained role provisioning and binding here.
 - [ ] Run standalone actual-worker CIMD egress check first. Use the accepted disposable composition
   only within its supported separate test identity/profile; it proves Azure infrastructure behavior,
@@ -252,7 +261,8 @@ approvals; sharing logical server `shale` leaves dedicated-server isolation evid
   acceptance with that candidate and all checks in section 3. Do not bypass guards to reach this step.
 - [ ] Record exact client/SDK, artifact, SQL contracts, safe audit/count evidence, timings and cleanup;
   shut down test authority after acceptance. Production remains OFF throughout.
-- **STOP:** any production reference, unsupported profile/identity, incomplete capability provider,
+- **STOP:** any production access/reference beyond the documented shared plan/server metadata, shared
+  capacity/owner-threshold breach, unsupported profile/identity, incomplete capability provider,
   failed native verifier/egress, NAT unfairness, wrong browser session, cross-tenant access, audit failure
   returning success or deadline/withdrawal regression. No production pilot based solely on fixture passes.
 
