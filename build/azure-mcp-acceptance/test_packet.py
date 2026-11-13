@@ -15,6 +15,7 @@ TOOL = ROOT / 'build/azure-mcp-acceptance'
 SQL = ROOT / 'docs/sql/ai-integration/azure-acceptance'
 STAGES = json.loads((TOOL / 'stages.json').read_text())
 XML_STAGES = ('13-v2-prerequisite', '14-v2-install', '15-v2-verify')
+SESSION_STAGES = XML_STAGES + tuple(s['name'] for s in STAGES[18:])
 XML_SESSION = ''.join('SET ' + name + ' ' + value + ';\n' for name, value in (
     ('ANSI_NULLS', 'ON'), ('ANSI_PADDING', 'ON'), ('ANSI_WARNINGS', 'ON'), ('ARITHABORT', 'ON'),
     ('CONCAT_NULL_YIELDS_NULL', 'ON'), ('QUOTED_IDENTIFIER', 'ON'), ('NUMERIC_ROUNDABORT', 'OFF'),
@@ -52,7 +53,7 @@ class PacketTest(unittest.TestCase):
 
     def test_every_rendered_stage_is_fenced_and_no_includes_or_variables_remain(self):
         files = list(self.rendered.glob('*.sql'))
-        self.assertEqual(len(STAGES), len(files))
+        self.assertEqual(len(STAGES) + 1, len(files))
         for file in files:
             sql = file.read_text()
             self.assertTrue(sql.startswith(':on error exit\n'))
@@ -81,10 +82,12 @@ class PacketTest(unittest.TestCase):
     def test_xml_catalog_stages_set_all_required_options_before_each_unchanged_source(self):
         for stage in STAGES:
             sql = (self.rendered / (stage['name'] + '.sql')).read_text()
-            if stage['name'] not in XML_STAGES:
-                self.assertNotIn(XML_SESSION, sql, 'Session patch must stay limited to stages 13-15')
+            if stage['name'] not in SESSION_STAGES:
+                self.assertNotIn(XML_SESSION, sql, 'Completed-stage rendering must remain unchanged')
                 continue
             self.assertEqual(len(stage['sources']), sql.count(XML_SESSION))
+            if stage['name'] not in XML_STAGES:
+                continue
             for path in stage['sources']:
                 source = (ROOT / path).read_text()
                 start = sql.index(source)

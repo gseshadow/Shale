@@ -1,5 +1,11 @@
 # ShaleMcpAcceptance installation packet
 
+**18/51 continuation:** the [supervised local installer](../../../../build/azure-mcp-acceptance/README.md) now provides offline readiness,
+per-stage approvals and an append-only recovery ledger. Stage 15c requires a newly reviewed hash;
+completed stages stay completed. The pre-Stage-16 worker/JVM/timezone gate remains mandatory.
+This is preparation only, not authorization to retry SQL or start/deploy the app.
+
+
 **PREPARATION ONLY. No Azure/SQL connection, migration, credential provisioning, deployment,
 firewall change or activation is authorized by this PR.** Packet introduced in #1963 from
 `bf320bb352ebae6932a22b666c8ed9285eaed77a`; reconciled against latest fetched `codex/latest`

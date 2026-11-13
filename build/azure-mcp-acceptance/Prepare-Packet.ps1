@@ -3,7 +3,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$PacketDirectory,
-    [string]$AuthoritativeFixture
+    [string]$AuthoritativeFixture,
+    [switch]$Continuation
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -12,6 +13,15 @@ $templates = Join-Path $repo 'docs/sql/ai-integration/azure-acceptance'
 $packet = [IO.Path]::GetFullPath($PacketDirectory)
 if ($packet -eq $repo -or -not $packet.StartsWith((Join-Path $repo 'work') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Use a private directory under this checkout work/; never a shared or tracked output directory.'
+}
+. (Join-Path $PSScriptRoot 'Supervision.ps1')
+[void](Assert-PrivatePath $packet)
+if ($Continuation) {
+    foreach ($required in @('fixture.sql','normalize.sql','identities-foundation.sql','identities.sql','seed.sql','binding-inputs.sql','phase1r.json')) {
+        [void](Assert-PrivatePath (Join-Path $packet $required))
+        if (-not (Test-Path -LiteralPath (Join-Path $packet $required))) { throw 'STOP: continuation requires all existing private inputs; no input will be generated.' }
+    }
+    if (-not $AuthoritativeFixture) { throw 'STOP: continuation requires the unchanged authoritative fixture.' }
 }
 [void][IO.Directory]::CreateDirectory($packet)
 foreach ($name in @('normalize.sql','identities-foundation.sql','identities.sql','seed.sql')) {
@@ -38,7 +48,10 @@ if ($AuthoritativeFixture) {
     $newFixture = Join-Path $packet ('fixture-' + [guid]::NewGuid().ToString('N') + '.sql')
     & java -cp $classes com.shale.data.verification.ExportFixture $AuthoritativeFixture $newFixture
     if ($LASTEXITCODE -ne 0) { throw 'STOP: authoritative DDL parser refused fixture.' }
-    Move-Item -LiteralPath $newFixture -Destination $fixture -Force
+    if ($Continuation) {
+        if ((Get-FileHash -LiteralPath $newFixture -Algorithm SHA256).Hash -cne (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash) { throw 'STOP: existing fixture export differs; preserve it for independent review.' }
+        Remove-Item -LiteralPath $newFixture
+    } else { Move-Item -LiteralPath $newFixture -Destination $fixture -Force }
 } else {
     # Never consume a manually supplied or stale fixture.sql without rechecking the private source.
     [IO.File]::WriteAllText($fixture, "THROW 59807,'STOP: provide the unchanged hash-gated authoritative fixture to Prepare-Packet.',1;`n")
@@ -79,12 +92,14 @@ GO
 $rendered = Join-Path $packet ('rendered-' + [guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($rendered)
 $manifest = @()
-foreach ($stage in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stages.json') -Raw | ConvertFrom-Json)) {
+$allStages = @(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stages.json') -Raw | ConvertFrom-Json)
+foreach ($stage in $allStages) {
     $stageFence = $fence
     if ($stage.PSObject.Properties.Name -contains 'user') { $stageFence = $target + "`nGO`n" }
     $sql = ":on error exit`n" + $stageFence
     $sourceSession = ''
-    if ($stage.name -cin @('13-v2-prerequisite','14-v2-install','15-v2-verify')) {
+    if ($stage.name -cin @('13-v2-prerequisite','14-v2-install','15-v2-verify') -or
+        [array]::IndexOf(@($allStages.name), $stage.name) -ge 18) {
         $sourceSession = $xmlQuerySession + "`n"
     }
     foreach ($source in $stage.sources) {
@@ -111,6 +126,10 @@ foreach ($stage in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stages.js
         } else { $body = Expand-Sql (Join-Path $repo $source) }
         # Bound each source on both sides. No app/tenant context is carried between source batches.
         $sql += $sourceSession + $body + "`nGO`n" + $stageFence
+        if ([array]::IndexOf(@($allStages.name), $stage.name) -ge 18) {
+            $part = [array]::IndexOf(@($stage.sources), $source) + 1
+            $sql += "SELECT 'ACCEPTANCE_SOURCE_OK:$($stage.name):$part' AS AcceptanceResult;`nGO`n"
+        }
     }
     # SQLCMD substitution is disabled on execution, so unresolved placeholders must never be shipped.
     if ($sql.Contains('$(')) { throw 'STOP: unresolved SQLCMD input.' }
@@ -118,6 +137,10 @@ foreach ($stage in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stages.js
     [IO.File]::WriteAllText($file, $sql, [Text.UTF8Encoding]::new($false))
     $manifest += [pscustomobject]@{ Stage=$stage.name; SHA256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash }
 }
+# Read-only reconciliation is separately hash-approved, never a mutation replay.
+$check = ":on error exit`n" + $fence + $xmlQuerySession + "`n" + [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Reconcile.sql'))
+[IO.File]::WriteAllText((Join-Path $rendered 'reconcile.sql'), $check, [Text.UTF8Encoding]::new($false))
+$manifest += [pscustomobject]@{ Stage='reconcile'; SHA256=(Get-FileHash -LiteralPath (Join-Path $rendered 'reconcile.sql') -Algorithm SHA256).Hash }
 $manifest | Export-Csv -LiteralPath (Join-Path $rendered 'sha256.csv') -NoTypeInformation
 Write-Output "Prepared offline: $rendered"
 Write-Output 'STOP at blocked templates. Review rendered SQL and hashes; no SQL connection or execution occurred.'
