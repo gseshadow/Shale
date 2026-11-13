@@ -12,6 +12,17 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = '4B64B50DA531EBC6A2EB9DC26C6555EF555621DF371FE9D8A5CF994FB6E8417F'
 FUNCTIONS = ('fn_FilterByTenant', 'fn_FilterByTenantOrGlobal')
 TARGETS = ('Users', 'auditLog', 'Statuses')
+# Reviewed source bytes, NOT a predicate allowlist. All bindings are parsed below.
+# .gitattributes pins these SQL files to LF on Windows too.
+STAGE_SOURCES = (
+    ('02-phase3b1', 'phase3b1.sql', 'A25CF6FEAB9C399BE743827A783B2B75C6EFB1C26BAC917D787DC936650F84EF'),
+    ('03-phase3b2b', 'phase3b2b.sql', '47ADADB3EAD42EE9ED693AEA438ECB906AAB0981B05CF592C6D9EA970179692F'),
+    ('04-phase3b2c1', 'phase3b2c1.sql', '3768750D096B5B7B320E47ED197D121D98250BB42145CD7B5BCBB6A4F4124E2C'),
+    ('05-phase3b2c2', 'phase3b2c2.sql', '60546C5BD11B91A02C0061FBF0A685EAEBBE491ED12B9711CEF4C7F251BE0668'),
+    ('06-revocation', 'revocation.sql', '4C3A0E3987E4E19A65D0A70511A901DBBFB532459B2D817C907D5A14D9C8E08D'),
+    ('07-phase3b2d', 'phase3b2d.sql', '9EB9C2A16688A3C5627960B58F226C387CFA97137776082BE874AE3468F81A07'),
+    ('08-phase3b3', 'phase3b3.sql', '77AA82D6BB2944A8125E4E92EE55CC17FD6E010F7139915405B63E791E9A5021'),
+)
 
 
 def require(ok, message):
@@ -92,16 +103,14 @@ def binding(c):
         else:
             arg.append(value)
     c.expect(')')
+    require(arg or not args, 'empty predicate argument')
     if arg:
         args.append(arg)
     return function, args
 
 
-def policy(values):
-    c = Cursor(values)
-    for word in ('CREATE', 'SECURITY', 'POLICY'):
-        c.expect(word)
-    name, predicates = c.name(), []
+def additions(c, name):
+    predicates = []
     while c.peek() == 'ADD':
         c.take()
         kind = c.take().upper()
@@ -117,6 +126,19 @@ def policy(values):
                                function=function, arguments=args))
         if c.peek() == ',':
             c.take()
+            require(c.peek() == 'ADD', 'expected ADD after predicate separator')
+        else:
+            break
+    require(predicates, 'expected security predicate additions')
+    return predicates
+
+
+def policy(values):
+    c = Cursor(values)
+    for word in ('CREATE', 'SECURITY', 'POLICY'):
+        c.expect(word)
+    name = c.name()
+    predicates = additions(c, name)
     c.expect('WITH')
     c.expect('(')
     options = {}
@@ -137,10 +159,108 @@ def policy(values):
     return dict(name=name, enabled=True, bound=options.get('SCHEMABINDING', True)), predicates
 
 
-def baseline(batches):
-    functions, policies, predicates, schemas = [], [], [], {'dbo': 'dbo'}
+def table_declarations(values):
+    tables = []
+    for i in range(len(values) - 2):
+        if [v.upper() for v in values[i:i+2]] == ['CREATE', 'TABLE']:
+            c = Cursor(values[i+2:])
+            tables.append(tuple(c.name()))
+            c.expect('(')
+    require(len(tables) == len(set(tables)), 'duplicate table definition')
+    return set(tables)
+
+
+def migration_predicates(source, tenant_policy):
+    """Decode only the reviewed literal EXEC and SET @sql/@policy forms; never execute."""
+    values, predicates = tokens(source), []
+    for i, value in enumerate(values):
+        if value.startswith(("N'", "n'", "'")):
+            sql = value[value.index("'")+1:-1].replace("''", "'")
+            if not re.search(r'\bSECURITY\s+POLICY\b', sql, re.I):
+                continue
+            statement = tokens(sql)
+            if statement == ['ALTER', 'SECURITY', 'POLICY']:
+                # The reviewed Stage 02 resolves its sole enabled TenantFilter by
+                # name. Resolve against the fixture, not an arbitrary destination.
+                require(values[i-3:i] == ['SET', '@sql', '=']
+                        and values[i+1:i+4] == ['+', '@policy', '+'], 'unsupported dynamic policy expression')
+                tail = values[i+4]
+                require(tail.startswith("N'") and values[i+5:i+12] ==
+                        [';', 'EXEC', 'sys', '.', 'sp_executesql', '@sql', ';'],
+                        'unsupported dynamic policy execution')
+                statement += [tenant_policy[0], '.', tenant_policy[1]] + tokens(tail[2:-1].replace("''", "'"))
+            else:
+                require([v.upper() for v in values[max(0, i-2):i]] == ['EXEC', '(']
+                        and values[i+1:i+3] == [')', ';'], 'unsupported security policy SQL wrapper')
+            c = Cursor(statement)
+            for word in ('ALTER', 'SECURITY', 'POLICY'):
+                c.expect(word)
+            name = c.name()
+            require(name == tenant_policy, f'unexpected migration policy: {name}')
+            predicates.extend(additions(c, name))
+            c.expect(';')
+            require(c.peek() == '', 'unsupported migration policy suffix')
+        else:
+            require([v.upper() for v in values[i:i+2]] != ['SECURITY', 'POLICY'],
+                    'unsupported nonliteral security policy SQL')
+    return predicates, table_declarations(values)
+
+
+def migration_inventory(policies, existing_tables=(), root=ROOT):
+    manifest = json.loads((root / 'build/azure-mcp-acceptance/stages.json').read_text(encoding='utf-8'))
+    names = [s['name'] for s in manifest]
+    require(len(names) == len(set(names)), 'duplicate stage name')
+    span = manifest[names.index('01-fixture')+1:names.index('09-normalize')]
+    reviewed = [dict(name=name, sources=['docs/sql/ai-integration/' + file]) for name, file, _ in STAGE_SOURCES]
+    require(span == reviewed, 'Stage 02-08 source order/manifest differs from review')
+    tenant = [p for p in policies if p['name'][1] == 'TenantFilter']
+    require(tenant == [dict(name=['sec', 'TenantFilter'], enabled=True, bound=True)],
+            'Stage 02 requires the sole enabled schema-bound sec.TenantFilter')
+    predicates, provenance, tables = [], [], set(existing_tables)
+    for stage, (_, _, digest) in zip(span, STAGE_SOURCES):
+        path = stage['sources'][0]
+        data = (root / path).read_bytes()
+        require(sha(data) == digest, f'unreviewed migration source SHA256: {path}')
+        rows, created = migration_predicates(data.decode('utf-8'), tenant[0]['name'])
+        require(not tables.intersection(created), f'conflicting table definitions: {path}')
+        require(all(tuple(p['target']) in created for p in rows), f'predicate target not created by stage: {path}')
+        tables.update(created)
+        predicates.extend(rows)
+        provenance.append(dict(stage=stage['name'], source=path, sha256=digest, predicateCount=len(rows)))
+    require(len(predicates) == 39, f'Stage 02-08 must add exactly 39 predicates; parsed {len(predicates)}')
+    unique_predicates(predicates)
+    return predicates, provenance
+
+
+def unique_predicates(predicates):
+    seen = set()
+    for p in predicates:
+        key = keyed([p['policy'], p['target'], p['kind'], p['operation']])
+        require(key not in seen, f'duplicate/conflicting predicate slot: {key}')
+        seen.add(key)
+
+
+def predicate_counts(predicates):
+    """Count parsed bindings without dropping duplicates or applying an approval."""
+    counts = Counter()
+    for p in predicates:
+        scope = 'target' if p['target'] in [['dbo', t] for t in TARGETS] else 'nonTarget'
+        counts[(tuple(p['policy']), p['kind'], scope)] += 1
+    groups = sorted({(policy, kind) for policy, kind, _ in counts})
+    rows = [dict(policy=list(policy), kind=kind,
+                 target=counts[policy, kind, 'target'], nonTarget=counts[policy, kind, 'nonTarget'])
+            for policy, kind in groups]
+    return dict(total=len(predicates), target=sum(r['target'] for r in rows),
+                nonTarget=sum(r['nonTarget'] for r in rows), byPolicyAndType=rows)
+
+
+def baseline(batches, diagnostics=False):
+    functions, policies, predicates, schemas, tables = [], [], [], {'dbo': 'dbo'}, set()
     for batch in batches:
         t = tokens(batch)
+        created = table_declarations(t)
+        require(not tables.intersection(created), 'duplicate fixture table definition')
+        tables.update(created)
         if [v.upper() for v in t[:2]] == ['CREATE', 'SCHEMA']:
             require(len(t) in (3, 4, 5, 6), 'unsupported schema ownership')
             rest = t[3:]
@@ -174,18 +294,39 @@ def baseline(batches):
     require(sorted(f['name'][1] for f in functions) == sorted(FUNCTIONS), 'expected exactly two RLS functions')
     require(len({tuple(p['name']) for p in policies}) == len(policies), 'duplicate policy')
     require('sec' in schemas, 'missing sec schema ownership')
+    fixture_counts = predicate_counts(predicates)
+    if diagnostics:
+        print_counts('fixture', predicates)
+    require(fixture_counts['nonTarget'] == 77,
+            f'fixture must contain exactly 77 original non-target predicates; parsed {fixture_counts["nonTarget"]}')
+    migration_rows, provenance = migration_inventory(policies, tables)
+    predicates.extend(migration_rows)
+    unique_predicates(predicates)
+    counts = predicate_counts(predicates)
+    if diagnostics:
+        for source in provenance:
+            print(f'  {source["stage"]}: migration additions={source["predicateCount"]} SHA256={source["sha256"]}')
+        print_counts('Stage 09', predicates)
+    require(counts['nonTarget'] == 116,
+            f'Stage 09 must contain exactly 116 non-target predicates; parsed {counts["nonTarget"]}')
     owners = []
     objects = {tuple(p['name']) for p in policies} | {tuple(p['target']) for p in predicates}
     objects |= {('sec', f) for f in FUNCTIONS} | {('dbo', t) for t in TARGETS}
     for name in sorted(objects):
         require(name[0] in schemas, f'unknown schema owner: {name[0]}')
         owners.append(dict(name=list(name), schemaOwner=schemas[name[0]], owner=schemas[name[0]]))
-    result = dict(version=1, fixtureSha256=FIXTURE, functions=functions,
-                  policies=policies, predicates=predicates, owners=owners)
-    require(sum(p['target'] not in [['dbo', t] for t in TARGETS] for p in predicates) == 116,
-            'fixture must contain exactly 116 non-target predicates')
+    result = dict(version=2, fixtureSha256=FIXTURE, functions=functions, fixtureCounts=fixture_counts,
+                  migrationSources=provenance, policies=policies, predicates=predicates, owners=owners)
     require(schemas['dbo'] == schemas['sec'] == 'dbo', 'Phase1R requires dbo schema ownership')
     return result
+
+
+def print_counts(label, predicates):
+    counts = predicate_counts(predicates)
+    print(f'Parsed {label} predicates: total={counts["total"]} target={counts["target"]} non-target={counts["nonTarget"]}')
+    for row in counts['byPolicyAndType']:
+        print(f'  {keyed(row["policy"])} {row["kind"]}: total={row["target"] + row["nonTarget"]} '
+              f'target={row["target"]} non-target={row["nonTarget"]}')
 
 
 def expected(fixture, output):
@@ -201,7 +342,7 @@ def expected(fixture, output):
         raw = re.findall(r'CONVERT\(nvarchar\(max\),0x([0-9a-f]+)\); EXEC sys.sp_executesql @FixtureBatch;',
                          export.read_text(encoding='utf-8'))
         require(raw, 'no parser-exported batches')
-        result = baseline([bytes.fromhex(h).decode('utf-16le') for h in raw])
+        result = baseline([bytes.fromhex(h).decode('utf-16le') for h in raw], diagnostics=True)
     with output.open('x', encoding='utf-8') as stream:
         json.dump(result, stream, ensure_ascii=True, indent=2)
     print(f'PASS baseline generated; SHA256={sha(output.read_bytes())}; not approval')
@@ -228,8 +369,18 @@ def compare(expected_data, actual):
         for item, count in sorted((extra - missing).items()):
             errors.append(f'{label}: unexpected {count} x {item}')
 
-    same('baseline format', 1, expected_data['version'])
+    same('baseline format', 2, expected_data['version'])
     same('fixture hash', FIXTURE, expected_data['fixtureSha256'])
+    migration_rows, provenance = migration_inventory(expected_data['policies'])
+    same('reviewed migration sources', provenance, expected_data['migrationSources'])
+    migration_targets = {tuple(p['target']) for p in migration_rows}
+    inventory('expected migration binding', migration_rows,
+              [p for p in expected_data['predicates'] if tuple(p['target']) in migration_targets])
+    fixture_rows = [p for p in expected_data['predicates'] if tuple(p['target']) not in migration_targets]
+    same('original fixture count', 77, predicate_counts(fixture_rows)['nonTarget'])
+    same('fixture count provenance', predicate_counts(fixture_rows), expected_data['fixtureCounts'])
+    same('expected Stage 09 count', 116, predicate_counts(expected_data['predicates'])['nonTarget'])
+    unique_predicates(expected_data['predicates'])
     identity = actual['identity']
     same('database', 'ShaleMcpAcceptance', identity['database'])
     check(identity['server'] in ('shale', 'shale.database.windows.net'), 'unexpected logical server')
