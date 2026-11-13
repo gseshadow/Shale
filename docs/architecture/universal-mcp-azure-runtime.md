@@ -154,5 +154,36 @@ principal checks using scripted JDBC, V3 capability procedure dispatch, tenant c
 connection closure and deadline decoration. Existing configuration tests now assert eligible production
 rather than an unconditional profile ban; the real all-OFF Boot test also checks absence of new providers.
 DCR verification tests preserve refusal for failed Case verification, V1 stores and an OFF SQL switch.
-These tests do not connect to SQL or enable a real deployment. Final commands/results are recorded
-with the draft PR; historical SQL/interoperability results are reused only at their recorded scope.
+These tests do not connect to SQL or enable a real deployment. Historical SQL/interoperability
+results are reused only at their recorded scope.
+
+Final local verification (Maven 3.9.11, Temurin JDK 21.0.13+9, validated session CA/proxy):
+
+| Check | Result |
+| --- | --- |
+| Focused provider/configuration + unchanged Case/browser/credential/metadata boundaries | 102 PASS (16 data, 86 server), zero failures/errors/skips |
+| Repository selector affected suite | 95 PASS, zero failures/errors/skips |
+| Local critical reactor, `mvn test` | 283 PASS, zero failures/errors/skips |
+| Documentation links, diff whitespace, unchanged historical SQL/resources/receipts/binding artifacts | PASS |
+
+Exact final local shell invocations used the task-local `run-maven` wrapper, which selects that
+JDK and invokes Maven with `-B -s /workspace/work/azure-mcp-runtime/settings.xml
+-Dmaven.repo.local=/workspace/.cache/maven`; the settings use the inherited session proxy and
+`MAVEN_OPTS` includes `-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts`:
+
+```bash
+/workspace/work/azure-mcp-runtime/run-maven -pl shale-server -am \
+  -Dtest=CimdRuntimeConfigurationTest,CimdConnectionConfigurationTest,DcrConnectionConfigurationTest,OAuthConfigurationTest,OAuthMetadataTest,McpCaseCompositionTest,McpProductionOffBootTest,CimdBrowserBindingTest,CimdClientAuthenticationTest,OAuthCodeExchangePolicyTest,OAuthRevocationPolicyTest,DcrRegistrationEndpointTest,CimdMetadataTest,CimdRetrievalTest,AiCaseDataAttestationTest,AiCaseDataAccessTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+PYTHONDONTWRITEBYTECODE=1 python build/test-selection/select_tests.py --base 39fb507b --head HEAD --format json
+# Execute the emitted selected_maven_args through the same wrapper.
+/workspace/work/azure-mcp-runtime/run-maven test
+git diff 39fb507b HEAD --check
+```
+
+The selector chooses Case/server boundaries and the changed configuration tests, with no full-suite
+escalation. The critical reactor is the repository's normal bounded inventory, not the all-tests
+profile. No historical SQL/client campaign, native Azure run or browser UI change was introduced.
+The initial system JRE had no supported compiler; an isolated JDK resolved that tooling failure.
+A new test helper's Runnable/Executable compile mismatch was corrected before the passing runs;
+no production contract was weakened to obtain a pass.

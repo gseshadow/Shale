@@ -95,6 +95,15 @@ class CimdRuntimeConfigurationTest {
         assertDoesNotThrow(() -> CimdRuntimeEligibility.require(eligible(), true));
     }
 
+    @Test void developmentRetainsItsSeparateExplicitIdentity() {
+        var env = eligible(); env.setActiveProfiles("test");
+        assertThrows(IllegalStateException.class, () -> CimdRuntimeEligibility.require(env, true));
+        env.setProperty("shale.ai.oauth.identity", "TEST");
+        assertThrows(IllegalArgumentException.class, () -> CimdRuntimeEligibility.require(env, true));
+        env.setProperty("shale.ai.oauth.public-origin", "https://shale.test");
+        assertDoesNotThrow(() -> CimdRuntimeEligibility.require(env, true));
+    }
+
     @Test void protectedUrlOptionsAndWrongDatabaseAreRejectedWithoutOpeningSql() {
         for (String url : List.of("jdbc:sqlserver://sql.example;databaseName=Synthetic;trustServerCertificate=true",
                 "jdbc:sqlserver://sql.example;databaseName=Other", "jdbc:sqlserver://sql.example")) {

@@ -24,6 +24,12 @@ public final class CimdRuntimeEligibility {
                 throw new IllegalStateException("Complete OAuth/MCP composition required for CIMD.");
         }
         if (dcr && !env.getProperty("shale.ai.cimd.enabled", Boolean.class, false)) throw refused();
+        if (!production) {
+            String identity = env.getProperty("shale.ai.oauth.identity");
+            if (!"DEVELOPMENT".equals(identity) && !"TEST".equals(identity)) throw refused();
+            new McpOAuthProperties(env.getRequiredProperty("shale.ai.oauth.public-origin"),
+                    McpOAuthProperties.Identity.valueOf(identity), true);
+        }
         if (production) {
             if (!env.getProperty("shale.ai.mcp.case-data-composition-enabled", Boolean.class, false)
                     || !"PRODUCTION".equals(env.getProperty("shale.ai.oauth.identity", "PRODUCTION"))

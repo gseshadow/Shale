@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Production must remain OFF; no partial composition may advertise an operational CIMD server. */
+/** Default-OFF; no partial or ineligible composition may advertise an operational CIMD server. */
 class CimdConnectionConfigurationTest {
     private final ApplicationContextRunner runner=new ApplicationContextRunner().withUserConfiguration(CimdConnectionConfiguration.class);
     @Test void offRequiresNoNewServicesAndCreatesNoLifecycle() {
