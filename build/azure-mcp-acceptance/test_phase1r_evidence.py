@@ -37,7 +37,7 @@ def catalog(baseline, offset=100):
     for f in baseline['functions']:
         raw = bytes.fromhex(f['definitionHex'])
         functions.append(dict(name=f['name'], definitionHex=f['definitionHex'], byteLength=len(raw), hash=E.sha(raw),
-                              type='IF', bound=True, ansi=True, quoted=True, executeAs=None, dependencies=[],
+                              type='IF', bound=True, ansi=True, quoted=True, executeAs=None, dependencies=[], dependencyCount=0,
                               parameters=[dict(id=1, name=f['parameter'], systemType=56, userType=56, output=False)]))
     predicates, raw = [], []
     for i, p in enumerate(baseline['predicates']):
@@ -239,6 +239,41 @@ class EvidenceTest(unittest.TestCase):
             a = catalog(self.baseline)
             change(a)
             self.assertEqual('FAIL', E.compare(self.baseline, a)['outcome'])
+
+    def test_empty_dependencies_require_independent_zero_count_and_actual_array(self):
+        self.assertEqual('PASS', self.review()['outcome'])
+        for field in ('dependencies', 'dependencyCount'):
+            a = catalog(self.baseline)
+            del a['functions'][0][field]
+            report = E.compare(self.baseline, a)
+            self.assertEqual('FAIL', report['outcome'])
+            self.assertIn('missing', '\n'.join(report['discrepancies']))
+        for malformed in (None, {}, '[]', 0, False):
+            a = catalog(self.baseline)
+            a['functions'][0]['dependencies'] = malformed
+            report = E.compare(self.baseline, a)
+            self.assertEqual('FAIL', report['outcome'], 'A zero count must never normalize missing/malformed JSON')
+            self.assertIn('non-array evidence', '\n'.join(report['discrepancies']))
+        for invalid_count in (None, -1, '0', False, 0.0, 1):
+            a = catalog(self.baseline)
+            a['functions'][0]['dependencyCount'] = invalid_count
+            self.assertEqual('FAIL', E.compare(self.baseline, a)['outcome'])
+
+    def test_unexpected_dependencies_fail_even_with_consistent_positive_count(self):
+        self.actual['functions'][0].update(dependencyCount=1, dependencies=[{'entityName': 'Unexpected'}])
+        report = self.review()
+        self.assertEqual('FAIL', report['outcome'])
+        self.assertTrue(any('dependencies: expected [], actual [' in d for d in report['discrepancies']))
+        self.assertFalse(any('count/array length' in d for d in report['discrepancies']))
+
+    def test_collector_empty_array_is_guarded_by_same_function_catalog_count(self):
+        sql = Path(__file__).with_name('Collect-Phase1R.sql').read_text()
+        self.assertIn('dep.[DependencyCount] AS [dependencyCount]', sql)
+        self.assertIn("JSON_QUERY(CASE WHEN dep.[DependencyCount]=0 THEN N'[]' ELSE", sql)
+        self.assertIn('CROSS APPLY (SELECT COUNT_BIG(*) AS [DependencyCount]', sql)
+        self.assertIn('WHERE counted.referencing_id=o.object_id', sql)
+        self.assertIn('WHERE d.referencing_id=o.object_id', sql)
+        self.assertNotRegex(sql, r'(?is)(?:COALESCE|ISNULL)\s*\([^;]*N\'\[\]\'')
 
     def test_raw_catalog_hash_and_resolved_id_mismatch_fail(self):
         self.actual['otherHash'] = '0' * 64

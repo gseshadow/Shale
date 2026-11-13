@@ -392,6 +392,13 @@ Get-Content -LiteralPath $Report
 
 The export uses bounded hex lines so definitions and ordered JSON cannot be silently truncated by
 SQLCMD long-cell settings. A malformed, incomplete or banner-contaminated capture fails closed.
+Each function now includes a catalog `dependencyCount` and a `dependencies` array. The collector
+emits explicit `[]` only when a separate COUNT_BIG over that function's `sys.sql_expression_dependencies`
+rows is zero; otherwise it preserves the dependency query's JSON without a null fallback. Comparison
+requires an array and a matching non-negative integer count, and still rejects any dependency.
+Null, missing, malformed or inconsistent evidence fails even if a supplied count is zero. Older
+captures without this count are insufficient: preserve them and export to a new private capture
+path using the patched collector when authorized. Never edit a capture to replace null with [].
 Reports and baselines use create-new semantics. Preserve a failed capture/report; use new paths
 for any separately justified recollection, never overwrite evidence or refresh hashes to bless drift.
 
