@@ -241,12 +241,14 @@ No historical stage source, manifest, completed-stage rendering or private input
 Stage 15c retains the seven-SET correction; all first 18 stages remain excluded from dispatch.
 
 Consecutive stages with the same principal share a SQLCMD connection to reduce authentication
-from repeated pre/stage/post connections to 20 total. Existing server/database/edition/collation,
+from repeated pre/stage/post connections to 22 total (seed, binding/install, provisioning/final,
+then 19 restricted connections). Existing server/database/edition/collation,
 neutral context, owner and OFF guards run at every stage boundary. Native `-b -V11` and
 `:on error exit` stop on SQL errors; source-owned assertions still reject unexpected state.
-Offline readiness validates all later prerequisites before approval, including Stage 16 evidence
-and existing private seed/identity approvals. All rendered hashes and the chosen absolute ODBC
-client are automatically verified before dispatch. No PATH choice, password transport fallback,
+Offline readiness validates the next executable group's prerequisites before dispatch. Seed
+is independent of future Stage 16 evidence; provisioning inputs are checked when Stage 28 is
+reached. Every dispatched file hash and the chosen absolute ODBC client are verified, while
+all previously completed hashes remain mandatory on resume. No PATH choice, password transport fallback,
 credential generation or credential-store access is introduced.
 
 The bounded reconciliation protocol fixes BOM/padding/CRLF and width-sensitive parsing. It
@@ -293,3 +295,38 @@ its unknown-build-path full-suite recommendation remains informational. Reviewed
 state across the remaining source closure: no top-level temporary-table dependency is added
 by batching, local cursors/GO boundaries remain source owned, and every stage repeats its
 existing neutral-context fence and SET preamble. Actual native SQL semantics remain unexecuted.
+
+
+## PR #1971 final workflow adjustment: group readiness
+
+The first fast-track version incorrectly made Stage 15c wait for all future private inputs.
+Stage 15c is now its own SQLCMD group, independently verified and durably recorded before
+the Stage 16 evidence gate. Missing group inputs yield a clean `BLOCKED` report (exit zero),
+with completed count, blocked stage and a continuation instruction, without creating any
+pending/failed journal event for work never dispatched. Integrity/SQL/transport failures
+continue to fail nonzero; uncertain execution still blocks every retry. The journal format
+and interpretation of existing pending groups are unchanged.
+
+The next groups are Stage 16 through 26, Stage 28 through final owner checks, then the
+existing distinct-principal catalog/identity groups. This second owner boundary prevents
+missing future provisioning inputs from blocking ready binding/install work. Readiness's
+explicit contiguous `GroupStages` option scopes hashes, guards, dependencies and private
+input checks to that group. Existing strict/default readiness retains whole-packet checks.
+Every selected stage still checks the identical destination fences, SQLCMD directives,
+fixture, seven SETs, approved inputs and applicable evidence. The current manifest is pinned
+for each invocation; new inputs need a new reviewed rendering/launch. Completed hashes are
+verified against the retained journal before proceeding, with no adoption/replay of changes.
+
+Test impact: reviewed all readiness/fast-track/strict-runner references before edits. Updated
+full-run connection count, failure prefix and seed-group assertions. Regression simulations
+cover clean 19/51 pause without Stage 16 evidence, a repeated blocked launch with no approval
+or SQL, new rendering and automatic resume without seed replay, Stage 28 deferral/resume,
+missing future rendered files, changed completed seed hashes, and ambiguous seed execution
+remaining blocked even when later prerequisites are absent. Only owned synthetic packets
+are modified. No operator inputs, hashes, credentials or local evidence are accessed.
+
+Audit compatibility remains operational-only: no domain/PHI read, audit schema or application
+audit insertion is added; existing SQL transactions and their authoritative audits remain
+unchanged. Journal/report additions carry only the blocked manifest stage and safe prerequisite
+classification. No Azure SQL, application/MCP startup/enablement, production or firewall action
+is performed. Windows ODBC/password/multiple-input/cancellation limits still apply.

@@ -33,7 +33,7 @@ try {
     $lock=[IO.File]::Open($lockPath,[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
     $stages=@(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stages.json') -Raw | ConvertFrom-Json)
     if ($OperatorUser -cin @($stages | Where-Object { $_.PSObject.Properties.Name -contains 'user' } | ForEach-Object user)) { throw 'STOP: owner must be distinct from restricted acceptance identities.' }
-    $hashes=@{}; foreach ($stage in $stages) { $hashes[$stage.name]=Get-StageHash $dir $stage.name }
+    $hashes=@{}; foreach ($stage in $stages[0..17]) { $hashes[$stage.name]=Get-StageHash $dir $stage.name }
     $baseline=Get-TextSHA256 (($stages[0..17] | ForEach-Object { $_.name+':'+$hashes[$_.name] }) -join "`n")
     $strict=Assert-PrivatePath (Join-Path $packet 'supervised.jsonl')
     if (Test-Path -LiteralPath $strict) {
@@ -50,13 +50,14 @@ try {
     $next=$history.Next; $script:chain=$history.Chain; $script:index=$history.Index
     if ($history.Pending) { throw 'STOP: interrupted/failed fast-track group; independently reconcile it before any retry. No completed stage will replay.' }
     if ($next -eq 51) { Write-Output 'FAST-TRACK: already complete 51/51; nothing executed.'; return }
-    # Full offline prerequisites, including the Stage 16 JVM/timezone evidence,
-    # are checked BEFORE approval/execution. No evidence or secret is fabricated.
-    & (Join-Path $PSScriptRoot 'Test-Readiness.ps1') -RenderedDirectory $dir -AuthoritativeFixture $AuthoritativeFixture -Stage All -PreparedOnly -SqlcmdExecutable $client | ForEach-Object { if ($_ -like 'BLOCKED:*') { Write-Host $_ } }
+    # Freeze the manifest for this invocation. New private inputs require a new
+    # rendering/launch, preserving every completed-stage hash, never live adoption.
+    $manifestPath=Assert-PrivatePath (Join-Path $dir 'sha256.csv')
+    $manifestHash=(Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash
     $run=Assert-PrivatePath (Join-Path $packet ('fast-track-'+[guid]::NewGuid().ToString('N')))
     [void][IO.Directory]::CreateDirectory($run)
     $reportPath=Join-Path $run 'report.json'
-    $report=[ordered]@{Mode='FAST_TRACK'; Server='shale.database.windows.net'; Database='ShaleMcpAcceptance'; CompletedThrough=$stages[$next-1].name; CompletedCount=$next; CompletedStages=@(); Outcome='NOT_STARTED'; FailureStage=$null; ExitCode=$null; SqlErrorNumbers=@(); FailureCode=''; AttemptedGroupStages=@(); NextAction='Approve the reviewed acceptance run.'}
+    $report=[ordered]@{Mode='FAST_TRACK'; Server='shale.database.windows.net'; Database='ShaleMcpAcceptance'; CompletedThrough=$stages[$next-1].name; CompletedCount=$next; CompletedStages=@(); Outcome='NOT_STARTED'; FailureStage=$null; BlockedStage=$null; ExitCode=$null; SqlErrorNumbers=@(); FailureCode=''; AttemptedGroupStages=@(); NextAction='Approve the reviewed acceptance run.'}
     function Append-RunEvent($Record) {
         $Record.Index=$script:index
         $payload=$Record | ConvertTo-Json -Compress
@@ -66,6 +67,21 @@ try {
         try { $stream.Write($bytes); $stream.Flush($true) } finally { $stream.Dispose() }
         $script:chain=$digest; $script:index++
     }
+    function Test-NextGroup($Group) {
+        if ((Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash -cne $manifestHash) { throw 'STOP: approved packet manifest changed; relaunch with a reviewed rendering.' }
+        try {
+            & (Join-Path $PSScriptRoot 'Test-Readiness.ps1') -RenderedDirectory $dir -AuthoritativeFixture $AuthoritativeFixture -GroupStages @($stages[$Group.Start..($Group.End-1)].name) -PreparedOnly -SqlcmdExecutable $client | Out-Null
+        } catch {
+            $blockedStage=$_.Exception.Data['AcceptancePrerequisiteStage']
+            if (-not $blockedStage) { throw }
+            $report.Outcome='BLOCKED'; $report.BlockedStage=$blockedStage
+            $report.FailureCode='PREREQUISITE_BLOCKED'; $report.AttemptedGroupStages=@()
+            $report.NextAction="Provide independently reviewed inputs/evidence for $blockedStage; re-render with -Continuation preserving completed hashes and relaunch the same command. "+$_.Exception.Message
+            Write-Host "BLOCKED: $blockedStage; $($_.Exception.Message)"
+            return $false
+        }
+        return $true
+    }
     $templates=Join-Path $PSScriptRoot '../../docs/sql/ai-integration/azure-acceptance'
     $target=[IO.File]::ReadAllText((Join-Path $templates 'target.sql'))
     $owner=[IO.File]::ReadAllText((Join-Path $templates 'owner.sql'))
@@ -73,40 +89,56 @@ try {
     while ($cursor -lt 51) {
         $start=$cursor; $user=$OperatorUser
         if ($stages[$cursor].PSObject.Properties.Name -contains 'user') { $user=$stages[$cursor].user }
+        do {
+            $restricted=$stages[$cursor].PSObject.Properties.Name -contains 'user'
+            $cursor++
+            # Seed is independently verified before the Stage 16 gate. Stage 28's
+            # private provisioning inputs cannot block the preceding ready stages.
+            if ($cursor -ge 51 -or $cursor -in @(19,30)) { break }
+            $nextUser=$OperatorUser; if ($stages[$cursor].PSObject.Properties.Name -contains 'user') { $nextUser=$stages[$cursor].user }
+        } while ($nextUser -ceq $user)
+        $groups += [pscustomobject]@{Start=$start; End=$cursor; User=$user; Restricted=$restricted; Files=@(); Hashes=@()}
+    }
+    # Missing prerequisites before dispatch are a clean pause, never a pending SQL
+    # outcome. Check the first group before requesting the single run approval.
+    if (-not (Test-NextGroup $groups[0])) { return }
+    Write-Output "FAST-TRACK: $next/51 complete; run $($stages[$next].name) through $($stages[-1].name). Target ONLY shale.database.windows.net / ShaleMcpAcceptance."
+    Write-Output "ODBC version=$($identity.Version) SHA256=$clientHash. Stage hashes verified automatically. Stage 16 evidence is required when its group is reached. Application/MCP stay OFF."
+    if ((Read-Host 'Approve this entire reviewed disposable acceptance run, existing inputs/credentials, retained 18-stage evidence and all remaining SQL transitions; type FAST_TRACK_SHALE_MCP_ACCEPTANCE') -cne 'FAST_TRACK_SHALE_MCP_ACCEPTANCE') { throw 'STOP: run approval refused; no SQL executed.' }
+    if ($script:index -eq 0) { Append-RunEvent ([ordered]@{Kind='baseline';Hash=$baseline;Index=0}) }
+    $report.Outcome='RUNNING'
+    foreach ($group in $groups) {
+        if (-not (Test-NextGroup $group)) { return }
         $files=@()
-        if ($cursor -eq 18) {
+        if ($group.Start -eq 18) {
             $checkpoint=Join-Path $run 'checkpoint18.sql'
             $sql=":on error exit`n"+$target+"`n"+$owner+"`nGO`n"
             $sql+="IF EXISTS(SELECT 1 FROM dbo.ShaleClients) OR EXISTS(SELECT 1 FROM dbo.Users) OR EXISTS(SELECT 1 FROM dbo.Cases) THROW 59810,'Fast-track requires the verified empty 18-stage checkpoint; no seed replay.',1;`n"
             $sql+="IF (SELECT COUNT(*) FROM sys.database_principals WHERE name IN(N'mcpacc_auth',N'mcpacc_runtime',N'mcpacc_predecessor',N'mcpacc_verifier',N'mcpacc_bootstrap') AND type='S' AND authentication_type=2)<>5 THROW 59810,'Foundation identities missing.',1;`nGO`nSELECT CAST('FAST_CHECKPOINT_OK:18' AS varchar(96)) AS FastTrackStatus;`nGO`n"
             Write-FastTrackFile $checkpoint $sql; $files+=$checkpoint
         }
-        do {
-            $stage=$stages[$cursor]
+        foreach ($stage in $stages[$group.Start..($group.End-1)]) {
+            $hashes[$stage.name]=Get-StageHash $dir $stage.name
             $restricted=$stage.PSObject.Properties.Name -contains 'user'
             $fence=$target+"`n"; if (-not $restricted) { $fence+=$owner+"`n" }; $fence+="GO`n"
             $before=Join-Path $run ($stage.name+'-begin.sql'); $after=Join-Path $run ($stage.name+'-done.sql')
             Write-FastTrackFile $before (":on error exit`n"+$fence+"SELECT CAST('FAST_STAGE_BEGIN:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")
             Write-FastTrackFile $after (":on error exit`n"+$fence+"SELECT CAST('FAST_STAGE_DONE:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")
             $files+=@($before,(Join-Path $dir ($stage.name+'.sql')),$after)
-            $cursor++
-            if ($cursor -ge 51) { break }
-            $nextUser=$OperatorUser; if ($stages[$cursor].PSObject.Properties.Name -contains 'user') { $nextUser=$stages[$cursor].user }
-        } while ($nextUser -ceq $user)
+        }
         # ODBC's documented -i file1,file2 syntax has no unambiguous comma escape.
         if (@($files | Where-Object { $_.Contains(',') }).Count -or (($files -join ',').Length -gt 24000)) { throw 'STOP: input paths cannot contain commas or exceed the batch argument limit; use strict mode or a shorter reviewed checkout path.' }
-        $groups += [pscustomobject]@{Start=$start; End=$cursor; User=$user; Restricted=$restricted; Files=$files; Hashes=@($files | ForEach-Object {(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash})}
-    }
-    Write-Output "FAST-TRACK: $next/51 complete; run $($stages[$next].name) through $($stages[-1].name). Target ONLY shale.database.windows.net / ShaleMcpAcceptance."
-    Write-Output "ODBC version=$($identity.Version) SHA256=$clientHash. Stage hashes verified automatically. Stage 16 evidence must already be approved. Application/MCP stay OFF."
-    if ((Read-Host 'Approve this entire reviewed disposable acceptance run, existing inputs/credentials, retained 18-stage evidence and all remaining SQL transitions; type FAST_TRACK_SHALE_MCP_ACCEPTANCE') -cne 'FAST_TRACK_SHALE_MCP_ACCEPTANCE') { throw 'STOP: run approval refused; no SQL executed.' }
-    if ($script:index -eq 0) { Append-RunEvent ([ordered]@{Kind='baseline';Hash=$baseline;Index=0}) }
-    $report.Outcome='RUNNING'
-    foreach ($group in $groups) {
+        $group.Files=$files
+        $group.Hashes=@($files | ForEach-Object {
+            $name=[IO.Path]::GetFileNameWithoutExtension($_)
+            if ($hashes.ContainsKey($name)) { $hashes[$name] }
+            else { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }
+        })
         if ((Get-FileHash -LiteralPath $client -Algorithm SHA256).Hash -cne $clientHash) { throw 'STOP: reviewed SQLCMD executable changed.' }
         for ($i=0; $i -lt $group.Files.Count; $i++) {
             if ((Get-FileHash -LiteralPath $group.Files[$i] -Algorithm SHA256).Hash -cne $group.Hashes[$i]) { throw 'STOP: approved batch inputs changed.' }
         }
+        if ((Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash -cne $manifestHash) { throw 'STOP: approved packet manifest changed; relaunch with a reviewed rendering.' }
         $report.AttemptedGroupStages=@($stages[$group.Start..($group.End-1)] | ForEach-Object name)
         Append-RunEvent ([ordered]@{Kind='pending';Start=$group.Start;End=$group.End;Index=0})
         $seconds=if ($group.Restricted) {'5'} else {'20'}

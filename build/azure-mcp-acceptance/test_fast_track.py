@@ -97,9 +97,10 @@ foreach ($file in $files) {
 }
 if (MODE -eq 'interrupted') { return [pscustomobject]@{ExitCode=$null;FailureCode='PROCESS_INTERRUPTED';Lines=@();PasswordPromptObserved=$true;PasswordInputReadyShown=$true} }
 if (MODE -eq 'between-groups') { [IO.File]::AppendAllText(CLIENT,'changed synthetic executable') }
+if (MODE -eq 'manifest-drift') { [IO.File]::AppendAllText(MANIFEST,"`n") }
 if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIVATE_NEVER_PRINT') }
 [pscustomobject]@{ExitCode=$exit;FailureCode='';Lines=@($lines);PasswordPromptObserved=(MODE -ne 'missing-prompt');PasswordInputReadyShown=(MODE -ne 'missing-prompt')}
-'''.replace('CALLS', quote(self.calls)).replace('CLIENT', quote(self.client)).replace('STAGEFILE', quote(TOOL / 'stages.json')).replace('MODE', quote(mode)))
+'''.replace('CALLS', quote(self.calls)).replace('CLIENT', quote(self.client)).replace('STAGEFILE', quote(TOOL / 'stages.json')).replace('MANIFEST', quote(self.rendered / 'sha256.csv')).replace('MODE', quote(mode)))
         pre = "function global:Join-Path {param($Path,$ChildPath); if ($ChildPath -ceq 'Invoke-NativeSqlcmd.ps1') { " + quote(self.transport) + " } else { Microsoft.PowerShell.Management\\Join-Path $Path $ChildPath } }; "
         pre += "function global:Get-FileHash {param($LiteralPath,$Algorithm); if ($LiteralPath -eq " + quote(self.fixture) + ") { [pscustomobject]@{Hash='4B64B50DA531EBC6A2EB9DC26C6555EF555621DF371FE9D8A5CF994FB6E8417F'} } else { Microsoft.PowerShell.Utility\\Get-FileHash -LiteralPath $LiteralPath -Algorithm $Algorithm } }; "
         pre += "function global:Read-Host {param($Prompt); if ($Prompt -notlike 'Approve this entire*') {throw 'Unexpected repeated prompt'}; [IO.File]::AppendAllText(" + quote(self.approvals) + ",'approval\n'); " + ("'NO'" if mode == 'refuse' else "'FAST_TRACK_SHALE_MCP_ACCEPTANCE'") + ' }; '
@@ -118,7 +119,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         path = max(self.packet.glob('fast-track-*/report.json'), key=lambda p: p.stat().st_mtime_ns)
         return json.loads(path.read_text())
 
-    def test_complete_remaining_stages_one_approval_absolute_client_and_twenty_logins(self):
+    def test_complete_remaining_stages_one_approval_absolute_client_and_twenty_two_logins(self):
         inputs = {p: p.read_bytes() for p in self.packet.glob('*.sql')}
         result = self.run_fast()
         report = self.report()
@@ -127,7 +128,8 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual([s['name'] for s in STAGES[18:]], report['CompletedStages'])
         self.assertEqual(1, self.approvals.read_text().count('approval'))
         calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
-        self.assertEqual(20, len(calls))
+        self.assertEqual(22, len(calls))
+        self.assertEqual(['15c-seed'], self.dispatched_stages()[0])
         for args in calls:
             self.assertEqual('ShaleMcpAcceptance', args[args.index('-d')+1])
             self.assertEqual('tcp:shale.database.windows.net,1433', args[args.index('-S')+1])
@@ -143,14 +145,14 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(before, self.calls.read_text())
         self.assertIn('outcome=COMPLETE', result.stdout)
 
-    def test_verified_group_resumes_without_replaying_owner_stages(self):
+    def test_verified_seed_group_resumes_without_replaying_seed(self):
         self.run_fast('between-groups', success=False)
-        self.assertEqual(32, self.report()['CompletedCount'])
+        self.assertEqual(19, self.report()['CompletedCount'])
         self.assertEqual(1, len(self.calls.read_text().splitlines()))
         self.run_fast()
         self.assertEqual(51, self.report()['CompletedCount'])
-        self.assertEqual('31-verifier-catalogs', self.report()['CompletedStages'][0])
-        self.assertEqual(20, len(self.calls.read_text().splitlines()))
+        self.assertEqual('16-binding-preflight', self.report()['CompletedStages'][0])
+        self.assertEqual(22, len(self.calls.read_text().splitlines()))
 
     def test_unconfirmed_native_password_prompt_blocks_later_connections(self):
         self.run_fast('missing-prompt', success=False)
@@ -190,7 +192,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(23, report['CompletedCount'])
         self.assertEqual([50001], report['SqlErrorNumbers'])
         self.assertEqual(16, report['ExitCode'])
-        self.assertEqual(1, len(self.calls.read_text().splitlines()))
+        self.assertEqual(2, len(self.calls.read_text().splitlines()))
         before = self.calls.read_text()
         self.run_fast(success=False)
         self.assertEqual(before, self.calls.read_text())
@@ -207,7 +209,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.run_fast('ambiguous', success=False)
         report = self.report()
         self.assertEqual(18, report['CompletedCount'])
-        self.assertEqual(14, len(report['AttemptedGroupStages']))
+        self.assertEqual(['15c-seed'], report['AttemptedGroupStages'])
         self.assertEqual('INCOMPLETE_RESULTS', report['FailureCode'])
 
     def test_unexpected_database_checkpoint_stops_before_seed(self):
@@ -215,15 +217,145 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(18, self.report()['CompletedCount'])
         self.assertEqual([59810], self.report()['SqlErrorNumbers'])
 
-    def test_missing_binding_evidence_blocks_before_any_approval_or_sql(self):
+    def journal(self):
+        return [json.loads(json.loads(line)['Payload'])
+                for line in (self.packet / 'fast-track.jsonl').read_text().splitlines()]
+
+    def dispatched_stages(self):
+        if not self.calls.exists():
+            return []
+        groups = []
+        for line in self.calls.read_text().splitlines():
+            args = json.loads(line)
+            paths = args[args.index('-i')+1].split(',')
+            groups.append([Path(path).stem for path in paths if Path(path).stem in {s['name'] for s in STAGES}])
+        return groups
+
+    def test_seed_verifies_alone_then_cleanly_pauses_at_stage16_and_resumes(self):
+        path = self.packet / 'binding-inputs.sql'
+        ready = path.read_text()
+        path.write_text(ready.replace('@BindEvidenceConfirmed bit=1', '@BindEvidenceConfirmed bit=0'))
+        self.render()
+        result = self.run_fast()
+        self.assertIn('BLOCKED: 16-binding-preflight', result.stdout)
+        self.assertIn('worker/JVM/timezone evidence', result.stdout)
+        report = self.report()
+        self.assertEqual('BLOCKED', report['Outcome'])
+        self.assertEqual(19, report['CompletedCount'])
+        self.assertEqual('15c-seed', report['CompletedThrough'])
+        self.assertEqual(['15c-seed'], report['CompletedStages'])
+        self.assertEqual('16-binding-preflight', report['BlockedStage'])
+        self.assertIsNone(report['FailureStage'])
+        self.assertEqual([], report['AttemptedGroupStages'])
+        self.assertEqual([['15c-seed']], self.dispatched_stages())
+        self.assertEqual(1, self.approvals.read_text().count('approval'))
+        self.assertEqual(['baseline','pending','complete','verified'], [r['Kind'] for r in self.journal()])
+        retained = (self.packet / 'fast-track.jsonl').read_bytes()
+        self.run_fast()  # still missing evidence: no new approval, connection or ledger event
+        self.assertEqual(retained, (self.packet / 'fast-track.jsonl').read_bytes())
+        self.assertEqual(1, self.approvals.read_text().count('approval'))
+        self.assertEqual([['15c-seed']], self.dispatched_stages())
+        path.write_text(ready)  # owned synthetic inputs only
+        self.render()
+        self.run_fast()
+        self.assertEqual(51, self.report()['CompletedCount'])
+        self.assertEqual('16-binding-preflight', self.report()['CompletedStages'][0])
+        self.assertEqual(1, sum(g.count('15c-seed') for g in self.dispatched_stages()))
+        self.assertEqual(22, len(self.dispatched_stages()))
+        self.assertTrue((self.packet / 'fast-track.jsonl').read_bytes().startswith(retained))
+
+    def test_future_provisioning_inputs_pause_only_at_stage28_then_resume(self):
+        path = self.packet / 'identities.sql'
+        ready = path.read_text()
+        path.write_text(ready.replace('@ProvisionApproved bit=1', '@ProvisionApproved bit=0'))
+        self.render()
+        self.run_fast()
+        self.assertEqual('BLOCKED', self.report()['Outcome'])
+        self.assertEqual(30, self.report()['CompletedCount'])
+        self.assertEqual('28-contained-users', self.report()['BlockedStage'])
+        self.assertEqual([['15c-seed'], [s['name'] for s in STAGES[19:30]]], self.dispatched_stages())
+        self.assertEqual('verified', self.journal()[-1]['Kind'])
+        path.write_text(ready)
+        self.render()
+        self.run_fast()
+        self.assertEqual(51, self.report()['CompletedCount'])
+        self.assertEqual('28-contained-users', self.report()['CompletedStages'][0])
+        self.assertEqual(22, len(self.dispatched_stages()))
+
+    def test_seed_prerequisites_still_block_before_approval_or_sql(self):
+        path = self.packet / 'seed.sql'
+        path.write_text(path.read_text().replace('@SeedApproved bit=1', '@SeedApproved bit=0'))
+        self.render()
+        self.run_fast()
+        self.assertEqual('BLOCKED', self.report()['Outcome'])
+        self.assertEqual('15c-seed', self.report()['BlockedStage'])
+        self.assertEqual(18, self.report()['CompletedCount'])
+        self.assertFalse(self.calls.exists())
+        self.assertFalse(self.approvals.exists())
+        self.assertFalse((self.packet / 'fast-track.jsonl').exists())
+
+    def test_completed_seed_hash_cannot_change_after_prerequisite_pause(self):
         path = self.packet / 'binding-inputs.sql'
         path.write_text(path.read_text().replace('@BindEvidenceConfirmed bit=1', '@BindEvidenceConfirmed bit=0'))
         self.render()
-        result = self.run_fast(success=False)
-        self.assertIn('BLOCKED: 16-binding-preflight', result.stdout)
-        self.assertIn('worker/JVM/timezone evidence', result.stdout)
-        self.assertFalse(self.calls.exists())
-        self.assertFalse(self.approvals.exists())
+        self.run_fast()
+        seed = self.packet / 'seed.sql'
+        seed.write_text(seed.read_text() + '\n-- changed synthetic completed source\n')
+        self.render()
+        self.run_fast(success=False)
+        self.assertEqual([['15c-seed']], self.dispatched_stages())
+
+    def test_future_missing_file_cannot_block_seed_or_create_pending_future_group(self):
+        (self.rendered / '16-binding-preflight.sql').unlink()
+        self.run_fast(success=False)
+        self.assertEqual(19, self.report()['CompletedCount'])
+        self.assertEqual([['15c-seed']], self.dispatched_stages())
+        self.assertEqual('verified', self.journal()[-1]['Kind'])
+
+    def test_uncertain_seed_cannot_be_retried_when_future_evidence_is_missing(self):
+        path = self.packet / 'binding-inputs.sql'
+        path.write_text(path.read_text().replace('@BindEvidenceConfirmed bit=1', '@BindEvidenceConfirmed bit=0'))
+        self.render()
+        self.run_fast('ambiguous', success=False)
+        self.assertEqual(18, self.report()['CompletedCount'])
+        self.assertEqual('failed', self.journal()[-1]['Kind'])
+        before = self.calls.read_bytes()
+        self.run_fast(success=False)
+        self.assertEqual(before, self.calls.read_bytes())
+
+    def test_packet_manifest_change_during_run_stops_before_next_group(self):
+        self.run_fast('manifest-drift', success=False)
+        self.assertEqual(19, self.report()['CompletedCount'])
+        self.assertIn('manifest changed', self.report()['NextAction'])
+        self.assertEqual([['15c-seed']], self.dispatched_stages())
+        self.assertEqual('verified', self.journal()[-1]['Kind'])
+
+    def test_future_target_tampering_is_rejected_before_its_group_dispatch(self):
+        path = self.rendered / '16-binding-preflight.sql'
+        path.write_text(path.read_text().replace("N'ShaleMcpAcceptance'", "N'Shale'", 1))
+        manifest = self.rendered / 'sha256.csv'
+        with manifest.open() as stream:
+            rows = list(csv.DictReader(stream))
+        for row in rows:
+            if row['Stage'] == '16-binding-preflight':
+                row['SHA256'] = hashlib.sha256(path.read_bytes()).hexdigest().upper()
+        with manifest.open('w', newline='') as stream:
+            writer = csv.DictWriter(stream, fieldnames=['Stage', 'SHA256']); writer.writeheader(); writer.writerows(rows)
+        self.run_fast(success=False)
+        self.assertEqual(19, self.report()['CompletedCount'])
+        self.assertEqual([['15c-seed']], self.dispatched_stages())
+        self.assertEqual('verified', self.journal()[-1]['Kind'])
+
+    def test_group_readiness_rejects_unknown_gapped_and_completed_stages(self):
+        command = ('& ' + quote(TOOL / 'Test-Readiness.ps1')
+                   + ' -RenderedDirectory ' + quote(self.rendered)
+                   + ' -AuthoritativeFixture ' + quote(self.fixture))
+        for stages, message in ((['15c-seed','17-binding-install'], 'manifest order'),
+                                (['15b-foundation-users'], 'invalid readiness group'),
+                                (['unknown'], 'invalid readiness group')):
+            result = self.fixture_case.ps(command + ' -GroupStages @('
+                                          + ','.join(quote(s) for s in stages) + ')', success=False)
+            self.assertIn(message, result.stderr)
 
     def test_tampered_target_or_hash_is_refused_before_sql(self):
         path = self.rendered / '15c-seed.sql'

@@ -49,7 +49,7 @@ A stage-specific PASS permits a later approval prompt, never execution by itself
 
 ## Fast-track: one run approval
 
-For the retained **18/51 checkpoint only**, after the preparation above, run:
+For the retained **18/51 checkpoint**, or to resume its verified fast-track progress, run:
 
 ```powershell
 .\build\azure-mcp-acceptance\Start-FastTrackAcceptance.ps1
@@ -61,24 +61,37 @@ can instead be provided with `-RenderedDirectory`, `-AuthoritativeFixture`,
 `-SqlcmdExecutable` and `-OperatorUser`. Fast-track does not use PATH to choose SQLCMD.
 Run the SQL-free Windows probes below with that same executable first.
 
-Before any SQL, fast-track checks **all** remaining prerequisites, client family, hashes,
-source/target fences, existing secret inputs and the mandatory **pre-Stage-16 JVM/timezone
-evidence**. It cannot manufacture evidence or bypass missing binding approvals. If the
-retained checkpoint still lacks this evidence, the run stops offline before seed. Complete
-only separately authorized evidence collection first; keep the application stopped afterward.
-No replacement password, BCrypt value, private input or fixture is generated.
+Fast-track checks prerequisites **for the next executable group**. Stage **15c-seed runs
+alone** when its own seed inputs, session settings, fixture fingerprint, hashes and destination
+fences pass. Future Stage 16 evidence and Stage 28 private inputs do not block seed.
+
+After seed's source/status checks and native execution succeed, the journal records **19/51**
+complete before checking Stage 16. Missing mandatory **worker JVM/timezone evidence**, binding
+approvals, zones or samples produce a clean `BLOCKED` report naming `16-binding-preflight`.
+No Stage 16 connection or pending journal record is created. A prerequisite pause exits zero;
+`BLOCKED` means incomplete work, not acceptance PASS. SQL/transport/integrity failures still
+exit nonzero. No evidence, replacement password, BCrypt value, private input or fixture is generated.
+
+After independently reviewed evidence/inputs are available, re-render the same packet with
+`Prepare-Packet.ps1 -Continuation`, preserve every completed stage's hash, and relaunch the
+same fast-track command with that exact rendering. It resumes automatically at Stage 16,
+without seed replay or manual checkpoint entry. Stage 28 provisioning inputs likewise pause
+only their own group, after ready earlier stages complete; later relaunch resumes there.
+Do not start the application to obtain evidence without separate authorization.
 
 Review the displayed target/client and type **FAST_TRACK_SHALE_MCP_ACCEPTANCE** once to
-approve all remaining SQL transitions using the retained independent 18-stage evidence.
+approve the invocation's remaining SQL transitions using the retained independent 18-stage evidence.
+Each relaunch requests one run approval; no approvals repeat within that invocation.
 Hashes are checked automatically; no hash retyping, per-stage phrases or pre/post snapshot
 connections are required. The destination is hard-coded to **shale.database.windows.net /
 ShaleMcpAcceptance**, with the existing database/server/edition/collation/owner/OFF guards
 repeated in SQL. The first connection also refuses nonempty seed tables or missing foundation
 identities before Stage 15c. Completed stages 00–15b are never sent to SQLCMD.
 
-The 14 consecutive owner stages share one fail-fast connection; the two restricted catalogs
-and 17 identity checks each retain their exact separate login. Expect **20 native password
-prompts** for a full remaining run, using the existing credentials. These are authentication,
+Owner connections are grouped as **15c seed**, **16–26 binding/install work**, and
+**28–30 provisioning/final checks**, with readiness checked before each group. The two
+restricted catalogs and 17 identity checks retain separate exact logins. Expect **22 native
+password prompts** for an uninterrupted remaining run, using the existing credentials. These are authentication,
 not repeated approvals. Wait for **PASSWORD INPUT READY** on every connection. Passwords
 stay in SQLCMD's inherited console input; they are never passed through argv/environment,
 read from the credential store, or captured by PowerShell. The reviewed ODBC executable must
@@ -91,11 +104,14 @@ mode retains its existing flags. Do not use a packet/checkout path containing co
 multiple-input argument cannot safely represent those paths. Excessively long paths fail offline.
 
 Progress and a concise `report.json` appear under a new private `fast-track-<id>` directory.
-The report lists completed stages, failing stage, native exit/SQL error numbers, the attempted
-group and next action. Raw SQL output, messages, credentials, password hashes and private
+The report lists completed stages, blocked or failing stage, native exit/SQL error numbers,
+the attempted group and next action. Raw SQL output, messages, credentials, password hashes and private
 rows are discarded. The packet's hash-chained `fast-track.jsonl` and shared lock prevent replay
 and concurrent runners. Keep these files and the independent original checkpoint evidence.
 Relaunch can advance only after fully verified groups; it never replays a completed stage.
+A missing prerequisite is checked before dispatch and leaves no pending group. The packet
+manifest is frozen for the invocation: changed private inputs require a new reviewed rendering
+and launch, rather than being silently adopted during an approved run.
 
 **Any failed, interrupted or uncertain group blocks relaunch.** SQL errors stop the native
 batch immediately. Output validation occurs when that connection returns: if capture or
