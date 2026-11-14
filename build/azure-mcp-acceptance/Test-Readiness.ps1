@@ -3,7 +3,9 @@
 param(
     [string]$RenderedDirectory,
     [string]$AuthoritativeFixture,
-    [string]$Stage = 'All'
+    [string]$Stage = 'All',
+    [switch]$PreparedOnly,
+    [string]$SqlcmdExecutable
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Supervision.ps1')
@@ -18,7 +20,11 @@ if ($names.Count -ne 51 -or $names[17] -cne '15b-foundation-users' -or $names[18
 if ($AuthoritativeFixture) {
     if ((Get-FileHash -LiteralPath $AuthoritativeFixture -Algorithm SHA256).Hash -cne '4B64B50DA531EBC6A2EB9DC26C6555EF555621DF371FE9D8A5CF994FB6E8417F') { throw 'STOP: fixture fingerprint mismatch.' }
 } else { throw 'STOP: unchanged authoritative fixture path required for offline fingerprint check.' }
-foreach ($tool in @('java','javac','sqlcmd')) {
+$tools = if ($PreparedOnly) { @() } else { @('java','javac') }
+if ($SqlcmdExecutable) {
+    if (-not [IO.Path]::IsPathRooted($SqlcmdExecutable) -or -not (Test-Path -LiteralPath $SqlcmdExecutable -PathType Leaf)) { throw 'STOP: absolute SQLCMD executable path required.' }
+} else { $tools += 'sqlcmd' }
+foreach ($tool in $tools) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "STOP: missing local prerequisite: $tool." }
 }
 $manifest = @(Import-Csv -LiteralPath (Join-Path $dir 'sha256.csv'))

@@ -230,3 +230,46 @@ tests PASS** (zero failures/errors/skips), PowerShell AST parsing and Git whites
 `--base 6a5426b1 --head HEAD` selects no Maven feature area and requires the critical reactor; its
 full-suite suggestion remains informational. SQL opt-ins were removed. The operator's Windows
 console PASS is retained as reported evidence; a genuine ODBC 17/18 Windows probe is still pending.
+
+
+## Fast-track acceptance mode
+
+Reviewed against merged PR #1970 (`a2a0871b`). The new user-authorized mode replaces manual
+hash entry and per-stage approvals with one explicit run approval. Strict mode remains
+available. See the [fast-track operator guide](../../build/azure-mcp-acceptance/README.md#fast-track-one-run-approval).
+No historical stage source, manifest, completed-stage rendering or private input changes.
+Stage 15c retains the seven-SET correction; all first 18 stages remain excluded from dispatch.
+
+Consecutive stages with the same principal share a SQLCMD connection to reduce authentication
+from repeated pre/stage/post connections to 20 total. Existing server/database/edition/collation,
+neutral context, owner and OFF guards run at every stage boundary. Native `-b -V11` and
+`:on error exit` stop on SQL errors; source-owned assertions still reject unexpected state.
+Offline readiness validates all later prerequisites before approval, including Stage 16 evidence
+and existing private seed/identity approvals. All rendered hashes and the chosen absolute ODBC
+client are automatically verified before dispatch. No PATH choice, password transport fallback,
+credential generation or credential-store access is introduced.
+
+The bounded reconciliation protocol fixes BOM/padding/CRLF and width-sensitive parsing. It
+does not waive malformed/duplicate/overflow rejection. No real failing output was supplied;
+the exact live failure is not claimed reproduced. Fast-track avoids repetitive snapshot calls
+and relies on the unchanged source assertions plus validated per-source results.
+
+The separate append-only journal records pending groups before process start, validated stage
+completions in order, then verified groups. A failure, interrupted process or ambiguous result
+leaves a pending group and blocks every retry. Completed markers may establish a prefix, but
+the entire attempted group must be reconciled independently before further execution. Capture
+validation happens after the group returns; missing output can mean later SQL already executed.
+Strict/fast-track history cannot be silently mixed. A hash chain detects accidental corruption,
+not a malicious operator with packet write access; retain the original independent evidence.
+
+Audit compatibility: this is local acceptance orchestration using existing SQL sources and
+their authoritative transactions/audits. No application audit schema, PHI read, domain event
+or permission is added. Local journal/report fields contain only stage/hash/progress and safe
+numeric diagnostics, never raw SQL/error text/private rows/credentials/password hashes.
+
+Test impact: existing readiness, rendering, strict recovery, safe result parsing and native
+transport tests remain required. New synthetic-only transport simulations cover all 33 stages,
+one approval, exact destinations/principals/flags, no replay, SQL failure, interruption, ambiguous
+results, checkpoint drift, missing evidence, tampering and reconciliation output layouts. No
+SQLCMD, Azure SQL or operator private inputs are used. Native Windows ODBC multiple-input
+execution and hidden-input/cancellation behavior remain local verification limitations.

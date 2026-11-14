@@ -18,6 +18,7 @@ $lockPath = Assert-PrivatePath (Join-Path $ledgerDirectory 'supervised.lock')
 # Exclusive session lock, released by process termination too. Never overwrite evidence.
 $lock = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
 try {
+    if (Test-Path -LiteralPath (Join-Path $ledgerDirectory 'fast-track.jsonl')) { throw 'STOP: fast-track history exists; review its report before changing modes. No stage will replay.' }
     $script:previous = '0' * 64
     $events = @()
     if (Test-Path -LiteralPath $ledgerPath) {

@@ -1,4 +1,4 @@
-# Supervised local SQL acceptance
+# Local SQL acceptance: fast-track or strict supervision
 
 This tool prepares and supervises the **remaining 33 of 51 SQL stages**. It has no
 Azure management, deployment, app-start, firewall or enablement commands. Production
@@ -47,7 +47,70 @@ samples and capability approval/12 distinct secret inputs, without printing thei
 Source checks cannot establish live roles, permissions, stopped-app state or JVM evidence.
 A stage-specific PASS permits a later approval prompt, never execution by itself.
 
-## Supervise the remainder from one terminal
+## Fast-track: one run approval
+
+For the retained **18/51 checkpoint only**, after the preparation above, run:
+
+```powershell
+.\build\azure-mcp-acceptance\Start-FastTrackAcceptance.ps1
+```
+
+Supply the exact existing rendering directory, unchanged fixture path, reviewed **absolute
+ODBC 17/18 executable path**, and existing acceptance owner username when prompted. These
+can instead be provided with `-RenderedDirectory`, `-AuthoritativeFixture`,
+`-SqlcmdExecutable` and `-OperatorUser`. Fast-track does not use PATH to choose SQLCMD.
+Run the SQL-free Windows probes below with that same executable first.
+
+Before any SQL, fast-track checks **all** remaining prerequisites, client family, hashes,
+source/target fences, existing secret inputs and the mandatory **pre-Stage-16 JVM/timezone
+evidence**. It cannot manufacture evidence or bypass missing binding approvals. If the
+retained checkpoint still lacks this evidence, the run stops offline before seed. Complete
+only separately authorized evidence collection first; keep the application stopped afterward.
+No replacement password, BCrypt value, private input or fixture is generated.
+
+Review the displayed target/client and type **FAST_TRACK_SHALE_MCP_ACCEPTANCE** once to
+approve all remaining SQL transitions using the retained independent 18-stage evidence.
+Hashes are checked automatically; no hash retyping, per-stage phrases or pre/post snapshot
+connections are required. The destination is hard-coded to **shale.database.windows.net /
+ShaleMcpAcceptance**, with the existing database/server/edition/collation/owner/OFF guards
+repeated in SQL. The first connection also refuses nonempty seed tables or missing foundation
+identities before Stage 15c. Completed stages 00–15b are never sent to SQLCMD.
+
+The 14 consecutive owner stages share one fail-fast connection; the two restricted catalogs
+and 17 identity checks each retain their exact separate login. Expect **20 native password
+prompts** for a full remaining run, using the existing credentials. These are authentication,
+not repeated approvals. Wait for **PASSWORD INPUT READY** on every connection. Passwords
+stay in SQLCMD's inherited console input; they are never passed through argv/environment,
+read from the credential store, or captured by PowerShell. The reviewed ODBC executable must
+support this hidden-input path; an unconfirmed prompt cannot establish a successful group.
+
+Original rendered SQL is reused in order with public begin/done controls. Existing SQL
+transactions, assertions, timeout budgets, TLS validation and SQLCMD security switches remain.
+Fast-track strengthens `-V` to **11** so even severity 11–15 SQL errors stop SQLCMD; strict
+mode retains its existing flags. Do not use a packet/checkout path containing commas; ODBC's
+multiple-input argument cannot safely represent those paths. Excessively long paths fail offline.
+
+Progress and a concise `report.json` appear under a new private `fast-track-<id>` directory.
+The report lists completed stages, failing stage, native exit/SQL error numbers, the attempted
+group and next action. Raw SQL output, messages, credentials, password hashes and private
+rows are discarded. The packet's hash-chained `fast-track.jsonl` and shared lock prevent replay
+and concurrent runners. Keep these files and the independent original checkpoint evidence.
+Relaunch can advance only after fully verified groups; it never replays a completed stage.
+
+**Any failed, interrupted or uncertain group blocks relaunch.** SQL errors stop the native
+batch immediately. Output validation occurs when that connection returns: if capture or
+parsing fails, additional stages in the attempted group may already have committed. Independently
+reconcile the **entire attempted group**, surviving clients/sessions and transactional effects;
+matching counts or a zero exit alone do not prove a commit. There is no automatic retry,
+automatic ledger repair or fast-track recovery override. Do not delete/edit a journal or switch
+modes to bypass uncertainty. Existing strict-mode progress beyond its baseline blocks adoption;
+strict mode likewise refuses a packet containing fast-track history. Use independently reviewed
+recovery work before further execution.
+
+At 51/51 only SQL preparation is complete. Application startup, MCP activation, firewall
+changes and runtime acceptance remain separate. Fast-track contains no such operations.
+
+## Strict mode: supervise the remainder from one terminal
 
 **Future operator action only:** run this only after separately approving continuation,
 reviewing this change, the new Stage 15c hash, and the read-only reconciliation hash.
@@ -145,7 +208,7 @@ separate native-process tests run only local pwsh fixtures. No test starts SQLCM
 ## Required local Windows review before merge
 
 This Linux review cannot certify Windows console/ODBC hidden input or Ctrl+C cleanup.
-Keep PR #1970 a draft until these **SQL-free** checks pass in the actual Windows terminal
+The strict installer review identified these **SQL-free** checks, which must pass in the actual Windows terminal
 with the intended PowerShell and independently reviewed ODBC executable:
 
 ```powershell
@@ -211,3 +274,16 @@ retry/recovery policy. No real credentials, private packet or Azure endpoint is 
 Before any later separately authorized installer run, ensure `Get-Command sqlcmd -CommandType
 Application` resolves the same approved ODBC executable/hash used by the probe. A successful
 explicit-path probe does not change PATH or replace the existing Go installation.
+
+### Fast-track Windows limitation
+
+A full simulated fast-track run does not certify ODBC's multiple `-i file1,file2` execution,
+space-containing Windows paths, hidden password input, or cancellation on the operator's
+Windows/driver version. The probes above cover the console path only. Native SQL execution
+was not performed for this change. Do not use acceptance Stage 15c as a compatibility probe.
+
+Reconciliation now emits one bounded `PRINT` record rather than a variable-width result
+column; its reader accepts SQLCMD BOM, surrounding spaces and CRLF, canonicalizes the digest,
+and still rejects missing, duplicate, malformed, truncated or overflowing records. This fixes
+those output-shape failures without accepting arbitrary substrings. The reported live output
+was unavailable, so the exact historical parsing failure and native correction remain unverified.
