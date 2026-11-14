@@ -230,3 +230,124 @@ tests PASS** (zero failures/errors/skips), PowerShell AST parsing and Git whites
 `--base 6a5426b1 --head HEAD` selects no Maven feature area and requires the critical reactor; its
 full-suite suggestion remains informational. SQL opt-ins were removed. The operator's Windows
 console PASS is retained as reported evidence; a genuine ODBC 17/18 Windows probe is still pending.
+
+
+## Fast-track acceptance mode
+
+Reviewed against merged PR #1970 (`a2a0871b`). The new user-authorized mode replaces manual
+hash entry and per-stage approvals with one explicit run approval. Strict mode remains
+available. See the [fast-track operator guide](../../build/azure-mcp-acceptance/README.md#fast-track-one-run-approval).
+No historical stage source, manifest, completed-stage rendering or private input changes.
+Stage 15c retains the seven-SET correction; all first 18 stages remain excluded from dispatch.
+
+Consecutive stages with the same principal share a SQLCMD connection to reduce authentication
+from repeated pre/stage/post connections to 22 total (seed, binding/install, provisioning/final,
+then 19 restricted connections). Existing server/database/edition/collation,
+neutral context, owner and OFF guards run at every stage boundary. Native `-b -V11` and
+`:on error exit` stop on SQL errors; source-owned assertions still reject unexpected state.
+Offline readiness validates the next executable group's prerequisites before dispatch. Seed
+is independent of future Stage 16 evidence; provisioning inputs are checked when Stage 28 is
+reached. Every dispatched file hash and the chosen absolute ODBC client are verified, while
+all previously completed hashes remain mandatory on resume. No PATH choice, password transport fallback,
+credential generation or credential-store access is introduced.
+
+The bounded reconciliation protocol fixes BOM/padding/CRLF and width-sensitive parsing. It
+does not waive malformed/duplicate/overflow rejection. No real failing output was supplied;
+the exact live failure is not claimed reproduced. Fast-track avoids repetitive snapshot calls
+and relies on the unchanged source assertions plus validated per-source results.
+
+The separate append-only journal records pending groups before process start, validated stage
+completions in order, then verified groups. A failure, interrupted process or ambiguous result
+leaves a pending group and blocks every retry. Completed markers may establish a prefix, but
+the entire attempted group must be reconciled independently before further execution. Capture
+validation happens after the group returns; missing output can mean later SQL already executed.
+Strict/fast-track history cannot be silently mixed. A hash chain detects accidental corruption,
+not a malicious operator with packet write access; retain the original independent evidence.
+
+Audit compatibility: this is local acceptance orchestration using existing SQL sources and
+their authoritative transactions/audits. No application audit schema, PHI read, domain event
+or permission is added. Local journal/report fields contain only stage/hash/progress and safe
+numeric diagnostics, never raw SQL/error text/private rows/credentials/password hashes.
+
+Test impact: existing readiness, rendering, strict recovery, safe result parsing and native
+transport tests remain required. New synthetic-only transport simulations cover all 33 stages,
+one approval, exact destinations/principals/flags, no replay, SQL failure, interruption, ambiguous
+results, checkpoint drift, missing evidence, tampering and reconciliation output layouts. No
+SQLCMD, Azure SQL or operator private inputs are used. Native Windows ODBC multiple-input
+execution and hidden-input/cancellation behavior remain local verification limitations.
+
+Fast-track verification: **92 offline acceptance tests PASS**, including the 14 new
+fast-track cases; the 14-case focused suite was rerun after improving blocker output and
+passes. **283 critical-reactor tests PASS**, zero failures/errors/skips. Commands:
+
+```text
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_fast_track.py' -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_*.py' -v
+python build/test-selection/select_tests.py --base a2a0871b --head HEAD --format json
+mvn -s /workspace/work/tools/maven-settings.xml -Dmaven.repo.local=/workspace/work/m2 test
+git diff --check
+```
+
+PowerShell AST parsing passes with workspace-local PowerShell 7.4; Maven uses JDK 21 /
+Maven 3.9.11 and the session's proxy/CA configuration. SQL opt-ins were removed from the
+Maven environment. The selector maps no Maven feature area and requires the critical reactor;
+its unknown-build-path full-suite recommendation remains informational. Reviewed session
+state across the remaining source closure: no top-level temporary-table dependency is added
+by batching, local cursors/GO boundaries remain source owned, and every stage repeats its
+existing neutral-context fence and SET preamble. Actual native SQL semantics remain unexecuted.
+
+
+## PR #1971 final workflow adjustment: group readiness
+
+The first fast-track version incorrectly made Stage 15c wait for all future private inputs.
+Stage 15c is now its own SQLCMD group, independently verified and durably recorded before
+the Stage 16 evidence gate. Missing group inputs yield a clean `BLOCKED` report (exit zero),
+with completed count, blocked stage and a continuation instruction, without creating any
+pending/failed journal event for work never dispatched. Integrity/SQL/transport failures
+continue to fail nonzero; uncertain execution still blocks every retry. The journal format
+and interpretation of existing pending groups are unchanged.
+
+The next groups are Stage 16 through 26, Stage 28 through final owner checks, then the
+existing distinct-principal catalog/identity groups. This second owner boundary prevents
+missing future provisioning inputs from blocking ready binding/install work. Readiness's
+explicit contiguous `GroupStages` option scopes hashes, guards, dependencies and private
+input checks to that group. Existing strict/default readiness retains whole-packet checks.
+Every selected stage still checks the identical destination fences, SQLCMD directives,
+fixture, seven SETs, approved inputs and applicable evidence. The current manifest is pinned
+for each invocation; new inputs need a new reviewed rendering/launch. Completed hashes are
+verified against the retained journal before proceeding, with no adoption/replay of changes.
+
+Test impact: reviewed all readiness/fast-track/strict-runner references before edits. Updated
+full-run connection count, failure prefix and seed-group assertions. Regression simulations
+cover clean 19/51 pause without Stage 16 evidence, a repeated blocked launch with no approval
+or SQL, new rendering and automatic resume without seed replay, Stage 28 deferral/resume,
+missing future rendered files, changed completed seed hashes, and ambiguous seed execution
+remaining blocked even when later prerequisites are absent. Only owned synthetic packets
+are modified. No operator inputs, hashes, credentials or local evidence are accessed.
+
+Audit compatibility remains operational-only: no domain/PHI read, audit schema or application
+audit insertion is added; existing SQL transactions and their authoritative audits remain
+unchanged. Journal/report additions carry only the blocked manifest stage and safe prerequisite
+classification. No Azure SQL, application/MCP startup/enablement, production or firewall action
+is performed. Windows ODBC/password/multiple-input/cancellation limits still apply.
+
+Group-readiness verification: **100 offline acceptance tests PASS**, including **22
+fast-track tests**. The full-run exact-principal assertion and missing Stage 28 private-value
+case were strengthened and rerun individually afterward; both pass. **283 critical-reactor
+tests PASS**, no failures/errors/skips, with SQL opt-ins removed. PowerShell AST parsing and
+Git whitespace checks PASS. Commands:
+
+```text
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_fast_track.py' -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_*.py' -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_fast_track.py' -k test_complete_remaining -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_fast_track.py' -k test_future_provisioning -v
+python build/test-selection/select_tests.py --base 333646a0 --head HEAD --format json
+mvn -s /workspace/work/tools/maven-settings.xml -Dmaven.repo.local=/workspace/work/m2 test
+git diff --check
+```
+
+The selector maps no additional Maven feature area and requires the critical reactor; its
+full-suite suggestion remains informational. Direct PowerShell-backed offline tests exercise
+the changed orchestration/readiness contracts; the critical reactor protects existing
+application behavior/default-OFF boundaries. No native SQL execution is claimed.

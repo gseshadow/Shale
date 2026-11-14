@@ -20,6 +20,8 @@ SET @Snapshot=@Snapshot+(SELECT * FROM sys.security_policies ORDER BY object_id 
 SET @Snapshot=@Snapshot+(SELECT * FROM sys.indexes WHERE object_id IN(SELECT object_id FROM sys.tables WHERE is_ms_shipped=0) ORDER BY object_id,index_id FOR JSON PATH);
 SET @Snapshot=@Snapshot+(SELECT * FROM sys.columns WHERE object_id IN(SELECT object_id FROM sys.tables WHERE is_ms_shipped=0) ORDER BY object_id,column_id FOR JSON PATH);
 SET @Snapshot=@Snapshot+(SELECT Id,Issuer,Resource,Contract,JavaTimeZone,SqlTimeZone FROM dbo.AiCaseDataDeployment ORDER BY Id FOR JSON PATH);
-SELECT CONCAT('ACCEPTANCE_SNAPSHOT:',CONVERT(varchar(64),HASHBYTES('SHA2_256',@Snapshot),2),':',
+IF @Snapshot IS NULL THROW 59810,'Reconciliation metadata is incomplete.',1;
+DECLARE @AcceptanceSnapshot varchar(160)=CONCAT('ACCEPTANCE_SNAPSHOT:',CONVERT(varchar(64),HASHBYTES('SHA2_256',@Snapshot),2),':',
  (SELECT COUNT_BIG(*) FROM dbo.ShaleClients),':',(SELECT COUNT_BIG(*) FROM dbo.Users),':',
- (SELECT COUNT_BIG(*) FROM dbo.Cases)) AS AcceptanceResult;
+ (SELECT COUNT_BIG(*) FROM dbo.Cases));
+PRINT @AcceptanceSnapshot;
