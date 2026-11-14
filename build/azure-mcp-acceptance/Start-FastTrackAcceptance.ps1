@@ -52,7 +52,7 @@ try {
     if ($next -eq 51) { Write-Output 'FAST-TRACK: already complete 51/51; nothing executed.'; return }
     # Full offline prerequisites, including the Stage 16 JVM/timezone evidence,
     # are checked BEFORE approval/execution. No evidence or secret is fabricated.
-    & (Join-Path $PSScriptRoot 'Test-Readiness.ps1') -RenderedDirectory $dir -AuthoritativeFixture $AuthoritativeFixture -Stage All -PreparedOnly -SqlcmdExecutable $client | Out-Null
+    & (Join-Path $PSScriptRoot 'Test-Readiness.ps1') -RenderedDirectory $dir -AuthoritativeFixture $AuthoritativeFixture -Stage All -PreparedOnly -SqlcmdExecutable $client | ForEach-Object { if ($_ -like 'BLOCKED:*') { Write-Host $_ } }
     $run=Assert-PrivatePath (Join-Path $packet ('fast-track-'+[guid]::NewGuid().ToString('N')))
     [void][IO.Directory]::CreateDirectory($run)
     $reportPath=Join-Path $run 'report.json'

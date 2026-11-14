@@ -219,7 +219,9 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         path = self.packet / 'binding-inputs.sql'
         path.write_text(path.read_text().replace('@BindEvidenceConfirmed bit=1', '@BindEvidenceConfirmed bit=0'))
         self.render()
-        self.run_fast(success=False)
+        result = self.run_fast(success=False)
+        self.assertIn('BLOCKED: 16-binding-preflight', result.stdout)
+        self.assertIn('worker/JVM/timezone evidence', result.stdout)
         self.assertFalse(self.calls.exists())
         self.assertFalse(self.approvals.exists())
 

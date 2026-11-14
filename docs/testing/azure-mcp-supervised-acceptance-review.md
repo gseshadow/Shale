@@ -273,3 +273,23 @@ one approval, exact destinations/principals/flags, no replay, SQL failure, inter
 results, checkpoint drift, missing evidence, tampering and reconciliation output layouts. No
 SQLCMD, Azure SQL or operator private inputs are used. Native Windows ODBC multiple-input
 execution and hidden-input/cancellation behavior remain local verification limitations.
+
+Fast-track verification: **92 offline acceptance tests PASS**, including the 14 new
+fast-track cases; the 14-case focused suite was rerun after improving blocker output and
+passes. **283 critical-reactor tests PASS**, zero failures/errors/skips. Commands:
+
+```text
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_fast_track.py' -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_*.py' -v
+python build/test-selection/select_tests.py --base a2a0871b --head HEAD --format json
+mvn -s /workspace/work/tools/maven-settings.xml -Dmaven.repo.local=/workspace/work/m2 test
+git diff --check
+```
+
+PowerShell AST parsing passes with workspace-local PowerShell 7.4; Maven uses JDK 21 /
+Maven 3.9.11 and the session's proxy/CA configuration. SQL opt-ins were removed from the
+Maven environment. The selector maps no Maven feature area and requires the critical reactor;
+its unknown-build-path full-suite recommendation remains informational. Reviewed session
+state across the remaining source closure: no top-level temporary-table dependency is added
+by batching, local cursors/GO boundaries remain source owned, and every stage repeats its
+existing neutral-context fence and SET preamble. Actual native SQL semantics remain unexecuted.
