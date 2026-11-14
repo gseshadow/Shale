@@ -130,7 +130,9 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
         self.assertEqual(22, len(calls))
         self.assertEqual(['15c-seed'], self.dispatched_stages()[0])
-        for args in calls:
+        for args, group in zip(calls, self.dispatched_stages()):
+            expected_users = {s.get('user', 'offline_owner') for s in STAGES if s['name'] in group}
+            self.assertEqual({args[args.index('-U')+1]}, expected_users)
             self.assertEqual('ShaleMcpAcceptance', args[args.index('-d')+1])
             self.assertEqual('tcp:shale.database.windows.net,1433', args[args.index('-S')+1])
             self.assertEqual('11', args[args.index('-V')+1])
@@ -267,12 +269,15 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
     def test_future_provisioning_inputs_pause_only_at_stage28_then_resume(self):
         path = self.packet / 'identities.sql'
         ready = path.read_text()
-        path.write_text(ready.replace('@ProvisionApproved bit=1', '@ProvisionApproved bit=0'))
+        missing = ready.replace("N'Synthetic12SecretForUser0Only'", 'NULL', 1)
+        self.assertNotEqual(ready, missing)
+        path.write_text(missing)
         self.render()
         self.run_fast()
         self.assertEqual('BLOCKED', self.report()['Outcome'])
         self.assertEqual(30, self.report()['CompletedCount'])
         self.assertEqual('28-contained-users', self.report()['BlockedStage'])
+        self.assertIn('twelve independent contained-user inputs required', self.report()['NextAction'])
         self.assertEqual([['15c-seed'], [s['name'] for s in STAGES[19:30]]], self.dispatched_stages())
         self.assertEqual('verified', self.journal()[-1]['Kind'])
         path.write_text(ready)

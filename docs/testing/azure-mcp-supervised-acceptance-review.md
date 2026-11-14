@@ -330,3 +330,24 @@ audit insertion is added; existing SQL transactions and their authoritative audi
 unchanged. Journal/report additions carry only the blocked manifest stage and safe prerequisite
 classification. No Azure SQL, application/MCP startup/enablement, production or firewall action
 is performed. Windows ODBC/password/multiple-input/cancellation limits still apply.
+
+Group-readiness verification: **100 offline acceptance tests PASS**, including **22
+fast-track tests**. The full-run exact-principal assertion and missing Stage 28 private-value
+case were strengthened and rerun individually afterward; both pass. **283 critical-reactor
+tests PASS**, no failures/errors/skips, with SQL opt-ins removed. PowerShell AST parsing and
+Git whitespace checks PASS. Commands:
+
+```text
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_fast_track.py' -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_*.py' -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_fast_track.py' -k test_complete_remaining -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_fast_track.py' -k test_future_provisioning -v
+python build/test-selection/select_tests.py --base 333646a0 --head HEAD --format json
+mvn -s /workspace/work/tools/maven-settings.xml -Dmaven.repo.local=/workspace/work/m2 test
+git diff --check
+```
+
+The selector maps no additional Maven feature area and requires the critical reactor; its
+full-suite suggestion remains informational. Direct PowerShell-backed offline tests exercise
+the changed orchestration/readiness contracts; the critical reactor protects existing
+application behavior/default-OFF boundaries. No native SQL execution is claimed.
