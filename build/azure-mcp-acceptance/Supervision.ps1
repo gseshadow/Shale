@@ -47,9 +47,23 @@ function Read-SafeResult([object[]]$Lines, [string]$Stage, [int]$Parts) {
     $text = ($Lines | ForEach-Object { [string]$_ }) -join "`n"
     if ($text -match '(?im)^\s*(Msg \d+|Sqlcmd:|STOP:)' -or $text.Length -gt 16000000) { throw 'STOP: SQL output error or overflow; raw output suppressed.' }
     if ($Stage -ceq 'reconcile') {
-        $matches = [regex]::Matches($text, '(?m)^ACCEPTANCE_SNAPSHOT:([A-F0-9]{64}):([0-9]+):([0-9]+):([0-9]+)\s*$')
-        if ($matches.Count -ne 1) { throw 'STOP: incomplete reconciliation output.' }
-        return $matches[0].Value.Trim()
+        # SQLCMD streams may include CRLF, indentation or a leading UTF-8 BOM.
+        # Parse complete bounded records, never arbitrary substrings or SQL text.
+        $records=@()
+        foreach ($line in ($text -split '\r?\n')) {
+            $candidate=$line.Trim().TrimStart([char]0xFEFF).Trim()
+            if ($candidate -cmatch '^ACCEPTANCE_SNAPSHOT:([A-Fa-f0-9]{64}):([0-9]{1,19}):([0-9]{1,19}):([0-9]{1,19})$') {
+                $digest=$Matches[1].ToUpperInvariant(); $counts=@()
+                foreach ($part in 2..4) {
+                    $number=0L
+                    if (-not [long]::TryParse($Matches[$part],[ref]$number)) { throw 'STOP: invalid reconciliation count.' }
+                    $counts += $number.ToString([Globalization.CultureInfo]::InvariantCulture)
+                }
+                $records += 'ACCEPTANCE_SNAPSHOT:' + $digest + ':' + ($counts -join ':')
+            } elseif ($candidate.Contains('ACCEPTANCE_SNAPSHOT:')) { throw 'STOP: malformed or truncated reconciliation record.' }
+        }
+        if ($records.Count -ne 1) { throw 'STOP: incomplete or duplicate reconciliation output.' }
+        return $records[0]
     }
     $markers = @([regex]::Matches($text, '(?m)^ACCEPTANCE_SOURCE_OK:([^\r\n]+)\s*$') | ForEach-Object { $_.Groups[1].Value.Trim() })
     if ($markers.Count -ne $Parts) { throw 'STOP: incomplete source results.' }
