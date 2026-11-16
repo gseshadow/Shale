@@ -40,7 +40,8 @@ function New-Checkpoint24Sql([string]$ticket) {
         $sql+="SELECT CAST('RECOVERY24_OK:$ticket' AS varchar(96)) AS RecoveryStatus;`nGO`n"
         return $sql
 }
-$lock=[IO.File]::Open((Join-Path $packet 'supervised.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+$lockPath=Assert-PrivatePath (Join-Path $packet 'supervised.lock')
+$lock=[IO.File]::Open($lockPath,[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
 try {
     $selectionPath=Assert-PrivatePath (Join-Path $packet 'fast-track-recovery.json')
     if (Test-Path -LiteralPath $selectionPath) { throw 'STOP: a recovery fork is already selected; preserve it and use only that fork.' }
