@@ -38,6 +38,18 @@ def audit(path):
         raise ValueError('Unsupported canonical registry')
     raw = Path(path).read_bytes()
     text = raw.decode('utf-8-sig').replace('\r\n', '\n')
+    block_pattern = r'/\* ACCEPTANCE_PROOF_DIAGNOSTIC_BEGIN \*/\n(.*?)/\* ACCEPTANCE_PROOF_DIAGNOSTIC_END \*/\n'
+    blocks = re.findall(block_pattern, text, flags=re.S)
+    diagnostic = (ROOT / 'build/azure-mcp-acceptance/ProofModuleFailure.sql').read_text(encoding='utf-8')
+    rollback_marker = ("IF ERROR_NUMBER()=59400 AND ERROR_MESSAGE()=N'CIMD proof module source/owner/context drift.' "
+                       "AND @@TRANCOUNT=0 SELECT CAST('PROOF_ROLLBACK_CONFIRMED' AS varchar(64)) AS ProofRollback;\n")
+    approved_blocks = ['IF XACT_STATE()<>0 BEGIN\n' + diagnostic + '\nEND;\n', rollback_marker,
+                       'BEGIN TRY\n', 'END TRY BEGIN CATCH\n' + diagnostic + '\nTHROW; END CATCH;\n']
+    present = 'ACCEPTANCE_PROOF_DIAGNOSTIC_BEGIN' in text
+    blocks_match = ((not present and not blocks) or
+                    (blocks == approved_blocks and text.count('/* ACCEPTANCE_PROOF_DIAGNOSTIC_BEGIN */') == 4
+                     and text.count('/* ACCEPTANCE_PROOF_DIAGNOSTIC_END */') == 4))
+    clean = re.sub(block_pattern, '', text, flags=re.S)
     payloads = PAYLOAD.findall(text)
     if len(payloads) != 16 or {int(i) for i, _ in payloads} != set(range(16)):
         raise ValueError('Incomplete or duplicate payloads')
@@ -59,20 +71,20 @@ def audit(path):
                             ExpectedExecutionContext='OWNER' if owner == '1' else 'CALLER',
                             EncodedOwnerClauseMatches=(('WITH EXECUTE AS OWNER' in body) == (owner == '1'))))
     registries_match = all(rows == expected_rows for rows in registry(text))
-    installer_at = text.find(canonical)
-    verifier_at = text.find(verify)
+    installer_at = clean.find(canonical)
+    verifier_at = clean.find(verify)
     # This is evidence of supplied preamble bytes, not observed engine SET flags.
     preamble = '\n'.join(XML_OPTIONS) + '\nGO\n'
     packet_options = (installer_at >= 0 and verifier_at > installer_at
-                      and text[:installer_at].endswith(preamble)
-                      and text[:verifier_at].endswith(preamble))
+                      and clean[:installer_at].endswith(preamble)
+                      and clean[:verifier_at].endswith(preamble))
     return dict(InputSHA256=hashlib.sha256(raw).hexdigest(), ModuleCount=len(results),
                 ExpectedRegistriesMatch=registries_match,
                 InstallerMatchesReviewedSource=(installer_at >= 0),
                 VerifierMatchesReviewedSource=(verifier_at >= 0),
                 PacketSessionPreamblesMatch=packet_options,
                 AllEncodedDefinitionsMatch=all(r['DefinitionHashMatches'] and r['EncodedOwnerClauseMatches'] for r in results),
-                EngineMetadataObserved=False, Modules=results)
+                EngineMetadataObserved=False, AcceptanceDiagnosticsPresent=present, AcceptanceDiagnosticBlocksMatch=blocks_match, Modules=results)
 
 
 def main():
@@ -86,7 +98,7 @@ def main():
         print('STOP: unsupported/incomplete Stage 21 input; SQL, paths and exception text suppressed.', file=sys.stderr)
         return 2
     print(json.dumps(result, indent=2))
-    return 0 if result['AllEncodedDefinitionsMatch'] and result['ExpectedRegistriesMatch'] else 1
+    return 0 if result['AllEncodedDefinitionsMatch'] and result['ExpectedRegistriesMatch'] and result['AcceptanceDiagnosticBlocksMatch'] else 1
 
 
 if __name__ == '__main__':

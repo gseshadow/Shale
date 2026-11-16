@@ -49,7 +49,9 @@ try {
     if ($JournalPath) {
         $journal=Assert-PrivatePath $JournalPath
         if ([IO.Path]::GetDirectoryName($journal) -cne $packet -or -not (Test-Path -LiteralPath $journal)) { throw 'STOP: recovery journal must already exist in this packet.' }
-        $selection=Get-Content -LiteralPath (Assert-PrivatePath (Join-Path $packet 'fast-track-recovery.json')) -Raw | ConvertFrom-Json
+        $selectionPath=Assert-PrivatePath (Join-Path $packet 'fast-track-stage21-recovery.json')
+        if (-not (Test-Path -LiteralPath $selectionPath)) { $selectionPath=Assert-PrivatePath (Join-Path $packet 'fast-track-recovery.json') }
+        $selection=Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
         if ($selection.Journal -cne $journal) { throw 'STOP: only the selected recovery fork can execute.' }
     }
     $history=Get-FastTrackHistory $journal $stages $baseline $dir
@@ -64,7 +66,7 @@ try {
     $run=Assert-PrivatePath (Join-Path $packet ('fast-track-'+[guid]::NewGuid().ToString('N')))
     [void][IO.Directory]::CreateDirectory($run)
     $reportPath=Join-Path $run 'report.json'
-    $report=[ordered]@{Mode='FAST_TRACK'; Server='shale.database.windows.net'; Database='ShaleMcpAcceptance'; CompletedThrough=$stages[$next-1].name; CompletedCount=$next; CompletedStages=@(); Outcome='NOT_STARTED'; FailureStage=$null; BlockedStage=$null; ExitCode=$null; SqlErrorNumbers=@(); Assertions=@(); SessionFailures=@(); FailureCode=''; AttemptedGroupStages=@(); NextAction='Approve the reviewed acceptance run.'}
+    $report=[ordered]@{Mode='FAST_TRACK'; Server='shale.database.windows.net'; Database='ShaleMcpAcceptance'; CompletedThrough=$stages[$next-1].name; CompletedCount=$next; CompletedStages=@(); Outcome='NOT_STARTED'; FailureStage=$null; BlockedStage=$null; ExitCode=$null; SqlErrorNumbers=@(); Assertions=@(); SessionFailures=@(); ProofModules=@(); ProofDiagnosticsValid=$false; RollbackConfirmed=$false; FailureCode=''; AttemptedGroupStages=@(); NextAction='Approve the reviewed acceptance run.'}
     function Append-RunEvent($Record) {
         $Record.Index=$script:index
         $payload=$Record | ConvertTo-Json -Compress
@@ -162,6 +164,12 @@ try {
             $report.ExitCode=$capture.ExitCode; $report.SqlErrorNumbers=$numbers
             $report.Assertions=@(Get-SafeFastTrackAssertions $capture.Lines)
             $report.SessionFailures=@(Get-SafeFastTrackSessionFailures $capture.Lines $report.FailureStage)
+            if ($report.FailureStage -ceq '21-proof') {
+                $proof=Read-ProofModuleFailures $capture.Lines
+                $report.ProofModules=@($proof.Modules); $report.ProofDiagnosticsValid=$proof.Valid
+                $report.RollbackConfirmed=$proof.RollbackConfirmed
+                foreach ($module in $proof.Modules) { Write-Host ("PROOF: "+$module.Module+" failed=["+($module.FailedProperties -join ',')+"]") }
+            }
             Write-Host ("STOP: stage="+$report.FailureStage+" exit="+$capture.ExitCode+" SQL-errors=["+($numbers -join ',')+"] assertions=["+($report.Assertions -join ',')+"] session-failures=["+($report.SessionFailures -join ',')+"]")
             $report.FailureCode=if ($capture.FailureCode) {$capture.FailureCode} elseif ($numbers.Count) {'SQL_ERROR'} elseif ($capture.ExitCode -ne 0) {'PROCESS_EXIT'} elseif (-not $capture.PasswordPromptObserved -or -not $capture.PasswordInputReadyShown) {'PASSWORD_PROMPT_NOT_CONFIRMED'} else {'INCOMPLETE_RESULTS'}
             Append-RunEvent ([ordered]@{Kind='failed';Stage=$report.FailureStage;Index=0})

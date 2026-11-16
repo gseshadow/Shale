@@ -71,6 +71,15 @@ class ProofModuleDiagnosticTest(unittest.TestCase):
         self.assertTrue(report['AllEncodedDefinitionsMatch'])
         self.assertFalse(report['ExpectedRegistriesMatch'])
 
+    def test_unapproved_marked_diagnostic_sql_is_not_blessed_by_stripping(self):
+        text = diag.INSTALLER.read_text() + ('/* ACCEPTANCE_PROOF_DIAGNOSTIC_BEGIN */\n'
+                                             'PRIVATE_NEVER_PRINT\n'
+                                             '/* ACCEPTANCE_PROOF_DIAGNOSTIC_END */\n')
+        result = self.run_input(text)
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(json.loads(result.stdout)['AcceptanceDiagnosticBlocksMatch'])
+        self.assertNotIn('PRIVATE_NEVER_PRINT', result.stdout + result.stderr)
+
     def test_private_or_malformed_input_is_never_echoed(self):
         for text in ('PRIVATE_NEVER_PRINT', diag.INSTALLER.read_text() + '\nPRIVATE_NEVER_PRINT'):
             result = self.run_input(text)

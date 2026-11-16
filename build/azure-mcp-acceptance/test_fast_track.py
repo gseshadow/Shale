@@ -75,6 +75,7 @@ foreach ($file in $files) {
  if ($name.EndsWith('-done')) { $stage=$name.Substring(0,$name.Length-5); $lines.Add('FAST_STAGE_DONE:'+$stage); continue }
  $spec=$specs | Where-Object name -CEQ $name
  if (-not $spec) { throw 'Unknown stage dispatched' }
+ if (MODE -eq 'module-drift' -and $name -ceq '21-proof') { $lines.Add('PROOF_MODULE_FAIL:AiCimdDataLocateAccessOwnerV1:0000100'); $lines.Add('PROOF_ROLLBACK_CONFIRMED'); $lines.Add('Msg 59400, Level 16, State 1, PRIVATE_NEVER_PRINT'); $lines.Add('CIMD proof module source/owner/context drift.'); $exit=16; break }
  if (MODE -eq 'proof-fail' -and $name -ceq '21-proof') { $lines.Add('Msg 59400, Level 16, State 1, Server PRIVATE_NEVER_PRINT, Line 12'); $lines.Add('Fresh unscoped dbo lease required.'); $exit=16; break }
  if (MODE -eq 'sql-fail' -and $name -ceq '20-pr3') { $lines.Add('Msg 50001, Level 16, State 1, PRIVATE_NEVER_PRINT'); $exit=16; break }
  switch ($name) {
@@ -150,6 +151,20 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.run_fast()  # completed runs never replay
         self.assertEqual(before, self.calls.read_text())
         self.assertIn('outcome=COMPLETE', result.stdout)
+
+    def test_module_drift_retains_only_safe_names_flags_and_rollback_marker(self):
+        result = self.run_fast('module-drift', success=False)
+        report = self.report()
+        self.assertEqual(24, report['CompletedCount'])
+        self.assertEqual(['PROOF_MODULE_DRIFT'], report['Assertions'])
+        self.assertEqual([{'Module': 'AiCimdDataLocateAccessOwnerV1',
+                           'FailedProperties': ['QUOTED_IDENTIFIER']}], report['ProofModules'])
+        self.assertTrue(report['ProofDiagnosticsValid'])
+        self.assertTrue(report['RollbackConfirmed'])
+        self.assertIn('QUOTED_IDENTIFIER', result.stdout)
+        before = self.calls.read_bytes()
+        self.run_fast(success=False)
+        self.assertEqual(before, self.calls.read_bytes())
 
     def test_proof_assertion_is_allowlisted_and_failure_remains_pending(self):
         result = self.run_fast('proof-fail', success=False)

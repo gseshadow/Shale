@@ -15,6 +15,7 @@ if ($packet -eq $repo -or -not $packet.StartsWith((Join-Path $repo 'work') + [IO
     throw 'Use a private directory under this checkout work/; never a shared or tracked output directory.'
 }
 . (Join-Path $PSScriptRoot 'Supervision.ps1')
+. (Join-Path $PSScriptRoot 'ProofModuleDiagnostics.ps1')
 [void](Assert-PrivatePath $packet)
 if ($Continuation) {
     foreach ($required in @('fixture.sql','normalize.sql','identities-foundation.sql','identities.sql','seed.sql','binding-inputs.sql','phase1r.json')) {
@@ -124,6 +125,7 @@ foreach ($stage in $allStages) {
                 $body = "DECLARE @Phase1RMode varchar(10)='$mode';`n" + $body
             } else { $body = "THROW 59807,'STOP: independent fresh-fixture Phase1R hash review required.',1;" }
         } else { $body = Expand-Sql (Join-Path $repo $source) }
+        if ($stage.name -ceq '21-proof') { $body=Add-ProofModuleDiagnostics $body $source }
         # Bound each source on both sides. No app/tenant context is carried between source batches.
         $sql += $sourceSession + $body + "`nGO`n" + $stageFence
         if ([array]::IndexOf(@($allStages.name), $stage.name) -ge 18) {

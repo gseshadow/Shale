@@ -26,7 +26,7 @@ function Read-FastTrackBatch([object[]]$Lines,[object[]]$Stages) {
     [pscustomobject]@{ Completed=$completed; Complete=($next -eq $Stages.Count -and -not $invalid -and -not $active); Invalid=$invalid }
 }
 function Get-FastTrackHistory([string]$Path,[object[]]$Stages,[string]$BaselineHash,[string]$Directory) {
-    $next=18; $pending=$false; $groupEnd=18; $chain='0'*64; $index=0; $groupStart=18; $failedStage=$null; $prefix=''; $recovered=$false
+    $next=18; $pending=$false; $groupEnd=18; $chain='0'*64; $index=0; $groupStart=18; $failedStage=$null; $prefix=''; $recovered=$false; $checkpointSnapshot=$null
     if (Test-Path -LiteralPath $Path) {
         if (-not [IO.File]::ReadAllText($Path).EndsWith("`n")) { throw 'STOP: fast-track journal truncated; preserve it for reconciliation.' }
         foreach ($line in [IO.File]::ReadAllLines($Path)) {
@@ -37,7 +37,11 @@ function Get-FastTrackHistory([string]$Path,[object[]]$Stages,[string]$BaselineH
                 $row=$outer.Payload | ConvertFrom-Json
                 if ($row.Index -ne $index) { throw 'Index mismatch' }
                 if ($index -eq 0) {
-                    if ($row.Kind -cne 'baseline' -or $row.Hash -cne $BaselineHash) { throw 'Baseline changed' }
+                    if ($row.Hash -cne $BaselineHash) { throw 'Baseline changed' }
+                    if ($row.Kind -ceq 'stage21-baseline') {
+                        Assert-Stage21RetryReceipt $row.Evidence $row.EvidenceHash $Directory $Stages $BaselineHash
+                        $next=24; $recovered=$true
+                    } elseif ($row.Kind -cne 'baseline') { throw 'Unknown baseline' }
                 } else {
                     switch ($row.Kind) {
                         'pending' { if ($pending -or $row.Start -ne $next -or $row.End -le $next -or $row.End -gt 51) { throw 'Bad pending group' }; $pending=$true; $groupStart=$row.Start; $groupEnd=$row.End; $failedStage=$null }
@@ -67,7 +71,7 @@ function Get-FastTrackHistory([string]$Path,[object[]]$Stages,[string]$BaselineH
                                 if ((Get-FileHash -LiteralPath $capturePath -Algorithm SHA256).Hash -cne $capture.Hash) { throw 'Recovery capture changed' }
                             }
                             if (@($receipt.Captures).Count -ne 2) { throw 'Incomplete captures' }
-                            $pending=$false; $recovered=$true
+                            $pending=$false; $recovered=$true; $checkpointSnapshot=$receipt.Snapshot
                         }
                         default { throw 'Unknown record' }
                     }
@@ -76,7 +80,7 @@ function Get-FastTrackHistory([string]$Path,[object[]]$Stages,[string]$BaselineH
             } catch { throw 'STOP: invalid fast-track journal; preserve it for independent reconciliation.' }
         }
     }
-    [pscustomobject]@{ Next=$next; Pending=$pending; Recovered=$recovered; GroupStart=$groupStart; GroupEnd=$groupEnd; FailedStage=$failedStage; Chain=$chain; Index=$index }
+    [pscustomobject]@{ Next=$next; Pending=$pending; Recovered=$recovered; Checkpoint24Snapshot=$checkpointSnapshot; GroupStart=$groupStart; GroupEnd=$groupEnd; FailedStage=$failedStage; Chain=$chain; Index=$index }
 }
 
 # Exact public assertion text only. Never echo a SQL message, header suffix,
@@ -126,3 +130,27 @@ function Get-SafeFastTrackSessionFailures([object[]]$Lines,[string]$Stage) {
         }
     }
 }
+
+# Names and flags only. Unknown, duplicate, all-zero or malformed records fail
+# closed as diagnostic evidence; raw lines never enter reports or exceptions.
+function Read-ProofModuleFailures([object[]]$Lines) {
+    $names=@([IO.File]::ReadAllLines((Join-Path $PSScriptRoot '../sql-confinement/cimd-v1-modules.sha256')) | ForEach-Object { $_.Split('=')[0] })
+    $flags=@('OBJECT_MISSING','DEFINITION_UNAVAILABLE','OWNERSHIP','ANSI_NULLS','QUOTED_IDENTIFIER','EXECUTION_CONTEXT','DEFINITION_HASH')
+    $found=@(); $seen=@(); $invalid=$false; $rollback=0
+    foreach ($line in ((($Lines | ForEach-Object {[string]$_}) -join "`n") -split '\r?\n')) {
+        $candidate=$line.Trim()
+        if ($candidate -ceq 'PROOF_ROLLBACK_CONFIRMED') { $rollback++; continue }
+        if (-not $candidate.StartsWith('PROOF_MODULE_FAIL:')) { continue }
+        if ($candidate -cnotmatch '^PROOF_MODULE_FAIL:([A-Za-z0-9_]{1,128}):([01]{7})$') { $invalid=$true; continue }
+        $name=$Matches[1]; $mask=$Matches[2]
+        if ($name -cnotin $names -or $name -cin $seen -or $mask -ceq '0000000') { $invalid=$true; continue }
+        $seen+=$name; $failed=@()
+        foreach ($i in 0..6) { if ($mask[$i] -ceq [char]'1') { $failed+=$flags[$i] } }
+        $found+=[pscustomobject]@{Module=$name; FailedProperties=$failed}
+    }
+    if ($rollback -gt 1) { $invalid=$true }
+    if ($invalid) { $found=@() }
+    [pscustomobject]@{Modules=@($found); Valid=(-not $invalid -and $found.Count -gt 0); RollbackConfirmed=($rollback -eq 1 -and -not $invalid)}
+}
+
+. (Join-Path $PSScriptRoot 'Stage21RetryEvidence.ps1')

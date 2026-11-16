@@ -147,20 +147,14 @@ would need a separately reviewed plan, not an investigative installer replay.
 
 ## Recovery recommendation
 
-Keep all 24 completed stages and all existing evidence. The new failed/pending
-Stage 21 attempt on the selected fork remains unresolved. Do not reuse the older
-`Stage21Recovery.ps1` to clear this failure: it supports only the original grouped
-16–26 failure and refuses a second selected fork. Do not remove the selection file,
-modify either journal, mark a stage complete, reset acceptance or replay 00–20.
-
-First collect/review the retained-packet audit and, only when independently authorized,
-the read-only current-state query. If modules are absent, separately reconfirm the
-existing binding, OFF controls and PR3 receipt/confinement checkpoint without installing
-anything. Object absence alone is insufficient. Any existing/partial module, drift or
-uncertain transaction means stop and preserve evidence. There is no automatic recovery
-or further execution command in this diagnostic change. A future correction must be
-based on an identified discrepancy; any subsequent resume requires a separately reviewed
-resolution of the pending attempt while preserving the verified prefix.
+Historical module/property identification remains unavailable. The follow-up
+[transaction diagnostics and one evidence-bound resume](stage21-transaction-resume.md)
+now implements the narrow recovery for the latest failed single-stage attempt.
+It preserves all existing journals and requires one new read-only observation to
+match the prior verified checkpoint24 snapshot. It changes only acceptance packet
+error-path instrumentation; original module bodies, hashes and assertions remain.
+Do not reuse the original grouped `Stage21Recovery.ps1`, remove selection files,
+edit journals or retry without the evidence-bound procedure and separate run approval.
 
 Audit compatibility: public-source hashing and narrow administrative catalog metadata
 only. No sensitive application read, domain/admin database mutation, audit schema change
