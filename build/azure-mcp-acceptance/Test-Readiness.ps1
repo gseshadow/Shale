@@ -6,7 +6,8 @@ param(
     [string]$Stage = 'All',
     [string[]]$GroupStages,
     [switch]$PreparedOnly,
-    [string]$SqlcmdExecutable
+    [string]$SqlcmdExecutable,
+    [switch]$SqlClient
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Supervision.ps1')
@@ -36,7 +37,7 @@ if ($AuthoritativeFixture) {
 $tools = if ($PreparedOnly) { @() } else { @('java','javac') }
 if ($SqlcmdExecutable) {
     if (-not [IO.Path]::IsPathRooted($SqlcmdExecutable) -or -not (Test-Path -LiteralPath $SqlcmdExecutable -PathType Leaf)) { throw 'STOP: absolute SQLCMD executable path required.' }
-} else { $tools += 'sqlcmd' }
+} elseif (-not $SqlClient) { $tools += 'sqlcmd' }
 foreach ($tool in $tools) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "STOP: missing local prerequisite: $tool." }
 }
