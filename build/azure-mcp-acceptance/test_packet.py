@@ -64,6 +64,12 @@ class PacketTest(unittest.TestCase):
                       'PacketSessionPreamblesMatch'):
             self.assertTrue(report[field], field + ' must hold in the generated acceptance packet')
         self.assertFalse(report['EngineMetadataObserved'])
+        # Operator supplied this exact LF retry artifact. Windows checkout newlines
+        # normalize only in this offline comparison; no evidence file is changed.
+        canonical_lf = (self.rendered / '21-proof.sql').read_text(encoding='utf-8')
+        self.assertEqual('F3D4E8EB41054B0E5A5EF4A608497B6936DB0D889E77A1C99D9BE72A6FD5827E',
+                         hashlib.sha256(canonical_lf.encode('utf-8')).hexdigest().upper(),
+                         'Reviewed Stage 21 rendering must reproduce the supplied retry fingerprint')
 
     def test_every_rendered_stage_is_fenced_and_no_includes_or_variables_remain(self):
         files = list(self.rendered.glob('*.sql'))

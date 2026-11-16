@@ -58,9 +58,27 @@ acceptance renderer/transport and related generation/packet tests.
   rewrites the hex payloads. One connection per stage preserves the two sources'
   order; both sources establish the relevant options independently.
 - Ownership and persisted engine flags cannot be established by hashing text.
-  No live catalog metadata or exact retained retry packet was available to this
-  offline review. A fresh session with no reported failures establishes neither
+  No live catalog metadata was available to this offline review. A fresh session with no reported failures establishes neither
   a particular module's owner nor its persisted SET/execution-context flags.
+
+## Exact retry packet fingerprint confirmed
+
+The operator supplied the exact retry-file SHA-256:
+`F3D4E8EB41054B0E5A5EF4A608497B6936DB0D889E77A1C99D9BE72A6FD5827E`.
+Offline reconstruction from the unchanged public target/owner fences, both Stage 21
+sources, renderer SET/GO preambles and source markers produces **that exact hash**
+with LF bytes. No SQL, private inputs, credentials or journal edits are needed.
+Stage 21 has no private source input. This cryptographically matches the reviewed
+rendered bytes to the supplied retry artifact (subject to the operator's hash provenance).
+It excludes a different/stale rendered Stage 21 file or payload rewrite for this hash.
+
+The exact-hash-matched file's offline audit reports all 16 encoded definition hashes,
+all expected registry rows, both complete reviewed sources, and both session preambles
+matching. It reports `EngineMetadataObserved=false`. The fact that these input bytes
+match does **not** prove that SQL Server persisted matching ownership, flags, execution
+context or definition bytes. The failed existential predicate establishes that at least
+one persisted module comparison was false at assertion time; it supplies no further
+identity. Per-module metadata was explicitly not retained. A SHA-256 cannot recover it.
 
 **Conclusion:** the public implementation and expected hashes are internally
 consistent, and the generated packet passes the byte/preamble checks. There is no
@@ -120,8 +138,9 @@ digests, expected execution context, bounded observed context (`CALLER`, `OWNER`
 The query outputs neither definitions nor credentials, owner account names, arbitrary
 SQL messages or application data. `CurrentAssertionFindingCount` is a current-state
 failure count, not a completed-stage count. Do not run the installer to populate it.
-The output and exact retained packet audit are the next evidence needed to distinguish
-a live metadata mismatch from a stale/different packet or unavailable historical state.
+The supplied retry fingerprint already matches the reconstructed reviewed packet.
+Current query output is still needed to inspect any surviving engine metadata; a packet
+match cannot distinguish the module/property that existed only inside a rolled-back transaction.
 If everything rolled back and no transient metadata was retained, exact historical
 identification is impossible from this evidence alone; additional instrumentation
 would need a separately reviewed plan, not an investigative installer replay.
