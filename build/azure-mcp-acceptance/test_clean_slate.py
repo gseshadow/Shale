@@ -128,10 +128,15 @@ $p='DIRECTORY/new.jsonl';$old='DIRECTORY/old.jsonl'
 [IO.File]::WriteAllText($old,'historical failed/pending evidence')
 $hash=(Get-FileHash $old).Hash
 New-CleanEvent $p @{Kind='approved'};New-CleanEvent $p @{Kind='stage-pending';Stage='00-empty'}
+$original=[IO.File]::ReadAllText($p)
 [IO.File]::AppendAllText($p,'truncated')
 $bytes=[IO.File]::ReadAllText($p)
 $refused=$false;try{New-CleanEvent $p @{Kind='complete'}}catch{$refused=$true}
 if(-not $refused -or [IO.File]::ReadAllText($p) -cne $bytes -or (Get-FileHash $old).Hash -cne $hash){throw 'Evidence modified or corruption accepted'}
+$corrupt=$original.Replace('approved','declined')
+[IO.File]::WriteAllText($p,$corrupt)
+$refused=$false;try{New-CleanEvent $p @{Kind='complete'}}catch{$refused=$true}
+if(-not $refused -or [IO.File]::ReadAllText($p) -cne $corrupt){throw 'Hash-chain mutation accepted or overwritten'}
 '''.replace('DIRECTORY', directory))
 
     def test_phase1r_never_adopts_failed_comparison_or_stale_hashes(self):
@@ -170,6 +175,9 @@ if($c.Count -ne 17 -or $script:prompts -ne 17){throw 'Repeated password prompt d
 $sql=[IO.File]::ReadAllText((Join-Path $run 'identities.sql'))
 if(-not $sql.Contains("Private''PasswordFor:mcpacc_case")){throw 'Private SQL literal escape lost'}
 if((Get-FileHash ./docs/sql/ai-integration/azure-acceptance/identities.sql).Hash -cne $old){throw 'Original template changed'}
+[IO.File]::WriteAllText((Join-Path $run 'identities.sql'),$sql.Replace('mcpacc_case','mcpacc_unknown'))
+$refused=$false;try{Get-CleanIdentityCredentials $run|Out-Null}catch{$refused=$true}
+if(-not $refused){throw 'Unexpected identity would block the run after reset'}
 '''.replace('DIRECTORY', directory))
 
     def test_connection_construction_pins_target_without_password_in_connection_string(self):

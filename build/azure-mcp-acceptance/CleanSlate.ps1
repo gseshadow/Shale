@@ -160,5 +160,8 @@ function Get-CleanIdentityCredentials([string]$Run) {
         $text=[regex]::Replace($text,'(@ProvisionApproved\s+bit\s*=\s*)[01]','${1}1')
         [IO.File]::WriteAllText($path,$text)
     }
+    $expectedUsers=@(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stages.json') -Raw | ConvertFrom-Json |
+        Where-Object { $_.PSObject.Properties.Name -contains 'user' } | ForEach-Object user | Sort-Object -Unique)
+    if ($credentials.Count -ne $expectedUsers.Count -or @($expectedUsers | Where-Object { -not $credentials.ContainsKey($_) }).Count) { throw 'STOP: contained credentials do not match the 17 required manifest identities.' }
     return $credentials
 }
