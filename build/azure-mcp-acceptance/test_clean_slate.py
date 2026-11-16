@@ -1,6 +1,7 @@
 """Offline only: no az invocation, SqlConnection.Open, fixture secrets or SQL execution."""
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -208,6 +209,47 @@ $c.Dispose()
         self.assertIn('IF XACT_STATE()<>0 ROLLBACK', reset)
         self.assertNotRegex(reset, r'(?i)\b(?:DROP|CREATE|ALTER)\s+DATABASE\b|\bUSE\s+\[')
         self.assertLess(reset.index('RESET_UNSUPPORTED_FEATURE'), reset.index('BEGIN TRANSACTION'))
+
+    def test_reset_type_allowlist_is_exact_and_requires_a_table_type(self):
+        # Only the inventoried dbo table type may bypass the unknown-type refusal.
+        reset = (TOOL / 'CleanSlateReset.sql').read_text()
+        lookup = re.search(r'DECLARE\s+@AcceptanceTableTypeObjectId\s+int=\((.*?)\);', reset, re.S).group(1)
+        self.assertIn('SELECT type_table_object_id FROM sys.table_types', lookup)
+        self.assertRegex(lookup, r"CONVERT\(varbinary\(max\),SCHEMA_NAME\(schema_id\)\)=CONVERT\(varbinary\(max\),N'dbo'\)")
+        self.assertRegex(lookup, r"CONVERT\(varbinary\(max\),name\)=CONVERT\(varbinary\(max\),N'AiCaseDataIds'\)")
+        refusal = reset[reset.index('OR EXISTS(SELECT 1 FROM sys.types'):reset.index("THROW 59802,'RESET_UNSUPPORTED_FEATURE'")]
+        self.assertRegex(refusal, r't\.is_user_defined=1\s+AND NOT EXISTS\(SELECT 1 FROM sys.table_types tt WHERE tt\.user_type_id=t\.user_type_id\s+AND tt\.type_table_object_id=@AcceptanceTableTypeObjectId\)')
+        self.assertIn("AND NOT(type='TT' AND object_id=ISNULL(@AcceptanceTableTypeObjectId,-1))", refusal)
+        # No blanket TT permission: unknown table types still hit the existing object guard.
+        allowed_kinds = re.search(r'FROM sys.objects WHERE is_ms_shipped=0 AND type NOT IN\(([^)]+)\)', refusal).group(1)
+        self.assertNotIn("'TT'", allowed_kinds)
+        self.assertLess(reset.index("'RESET_UNSUPPORTED_FEATURE'"), reset.index('BEGIN TRANSACTION'))
+
+    def test_reset_preserves_known_type_constraints_until_drop_type(self):
+        # Canonical AiCaseDataIds has a CHECK constraint: ALTER TABLE cannot drop it.
+        reset = (TOOL / 'CleanSlateReset.sql').read_text()
+        constraint_drop = re.search(r"INSERT @Drops SELECT object_id,N'ALTER TABLE.*?;", reset, re.S).group(0)
+        self.assertIn("type IN('F','C','D')", constraint_drop)
+        self.assertIn('parent_object_id<>ISNULL(@AcceptanceTableTypeObjectId,-1)', constraint_drop)
+        installer = (ROOT / 'docs/sql/ai-integration/phase3b8-confinement.sql').read_text()
+        self.assertRegex(installer, r'CREATE TYPE dbo\.AiCaseDataIds AS TABLE\(CaseId int NOT NULL PRIMARY KEY CHECK\(CaseId>0\)\)')
+
+    def test_reset_drops_known_type_after_modules_before_empty_check_and_commit(self):
+        # Type references in parameters/local declarations must disappear first;
+        # DROP TYPE also removes its TT/constraint objects before emptiness is checked.
+        reset = (TOOL / 'CleanSlateReset.sql').read_text()
+        module_loop = reset.index('WHILE EXISTS(SELECT 1 FROM sys.objects WHERE is_ms_shipped=0 AND parent_object_id=0')
+        module_loop_end = reset.index(' END;', module_loop)
+        drop_type = re.search(r"IF @AcceptanceTableTypeObjectId IS NOT NULL\s+EXEC sys\.sp_executesql N'DROP TYPE \[dbo\]\.\[AiCaseDataIds\];';", reset)
+        self.assertIsNotNone(drop_type, 'Absent type must be a no-op; drop must name only the known type')
+        empty_check = reset.index("IF EXISTS(SELECT 1 FROM sys.objects WHERE is_ms_shipped=0) THROW 59802,'RESET_OBJECTS_REMAIN'")
+        self.assertLess(reset.index('BEGIN TRANSACTION'), module_loop)
+        self.assertLess(module_loop_end, drop_type.start())
+        self.assertLess(drop_type.end(), empty_check)
+        self.assertLess(empty_check, reset.index('DROP SCHEMA'))
+        self.assertLess(empty_check, reset.index(' COMMIT;'))
+        self.assertIn('IF XACT_STATE()<>0 ROLLBACK;\n THROW;', reset)
+        self.assertEqual(1, len(re.findall(r'DROP TYPE', re.sub(r'/\*.*?\*/', '', reset, flags=re.S))))
 
     def test_resource_identity_refuses_wrong_database_and_running_app(self):
         self.ps(r'''

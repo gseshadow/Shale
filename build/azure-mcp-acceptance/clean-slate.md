@@ -53,10 +53,13 @@ The reset is **in place**, preserving Azure SQL database identity/configuration,
 owner and Azure resource settings. A repeated SQL identity fence precedes a single
 DDL transaction with `XACT_ABORT ON`, exclusive installer lock and rollback/rethrow.
 Only acceptance object families are supported. Unknown/unsupported features
-(DDL triggers, temporal/external/memory-optimized tables, user-defined types,
+(DDL triggers, temporal/external/memory-optimized tables, unrecognized user-defined types,
 assemblies, credentials, external sources, keys/certificates, XML collections)
 are refused before drops. A dependency cycle rolls back the reset. No fallback
 connects to `master`, drops/recreates a database, or changes the shared server.
+The known `dbo.AiCaseDataIds` table type is the sole type exception; it is dropped
+with its CHECK/PK constraints after referencing modules and before the empty-object
+check. Same-named types in other schemas and non-table types remain unsupported.
 Stage 00 independently requires the resulting database to be empty.
 
 At the Stage 09 boundary, a fresh read-only catalog capture is compared with the
