@@ -11,6 +11,12 @@ IF CONVERT(varbinary(max),ISNULL(DB_NAME(),N''))<>CONVERT(varbinary(max),N'Shale
  OR SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL
  OR SESSION_CONTEXT(N'PrincipalEmail') IS NOT NULL
  THROW 59800,'RESET_IDENTITY_REFUSED',1;
+/* Only the known acceptance table type is supported. Its TT catalog object and
+   type-owned constraints survive until referencing modules have been removed. */
+DECLARE @AcceptanceTableTypeObjectId int=(
+ SELECT type_table_object_id FROM sys.table_types
+ WHERE CONVERT(varbinary(max),SCHEMA_NAME(schema_id))=CONVERT(varbinary(max),N'dbo')
+  AND CONVERT(varbinary(max),name)=CONVERT(varbinary(max),N'AiCaseDataIds'));
 /* Refuse unfamiliar database features before any destructive statement.
    This reset supports the acceptance fixture / installer object families only. */
 IF EXISTS(SELECT 1 FROM sys.triggers WHERE parent_class=0 AND is_ms_shipped=0)
@@ -22,9 +28,12 @@ IF EXISTS(SELECT 1 FROM sys.triggers WHERE parent_class=0 AND is_ms_shipped=0)
  OR EXISTS(SELECT 1 FROM sys.asymmetric_keys)
  OR EXISTS(SELECT 1 FROM sys.symmetric_keys WHERE name<>N'##MS_DatabaseMasterKey##')
  OR EXISTS(SELECT 1 FROM sys.xml_schema_collections WHERE xml_collection_id>1)
- OR EXISTS(SELECT 1 FROM sys.types WHERE is_user_defined=1)
+ OR EXISTS(SELECT 1 FROM sys.types t WHERE t.is_user_defined=1
+  AND NOT EXISTS(SELECT 1 FROM sys.table_types tt WHERE tt.user_type_id=t.user_type_id
+   AND tt.type_table_object_id=@AcceptanceTableTypeObjectId))
  OR EXISTS(SELECT 1 FROM sys.database_principals WHERE principal_id>4 AND type NOT IN('R','S','E','X'))
- OR EXISTS(SELECT 1 FROM sys.objects WHERE is_ms_shipped=0 AND type NOT IN('U','V','P','FN','IF','TF','TR','C','D','F','PK','UQ','SO','SN','IT','SP'))
+ OR EXISTS(SELECT 1 FROM sys.objects WHERE is_ms_shipped=0 AND type NOT IN('U','V','P','FN','IF','TF','TR','C','D','F','PK','UQ','SO','SN','IT','SP')
+  AND NOT(type='TT' AND object_id=ISNULL(@AcceptanceTableTypeObjectId,-1)))
  THROW 59802,'RESET_UNSUPPORTED_FEATURE',1;
 BEGIN TRY
  BEGIN TRANSACTION;
@@ -35,7 +44,8 @@ BEGIN TRY
  DECLARE @Drops table(Id int PRIMARY KEY,Ddl nvarchar(max));
  INSERT @Drops SELECT object_id,N'DROP SECURITY POLICY '+QUOTENAME(SCHEMA_NAME(schema_id))+N'.'+QUOTENAME(name) FROM sys.security_policies;
  INSERT @Drops SELECT object_id,N'ALTER TABLE '+QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id))+N'.'+QUOTENAME(OBJECT_NAME(parent_object_id))+N' DROP CONSTRAINT '+QUOTENAME(name)
- FROM sys.objects WHERE is_ms_shipped=0 AND type IN('F','C','D') AND parent_object_id<>0;
+ FROM sys.objects WHERE is_ms_shipped=0 AND type IN('F','C','D') AND parent_object_id<>0
+  AND parent_object_id<>ISNULL(@AcceptanceTableTypeObjectId,-1);
  INSERT @Drops SELECT object_id,N'DROP TRIGGER '+QUOTENAME(SCHEMA_NAME(schema_id))+N'.'+QUOTENAME(name) FROM sys.objects WHERE is_ms_shipped=0 AND type='TR';
  WHILE EXISTS(SELECT 1 FROM @Drops)
  BEGIN
@@ -56,6 +66,10 @@ BEGIN TRY
   IF @Ddl IS NULL THROW 59802,'RESET_DEPENDENCY_CYCLE',1;
   EXEC sys.sp_executesql @Ddl;
  END;
+ /* Table types cannot be altered like ordinary tables. DROP TYPE removes its
+    CHECK/PK objects atomically, after all referencing procedures/functions. */
+ IF @AcceptanceTableTypeObjectId IS NOT NULL
+  EXEC sys.sp_executesql N'DROP TYPE [dbo].[AiCaseDataIds];';
  IF EXISTS(SELECT 1 FROM sys.objects WHERE is_ms_shipped=0) THROW 59802,'RESET_OBJECTS_REMAIN',1;
  DECLARE @Name sysname;
  WHILE EXISTS(SELECT 1 FROM sys.schemas WHERE schema_id<16384 AND name NOT IN(N'dbo',N'guest',N'sys',N'INFORMATION_SCHEMA'))
