@@ -1,0 +1,161 @@
+# Stage 21 PROOF_MODULE_DRIFT: read-only investigation
+
+Reported after PR #1972: checkpoint24 was verified, then one separate-connection
+Stage 21 attempt failed with 59400 / `PROOF_MODULE_DRIFT`, no session failures,
+and no completion marker. Preserve that attempt's report, packet, all journals,
+client/utility hashes and the completed 00–20 evidence. This investigation executes
+no SQL, changes no objects and makes no journal recovery decision.
+
+## What is established
+
+The public assertion is **“CIMD proof module source/owner/context drift.”** It is
+an existential check over **16 modules**, not a module-specific error. Each must
+have a dbo-schema object and a `sys.sql_modules` row satisfying all of:
+
+| Property | Exact requirement |
+| --- | --- |
+| Definition digest | SHA-256 of the complete `nvarchar` definition, compared with its expected `binary(32)` hash |
+| Effective owner | `COALESCE(sys.objects.principal_id, sys.schemas.principal_id) = 1` (dbo) |
+| ANSI_NULLS | `uses_ansi_nulls = 1` |
+| QUOTED_IDENTIFIER | `uses_quoted_identifier = 1` |
+| Execution context | `execute_as_principal_id = -2` for `AiCimdDataLocateAccessOwnerV1`; NULL (CALLER) for the other 15 |
+
+The assertion occurs directly in the installer, in its embedded seal verification,
+and in the second Stage 21 source (the standalone verifier). The assertion code
+alone does not identify which occurrence or which module/property failed. Absence
+of a stage completion marker also does not distinguish these occurrences. Check
+retained `CompletedStages`/source markers if available; do not infer them.
+
+The first two occurrences execute **inside the installer's transaction**. Its CATCH
+rolls back before rethrowing. A later independent catalog query cannot recover
+rolled-back module metadata. If the query below returns 16 absent rows, it cannot
+identify the historical failing module. If the standalone verifier failed after a
+successful installer commit, the modules may still exist and can be inspected.
+No current observation is a substitute for evidence from the failed transaction.
+
+## Offline findings against the reviewed public code
+
+Base: merge of PR #1972 (`bd458064`). Review covered the repository prompt rules,
+database schema and tenancy/RLS architecture, CIMD generator, installer, verifier,
+acceptance renderer/transport and related generation/packet tests.
+
+- All **16** `@C4aModule0` through `@C4aModule15` hex payloads decode to the expected
+  names. SHA-256 of their exact UTF-16LE bytes matches every expected module digest
+  in both installer and standalone verifier. No hash was refreshed or replaced.
+- Exactly `AiCimdDataLocateAccessOwnerV1` declares `WITH EXECUTE AS OWNER`; the other
+  15 declare no execution-context override, matching the expected CALLER metadata.
+- The installer sets ANSI_NULLS and QUOTED_IDENTIFIER ON before module creation.
+  It creates modules with separate `sys.sp_executesql` calls from hex-decoded
+  `nvarchar(max)`. Module bodies therefore do not acquire the rendering file's
+  Windows CRLF line endings. The hex already fixes their internal line endings.
+- The acceptance renderer supplies the seven XML SET options before each Stage 21
+  source, followed by GO. In particular, ANSI_NULLS and QUOTED_IDENTIFIER are ON.
+  ODBC SQLCMD's default QUOTED_IDENTIFIER setting is therefore insufficient to
+  explain a failure by itself. Source and generated-packet regression tests check
+  the exact payloads, expected registries and both SET preambles.
+- The renderer preserves the installer and verifier source bytes (apart from file
+  newline representation). No accepted include, target fence or session preamble
+  rewrites the hex payloads. One connection per stage preserves the two sources'
+  order; both sources establish the relevant options independently.
+- Ownership and persisted engine flags cannot be established by hashing text.
+  No live catalog metadata was available to this offline review. A fresh session with no reported failures establishes neither
+  a particular module's owner nor its persisted SET/execution-context flags.
+
+## Exact retry packet fingerprint confirmed
+
+The operator supplied the exact retry-file SHA-256:
+`F3D4E8EB41054B0E5A5EF4A608497B6936DB0D889E77A1C99D9BE72A6FD5827E`.
+Offline reconstruction from the unchanged public target/owner fences, both Stage 21
+sources, renderer SET/GO preambles and source markers produces **that exact hash**
+with LF bytes. No SQL, private inputs, credentials or journal edits are needed.
+Stage 21 has no private source input. This cryptographically matches the reviewed
+rendered bytes to the supplied retry artifact (subject to the operator's hash provenance).
+It excludes a different/stale rendered Stage 21 file or payload rewrite for this hash.
+
+The exact-hash-matched file's offline audit reports all 16 encoded definition hashes,
+all expected registry rows, both complete reviewed sources, and both session preambles
+matching. It reports `EngineMetadataObserved=false`. The fact that these input bytes
+match does **not** prove that SQL Server persisted matching ownership, flags, execution
+context or definition bytes. The failed existential predicate establishes that at least
+one persisted module comparison was false at assertion time; it supplies no further
+identity. Per-module metadata was explicitly not retained. A SHA-256 cannot recover it.
+
+**Conclusion:** the public implementation and expected hashes are internally
+consistent, and the generated packet passes the byte/preamble checks. There is no
+established implementation/hash/runner defect to correct yet. The exact historical
+module/property remains unknown. Do not weaken the assertion, change ownership,
+rehash definitions or treat a text audit as observed SQL Server metadata.
+
+## Audit the exact retry packet without SQL
+
+Run with Python 3 from the reviewed checkout, using the **retained retry rendering**:
+
+```powershell
+python build/azure-mcp-acceptance/proof_module_diagnostic.py --input $ExactRetainedStage21Sql
+```
+
+The utility reads only that file and the two public reviewed sources. It emits
+fixed public names, hashes, byte counts and booleans; it never prints source,
+paths, private values or exception text and never launches a process or connection.
+Compare `InputSHA256` with the retained manifest/report hash. Review all of:
+
+- `AllEncodedDefinitionsMatch` and `ExpectedRegistriesMatch`.
+- `InstallerMatchesReviewedSource` and `VerifierMatchesReviewedSource`.
+- `PacketSessionPreamblesMatch`.
+- `EngineMetadataObserved` must remain **false**: this is deliberately offline.
+
+Exit 0 checks payload digests/context declarations and expected registries. The
+source and packet-preamble booleans must also be reviewed; an old/different packet
+may pass its payload checks while failing those provenance checks. Exit 1 reports
+payload/registry differences; exit 2 rejects malformed or unsupported input. None
+authorizes a retry. Preserve the exact original file, including its SHA-256; do not
+regenerate it in place to obtain a passing report.
+
+## Narrow read-only catalog query
+
+The standalone query is
+[`Stage21ModuleDiagnostic.sql`](Stage21ModuleDiagnostic.sql). Independently review
+its hash and fixed destination before any separately authorized SQL collection.
+This task has not executed it. It requires the existing acceptance owner with
+full CONTROL/VIEW DEFINITION, neutral autocommit context, the exact Azure logical
+server/database/collation, and reads only database identity/session metadata plus
+`sys.schemas`, `sys.objects`, and `sys.sql_modules` for the 16 fixed public names.
+It executes no module, reads no application rows, and creates no object or receipt.
+
+For each name it returns separate zero/one comparisons, expected/observed definition
+digests, expected execution context, bounded observed context (`CALLER`, `OWNER`,
+`OTHER_PRINCIPAL`, `UNAVAILABLE`), and `CurrentAssertionFindingCount`:
+
+- `MISMATCH_NOW`: use the zero property columns to identify the current module and
+  exact failed predicate. Multiple modules/properties can fail simultaneously.
+- `MATCHES_ASSERTION_NOW`: current metadata satisfies this assertion; it does not
+  prove what existed during the failed attempt or establish installation completion.
+- `ABSENT_NOW_NO_HISTORICAL_METADATA`: an absent module has no inspectable definition,
+  owner or persisted flags. Those comparison zeroes mean unavailable, not proof that
+  every property was historically wrong. This is the expected limitation after rollback.
+- `DEFINITION_UNAVAILABLE`: stop; do not substitute an empty definition or new hash.
+
+The query outputs neither definitions nor credentials, owner account names, arbitrary
+SQL messages or application data. `CurrentAssertionFindingCount` is a current-state
+failure count, not a completed-stage count. Do not run the installer to populate it.
+The supplied retry fingerprint already matches the reconstructed reviewed packet.
+Current query output is still needed to inspect any surviving engine metadata; a packet
+match cannot distinguish the module/property that existed only inside a rolled-back transaction.
+If everything rolled back and no transient metadata was retained, exact historical
+identification is impossible from this evidence alone; additional instrumentation
+would need a separately reviewed plan, not an investigative installer replay.
+
+## Recovery recommendation
+
+Historical module/property identification remains unavailable. The follow-up
+[transaction diagnostics and one evidence-bound resume](stage21-transaction-resume.md)
+now implements the narrow recovery for the latest failed single-stage attempt.
+It preserves all existing journals and requires one new read-only observation to
+match the prior verified checkpoint24 snapshot. It changes only acceptance packet
+error-path instrumentation; original module bodies, hashes and assertions remain.
+Do not reuse the original grouped `Stage21Recovery.ps1`, remove selection files,
+edit journals or retry without the evidence-bound procedure and separate run approval.
+
+Audit compatibility: public-source hashing and narrow administrative catalog metadata
+only. No sensitive application read, domain/admin database mutation, audit schema change
+or alternative audit trail is introduced. Live SQL behavior remains unverified.

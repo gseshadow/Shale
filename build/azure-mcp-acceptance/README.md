@@ -305,3 +305,17 @@ column; its reader accepts SQLCMD BOM, surrounding spaces and CRLF, canonicalize
 and still rejects missing, duplicate, malformed, truncated or overflowing records. This fixes
 those output-shape failures without accepting arbitrary substrings. The reported live output
 was unavailable, so the exact historical parsing failure and native correction remain unverified.
+
+## Repeatable Stage 21 module assertion
+
+For a fresh-session failure reporting `PROOF_MODULE_DRIFT`, see
+[the module-level read-only investigation](stage21-module-drift.md). It includes
+a safe current-catalog query and an offline audit of the retained retry packet.
+It preserves the pending attempt and completed prefix; it neither identifies a
+rolled-back module from object absence nor authorizes another installer attempt.
+
+For the latest failed **single-stage** retry on the selected recovered24 fork, use
+[transaction diagnostics and the evidence-bound resume procedure](stage21-transaction-resume.md).
+It instruments new Stage 21 packets before rollback and creates a new journal only
+after one reviewed read-only observation matches the prior verified checkpoint.
+It never edits existing histories, weakens assertions or retries automatically.
