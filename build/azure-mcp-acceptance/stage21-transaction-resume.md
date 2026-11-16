@@ -116,7 +116,9 @@ if ($LASTEXITCODE -ne 0) { throw 'STOP: offline proof audit failed' }
 
 Review all comparison booleans, including `AcceptanceDiagnosticsPresent` and
 `AcceptanceDiagnosticBlocksMatch`, as true; `EngineMetadataObserved` remains false.
-Review the new Stage 21 hash and the catch-path diff. Recovery below independently
+Review the new Stage 21 hash and the catch-path diff. Keep the original checkout
+line-ending configuration; if completed-stage hashes change, stop instead of
+normalizing existing evidence. Recovery below independently
 checks all first-30 hashes and the exact transform; do not manually edit a manifest.
 
 ### 2. Prepare the single read-only checkpoint probe offline

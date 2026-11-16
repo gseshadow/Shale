@@ -112,6 +112,12 @@ class LatestStage21RecoveryTest(unittest.TestCase):
             self.assertNotIn('PRIVATE_NEVER_PRINT', result.stdout + result.stderr)
             self.assertFalse((self.packet / 'fast-track-stage21-recovery.json').exists())
             self.assert_sources_preserved()
+        self.capture.write_text(good)
+        self.ps('-PlanPath ' + quote(self.plan_file) + ' -Capture ' + quote(self.capture)
+                + ' -ReviewReference synthetic-review -VerifiedNativeExitZero:$false -NoOtherSessionsOrWriters',
+                success=False)
+        self.assertFalse((self.packet / 'fast-track-stage21-recovery.json').exists())
+        self.assert_sources_preserved()
 
     def test_changed_sql_even_with_updated_plan_hash_is_refused(self):
         self.prepare()
@@ -177,7 +183,7 @@ class LatestStage21RecoveryTest(unittest.TestCase):
         self.assertEqual(approvals, self.case.approvals.read_bytes())
         self.assert_sources_preserved()
 
-    def test_unapproved_stage21_change_or_missing_attestation_is_refused(self):
+    def test_unapproved_stage21_change_is_refused(self):
         good = (self.new / '21-proof.sql').read_text()
         self.replace_stage(self.new, good + '\n-- unapproved synthetic change')
         self.prepare(success=False)
