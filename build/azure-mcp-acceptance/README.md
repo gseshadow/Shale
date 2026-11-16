@@ -326,3 +326,11 @@ It never edits existing histories, weakens assertions or retries automatically.
 For the latest v1 all-absent report (`RollbackConfirmed=false`), the
 [pre-THROW diagnostic correction and current recovery commands](stage21-prethrow-resume.md)
 supersede CATCH-based collection. No SQL implementation/hash correction is assumed.
+
+## After a successful 51/51 SQL run
+
+Use [automated live runtime acceptance](live-runtime.md) for the next phase. Its single command
+reuses the existing successful state and evidence, requires one explicit operator approval,
+deploys/starts only the acceptance app, runs automated MCP/OAuth/native/audit checks and finishes
+OFF/stopped. Do not invoke a clean-slate/reset command to perform runtime acceptance. Codex must
+not execute this operator deployment command.

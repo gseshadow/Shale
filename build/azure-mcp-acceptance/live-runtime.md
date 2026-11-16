@@ -1,0 +1,212 @@
+# Automated live MCP acceptance (operator only)
+
+From the reviewed PR checkout in an interactive **PowerShell 7.4+** console, run this one command:
+
+```powershell
+.\build\azure-mcp-acceptance\Start-LiveRuntimeAcceptance.ps1
+```
+
+The command defaults to the successful existing SQL run
+`work/clean-slate-06a67de3fd7340378f9e0db9d6934d89` (51/51 including Stage 21).
+Keep its complete directory, rendered packets, private input copies and hash-chained journal in place.
+This successor reads them; it never resets SQL, reinstalls schema, replays a migration,
+provisions users, regrants rights, regenerates receipts, changes binding or edits old evidence.
+The historical clean-slate command must **not** be used for this phase.
+
+The only destinations compiled into the runner are subscription
+`cd334e90-1e97-4b68-b4e3-80bf7b438546`, resource group `Shale`, Linux App Service
+`shale-mcp-acceptance`, and `shale.database.windows.net` / `ShaleMcpAcceptance`.
+Production `Shale`, shared plan/server changes and real tenants/data are outside the command.
+No Azure deployment or live SQL is executed by Codex. An operator runs this command locally.
+
+## Before running
+
+Use a private console without PowerShell transcripts, command/input logging or debug tracing.
+Have Azure CLI already signed into that subscription and Python with the existing MCP harness's
+`mcp` **2.3.0** and `httpx2` dependencies installed. Use the established reviewed client environment,
+not the older pre-2026 MCP v1 client. The command does not install tools or dependencies.
+PowerShell's SqlClient transport is reused from the successful SQL runner: fresh unpooled encrypted,
+certificate-validated connections, fixed database/server, seven required SET options, full result
+consumption and rollback/disconnect on failure. SQLCMD is not needed.
+
+Keep the app stopped. Use an exclusive maintenance window: the local runner/reset lock cannot
+prevent another operator or machine changing settings, running SQL or starting the app.
+Do not run a clean-slate/SQL installer or another acceptance campaign concurrently.
+
+Have the reviewed executable server JAR, its **independently recorded SHA-256** and build version.
+The command prompts for these inputs, copies the JAR into the protected new run, checks the
+hash and packaged build-info, refuses known fixture classes and checks the remote JAR hash
+on both dormant and enabled workers. A supplied hash identifies exact reviewed bytes; this is
+not a reproducible-build/signature certificate or proof linking arbitrary bytes to a Git commit.
+Use the artifact from the separately reviewed server build; never use test fixture providers.
+
+The existing App Service must already have its acceptance-only configuration/credentials.
+This runner changes only the eleven boolean control/advertisement settings and deploys the JAR;
+it never prints, exports, rewrites or synthesizes datasource/password/JWT settings. Required state:
+
+- Linux Java 21 stack, one worker, HTTPS only, TLS >= 1.2, FTPS disabled; startup exactly
+  `java -jar /home/site/wwwroot/shale-server.jar --spring.profiles.active=azure`.
+- `SPRING_PROFILES_ACTIVE=azure`; `shale.ai.oauth.identity=PRODUCTION` (runtime identity grammar,
+  with the acceptance destination). Case `V2`, CIMD `DCR_V3`, database `ShaleMcpAcceptance`.
+- All ten [app controls](../../docs/universal-mcp-azure-readiness.md#3-required-azure-configuration-and-acceptance)
+  explicitly `false`; `shale.ai.cimd.metadata-advertisement-enabled=false`.
+- Public/browser/allowed MCP origin exactly `https://shale-mcp-acceptance.azurewebsites.net`.
+  Use that same origin for browser CORS if separately testing the web UI; no wildcard origins.
+- Existing dedicated `SHALE_APP_DB_{URL,USER,PASSWORD}` (`mcpacc_auth`) and
+  `SHALE_RT_DB_{URL,USER,PASSWORD}` (`mcpacc_runtime`). AI/predecessor/verifier/bootstrap and all
+  twelve `shale.ai.cimd.runtime.<key>.{jdbc-url,username,password}` sources map to their exact
+  `mcpacc_*` users in the successful run. Runtime setting keys are listed in
+  [the runtime architecture](../../docs/architecture/universal-mcp-azure-runtime.md).
+- Destination-only JDBC URL `jdbc:sqlserver://shale.database.windows.net:1433;databaseName=ShaleMcpAcceptance`
+  (port and trailing semicolon optional), with no security overrides or embedded credentials.
+  Existing Java providers enforce TLS. The runner intentionally rejects alternate URL spellings,
+  aliases, connection-string entries and Java/Spring property-source overrides rather than guess precedence.
+- Synthetic-only JWT secret (>=32 characters) and explicit session binding cutoff. No production secret
+  may be reused. Azure setting values must be inspectable by the operator's authenticated CLI;
+  unresolved Key Vault-reference strings cannot be compared to private contained credentials and fail closed.
+
+Have existing acceptance database-owner credentials and the synthetic passwords matching seed users
+`admin@example.invalid` (71/7), `badmin@example.invalid` (81/8), and `a72@example.invalid` (72/7).
+These are securely requested using `Get-Credential`; no password is a command parameter.
+The 17 dedicated contained credentials are read from the successful run's private inputs, with secure
+prompts only for missing secrets. Nothing changes those input files or creates a credential store.
+Human passwords/tokens go to the child over redirected stdin and remain in memory, never argv/env/files.
+Credentials must belong exclusively to this acceptance fixture. Do not enter production credentials.
+
+The command needs existing Kudu **Microsoft Entra bearer** access to the acceptance SCM endpoint and
+permission to deploy/start/stop/update acceptance app controls. Publishing-password fallback is absent.
+Kudu `/api/command` must support the fixed hash/log commands on this Linux app. Existing container
+stdout files under `/home/LogFiles/*docker.log` must contain the application's startup markers.
+Missing SCM support, logs, native permissions or prerequisites is a FAIL; no broadening of privileges,
+TLS relaxation, fake worker/provider or alternate target is attempted.
+
+## One approval, then automation
+
+Before approval the command validates the SQL completion report, every ordered stage-complete event
+and stage-file fingerprint, journal chain, exact JAR/build, Azure resources/startup/configuration,
+OFF controls, exact synthetic base rows, immutable binding and its 28 Java/SQL samples, restricted
+principal/catalog checks and fresh-session RLS isolation/neutral denial. Only current repository
+read-only catalog and identity scripts run; retained rendered SQL is hashed but never executed.
+It does not invoke the historical installer, even Stage 21.
+
+Review the displayed fixed target, JAR hash and build. Type **`RUN_SHALE_MCP_ACCEPTANCE` once**.
+That single approval authorizes this entire bounded synthetic campaign and its cleanup. There are
+no per-stage approval prompts, unattended approval switches or reset/recovery overrides. Missing input
+and credential prompts collect prerequisites; they do not authorize deployment. Declining leaves Azure
+and SQL untouched. All post-approval paths, including repeated preflight failure, enter cleanup.
+
+The runner then:
+
+1. Rechecks the prerequisites/evidence and deploys only that JAR with restart disabled to
+   `/home/site/wwwroot/shale-server.jar`. A deployment that unexpectedly starts the app fails.
+2. Starts dormant, verifies DB health, deployed hash, actual worker JVM Java 21/zone matching the
+   unchanged binding, disabled readiness and closed MCP/OAuth POST routes. Stops again.
+3. Revalidates native identity/catalog/binding/RLS prerequisites. Enables only the acceptance SQL
+   product/proof/OAuth/external/DCR switches and policies for synthetic tenants 7 and 8; enables
+   the ten app controls with CIMD advertisement false. Starts and requires a **fresh**
+   `AI_CASE_SQL_READINESS ready` marker, worker zone and exact deployed JAR hash.
+4. Runs the Python MCP SDK using the existing authoritative harness's schema/result assertions.
+   Verifies HTTPS discovery and protected resource, no anonymous/random/WEB/REFRESH bearer access,
+   SDK initialization/protocol/tool discovery, normal WEB login, public DCR, ordinary-user and
+   cross-tenant approval denial, separate tenant approval/consent, S256/state binding, wrong verifier
+   and consumed-code replay rejection, permitted Case search/overview, cross-tenant/deleted/missing
+   Case denial and tenant-argument spoof rejection, refresh/resource binding and rotation,
+   credential/family revocation, real expiry and tenant-approval revocation/isolation.
+5. Waits for an independent **unrevoked** ACCESS token's natural five-minute lifetime and proves
+   it is then denied. It never updates credential dates, changes TTLs or disables constraints.
+   A separate fresh, proven-usable family tests approval revocation to avoid confusing it with expiry.
+6. Compares new successful disclosures with committed READ/ALLOWED_READ, RETURNED resources,
+   exact tenant/Case context, consumed handoffs, released quotas and Overview PHI audit increments;
+   requires negative access-audit persistence, unchanged base fixture/binding, then shuts down.
+
+Private reports retain the concrete failed phase/check. Expected denied responses are strict HTTP
+status/error assertions: a network exception, arbitrary 500 or broken initialization cannot count as
+successful denial. HTTP requests use validated TLS, no ambient proxy or automatic redirects, fixed
+origin, deadlines and bounded response size. No callback listener is necessary: authorization redirects
+are validated in memory, never followed with a WEB bearer. This is automated HTTP authorization/consent,
+not browser UI automation. The child has a 15-minute watchdog and process-tree termination on timeout.
+
+## Cleanup and evidence
+
+Every approved run finishes through `finally`: revoke issued families/logout original WEB sessions
+when the client can run cleanup; independently attempt all five SQL switches and both synthetic tenant
+policies OFF, all app/advertisement controls OFF, and Azure app stop. Each SQL switch/policy is attempted
+even after another fails. App OFF/stop attempts still run if SQL fails. Fresh reads must confirm SQL OFF,
+all app controls OFF and `Stopped`. **Cleanup uncertainty makes the entire report FAIL.**
+Historical schema, binding, users, base records, existing credentials and evidence remain; new audited
+synthetic approvals, registrations, sessions, credential hashes, access evidence and revocations persist.
+No reset/deletion follows a failure. A repeated campaign creates a new DCR client/run; it does not resume
+or erase the previous run. Inspect a failure before running again.
+
+New private `work/live-mcp-<guid>/` (owner-only ACL/0700) contains:
+
+- `report.json`: overall PASS/FAIL, approval, failed phase, exact JAR/build, original SQL journal hash,
+  per-step status, allowlisted startup markers, independently confirmed cleanup booleans.
+- `http-report.json`: individual PASS checks, failed check, protocol/client versions, disclosure and
+  Overview counts and credential cleanup. Written incrementally; abrupt child failure preserves the prefix.
+- `journal.jsonl`: new hash-chained approval/completion events; no mutation of the successful SQL journal.
+- `prior-evidence.json`: fingerprints of every historical evidence/input file; checked again after the run.
+- Exact JAR, control booleans, and `sha256.json` for final run files. No raw SQL results, driver exceptions,
+  HTTP bodies, patient values, secret settings, plaintext passwords or OAuth tokens are exported.
+
+Before each startup, existing raw container logs are moved, without deletion, into remote
+`/home/LogFiles/acceptance-<run-id>-before-dormant/` or `...-dormant/`. This preserves evidence and excludes
+stale startup markers. The enabled run's raw logs remain at the original remote log path; the report
+retains only closed startup markers. Preserve both local run and remote log archives under the existing
+acceptance evidence policy. Do not publish the private packet or raw logs to a PR.
+
+If PowerShell is force-killed, the machine loses power, or Azure/SQL cannot be reached, client-side
+`finally` cannot guarantee remote shutdown. Ordinary exceptions, startup/deployment failure and child
+timeout are covered. Normal Ctrl+C invokes PowerShell cleanup, but confirm the final report; hard-kill
+and native Windows console behavior need operator validation. If `Cleanup` is missing/false, use the
+same acceptance-only operator credentials to stop this App Service and restore its ten controls and
+five SQL switches plus tenant 7/8 policies OFF through the reviewed seams. Preserve evidence and obtain
+current OFF/stopped observations before another run. Do not infer shutdown from a missing process/log,
+retry deployment, reset SQL or change a binding to recover.
+
+PASS is scoped to this automated DCR/OAuth/MCP/runtime campaign. It does not certify production,
+CIMD remote metadata/JWKS/worker egress, actual browser UI/CORS/callback UX, an independent stock-client
+onboarding campaign, quotas/load/NAT fairness or all adversarial audit-fault cases. Those remain separate
+items in the [broader acceptance runbook](../../docs/testing/universal-mcp-azure-acceptance-runbook.md).
+None of them is silently counted as PASS, and the runner's PASS never enables production.
+
+## Audit compatibility and offline test impact
+
+No Java runtime, SQL schema, receipt, migration, RLS, grant or binding contract changes. Sensitive Case
+reads retain the existing PHI/access/resource/handoff audit boundary and are checked against durable SQL.
+Tenant policy changes use `AiSetTenantPolicyV1`, which owns its same-transaction entity-action audit and
+revocation. The fixed acceptance-owner product toggle uses the existing global audit shape, exclusive
+`AiCapabilityV1` lock and atomic product-change/audit transaction, without granting an operator role to
+the web application. It is a scoped acceptance administrative seam. The four operational SQL switches
+and Azure app lifecycle/settings changes have no tenant PHI audit vocabulary: local hash-chained run
+and Azure operational records cover those actions; no fabricated domain event or new audit table.
+
+Pre-edit inventory: reviewed `test_clean_slate.py`, `test_supervised.py`, `test_fast_track.py`,
+`Test-Readiness.ps1`, clean-slate journal/transport tests and the authoritative/acceptance Python MCP
+harnesses. New files map to `test_live_runtime.py`; the only existing harness change places its executable
+main behind the usual import guard so assertions can be reused without launching historical fixtures.
+Its schema/result logic remains unchanged. Existing SQL-preparation tests must continue passing.
+
+Run offline only (no Azure/SQL/native client process in these tests):
+
+```powershell
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_live_*.py' -v
+python -m unittest discover -s build/azure-mcp-acceptance -p 'test_*.py'
+python build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format json
+mvn test
+```
+
+Fault-injection tests exercise all campaign phases, single approval/decline, independent cleanup
+failures, secret-safe FAIL reports, JAR/hash/build/fixture rejection, SQL journal refusal, configuration
+substitution and fixed native read-only source admission. No GitHub Actions testing is added.
+Live Azure acceptance is intentionally **NOT RUN by Codex**; only the approving operator can produce
+its PASS/FAIL evidence. Missing private successful-run files in a Codex workspace are not rebuilt.
+
+Implementation verification (2026-11-16): 16 new offline regressions PASS; all 150 existing acceptance
+regressions verified PASS across the broad run and corrected-tooling packet/supervised reruns;
+critical Maven reactor `mvn test` **283 PASS**, zero failures/errors/skips. The first broad run lacked
+`javac` on PATH; selecting the existing JDK 21 resolved its packet setup error and three supervised
+prerequisite failures (13 packet and 26 supervised tests subsequently PASS). No production/test
+expectations were weakened. The repository selector maps these operator-tool paths as unknown and
+selects no affected Maven suite; its full-suite suggestion is informational. Diff and relative-link
+checks PASS. Azure/SQL/Windows live runtime execution remains operator-only and NOT RUN here.
