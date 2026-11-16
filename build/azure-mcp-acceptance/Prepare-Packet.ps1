@@ -4,7 +4,8 @@
 param(
     [Parameter(Mandatory)][string]$PacketDirectory,
     [string]$AuthoritativeFixture,
-    [switch]$Continuation
+    [switch]$Continuation,
+    [switch]$CleanSlate
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -99,7 +100,7 @@ foreach ($stage in $allStages) {
     if ($stage.PSObject.Properties.Name -contains 'user') { $stageFence = $target + "`nGO`n" }
     $sql = ":on error exit`n" + $stageFence
     $sourceSession = ''
-    if ($stage.name -cin @('13-v2-prerequisite','14-v2-install','15-v2-verify') -or
+    if ($CleanSlate -or $stage.name -cin @('13-v2-prerequisite','14-v2-install','15-v2-verify') -or
         [array]::IndexOf(@($allStages.name), $stage.name) -ge 18) {
         $sourceSession = $xmlQuerySession + "`n"
     }
@@ -128,7 +129,7 @@ foreach ($stage in $allStages) {
         if ($stage.name -ceq '21-proof') { $body=Add-ProofModuleDiagnostics $body $source }
         # Bound each source on both sides. No app/tenant context is carried between source batches.
         $sql += $sourceSession + $body + "`nGO`n" + $stageFence
-        if ([array]::IndexOf(@($allStages.name), $stage.name) -ge 18) {
+        if ($CleanSlate -or [array]::IndexOf(@($allStages.name), $stage.name) -ge 18) {
             $part = [array]::IndexOf(@($stage.sources), $source) + 1
             $sql += "SELECT 'ACCEPTANCE_SOURCE_OK:$($stage.name):$part' AS AcceptanceResult;`nGO`n"
         }

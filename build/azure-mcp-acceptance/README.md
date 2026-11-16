@@ -1,5 +1,7 @@
 # Local SQL acceptance: fast-track or strict supervision
 
+For the explicitly authorized disposable reset, use the new [clean-slate FAST TRACK](clean-slate.md): one command, one destructive approval, a new 0–51 run, and preserved historical evidence. The continuation instructions below do not apply to that mode.
+
 This tool prepares and supervises the **remaining 33 of 51 SQL stages**. It has no
 Azure management, deployment, app-start, firewall or enablement commands. Production
 `Shale` is excluded. Keep `shale-mcp-acceptance` stopped and all AI/MCP controls OFF.
