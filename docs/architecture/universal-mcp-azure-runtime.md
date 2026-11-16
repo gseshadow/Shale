@@ -187,3 +187,19 @@ profile. No historical SQL/client campaign, native Azure run or browser UI chang
 The initial system JRE had no supported compiler; an isolated JDK resolved that tooling failure.
 A new test helper's Runnable/Executable compile mismatch was corrected before the passing runs;
 no production contract was weakened to obtain a pass.
+
+## Automated synthetic runtime acceptance successor
+
+The [operator runner](../../build/azure-mcp-acceptance/live-runtime.md) reuses the successful
+51/51 disposable SQL installation without installer/reset replay. It pins the existing acceptance
+App Service/database, requires one explicit whole-campaign approval, verifies the exact JAR/build,
+native dedicated identities/catalogs, binding and RLS, then executes dormant/enabled worker checks
+and automated DCR/OAuth/MCP acceptance with independent OFF/stop cleanup. No production activation
+or deployment from Codex is authorized. Live PASS evidence must come from the operator's run;
+offline simulation does not close the Azure runtime gate.
+
+Audit compatibility uses the existing Case PHI/access/resource/handoff records, audited tenant-policy
+procedure and transactional global product-control audit. Operational SQL switches and Azure lifecycle
+are evidenced by the private operator journal/Azure records; no new domain audit vocabulary, schema,
+permissions or binding change. The linked runbook defines evidence, failure paths and the narrower
+DCR automation scope; CIMD egress, browser UI, independent stock clients and capacity gates remain.

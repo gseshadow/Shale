@@ -1,0 +1,238 @@
+"""Offline regression: all Azure/SQL/HTTP seams are replaced before invocation."""
+import asyncio
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[2]
+TOOL = Path(__file__).parent
+spec = importlib.util.spec_from_file_location('live_driver', ROOT / 'build/mcp-transport/live-azure-python.py')
+live = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(live)
+
+
+class LiveRuntimeTest(unittest.TestCase):
+    def ps(self, body):
+        result = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command',
+            "$ErrorActionPreference='Stop'; . ./build/azure-mcp-acceptance/LiveRuntime.ps1; " + body + '\nexit 0'],
+            cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout
+
+    def test_scripts_parse_and_import_without_network(self):
+        self.ps(r'''
+foreach($name in @('Start-LiveRuntimeAcceptance.ps1','LiveRuntime.ps1')) {
+ $errors=$null
+ [void][Management.Automation.Language.Parser]::ParseFile((Join-Path ./build/azure-mcp-acceptance $name),[ref]$null,[ref]$errors)
+ if($errors.Count){throw ($errors|Out-String)}
+}
+''')
+
+    def test_independent_cleanup_survives_each_failed_channel(self):
+        # A failed SQL shutdown must never suppress app OFF or Azure stop.
+        self.ps(r'''
+foreach($fail in @('none','sql','settings','stop')) {
+ $script:fail=$fail;$script:trace=[Collections.Generic.List[string]]::new()
+ function Set-LiveSqlControls {$script:trace.Add('sql');if($script:fail -eq 'sql'){throw 'secret SQL text'}}
+ function Assert-LiveSqlOff {}
+ function Set-LiveAppControls {$script:trace.Add('settings');if($script:fail -eq 'settings'){throw 'secret app settings'}}
+ function Get-LiveSettings {$s=@{};foreach($key in $script:LiveControls){$s[$key]='false'};$s['shale.ai.cimd.metadata-advertisement-enabled']='false';return $s}
+ function Invoke-CleanAzure($Arguments) {
+  if($Arguments[1] -eq 'stop'){$script:trace.Add('stop');if($script:fail -eq 'stop'){throw 'secret Azure error'}}
+  return @{id=$script:LiveAppId;state='Stopped'}
+ }
+ $r=Stop-LiveAcceptance $null @{} 'unused'
+ if(($script:trace -join ',') -cne 'sql,settings,stop'){throw 'Cleanup was short-circuited'}
+ if($r.SqlOff -ne ($fail -ne 'sql') -or $r.AppOff -ne ($fail -ne 'settings') -or $r.ApplicationStopped -ne ($fail -ne 'stop')){throw 'Cleanup falsely certified'}
+}
+''')
+
+    def test_sql_shutdown_attempts_all_switches_and_both_tenants(self):
+        self.ps(r'''
+$script:ownerCalls=0;$script:tenantCalls=0
+function Invoke-LiveOwner($Sql,$Owner) {$script:ownerCalls++;throw 'simulated single control failure'}
+function Invoke-CleanSource($Sql,$Credential) {$script:tenantCalls++;throw 'simulated tenant failure'}
+$refused=$false;try{Set-LiveSqlControls $false $null @{'mcpacc_runtime'=$null}}catch{$refused=$true}
+if(-not $refused -or $script:ownerCalls -ne 5 -or $script:tenantCalls -ne 2){throw 'SQL cleanup short-circuited'}
+''')
+
+    def test_approval_decline_and_every_failure_path_report_and_cleanup(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+            # Mutation seams are local mocks; even deployment is never sent to az.
+            self.ps(r'''
+$script:failure='';$script:trace=[Collections.Generic.List[string]]::new()
+function Hit($Name){$script:trace.Add($Name);if($script:failure -ceq $Name){throw 'PRIVATE_SENTINEL'}}
+function Read-Host {Hit 'approval';if($script:failure -eq 'decline'){return 'no'};return 'RUN_SHALE_MCP_ACCEPTANCE'}
+function Assert-LiveAzureConfiguration {Hit 'preflight'}
+function Assert-LiveSettings {}
+function Get-LiveSettings {return @{}}
+function Assert-LiveSqlOff {}
+function Assert-LiveSynthetic {}
+function Assert-LiveJar {}
+function Invoke-CleanAzure($Arguments) {if($Arguments[1] -eq 'deploy'){Hit 'deploy'};return @{state='Stopped'}}
+function Start-LiveWorker {Hit 'start'}
+function Assert-LiveWorker($Hash,$JavaZone,[switch]$Ready){Hit 'worker';if($Ready){return 'AI_CASE_SQL_READINESS ready'};return 'AI_CASE_SQL_READINESS disabled'}
+function Invoke-WebRequest {return @{StatusCode=404}}
+function Assert-CleanResources {}
+function Get-LiveBinding {Hit 'binding'}
+function Invoke-LiveRls {Hit 'rls'}
+function Invoke-LiveNativeChecks {Hit 'native'}
+function Get-LiveAuditBaseline {return @{Access=0;Phi=0}}
+function Set-LiveSqlControls {Hit 'sql-on'}
+function Set-LiveAppControls {Hit 'app-on'}
+function Invoke-LiveClient {Hit 'client';return @{disclosures=8;overviews=6}}
+function Assert-LiveAudits {Hit 'audits'}
+function Stop-LiveAcceptance {Hit 'cleanup';return @{SqlOff=($script:failure -ne 'cleanup-fail');AppOff=$true;ApplicationStopped=$true}}
+foreach($failure in @('decline','preflight','deploy','start','worker','binding','rls','native','sql-on','app-on','client','audits','cleanup-fail','none')) {
+ $script:failure=$failure;$script:trace.Clear()
+ $dir=Join-Path 'DIRECTORY' $failure;[void][IO.Directory]::CreateDirectory($dir)
+ $ctx=@{Run=$dir;Hash=('A'*64);Version='1.0.0';Id='offline';Jar='unused';Zones=@{Java='UTC'};Evidence=@{Directory='unused';JournalHash=('B'*64)};Credentials=@{};Humans=@{};Owner=$null;Inventory=@();Specs=@()}
+ $r=Invoke-LiveCampaign $ctx
+ if(($r.Status -ceq 'PASS') -ne ($failure -ceq 'none')){throw "False campaign result: $failure"}
+ if($failure -ceq 'decline') {if($script:trace.Contains('deploy') -or $script:trace.Contains('cleanup')){throw 'Unapproved mutation'}}
+ elseif(-not $script:trace.Contains('cleanup')){throw "Cleanup absent after $failure"}
+ if([IO.File]::ReadAllText((Join-Path $dir 'report.json')).Contains('PRIVATE_SENTINEL')){throw 'Sensitive failure leaked'}
+}
+'''.replace('DIRECTORY', directory))
+
+    def test_runtime_settings_refuse_wrong_database_identity_and_override(self):
+        self.ps(r'''
+$s=@{'SPRING_PROFILES_ACTIVE'='azure';'shale.ai.oauth.identity'='PRODUCTION';'shale.ai.oauth.public-origin'=$script:LiveOrigin;'shale.ai.oauth.browser-origin'=$script:LiveOrigin;'shale.ai.mcp.allowed-origins'=$script:LiveOrigin;'shale.ai.data.database'='ShaleMcpAcceptance';'shale.ai.data.contract-version'='V2';'shale.ai.cimd.contract-version'='DCR_V3';'SHALE_AUTH_TOKEN_SECRET'=('x'*40);'SHALE_AUTH_SESSION_BINDING_CUTOVER_AT'='2026-10-01T00:00:00Z'}
+foreach($k in $script:LiveControls){$s[$k]='false'};$s['shale.ai.cimd.metadata-advertisement-enabled']='false'
+$prefixes=@{'SHALE_APP'='auth';'SHALE_RT'='runtime';'shale.ai.data'='predecessor';'shale.ai.data.verifier'='verifier';'shale.ai.oauth.bootstrap'='bootstrap'}
+foreach($key in @('case','reviewer','publisher','approval','onboarding','browser','issuer','metadata','resolver','neutral','dcr-endpoint','dcr-metadata')){$prefixes['shale.ai.cimd.runtime.'+$key]=$key.Replace('-','_')}
+$c=@{}
+foreach($p in $prefixes.Keys){
+ $name='mcpacc_'+$prefixes[$p];$c[$name]=[pscredential]::new($name,(ConvertTo-SecureString ('offline-secret-'+$name) -AsPlainText -Force))
+ $ordinary=$p.StartsWith('SHALE_');$u=if($ordinary){$p+'_DB_USER'}else{$p+'.username'};$pw=if($ordinary){$p+'_DB_PASSWORD'}else{$p+'.password'};$url=if($ordinary){$p+'_DB_URL'}else{$p+'.jdbc-url'}
+ $s[$u]=$name;$s[$pw]=$c[$name].GetNetworkCredential().Password;$s[$url]='jdbc:sqlserver://shale.database.windows.net:1433;databaseName=ShaleMcpAcceptance'
+}
+Assert-LiveSettings $s $c
+foreach($test in @(@('SHALE_APP_DB_URL','jdbc:sqlserver://shale.database.windows.net;databaseName=Shale'),@('shale.ai.cimd.runtime.case.username','mcpacc_runtime'),@('shale.ai.data.password','wrong'),@('JAVA_TOOL_OPTIONS','-Dshale.ai.enabled=true'),@('SHALE_AI_ENABLED','true'),@('SPRING_PROFILES_ACTIVE','azure,dev'),@('shale.ai.cimd.contract-version','EXTERNAL_V2'),@('shale.ai.mcp.enabled','true'))){
+ $copy=$s.Clone();$copy[$test[0]]=$test[1];$refused=$false
+ try{Assert-LiveSettings $copy $c}catch{$refused=$true}
+ if(-not $refused){throw ('Unsafe configuration accepted: '+$test[0])}
+}
+''')
+
+    def test_incomplete_or_tampered_sql_history_is_never_adopted(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+            self.ps(r'''
+$d='DIRECTORY'
+[IO.File]::WriteAllText((Join-Path $d 'report.json'),'{}')
+$refused=$false;try{Read-LiveSqlEvidence $d}catch{$refused=$true};if(-not $refused){throw 'Incomplete SQL accepted'}
+[IO.File]::WriteAllText((Join-Path $d 'report.json'),'{{"Status":"complete","Completed":51,"Total":51,"Application":"Stopped","Activation":"OFF"}}'.Replace('{{','{').Replace('}}','}'))
+New-CleanEvent (Join-Path $d 'journal.jsonl') @{Kind='complete';Completed=51}
+$refused=$false;try{Read-LiveSqlEvidence $d}catch{$refused=$true};if(-not $refused){throw 'Missing Stage21 accepted'}
+$path=Join-Path $d 'journal.jsonl';$original=[IO.File]::ReadAllText($path);[IO.File]::WriteAllText($path,$original.Replace('complete','tampered'))
+$refused=$false;try{Read-LiveSqlEvidence $d}catch{$refused=$true};if(-not $refused){throw 'Tampering accepted'}
+'''.replace('DIRECTORY', directory))
+
+    def test_complete_sql_history_preserves_nonzero_verified_finding_column_counts(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+            self.ps(r'''
+$d='DIRECTORY';$rendered=Join-Path $d 'rendered-synthetic';[void][IO.Directory]::CreateDirectory($rendered)
+$stages=@(Get-Content ./build/azure-mcp-acceptance/stages.json -Raw|ConvertFrom-Json)
+$manifest=@();$n=0
+foreach($stage in $stages){
+ $n++;$file=Join-Path $rendered ($stage.name+'.sql');[IO.File]::WriteAllText($file,('SELECT '+$n+';'))
+ $hash=(Get-FileHash $file).Hash;$manifest+=[pscustomobject]@{Stage=$stage.name;SHA256=$hash}
+ # PASS's last integer is a count of verified zero-valued columns. Stage 31 legitimately has 2.
+ $findings=if($stage.name -ceq '31-verifier-catalogs'){2}else{0}
+ New-CleanEvent (Join-Path $d 'journal.jsonl') @{Kind='stage-complete';Stage=$stage.name;SHA256=$hash;Completed=$n;Result=('PASS:'+@($stage.sources).Count+':'+$findings)}
+}
+$manifest|Export-Csv (Join-Path $rendered 'sha256.csv') -NoTypeInformation
+New-CleanEvent (Join-Path $d 'journal.jsonl') @{Kind='complete';Completed=51;Application='Stopped';Activation='OFF'}
+[IO.File]::WriteAllText((Join-Path $d 'report.json'),'{{"Status":"complete","Completed":51,"Total":51,"Application":"Stopped","Activation":"OFF"}}'.Replace('{{','{').Replace('}}','}'))
+$before=(Get-FileHash (Join-Path $d 'journal.jsonl')).Hash
+$result=Read-LiveSqlEvidence $d
+if($result.Files.Count -ne 51 -or (Get-FileHash (Join-Path $d 'journal.jsonl')).Hash -cne $before){throw 'Valid existing SQL evidence rejected or modified'}
+'''.replace('DIRECTORY', directory))
+
+    def test_native_checks_cannot_execute_retained_sql_or_installers(self):
+        self.ps(r'''
+$script:seen=[Collections.Generic.List[string]]::new()
+function Invoke-CleanStage($Stage,$Sql,$Credential){$script:seen.Add($Sql);return 'PASS:1:0'}
+$specs=@(Get-Content ./build/azure-mcp-acceptance/stages.json -Raw|ConvertFrom-Json)
+$c=@{};foreach($spec in $specs){if($spec.PSObject.Properties.Name -contains 'user'){$c[$spec.user]=$null}}
+Invoke-LiveNativeChecks $specs $c
+if($script:seen.Count -ne 19){throw 'Required native checks missing'}
+$bad=[pscustomobject]@{name='31-bad';user='mcpacc_verifier';sources=@('docs/sql/ai-integration/universal-pr4a-proof.sql')}
+$refused=$false;try{Invoke-LiveNativeChecks @($bad) $c}catch{$refused=$true};if(-not $refused){throw 'Installer path accepted'}
+''')
+
+    def test_jar_requires_reviewed_hash_build_and_no_fixture_classes(self):
+        import hashlib
+        import zipfile
+        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+            jar = Path(directory) / 'candidate.jar'
+            def write(fixture=False):
+                with zipfile.ZipFile(jar, 'w') as z:
+                    z.writestr('BOOT-INF/classes/com/shale/server/ShaleServerApplication.class', b'offline')
+                    z.writestr('BOOT-INF/classes/com/shale/server/oauth/CimdRuntimeConfiguration.class', b'offline')
+                    z.writestr('BOOT-INF/classes/META-INF/build-info.properties', 'build.artifact=shale-server\nbuild.version=1.2.3\n')
+                    if fixture:
+                        z.writestr('BOOT-INF/classes/LiveMetadata.class', b'offline')
+                return hashlib.sha256(jar.read_bytes()).hexdigest()
+            digest = write()
+            self.ps(f"Assert-LiveJar '{jar}' '{digest}' '1.2.3'")
+            self.ps(f"$refused=$false;try{{Assert-LiveJar '{jar}' '{digest}' 'wrong'}}catch{{$refused=$true}};if(-not $refused){{throw 'Wrong build accepted'}}")
+            digest = write(True)
+            self.ps(f"$refused=$false;try{{Assert-LiveJar '{jar}' '{digest}' '1.2.3'}}catch{{$refused=$true}};if(-not $refused){{throw 'Fixture accepted'}}")
+
+    def test_live_client_failure_always_scrubs_and_revokes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            a = live.Acceptance(directory, {})
+            a.web = ['PRIVATE_WEB_SENTINEL']
+            a.families = [('dcr.synthetic', {'access_token': 'PRIVATE_ACCESS_SENTINEL'})]
+            async def fail():
+                a.current = 'oauth-s256-state-code-replay'
+                raise RuntimeError('PRIVATE_EXCEPTION_SENTINEL')
+            a.execute = fail
+            calls = []
+            a.ok = lambda *args, **kwargs: calls.append(args)
+            self.assertEqual(asyncio.run(a.run_all()), 1)
+            self.assertEqual([c[0] for c in calls], ['/oauth/mcp/revoke', '/api/auth/logout'])
+            report = (Path(directory) / 'http-report.json').read_text()
+            self.assertNotIn('PRIVATE_', report)
+            self.assertEqual(json.loads(report)['status'], 'FAIL')
+
+    def test_live_client_cleanup_failure_cannot_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            a = live.Acceptance(directory, {})
+            async def success():
+                a.web.append('synthetic-token')
+            a.execute = success
+            def fail(*args, **kwargs):
+                raise OSError('secret error')
+            a.ok = fail
+            self.assertEqual(asyncio.run(a.run_all()), 1)
+            self.assertFalse(json.loads((Path(directory) / 'http-report.json').read_text())['credentialCleanup'])
+
+    def test_callback_and_local_paths_cannot_substitute_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            a = live.Acceptance(directory, {})
+            for path in ('https://production.invalid', '//production.invalid', 'mcp'):
+                with self.assertRaises(AssertionError):
+                    a.request(path)
+
+    def test_single_approval_and_no_destructive_entrypoint(self):
+        helper = (TOOL / 'LiveRuntime.ps1').read_text()
+        entry = (TOOL / 'Start-LiveRuntimeAcceptance.ps1').read_text()
+        self.assertEqual(helper.count("Read-Host 'Type RUN_SHALE_MCP_ACCEPTANCE"), 1)
+        self.assertNotIn('Read-Host', helper.split('function Set-LiveSqlControls')[1].split('function Assert-LiveSqlOff')[0])
+        for forbidden in ('CleanSlateReset', 'Start-CleanSlateAcceptance', 'Prepare-Packet.ps1', 'ALTER ROLE', 'CREATE USER', 'DROP DATABASE'):
+            self.assertNotIn(forbidden, helper + entry)
+        self.assertIn('Invoke-LiveNativeChecks $specs $credentials', entry)
+        self.assertIn('finally {', helper)
+        self.assertIn('Stop-LiveAcceptance $Context.Owner', helper)
+
+
+if __name__ == '__main__':
+    unittest.main()

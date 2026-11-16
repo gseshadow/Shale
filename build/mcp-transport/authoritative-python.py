@@ -54,4 +54,5 @@ async def main():
     for key,name,args in [('RACE_REVOKE_TOKEN','search_cases',{'query':'MCP literal'}),('RACE_EXPIRY_TOKEN','get_case_overview',{'caseId':100})]:
         async with connect(key) as c:error(await c.call_tool(name,args),'FORBIDDEN');records.append(key+'-post-commit-final-gate');print(json.dumps({'phase':key,'records':list(records)}),flush=True)
     print(json.dumps({'client':'mcp','version':importlib.metadata.version('mcp'),'protocol':'2026-07-28','records':records}))
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())
