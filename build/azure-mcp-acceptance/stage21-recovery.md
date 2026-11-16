@@ -74,10 +74,13 @@ It creates `plan.json` and `checkpoint24.sql`, without connecting. Independently
 both, the utility commit, all hashes and the original evidence. The generated SQL has:
 
 1. Fixed acceptance destination, full owner visibility, neutral session and OFF guards.
-2. The unchanged rendered Stage 18 **read-only postcheck**, including its exact reviewed
-   binding inputs, proving the committed binding still matches them.
-3. Unchanged PR3 receipt/source/catalog and registry-confinement verification, proving
+2. Unchanged PR3 receipt/source/catalog and registry-confinement verification, proving
    the Stage 19–20 installed predecessor state rather than merely counting tables.
+3. Stage 18's exact reviewed binding inputs/assertions and single-binding postcheck,
+   proving the committed binding still matches them. In the derived probe only, its
+   exact historical V2 catalog verifier is replaced by the PR3-aware verification
+   above: PR3 intentionally added registry permissions after Stage 18. The original
+   completed stage bytes/hash remain untouched; no historical stage is dispatched.
 4. Absence checks across schemas for the proof/OAuth/reviewer/onboarding/C1/DCR object
    and role namespaces, plus later contained users. Any later or partial state stops.
 5. The existing metadata/receipt/permission/RLS/binding fingerprint and seed-table

@@ -70,6 +70,8 @@ class Stage21RecoveryTest(unittest.TestCase):
         self.assertIn('PR 3 catalog drift; never refresh receipts.', probe)
         self.assertIn('Later-stage artifacts present or partial', probe)
         self.assertNotIn('CREATE TABLE', probe)
+        legacy = (TOOL.parents[1] / 'docs/sql/ai-integration/phase3b8-confinement-verify.sql').read_text()
+        self.assertNotIn(legacy, probe, 'Use PR3-aware verification after PR3 role changes')
         self.finalize()
         self.assertEqual(self.original, self.journal.read_bytes())
         fork = next(self.packet.glob('fast-track-recovered-*.jsonl'))
@@ -134,6 +136,18 @@ class Stage21RecoveryTest(unittest.TestCase):
             'RECOVERY24_OK:' + self.plan['Ticket'], 'Msg 59812, Level 16, State 1'))
         self.finalize(success=False)
         self.assertFalse(list(self.packet.glob('fast-track-recovered-*.jsonl')))
+
+    def test_all_public_stage21_assertions_have_safe_codes(self):
+        import re
+        messages = set()
+        for name in ('universal-pr4a-proof.sql', 'universal-pr4a-proof-verify.sql'):
+            source = (TOOL.parents[1] / 'docs/sql/ai-integration' / name).read_text()
+            messages.update(re.findall(r"THROW 59400,'([^']*)'", source))
+        command = '. ' + quote(TOOL / 'FastTrack.ps1') + '; '
+        command += 'Get-SafeFastTrackAssertions @(' + ','.join(quote(m) for m in sorted(messages)) + ')'
+        result = self.case.fixture_case.ps(command)
+        self.assertNotIn('UNCLASSIFIED_SQL_ASSERTION', result.stdout)
+        self.assertEqual(len(messages), len(result.stdout.splitlines()))
 
     def test_safe_diagnostics_never_return_arbitrary_messages_or_session_values(self):
         command = '. ' + quote(TOOL / 'FastTrack.ps1') + "; "

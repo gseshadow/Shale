@@ -125,6 +125,7 @@ try {
             $restricted=$stage.PSObject.Properties.Name -contains 'user'
             $fence=$target+"`n"; if (-not $restricted) { $fence+=$owner+"`n" }; $fence+="GO`n"
             $session="SELECT CAST(CONCAT('FAST_SESSION_STATE:$($stage.name):',CASE WHEN USER_NAME()=N'dbo' THEN 1 ELSE 0 END,':',CASE WHEN @@TRANCOUNT<>0 THEN 1 ELSE 0 END,':',CASE WHEN SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL THEN 1 ELSE 0 END,':',CASE WHEN SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL THEN 1 ELSE 0 END,':',CASE WHEN (@@OPTIONS & 2)<>0 THEN 1 ELSE 0 END) AS varchar(128)) AS SessionState;`nGO`n"
+            if ($restricted) { $session='' } # dbo is an owner-install precondition only.
             $before=Join-Path $run ($stage.name+'-begin.sql'); $after=Join-Path $run ($stage.name+'-done.sql')
             Write-FastTrackFile $before (":on error exit`n"+$session+$fence+"SELECT CAST('FAST_STAGE_BEGIN:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")
             Write-FastTrackFile $after (":on error exit`n"+$fence+"SELECT CAST('FAST_STAGE_DONE:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")

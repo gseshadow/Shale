@@ -91,6 +91,13 @@ function Get-SafeFastTrackAssertions([object[]]$Lines) {
         'Unreviewed CIMD trigger/table-expression edge.'='PROOF_EXPRESSION_DRIFT'
         'CIMD strict RLS drift.'='PROOF_RLS_DRIFT'
         'CIMD exact role permission drift.'='PROOF_PERMISSION_DRIFT'
+        'CIMD proof catalog/source or predecessor drift; never refresh receipts.'='PROOF_CATALOG_OR_PREDECESSOR_DRIFT'
+        'CIMD proof role owner/inheritance drift.'='PROOF_ROLE_DRIFT'
+        'CIMD proof member authority drift.'='PROOF_MEMBER_AUTHORITY_DRIFT'
+        'CIMD proof signature drift.'='PROOF_SIGNATURE_DRIFT'
+        'CIMD proof securable ownership drift.'='PROOF_SECURABLE_OWNER_DRIFT'
+        'Unknown CIMD SQL platform.'='PROOF_SQL_PLATFORM_UNKNOWN'
+        'CIMD SQL authentication type drift.'='PROOF_AUTHENTICATION_TYPE_DRIFT'
         'STOP: fresh neutral autocommit connection required.'='PACKET_SESSION_NOT_NEUTRAL'
         'Fresh unscoped dbo installation required.'='OAUTH_FRESH_UNSCOPED_DBO'
         'Fresh unscoped owner installation required.'='REVIEWER_FRESH_UNSCOPED_DBO'
@@ -100,7 +107,7 @@ function Get-SafeFastTrackAssertions([object[]]$Lines) {
     $found=@()
     foreach ($line in ((($Lines | ForEach-Object {[string]$_}) -join "`n") -split '\r?\n')) {
         $candidate=$line.Trim()
-        if ($allowed.ContainsKey($candidate)) { $found+=$allowed[$candidate] }
+        if ($candidate -cin @($allowed.Keys)) { $found+=$allowed[$candidate] }
     }
     if (-not $found.Count) { return 'UNCLASSIFIED_SQL_ASSERTION' }
     return @($found | Sort-Object -Unique)
