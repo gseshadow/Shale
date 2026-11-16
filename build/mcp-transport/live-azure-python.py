@@ -138,11 +138,11 @@ class Acceptance:
         require(self.request('/oauth/mcp/token', exchange)[0] in (400, 401))
         return family, issued
 
-    def raw_discover(self, token=None):
+    def raw_discover(self, token=None, extra_headers=None):
         return self.request('/mcp', {'jsonrpc': '2.0', 'id': 'live', 'method': 'server/discover',
             'params': {'_meta': {'io.modelcontextprotocol/protocolVersion': PROTOCOL,
                                 'io.modelcontextprotocol/clientCapabilities': {}}}}, token, 'json',
-            {'MCP-Protocol-Version': PROTOCOL, 'Mcp-Method': 'server/discover'})
+            {'MCP-Protocol-Version': PROTOCOL, 'Mcp-Method': 'server/discover', **(extra_headers or {})})
 
     async def tools(self, token, tenant, *, full=True):
         import httpx2
@@ -200,6 +200,8 @@ class Acceptance:
         fb, _ = self.authorize(client, b)
         expiry, issued = self.authorize(client, a)
         require(self.raw_discover(a)[0] == 401 and self.raw_discover(fa['refresh_token'])[0] == 401)
+        require(self.raw_discover(fa['access_token'], {'Origin': 'https://attacker.invalid'})[0] == 403)
+        require(self.raw_discover(fa['access_token'], {'MCP-Protocol-Version': '2099-01-01'})[0] == 400)
         self.record(self.current)
         self.current = 'sdk-initialize-tools-case-reads-isolation-denials'
         await self.tools(fa['access_token'], 7)
@@ -226,6 +228,7 @@ class Acceptance:
         self.record(self.current)
         self.current = 'natural-credential-expiry'
         # Keep an independent, unrevoked family. Never update credential timestamps or disable SQL constraints.
+        require(self.raw_discover(expiry['access_token'])[0] == 200)
         deadline = issued + math.ceil(expiry['expires_in']) + 2
         while time.monotonic() < deadline:
             await asyncio.sleep(min(10, deadline - time.monotonic()))

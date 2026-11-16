@@ -201,3 +201,12 @@ failures, secret-safe FAIL reports, JAR/hash/build/fixture rejection, SQL journa
 substitution and fixed native read-only source admission. No GitHub Actions testing is added.
 Live Azure acceptance is intentionally **NOT RUN by Codex**; only the approving operator can produce
 its PASS/FAIL evidence. Missing private successful-run files in a Codex workspace are not rebuilt.
+
+Implementation verification (2026-11-16): 16 new offline regressions PASS; all 150 existing acceptance
+regressions verified PASS across the broad run and corrected-tooling packet/supervised reruns;
+critical Maven reactor `mvn test` **283 PASS**, zero failures/errors/skips. The first broad run lacked
+`javac` on PATH; selecting the existing JDK 21 resolved its packet setup error and three supervised
+prerequisite failures (13 packet and 26 supervised tests subsequently PASS). No production/test
+expectations were weakened. The repository selector maps these operator-tool paths as unknown and
+selects no affected Maven suite; its full-suite suggestion is informational. Diff and relative-link
+checks PASS. Azure/SQL/Windows live runtime execution remains operator-only and NOT RUN here.

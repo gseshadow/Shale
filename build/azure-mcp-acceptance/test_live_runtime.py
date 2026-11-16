@@ -55,11 +55,13 @@ foreach($fail in @('none','sql','settings','stop')) {
 
     def test_sql_shutdown_attempts_all_switches_and_both_tenants(self):
         self.ps(r'''
-$script:ownerCalls=0;$script:tenantCalls=0
-function Invoke-LiveOwner($Sql,$Owner) {$script:ownerCalls++;throw 'simulated single control failure'}
+$script:ownerCalls=0;$script:tenantCalls=0;$script:productSql=''
+function Invoke-LiveOwner($Sql,$Owner) {$script:ownerCalls++;if($Sql.Contains('UPDATE dbo.AiProductCapability')){$script:productSql=$Sql};throw 'simulated single control failure'}
 function Invoke-CleanSource($Sql,$Credential) {$script:tenantCalls++;throw 'simulated tenant failure'}
 $refused=$false;try{Set-LiveSqlControls $false $null @{'mcpacc_runtime'=$null}}catch{$refused=$true}
 if(-not $refused -or $script:ownerCalls -ne 5 -or $script:tenantCalls -ne 2){throw 'SQL cleanup short-circuited'}
+$sql=$script:productSql
+if($sql.IndexOf('BEGIN TRANSACTION') -ge $sql.IndexOf('UPDATE dbo.AiProductCapability') -or $sql.IndexOf('INSERT dbo.GlobalControlPlaneAuditLog') -le $sql.IndexOf('UPDATE dbo.AiProductCapability') -or -not $sql.EndsWith('COMMIT;') -or -not $sql.Contains('AI_DISABLED') -or -not $sql.Contains('sp_getapplock')){throw 'Product control lost atomic audit or lock'}
 ''')
 
     def test_approval_decline_and_every_failure_path_report_and_cleanup(self):

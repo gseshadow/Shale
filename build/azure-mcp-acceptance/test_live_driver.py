@@ -104,6 +104,10 @@ class FakeAcceptance(live.Acceptance):
                 self.tokens[family['peer']]['revoked'] = True
             return 200, {}, {}
         if path == '/mcp':
+            if headers and headers.get('Origin') == 'https://attacker.invalid':
+                return 403, {}, {}
+            if headers and headers.get('MCP-Protocol-Version') == '2099-01-01':
+                return 400, {}, {}
             token = self.tokens.get(bearer)
             good = token and token['kind'] == 'ACCESS' and not token['revoked'] and self.approvals.get(token['tenant']) and (self.accept_expired or token['expiry'] > self.clock)
             return (200 if good else 401), {}, {'WWW-Authenticate': 'Bearer resource_metadata="' + live.BASE + '/.well-known/oauth-protected-resource/mcp"'}
