@@ -31,6 +31,12 @@ work, rather than caching the original error on entry. The exact reason its guar
 was not observed cannot be reconstructed from the report. Console absence alone was
 also inconclusive because the old runner did not print the raw marker.
 
+In the public installer, the initial module check and embedded seal both precede
+COMMIT. The standalone source follows the installer. Decoding the predecessor
+verification batches found no BEGIN TRANSACTION, COMMIT or ROLLBACK statements;
+there is no evidence of an intentional early rollback in those public batches.
+This does not establish what error unwinding did in the actual failed session.
+
 The verified defect is **late, unattributed diagnostic collection and misleading
 validity semantics**. The original SQL module/property defect remains unknown.
 The legacy F3D4E8EB... packet and all 16 expected module hashes remain internally

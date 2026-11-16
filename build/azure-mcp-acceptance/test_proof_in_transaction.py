@@ -51,6 +51,19 @@ class TransactionProofDiagnosticTest(unittest.TestCase):
         self.assertEqual([], report['Modules'])
         self.assertEqual(0, report['Checks'][0]['TranCount'])
 
+    def test_no_transaction_in_catch_is_not_inferred_from_marker_absence(self):
+        records = ['PROOF_CHECK:INSTALL:1:1:1',
+                   'PROOF_MODULE_FAIL:INSTALL:AiCimdDataLocateAccessOwnerV1:0000001',
+                   'PROOF_CATCH:INSTALL:0:0:1']
+        report = self.parse(records)
+        self.assertTrue(report['Valid'])
+        self.assertFalse(report['RollbackConfirmed'])
+        self.assertEqual(0, report['CatchStates'][0]['XactState'])
+        self.assertEqual(1, report['Checks'][0]['XactState'])
+        confirmed = self.parse(records + ['PROOF_ROLLBACK_CONFIRMED'])
+        self.assertTrue(confirmed['RollbackConfirmed'])
+        self.assertEqual(report['CatchStates'], confirmed['CatchStates'])
+
     def test_invalid_duplicate_unknown_and_unscoped_records_fail_closed(self):
         good = 'PROOF_MODULE_FAIL:INSTALL:AiCimdDataLocateAccessOwnerV1:0000001'
         for lines in ([], [good], ['PROOF_CHECK:INSTALL:0:1:1', good],
