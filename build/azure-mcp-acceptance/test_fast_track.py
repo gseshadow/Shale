@@ -73,9 +73,13 @@ foreach ($file in $files) {
   $stage=$name.Substring(0,$name.Length-6); $lines.Add('  FAST_STAGE_BEGIN:'+$stage+'  '); continue
  }
  if ($name.EndsWith('-done')) { $stage=$name.Substring(0,$name.Length-5); $lines.Add('FAST_STAGE_DONE:'+$stage); continue }
+ $sourcePart=0
+ if ($name -ceq '21-proof-install-source') { $name='21-proof'; $sourcePart=1 }
+ if ($name -ceq '21-proof-verify-source') { $name='21-proof'; $sourcePart=2 }
  $spec=$specs | Where-Object name -CEQ $name
  if (-not $spec) { throw 'Unknown stage dispatched' }
- if (MODE -eq 'module-drift' -and $name -ceq '21-proof') { $lines.Add('PROOF_MODULE_FAIL:AiCimdDataLocateAccessOwnerV1:0000100'); $lines.Add('PROOF_ROLLBACK_CONFIRMED'); $lines.Add('Msg 59400, Level 16, State 1, PRIVATE_NEVER_PRINT'); $lines.Add('CIMD proof module source/owner/context drift.'); $exit=16; break }
+ if (MODE -in @('module-drift','module-drift-zero-exit') -and $name -ceq '21-proof') { $lines.Add('PROOF_CHECK:INSTALL:1:1:1'); $lines.Add('PROOF_MODULE_FAIL:INSTALL:AiCimdDataLocateAccessOwnerV1:0000100'); $lines.Add('PROOF_CATCH:INSTALL:-1:1:1'); $lines.Add('PROOF_ROLLBACK_CONFIRMED'); $lines.Add('Msg 59400, Level 16, State 1, PRIVATE_NEVER_PRINT'); $lines.Add('CIMD proof module source/owner/context drift.'); $exit=if (MODE -eq 'module-drift-zero-exit') {0} else {16}; break }
+ if (MODE -eq 'standalone-absent' -and $sourcePart -eq 2) { $lines.Add('PROOF_CHECK:STANDALONE:0:0:1'); $lines.Add('PROOF_METADATA_ABSENT:STANDALONE'); $lines.Add('Msg 59400, Level 16, State 1'); $lines.Add('CIMD proof module source/owner/context drift.'); $exit=16; break }
  if (MODE -eq 'proof-fail' -and $name -ceq '21-proof') { $lines.Add('Msg 59400, Level 16, State 1, Server PRIVATE_NEVER_PRINT, Line 12'); $lines.Add('Fresh unscoped dbo lease required.'); $exit=16; break }
  if (MODE -eq 'sql-fail' -and $name -ceq '20-pr3') { $lines.Add('Msg 50001, Level 16, State 1, PRIVATE_NEVER_PRINT'); $exit=16; break }
  switch ($name) {
@@ -94,6 +98,7 @@ foreach ($file in $files) {
  }
  foreach ($finding in $findings) { $lines.Add($finding);$lines.Add('----------------');$lines.Add('0') }
  for ($n=1;$n -le $spec.sources.Count;$n++) {
+  if ($sourcePart -gt 0 -and $n -ne $sourcePart) { continue }
   if (MODE -ne 'ambiguous' -or $name -cne '15c-seed') { $lines.Add("ACCEPTANCE_SOURCE_OK:${name}:$n") }
  }
 }
@@ -132,7 +137,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual([s['name'] for s in STAGES[18:]], report['CompletedStages'])
         self.assertEqual(1, self.approvals.read_text().count('approval'))
         calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
-        self.assertEqual(33, len(calls))
+        self.assertEqual(34, len(calls))
         self.assertEqual(['15c-seed'], self.dispatched_stages()[0])
         for args, group in zip(calls, self.dispatched_stages()):
             self.assertEqual(1, len(group), "Each stage must own its session")
@@ -157,14 +162,37 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         report = self.report()
         self.assertEqual(24, report['CompletedCount'])
         self.assertEqual(['PROOF_MODULE_DRIFT'], report['Assertions'])
-        self.assertEqual([{'Module': 'AiCimdDataLocateAccessOwnerV1',
+        self.assertEqual([{'Phase': 'INSTALL', 'Module': 'AiCimdDataLocateAccessOwnerV1',
                            'FailedProperties': ['QUOTED_IDENTIFIER']}], report['ProofModules'])
         self.assertTrue(report['ProofDiagnosticsValid'])
         self.assertTrue(report['RollbackConfirmed'])
+        self.assertEqual(['INSTALL'], report['ProofAttemptedSources'])
+        self.assertEqual(['21-proof'], self.dispatched_stages()[-1])
+        self.assertIn('before-THROW state=1', result.stdout)
+        self.assertIn('rollback-confirmed=True', result.stdout)
         self.assertIn('QUOTED_IDENTIFIER', result.stdout)
         before = self.calls.read_bytes()
         self.run_fast(success=False)
         self.assertEqual(before, self.calls.read_bytes())
+
+    def test_zero_exit_installer_sql_error_never_dispatches_standalone(self):
+        self.run_fast('module-drift-zero-exit', success=False)
+        report = self.report()
+        self.assertEqual(0, report['ExitCode'])
+        self.assertEqual(['INSTALL'], report['ProofAttemptedSources'])
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertFalse(any('21-proof-verify-source.sql' in args[args.index('-i')+1] for args in calls))
+        self.assertEqual(24, report['CompletedCount'])
+
+    def test_standalone_absence_is_scoped_and_not_claimed_as_a_module_defect(self):
+        self.run_fast('standalone-absent', success=False)
+        report = self.report()
+        self.assertEqual(['INSTALL', 'STANDALONE'], report['ProofAttemptedSources'])
+        self.assertEqual('NO_MODULE_METADATA_AT_ASSERTION', report['ProofObservation'])
+        self.assertEqual([], report['ProofModules'])
+        self.assertFalse(report['ProofDiagnosticsValid'])
+        self.assertFalse(report['RollbackConfirmed'])
+        self.assertEqual(24, report['CompletedCount'])
 
     def test_proof_assertion_is_allowlisted_and_failure_remains_pending(self):
         result = self.run_fast('proof-fail', success=False)
@@ -186,7 +214,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.run_fast()
         self.assertEqual(51, self.report()['CompletedCount'])
         self.assertEqual('16-binding-preflight', self.report()['CompletedStages'][0])
-        self.assertEqual(33, len(self.calls.read_text().splitlines()))
+        self.assertEqual(34, len(self.calls.read_text().splitlines()))
 
     def test_unconfirmed_native_password_prompt_blocks_later_connections(self):
         self.run_fast('missing-prompt', success=False)
@@ -262,7 +290,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         for line in self.calls.read_text().splitlines():
             args = json.loads(line)
             paths = args[args.index('-i')+1].split(',')
-            groups.append([Path(path).stem for path in paths if Path(path).stem in {s['name'] for s in STAGES}])
+            groups.append(['21-proof' if Path(path).stem in ('21-proof-install-source','21-proof-verify-source') else Path(path).stem for path in paths if Path(path).stem in {s['name'] for s in STAGES} or Path(path).stem in ('21-proof-install-source','21-proof-verify-source')])
         return groups
 
     def test_seed_verifies_alone_then_cleanly_pauses_at_stage16_and_resumes(self):
@@ -295,7 +323,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(51, self.report()['CompletedCount'])
         self.assertEqual('16-binding-preflight', self.report()['CompletedStages'][0])
         self.assertEqual(1, sum(g.count('15c-seed') for g in self.dispatched_stages()))
-        self.assertEqual(33, len(self.dispatched_stages()))
+        self.assertEqual(34, len(self.dispatched_stages()))
         self.assertTrue((self.packet / 'fast-track.jsonl').read_bytes().startswith(retained))
 
     def test_future_provisioning_inputs_pause_only_at_stage28_then_resume(self):
@@ -310,14 +338,16 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(30, self.report()['CompletedCount'])
         self.assertEqual('28-contained-users', self.report()['BlockedStage'])
         self.assertIn('twelve independent contained-user inputs required', self.report()['NextAction'])
-        self.assertEqual([[s['name']] for s in STAGES[18:30]], self.dispatched_stages())
+        expected = [[s['name']] for s in STAGES[18:30]]
+        expected.insert(7, ['21-proof'])
+        self.assertEqual(expected, self.dispatched_stages())
         self.assertEqual('verified', self.journal()[-1]['Kind'])
         path.write_text(ready)
         self.render()
         self.run_fast()
         self.assertEqual(51, self.report()['CompletedCount'])
         self.assertEqual('28-contained-users', self.report()['CompletedStages'][0])
-        self.assertEqual(33, len(self.dispatched_stages()))
+        self.assertEqual(34, len(self.dispatched_stages()))
 
     def test_seed_prerequisites_still_block_before_approval_or_sql(self):
         path = self.packet / 'seed.sql'

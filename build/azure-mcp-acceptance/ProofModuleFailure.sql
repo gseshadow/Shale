@@ -1,9 +1,13 @@
-/* Acceptance-only catch-path diagnostics. @C4aModules is the original expected registry.
-   Read metadata before rollback; return only fixed public names and failure bits. */
-IF ERROR_NUMBER()=59400 AND ERROR_MESSAGE()=N'CIMD proof module source/owner/context drift.'
-BEGIN
- BEGIN TRY
-  SELECT CAST(CONCAT('PROOF_MODULE_FAIL:',e.Name,':',
+/* Executed only inside the original failed assertion branch, BEFORE THROW.
+   No catch-path catalog reads; no module definitions, digests or private values emitted. */
+BEGIN TRY
+ SELECT CAST(CONCAT('PROOF_CHECK:__PHASE__:',XACT_STATE(),':',@@TRANCOUNT,':',
+   CASE WHEN (@@OPTIONS & 16384)=16384 THEN 1 ELSE 0 END) AS varchar(96)) AS ProofCheck;
+ IF NOT EXISTS(SELECT 1 FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id
+    JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE s.name=N'dbo' AND o.name IN(SELECT Name FROM @C4aModules))
+  SELECT CAST('PROOF_METADATA_ABSENT:__PHASE__' AS varchar(96)) AS ProofCheck;
+ ELSE
+  SELECT CAST(CONCAT('PROOF_MODULE_FAIL:__PHASE__:',e.Name,':',
     CASE WHEN o.object_id IS NULL THEN 1 ELSE 0 END,
     CASE WHEN m.definition IS NULL THEN 1 ELSE 0 END,
     CASE WHEN o.object_id IS NULL OR COALESCE(o.principal_id,s.principal_id)<>1 THEN 1 ELSE 0 END,
@@ -23,9 +27,7 @@ BEGIN
     AND ((e.OwnerLookup=1 AND z.execute_as_principal_id=-2) OR (e.OwnerLookup=0 AND z.execute_as_principal_id IS NULL))
     AND HASHBYTES('SHA2_256',z.definition)=e.Hash)
   ORDER BY e.Name;
- END TRY
- BEGIN CATCH
-  /* Diagnostics must never prevent the original rollback and rethrow. */
-  DECLARE @AcceptanceDiagnosticUnavailable bit=1;
- END CATCH;
-END;
+END TRY
+BEGIN CATCH
+ SELECT CAST('PROOF_DIAGNOSTIC_UNAVAILABLE:__PHASE__' AS varchar(96)) AS ProofCheck;
+END CATCH;

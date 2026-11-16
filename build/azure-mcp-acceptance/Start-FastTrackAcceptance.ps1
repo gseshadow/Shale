@@ -49,9 +49,7 @@ try {
     if ($JournalPath) {
         $journal=Assert-PrivatePath $JournalPath
         if ([IO.Path]::GetDirectoryName($journal) -cne $packet -or -not (Test-Path -LiteralPath $journal)) { throw 'STOP: recovery journal must already exist in this packet.' }
-        $selectionPath=Assert-PrivatePath (Join-Path $packet 'fast-track-stage21-recovery.json')
-        if (-not (Test-Path -LiteralPath $selectionPath)) { $selectionPath=Assert-PrivatePath (Join-Path $packet 'fast-track-recovery.json') }
-        $selection=Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
+        $selection=Get-SelectedStage21Recovery $packet
         if ($selection.Journal -cne $journal) { throw 'STOP: only the selected recovery fork can execute.' }
     }
     $history=Get-FastTrackHistory $journal $stages $baseline $dir
@@ -66,7 +64,7 @@ try {
     $run=Assert-PrivatePath (Join-Path $packet ('fast-track-'+[guid]::NewGuid().ToString('N')))
     [void][IO.Directory]::CreateDirectory($run)
     $reportPath=Join-Path $run 'report.json'
-    $report=[ordered]@{Mode='FAST_TRACK'; Server='shale.database.windows.net'; Database='ShaleMcpAcceptance'; CompletedThrough=$stages[$next-1].name; CompletedCount=$next; CompletedStages=@(); Outcome='NOT_STARTED'; FailureStage=$null; BlockedStage=$null; ExitCode=$null; SqlErrorNumbers=@(); Assertions=@(); SessionFailures=@(); ProofModules=@(); ProofDiagnosticsValid=$false; RollbackConfirmed=$false; FailureCode=''; AttemptedGroupStages=@(); NextAction='Approve the reviewed acceptance run.'}
+    $report=[ordered]@{Mode='FAST_TRACK'; Server='shale.database.windows.net'; Database='ShaleMcpAcceptance'; CompletedThrough=$stages[$next-1].name; CompletedCount=$next; CompletedStages=@(); Outcome='NOT_STARTED'; FailureStage=$null; BlockedStage=$null; ExitCode=$null; SqlErrorNumbers=@(); Assertions=@(); SessionFailures=@(); ProofModules=@(); ProofChecks=@(); ProofCatchStates=@(); ProofObservation='NOT_OBSERVED'; ProofAttemptedSources=@(); ProofDiagnosticsValid=$false; RollbackConfirmed=$false; FailureCode=''; AttemptedGroupStages=@(); NextAction='Approve the reviewed acceptance run.'}
     function Append-RunEvent($Record) {
         $Record.Index=$script:index
         $payload=$Record | ConvertTo-Json -Compress
@@ -131,7 +129,12 @@ try {
             $before=Join-Path $run ($stage.name+'-begin.sql'); $after=Join-Path $run ($stage.name+'-done.sql')
             Write-FastTrackFile $before (":on error exit`n"+$session+$fence+"SELECT CAST('FAST_STAGE_BEGIN:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")
             Write-FastTrackFile $after (":on error exit`n"+$fence+"SELECT CAST('FAST_STAGE_DONE:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")
-            $files+=@($before,(Join-Path $dir ($stage.name+'.sql')),$after)
+            if ($stage.name -ceq '21-proof') {
+                $parts=Split-ProofStageSources (Read-ProofStageSnapshot (Join-Path $dir '21-proof.sql') $hashes[$stage.name]) $fence
+                $installInput=Join-Path $run '21-proof-install-source.sql'; $verifyInput=Join-Path $run '21-proof-verify-source.sql'
+                Write-FastTrackFile $installInput $parts.Install; Write-FastTrackFile $verifyInput $parts.Verify
+                $files+=@($before,$installInput,$verifyInput,$after)
+            } else { $files+=@($before,(Join-Path $dir ($stage.name+'.sql')),$after) }
         }
         # ODBC's documented -i file1,file2 syntax has no unambiguous comma escape.
         if (@($files | Where-Object { $_.Contains(',') }).Count -or (($files -join ',').Length -gt 24000)) { throw 'STOP: input paths cannot contain commas or exceed the batch argument limit; use strict mode or a shorter reviewed checkout path.' }
@@ -151,7 +154,29 @@ try {
         $seconds=if ($group.Restricted) {'5'} else {'20'}
         $arguments=@('-S','tcp:shale.database.windows.net,1433','-d','ShaleMcpAcceptance','-U',$group.User,'-N','-b','-V','11','-r','1','-l','30','-t',$seconds,'-x','-X1','-f','65001','-i',($group.Files -join ','),'-s','|','-W','-w','65535')
         Write-Host "Executing $($stages[$group.Start].name)..$($stages[$group.End-1].name); wait for PASSWORD INPUT READY, then use this connection's existing credential."
-        $capture=& (Join-Path $PSScriptRoot 'Invoke-NativeSqlcmd.ps1') -Executable $client -Arguments $arguments -RequireConsole
+        if ($group.Start -eq 24) {
+            $report.ProofAttemptedSources=@('INSTALL')
+            $installArgs=@($arguments); $inputIndex=[array]::IndexOf($installArgs,'-i')+1
+            $installArgs[$inputIndex]=(@($group.Files[0],$group.Files[1]) -join ',')
+            $capture=& (Join-Path $PSScriptRoot 'Invoke-NativeSqlcmd.ps1') -Executable $client -Arguments $installArgs -RequireConsole
+            $installOkay=(-not $capture.FailureCode -and $capture.ExitCode -eq 0 -and $capture.PasswordPromptObserved -and $capture.PasswordInputReadyShown -and @(Get-SafeSqlErrorNumbers $capture.Lines).Count -eq 0)
+            if ($installOkay) {
+                try { [void](Read-SafeResult $capture.Lines '21-proof' 1) }
+                catch { $installOkay=$false; $capture.FailureCode='INSTALL_SOURCE_RESULTS_INVALID' }
+            }
+            if ($installOkay) {
+                # A separate process is dispatched ONLY after validated installer success.
+                if ((Get-FileHash -LiteralPath $client -Algorithm SHA256).Hash -cne $clientHash -or (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash -cne $manifestHash) { throw 'STOP: approved inputs changed between proof sources.' }
+                foreach ($i in 2..3) { if ((Get-FileHash -LiteralPath $group.Files[$i] -Algorithm SHA256).Hash -cne $group.Hashes[$i]) { throw 'STOP: proof verifier input changed.' } }
+                $report.ProofAttemptedSources+= 'STANDALONE'
+                Write-Host 'Stage 21 installer source passed; starting the independent standalone verifier connection.'
+                $verifyArgs=@($arguments); $verifyArgs[$inputIndex]=(@($group.Files[2],$group.Files[3]) -join ',')
+                $second=& (Join-Path $PSScriptRoot 'Invoke-NativeSqlcmd.ps1') -Executable $client -Arguments $verifyArgs -RequireConsole
+                $firstLines=@($capture.Lines); $capture=$second; $capture.Lines=@($firstLines)+@($second.Lines)
+            }
+        } else {
+            $capture=& (Join-Path $PSScriptRoot 'Invoke-NativeSqlcmd.ps1') -Executable $client -Arguments $arguments -RequireConsole
+        }
         $numbers=@(Get-SafeSqlErrorNumbers $capture.Lines)
         $parsed=Read-FastTrackBatch $capture.Lines @($stages[$group.Start..($group.End-1)])
         foreach ($done in $parsed.Completed) {
@@ -167,8 +192,11 @@ try {
             if ($report.FailureStage -ceq '21-proof') {
                 $proof=Read-ProofModuleFailures $capture.Lines
                 $report.ProofModules=@($proof.Modules); $report.ProofDiagnosticsValid=$proof.Valid
+                $report.ProofChecks=@($proof.Checks); $report.ProofCatchStates=@($proof.CatchStates); $report.ProofObservation=$proof.Observation
+                foreach ($context in $proof.Checks) { Write-Host ("PROOF: phase="+$context.Phase+" before-THROW state="+$context.XactState+" trancount="+$context.TranCount+" xact-abort="+$context.XactAbortOn) }
+                Write-Host ("PROOF: observation="+$proof.Observation+" rollback-confirmed="+$proof.RollbackConfirmed)
                 $report.RollbackConfirmed=$proof.RollbackConfirmed
-                foreach ($module in $proof.Modules) { Write-Host ("PROOF: "+$module.Module+" failed=["+($module.FailedProperties -join ',')+"]") }
+                foreach ($module in $proof.Modules) { Write-Host ("PROOF: "+$module.Phase+":"+$module.Module+" failed=["+($module.FailedProperties -join ',')+"]") }
             }
             Write-Host ("STOP: stage="+$report.FailureStage+" exit="+$capture.ExitCode+" SQL-errors=["+($numbers -join ',')+"] assertions=["+($report.Assertions -join ',')+"] session-failures=["+($report.SessionFailures -join ',')+"]")
             $report.FailureCode=if ($capture.FailureCode) {$capture.FailureCode} elseif ($numbers.Count) {'SQL_ERROR'} elseif ($capture.ExitCode -ne 0) {'PROCESS_EXIT'} elseif (-not $capture.PasswordPromptObserved -or -not $capture.PasswordInputReadyShown) {'PASSWORD_PROMPT_NOT_CONFIRMED'} else {'INCOMPLETE_RESULTS'}

@@ -25,7 +25,8 @@ function Read-FastTrackBatch([object[]]$Lines,[object[]]$Stages) {
     }
     [pscustomobject]@{ Completed=$completed; Complete=($next -eq $Stages.Count -and -not $invalid -and -not $active); Invalid=$invalid }
 }
-function Get-FastTrackHistory([string]$Path,[object[]]$Stages,[string]$BaselineHash,[string]$Directory) {
+function Get-FastTrackHistory([string]$Path,[object[]]$Stages,[string]$BaselineHash,[string]$Directory,[int]$Depth=0) {
+    if ($Depth -gt 4) { throw 'STOP: recovery ancestry too deep.' }
     $next=18; $pending=$false; $groupEnd=18; $chain='0'*64; $index=0; $groupStart=18; $failedStage=$null; $prefix=''; $recovered=$false; $checkpointSnapshot=$null
     if (Test-Path -LiteralPath $Path) {
         if (-not [IO.File]::ReadAllText($Path).EndsWith("`n")) { throw 'STOP: fast-track journal truncated; preserve it for reconciliation.' }
@@ -39,7 +40,10 @@ function Get-FastTrackHistory([string]$Path,[object[]]$Stages,[string]$BaselineH
                 if ($index -eq 0) {
                     if ($row.Hash -cne $BaselineHash) { throw 'Baseline changed' }
                     if ($row.Kind -ceq 'stage21-baseline') {
-                        Assert-Stage21RetryReceipt $row.Evidence $row.EvidenceHash $Directory $Stages $BaselineHash
+                        Assert-Stage21RetryReceipt $row.Evidence $row.EvidenceHash $Directory $Stages $BaselineHash $Depth
+                        $receipt=Read-Stage21JsonFile $row.Evidence
+                        $plan=Read-Stage21JsonFile $receipt.PlanPath
+                        $checkpointSnapshot=$plan.CheckpointSnapshot
                         $next=24; $recovered=$true
                     } elseif ($row.Kind -cne 'baseline') { throw 'Unknown baseline' }
                 } else {
@@ -136,21 +140,57 @@ function Get-SafeFastTrackSessionFailures([object[]]$Lines,[string]$Stage) {
 function Read-ProofModuleFailures([object[]]$Lines) {
     $names=@([IO.File]::ReadAllLines((Join-Path $PSScriptRoot '../sql-confinement/cimd-v1-modules.sha256')) | ForEach-Object { $_.Split('=')[0] })
     $flags=@('OBJECT_MISSING','DEFINITION_UNAVAILABLE','OWNERSHIP','ANSI_NULLS','QUOTED_IDENTIFIER','EXECUTION_CONTEXT','DEFINITION_HASH')
-    $found=@(); $seen=@(); $invalid=$false; $rollback=0
+    $found=@(); $checks=@(); $catches=@(); $absent=@(); $unavailable=@(); $seen=@(); $invalid=$false; $legacy=$false; $rollback=0
     foreach ($line in ((($Lines | ForEach-Object {[string]$_}) -join "`n") -split '\r?\n')) {
         $candidate=$line.Trim()
         if ($candidate -ceq 'PROOF_ROLLBACK_CONFIRMED') { $rollback++; continue }
-        if (-not $candidate.StartsWith('PROOF_MODULE_FAIL:')) { continue }
-        if ($candidate -cnotmatch '^PROOF_MODULE_FAIL:([A-Za-z0-9_]{1,128}):([01]{7})$') { $invalid=$true; continue }
-        $name=$Matches[1]; $mask=$Matches[2]
-        if ($name -cnotin $names -or $name -cin $seen -or $mask -ceq '0000000') { $invalid=$true; continue }
-        $seen+=$name; $failed=@()
-        foreach ($i in 0..6) { if ($mask[$i] -ceq [char]'1') { $failed+=$flags[$i] } }
-        $found+=[pscustomobject]@{Module=$name; FailedProperties=$failed}
+        if ($candidate -cmatch '^PROOF_(CHECK|CATCH):(INSTALL|SEAL|STANDALONE):(-1|0|1):([0-9]{1,5}):([01])$') {
+            $kind=$Matches[1]; $phase=$Matches[2]; $state=[int]$Matches[3]; $count=[int]$Matches[4]; $abort=($Matches[5] -ceq '1')
+            if ($count -gt 32767 -or (($state -eq 0) -ne ($count -eq 0))) { $invalid=$true; continue }
+            $record=[pscustomobject]@{Phase=$phase; XactState=$state; TranCount=$count; XactAbortOn=$abort}
+            if ($kind -ceq 'CHECK') { $checks+=$record } else { $catches+=$record }
+            continue
+        }
+        if ($candidate -cmatch '^PROOF_(METADATA_ABSENT|DIAGNOSTIC_UNAVAILABLE):(INSTALL|SEAL|STANDALONE)$') {
+            if ($Matches[1] -ceq 'METADATA_ABSENT') { $absent+=$Matches[2] } else { $unavailable+=$Matches[2] }; continue
+        }
+        if ($candidate -cmatch '^PROOF_MODULE_FAIL:(INSTALL|SEAL|STANDALONE):([A-Za-z0-9_]{1,128}):([01]{7})$') {
+            $phase=$Matches[1]; $name=$Matches[2]; $mask=$Matches[3]
+            if ($name -cnotin $names -or ($phase+':'+$name) -cin $seen -or $mask -ceq '0000000') { $invalid=$true; continue }
+            $seen+=($phase+':'+$name); $failed=@()
+            foreach ($i in 0..6) { if ($mask[$i] -ceq [char]'1') { $failed+=$flags[$i] } }
+            $found+=[pscustomobject]@{Phase=$phase;Module=$name;FailedProperties=$failed}; continue
+        }
+        if ($candidate.StartsWith('PROOF_MODULE_FAIL:')) { $legacy=$true; $invalid=$true }
+        elseif ($candidate.StartsWith('PROOF_CHECK:') -or $candidate.StartsWith('PROOF_CATCH:') -or $candidate.StartsWith('PROOF_METADATA_ABSENT:') -or $candidate.StartsWith('PROOF_DIAGNOSTIC_UNAVAILABLE:')) { $invalid=$true }
     }
-    if ($rollback -gt 1) { $invalid=$true }
-    if ($invalid) { $found=@() }
-    [pscustomobject]@{Modules=@($found); Valid=(-not $invalid -and $found.Count -gt 0); RollbackConfirmed=($rollback -eq 1 -and -not $invalid)}
+    if ($rollback -gt 1 -or $checks.Count -gt 1 -or $catches.Count -gt 1) { $invalid=$true }
+    if ($catches.Count -and ($catches[0].Phase -ceq 'STANDALONE' -or ($checks.Count -and $checks[0].Phase -cne $catches[0].Phase))) { $invalid=$true }
+    if ($rollback -and $catches.Count -ne 1) { $invalid=$true }
+    foreach ($phase in @($absent)+@($unavailable)) { if ($checks.Count -ne 1 -or $phase -cne $checks[0].Phase) { $invalid=$true } }
+    if ($absent.Count -and $found.Count) { $invalid=$true }
+    foreach ($module in $found) { if (@($checks | Where-Object Phase -CEQ $module.Phase).Count -ne 1) { $invalid=$true } }
+    if ($invalid -or $unavailable.Count -or $absent.Count) { $found=@() }
+    $observation=if ($legacy) {'UNSCOPED_LEGACY_OUTPUT'} elseif ($invalid) {'INVALID_DIAGNOSTIC_PROTOCOL'} elseif ($absent.Count) {'NO_MODULE_METADATA_AT_ASSERTION'} elseif ($unavailable.Count -or -not $found.Count) {'DIAGNOSTICS_UNAVAILABLE'} else {'PRE_THROW_MODULE_MISMATCH'}
+    [pscustomobject]@{Modules=@($found);Checks=@($checks);CatchStates=@($catches);Observation=$observation;Valid=(-not $invalid -and $found.Count -gt 0 -and $absent.Count -eq 0 -and $unavailable.Count -eq 0);RollbackConfirmed=($rollback -eq 1 -and -not $invalid)}
+}
+function Read-ProofStageSnapshot([string]$Path,[string]$ExpectedHash) {
+    $algorithm=$null
+    try {
+        $bytes=[IO.File]::ReadAllBytes((Assert-PrivatePath $Path))
+        $algorithm=[Security.Cryptography.SHA256]::Create()
+        $actual=[BitConverter]::ToString($algorithm.ComputeHash($bytes)).Replace('-','')
+        if ($actual -cne $ExpectedHash) { throw 'Changed bytes' }
+        return [Text.UTF8Encoding]::new($false,$true).GetString($bytes)
+    } catch { throw 'STOP: Stage 21 input changed or is not valid UTF-8; contents suppressed.' }
+    finally { if ($algorithm) { $algorithm.Dispose() } }
+}
+function Split-ProofStageSources([string]$Text,[string]$Fence) {
+    $boundary="SELECT 'ACCEPTANCE_SOURCE_OK:21-proof:1' AS AcceptanceResult;`nGO`n"
+    $at=$Text.IndexOf($boundary,[StringComparison]::Ordinal)
+    if ($at -lt 0 -or $at -ne $Text.LastIndexOf($boundary,[StringComparison]::Ordinal)) { throw 'STOP: Stage 21 source boundary changed.' }
+    $cut=$at+$boundary.Length
+    [pscustomobject]@{Install=$Text.Substring(0,$cut); Verify=(":on error exit`n"+$Fence+"SET XACT_ABORT ON;`nGO`n"+$Text.Substring($cut))}
 }
 
 . (Join-Path $PSScriptRoot 'Stage21RetryEvidence.ps1')
