@@ -11,6 +11,10 @@ from pathlib import Path
 import re
 import sys
 
+# Works both as a CLI and via the test module loader.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from proof_instrumentation import instrument, strip_v2
+
 ROOT = Path(__file__).resolve().parents[2]
 INSTALLER = ROOT / 'docs/sql/ai-integration/universal-pr4a-proof.sql'
 VERIFIER = ROOT / 'docs/sql/ai-integration/universal-pr4a-proof-verify.sql'
@@ -40,16 +44,23 @@ def audit(path):
     text = raw.decode('utf-8-sig').replace('\r\n', '\n')
     block_pattern = r'/\* ACCEPTANCE_PROOF_DIAGNOSTIC_BEGIN \*/\n(.*?)/\* ACCEPTANCE_PROOF_DIAGNOSTIC_END \*/\n'
     blocks = re.findall(block_pattern, text, flags=re.S)
-    diagnostic = (ROOT / 'build/azure-mcp-acceptance/ProofModuleFailure.sql').read_text(encoding='utf-8')
+    diagnostic = (ROOT / 'build/azure-mcp-acceptance/ProofModuleFailure.v1.sql').read_text(encoding='utf-8')
     rollback_marker = ("IF ERROR_NUMBER()=59400 AND ERROR_MESSAGE()=N'CIMD proof module source/owner/context drift.' "
                        "AND @@TRANCOUNT=0 SELECT CAST('PROOF_ROLLBACK_CONFIRMED' AS varchar(64)) AS ProofRollback;\n")
     approved_blocks = ['IF XACT_STATE()<>0 BEGIN\n' + diagnostic + '\nEND;\n', rollback_marker,
                        'BEGIN TRY\n', 'END TRY BEGIN CATCH\n' + diagnostic + '\nTHROW; END CATCH;\n']
     present = 'ACCEPTANCE_PROOF_DIAGNOSTIC_BEGIN' in text
-    blocks_match = ((not present and not blocks) or
-                    (blocks == approved_blocks and text.count('/* ACCEPTANCE_PROOF_DIAGNOSTIC_BEGIN */') == 4
-                     and text.count('/* ACCEPTANCE_PROOF_DIAGNOSTIC_END */') == 4))
-    clean = re.sub(block_pattern, '', text, flags=re.S)
+    v2_present = 'ACCEPTANCE_PROOF_V2_BEGIN' in text
+    if v2_present:
+        clean = strip_v2(text)
+        expected_packet = clean.replace(canonical, instrument(canonical, True)).replace(verify, instrument(verify, False))
+        blocks_match = (expected_packet == text and canonical in clean and verify in clean)
+        present = True
+    else:
+        blocks_match = ((not present and not blocks) or
+                        (blocks == approved_blocks and text.count('/* ACCEPTANCE_PROOF_DIAGNOSTIC_BEGIN */') == 4
+                         and text.count('/* ACCEPTANCE_PROOF_DIAGNOSTIC_END */') == 4))
+        clean = re.sub(block_pattern, '', text, flags=re.S)
     payloads = PAYLOAD.findall(text)
     if len(payloads) != 16 or {int(i) for i, _ in payloads} != set(range(16)):
         raise ValueError('Incomplete or duplicate payloads')
@@ -84,7 +95,7 @@ def audit(path):
                 VerifierMatchesReviewedSource=(verifier_at >= 0),
                 PacketSessionPreamblesMatch=packet_options,
                 AllEncodedDefinitionsMatch=all(r['DefinitionHashMatches'] and r['EncodedOwnerClauseMatches'] for r in results),
-                EngineMetadataObserved=False, AcceptanceDiagnosticsPresent=present, AcceptanceDiagnosticBlocksMatch=blocks_match, Modules=results)
+                EngineMetadataObserved=False, AcceptanceDiagnosticsPresent=present, AcceptanceDiagnosticVersion=(2 if v2_present else (1 if present else 0)), AcceptanceDiagnosticBlocksMatch=blocks_match, Modules=results)
 
 
 def main():

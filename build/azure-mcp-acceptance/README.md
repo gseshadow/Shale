@@ -88,9 +88,10 @@ ShaleMcpAcceptance**, with the existing database/server/edition/collation/owner/
 repeated in SQL. The first connection also refuses nonempty seed tables or missing foundation
 identities before Stage 15c. Completed stages 00–15b are never sent to SQLCMD.
 
-Every stage now uses a **separate native connection**; source files within a stage
-stay together. Identity equality does not establish session compatibility. Stages
-21–26 explicitly require fresh neutral owner sessions. Expect **33 native password
+Every stage uses a **separate native connection**. Stage 21 uses two gated source
+connections: standalone verification is dispatched only after installer success. Other
+stages keep their source files together. Identity equality does not establish session compatibility. Stages
+21–26 explicitly require fresh neutral owner sessions. Expect **34 native password
 prompts** for an uninterrupted run from the 18-stage baseline. These are authentication,
 not repeated approvals. Wait for **PASSWORD INPUT READY** on every connection. Passwords
 stay in SQLCMD's inherited console input and never enter argv/environment or PowerShell capture.
@@ -319,3 +320,7 @@ For the latest failed **single-stage** retry on the selected recovered24 fork, u
 It instruments new Stage 21 packets before rollback and creates a new journal only
 after one reviewed read-only observation matches the prior verified checkpoint.
 It never edits existing histories, weakens assertions or retries automatically.
+
+For the latest v1 all-absent report (`RollbackConfirmed=false`), the
+[pre-THROW diagnostic correction and current recovery commands](stage21-prethrow-resume.md)
+supersede CATCH-based collection. No SQL implementation/hash correction is assumed.

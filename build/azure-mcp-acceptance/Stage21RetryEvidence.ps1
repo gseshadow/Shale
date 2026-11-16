@@ -12,7 +12,8 @@ function Read-Stage21JsonFile([string]$Path) {
 function Get-Stage21RetryHashes([string]$Directory,[object[]]$Stages) {
     @($Stages[0..29] | ForEach-Object { [pscustomobject]@{Stage=$_.name;Hash=(Get-StageHash $Directory $_.name)} })
 }
-function Assert-Stage21RetryPlan($Plan,[string]$Directory,[object[]]$Stages,[string]$BaselineHash) {
+function Assert-Stage21RetryPlan($Plan,[string]$Directory,[object[]]$Stages,[string]$BaselineHash,[int]$Depth=0) {
+    if ($Plan.Version -eq 2) { Assert-Stage21RetryPlanV2 $Plan $Directory $Stages $BaselineHash $Depth; return }
     $packet=Assert-PrivatePath ([IO.Path]::GetDirectoryName($Directory))
     $old=Assert-PrivatePath $Plan.PreviousDirectory
     $new=Assert-PrivatePath $Plan.NewDirectory
@@ -26,7 +27,7 @@ function Assert-Stage21RetryPlan($Plan,[string]$Directory,[object[]]$Stages,[str
     # Only the original recovered24 fork can be the parent. No recursive retry chain.
     $first=Read-Stage21JsonText ([IO.File]::ReadLines($parent) | Select-Object -First 1)
     if ((Read-Stage21JsonText $first.Payload).Kind -cne 'baseline') { throw 'STOP: retry-of-retry is not supported.' }
-    $history=Get-FastTrackHistory $parent $Stages $BaselineHash $old
+    $history=Get-FastTrackHistory $parent $Stages $BaselineHash $old ($Depth+1)
     if (-not $history.Recovered -or -not $history.Pending -or $history.Next -ne 24 -or
         $history.GroupStart -ne 24 -or $history.GroupEnd -ne 25 -or $history.FailedStage -cne '21-proof' -or
         -not $history.Checkpoint24Snapshot) { throw 'STOP: parent must be the unresolved single Stage 21 attempt at checkpoint24.' }
@@ -36,7 +37,7 @@ function Assert-Stage21RetryPlan($Plan,[string]$Directory,[object[]]$Stages,[str
     foreach ($source in @('docs/sql/ai-integration/universal-pr4a-proof.sql','docs/sql/ai-integration/universal-pr4a-proof-verify.sql')) {
         $body=[IO.File]::ReadAllText((Join-Path $PSScriptRoot ('../../'+$source)))
         if ($expected.IndexOf($body,[StringComparison]::Ordinal) -lt 0 -or $expected.IndexOf($body,[StringComparison]::Ordinal) -ne $expected.LastIndexOf($body,[StringComparison]::Ordinal)) { throw 'STOP: old proof source shape differs.' }
-        $expected=$expected.Replace($body,(Add-ProofModuleDiagnostics $body $source))
+        $expected=$expected.Replace($body,(Add-ProofModuleDiagnosticsV1 $body $source))
     }
     if ([IO.File]::ReadAllText((Join-Path $new '21-proof.sql')) -cne $expected) { throw 'STOP: only reviewed diagnostic instrumentation may change Stage 21.' }
     $newHashes=@(Get-Stage21RetryHashes $new $Stages)
@@ -70,7 +71,7 @@ function Read-Stage21RetryCapture([string]$Path,$Plan) {
     [void](Read-SafeResult (@($lines | Where-Object { -not $_.StartsWith('ACCEPTANCE_SOURCE_OK:') })+@('ACCEPTANCE_SOURCE_OK:20-pr3:1','ACCEPTANCE_SOURCE_OK:20-pr3:2','ACCEPTANCE_SOURCE_OK:20-pr3:3')) '20-pr3' 3)
     return $snapshot
 }
-function Assert-Stage21RetryReceipt([string]$Path,[string]$Hash,[string]$Directory,[object[]]$Stages,[string]$BaselineHash) {
+function Assert-Stage21RetryReceipt([string]$Path,[string]$Hash,[string]$Directory,[object[]]$Stages,[string]$BaselineHash,[int]$Depth=0) {
     $path=Assert-PrivatePath $Path
     if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -cne $Hash) { throw 'STOP: retry receipt changed.' }
     $receipt=Read-Stage21JsonFile $path
@@ -78,8 +79,10 @@ function Assert-Stage21RetryReceipt([string]$Path,[string]$Hash,[string]$Directo
     $planPath=Assert-PrivatePath $receipt.PlanPath
     if ((Get-FileHash -LiteralPath $planPath -Algorithm SHA256).Hash -cne $receipt.PlanHash) { throw 'STOP: retry plan changed.' }
     $plan=Read-Stage21JsonFile $planPath
-    Assert-Stage21RetryPlan $plan $Directory $Stages $BaselineHash
+    Assert-Stage21RetryPlan $plan $Directory $Stages $BaselineHash $Depth
     $capture=Assert-PrivatePath $receipt.Capture
     if ((Get-FileHash -LiteralPath $capture -Algorithm SHA256).Hash -cne $receipt.CaptureHash) { throw 'STOP: retry observation changed.' }
     [void](Read-Stage21RetryCapture $capture $plan)
 }
+
+. (Join-Path $PSScriptRoot 'Stage21RetryEvidenceV2.ps1')
