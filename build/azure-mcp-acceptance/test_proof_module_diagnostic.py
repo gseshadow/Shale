@@ -32,7 +32,7 @@ class ProofModuleDiagnosticTest(unittest.TestCase):
         self.assertNotRegex(code, r'(?i)\b(?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|MERGE|EXEC(?:UTE)?|COMMIT|ROLLBACK|BEGIN\s+TRAN)\b')
         for field in ('ObjectPresent', 'DefinitionVisible', 'OwnerMatches', 'AnsiNullsMatches',
                       'QuotedIdentifierMatches', 'ExecuteAsMatches', 'DefinitionHashMatches',
-                      'CurrentAssertionFindingCount', 'ABSENT_NOW_NO_HISTORICAL_METADATA'):
+                      'CurrentAssertionFindingCount', 'ABSENT_NOW_NO_HISTORICAL_METADATA', 'ObservedExecutionContext'):
             self.assertIn(field, query)
         projection = query[query.rindex('\nSELECT ModuleName'):]
         self.assertNotRegex(projection, r'(?i)\bdefinition\b|principal_id|password|credential')

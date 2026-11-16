@@ -105,7 +105,8 @@ server/database/collation, and reads only database identity/session metadata plu
 It executes no module, reads no application rows, and creates no object or receipt.
 
 For each name it returns separate zero/one comparisons, expected/observed definition
-digests, expected execution context, and `CurrentAssertionFindingCount`:
+digests, expected execution context, bounded observed context (`CALLER`, `OWNER`,
+`OTHER_PRINCIPAL`, `UNAVAILABLE`), and `CurrentAssertionFindingCount`:
 
 - `MISMATCH_NOW`: use the zero property columns to identify the current module and
   exact failed predicate. Multiple modules/properties can fail simultaneously.

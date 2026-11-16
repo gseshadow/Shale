@@ -63,13 +63,17 @@ IF USER_NAME()<>N'dbo'
           OR (OwnerLookup=0 AND execute_as_principal_id IS NULL AND definition IS NOT NULL)
         THEN 1 ELSE 0 END AS ExecuteAsMatches,
    CASE WHEN HASHBYTES('SHA2_256',definition)=DefinitionHash THEN 1 ELSE 0 END AS DefinitionHashMatches,
-   CONVERT(varchar(64),HASHBYTES('SHA2_256',definition),2) AS ObservedDefinitionHash
+   CONVERT(varchar(64),HASHBYTES('SHA2_256',definition),2) AS ObservedDefinitionHash,
+   CASE WHEN definition IS NULL THEN 'UNAVAILABLE'
+        WHEN execute_as_principal_id IS NULL THEN 'CALLER'
+        WHEN execute_as_principal_id=-2 THEN 'OWNER' ELSE 'OTHER_PRINCIPAL' END AS ObservedExecutionContext
  FROM Observed
 )
 SELECT ModuleName,ObjectPresent,DefinitionVisible,
        OwnerMatches,AnsiNullsMatches,QuotedIdentifierMatches,ExecuteAsMatches,DefinitionHashMatches,
        CONVERT(varchar(64),DefinitionHash,2) AS ExpectedDefinitionHash,ObservedDefinitionHash,
        CASE WHEN OwnerLookup=1 THEN 'OWNER' ELSE 'CALLER' END AS ExpectedExecutionContext,
+       ObservedExecutionContext,
        CASE WHEN ObjectPresent=0 THEN 'ABSENT_NOW_NO_HISTORICAL_METADATA'
             WHEN DefinitionVisible=0 THEN 'DEFINITION_UNAVAILABLE'
             WHEN OwnerMatches+AnsiNullsMatches+QuotedIdentifierMatches+ExecuteAsMatches+DefinitionHashMatches=5
