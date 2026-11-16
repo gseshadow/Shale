@@ -51,6 +51,20 @@ class PacketTest(unittest.TestCase):
             raise AssertionError(f'Unexpected exit {result.returncode}: {result.stdout}\n{result.stderr}')
         return result
 
+    def test_stage21_packet_preserves_exact_module_payloads_and_reviewed_session_preambles(self):
+        # Public module hashes must survive packet rendering, including Windows newlines.
+        import sys
+        result = subprocess.run([sys.executable, str(TOOL / 'proof_module_diagnostic.py'),
+                                 '--input', str(self.rendered / '21-proof.sql')],
+                                text=True, capture_output=True, check=False)
+        self.assertEqual(0, result.returncode, result.stderr)
+        report = json.loads(result.stdout)
+        for field in ('AllEncodedDefinitionsMatch', 'ExpectedRegistriesMatch',
+                      'InstallerMatchesReviewedSource', 'VerifierMatchesReviewedSource',
+                      'PacketSessionPreamblesMatch'):
+            self.assertTrue(report[field], field + ' must hold in the generated acceptance packet')
+        self.assertFalse(report['EngineMetadataObserved'])
+
     def test_every_rendered_stage_is_fenced_and_no_includes_or_variables_remain(self):
         files = list(self.rendered.glob('*.sql'))
         self.assertEqual(len(STAGES) + 1, len(files))
