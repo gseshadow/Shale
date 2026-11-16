@@ -88,14 +88,12 @@ ShaleMcpAcceptance**, with the existing database/server/edition/collation/owner/
 repeated in SQL. The first connection also refuses nonempty seed tables or missing foundation
 identities before Stage 15c. Completed stages 00–15b are never sent to SQLCMD.
 
-Owner connections are grouped as **15c seed**, **16–26 binding/install work**, and
-**28–30 provisioning/final checks**, with readiness checked before each group. The two
-restricted catalogs and 17 identity checks retain separate exact logins. Expect **22 native
-password prompts** for an uninterrupted remaining run, using the existing credentials. These are authentication,
+Every stage now uses a **separate native connection**; source files within a stage
+stay together. Identity equality does not establish session compatibility. Stages
+21–26 explicitly require fresh neutral owner sessions. Expect **33 native password
+prompts** for an uninterrupted run from the 18-stage baseline. These are authentication,
 not repeated approvals. Wait for **PASSWORD INPUT READY** on every connection. Passwords
-stay in SQLCMD's inherited console input; they are never passed through argv/environment,
-read from the credential store, or captured by PowerShell. The reviewed ODBC executable must
-support this hidden-input path; an unconfirmed prompt cannot establish a successful group.
+stay in SQLCMD's inherited console input and never enter argv/environment or PowerShell capture.
 
 Original rendered SQL is reused in order with public begin/done controls. Existing SQL
 transactions, assertions, timeout budgets, TLS validation and SQLCMD security switches remain.
@@ -105,7 +103,8 @@ multiple-input argument cannot safely represent those paths. Excessively long pa
 
 Progress and a concise `report.json` appear under a new private `fast-track-<id>` directory.
 The report lists completed stages, blocked or failing stage, native exit/SQL error numbers,
-the attempted group and next action. Raw SQL output, messages, credentials, password hashes and private
+the attempted group and next action. Exact allowlisted public assertion codes and boolean session failures help distinguish
+assertions without disclosing context values. Raw SQL output, arbitrary messages, credentials, password hashes and private
 rows are discarded. The packet's hash-chained `fast-track.jsonl` and shared lock prevent replay
 and concurrent runners. Keep these files and the independent original checkpoint evidence.
 Relaunch can advance only after fully verified groups; it never replays a completed stage.
@@ -118,10 +117,13 @@ batch immediately. Output validation occurs when that connection returns: if cap
 parsing fails, additional stages in the attempted group may already have committed. Independently
 reconcile the **entire attempted group**, surviving clients/sessions and transactional effects;
 matching counts or a zero exit alone do not prove a commit. There is no automatic retry,
-automatic ledger repair or fast-track recovery override. Do not delete/edit a journal or switch
+automatic ledger repair or general fast-track recovery override. Do not delete/edit a journal or switch
 modes to bypass uncertainty. Existing strict-mode progress beyond its baseline blocks adoption;
 strict mode likewise refuses a packet containing fast-track history. Use independently reviewed
-recovery work before further execution.
+recovery work before further execution. For the reported **24/51, Stage 21** failure,
+see [the investigation and controlled recovery procedure](stage21-recovery.md): it prepares
+read-only evidence and creates a new hash-bound journal fork only after independent review,
+preserving the original failed/pending journal. No SQL runs during recovery preparation/finalization.
 
 At 51/51 only SQL preparation is complete. Application startup, MCP activation, firewall
 changes and runtime acceptance remain separate. Fast-track contains no such operations.
