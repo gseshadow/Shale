@@ -1,8 +1,8 @@
 #Requires -Version 7.0
 <# One foreground run approval. Fixed acceptance destination; no Azure management.
-   Consecutive stages for one identity share a fail-fast SQLCMD connection. #>
+   Each stage owns a fresh fail-fast SQLCMD connection; source batches stay together. #>
 [CmdletBinding()]
-param([string]$RenderedDirectory,[string]$AuthoritativeFixture,[string]$SqlcmdExecutable,[string]$OperatorUser)
+param([string]$RenderedDirectory,[string]$AuthoritativeFixture,[string]$SqlcmdExecutable,[string]$OperatorUser,[string]$JournalPath)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Supervision.ps1')
 . (Join-Path $PSScriptRoot 'FastTrack.ps1')
@@ -46,7 +46,14 @@ try {
         } catch { throw 'STOP: strict checkpoint is not a verified 18-stage baseline.' }
     }
     $journal=Assert-PrivatePath (Join-Path $packet 'fast-track.jsonl')
+    if ($JournalPath) {
+        $journal=Assert-PrivatePath $JournalPath
+        if ([IO.Path]::GetDirectoryName($journal) -cne $packet -or -not (Test-Path -LiteralPath $journal)) { throw 'STOP: recovery journal must already exist in this packet.' }
+        $selection=Get-Content -LiteralPath (Assert-PrivatePath (Join-Path $packet 'fast-track-recovery.json')) -Raw | ConvertFrom-Json
+        if ($selection.Journal -cne $journal) { throw 'STOP: only the selected recovery fork can execute.' }
+    }
     $history=Get-FastTrackHistory $journal $stages $baseline $dir
+    if ($JournalPath -and -not $history.Recovered) { throw 'STOP: only a verified recovery fork can select a different journal.' }
     $next=$history.Next; $script:chain=$history.Chain; $script:index=$history.Index
     if ($history.Pending) { throw 'STOP: interrupted/failed fast-track group; independently reconcile it before any retry. No completed stage will replay.' }
     if ($next -eq 51) { Write-Output 'FAST-TRACK: already complete 51/51; nothing executed.'; return }
@@ -57,7 +64,7 @@ try {
     $run=Assert-PrivatePath (Join-Path $packet ('fast-track-'+[guid]::NewGuid().ToString('N')))
     [void][IO.Directory]::CreateDirectory($run)
     $reportPath=Join-Path $run 'report.json'
-    $report=[ordered]@{Mode='FAST_TRACK'; Server='shale.database.windows.net'; Database='ShaleMcpAcceptance'; CompletedThrough=$stages[$next-1].name; CompletedCount=$next; CompletedStages=@(); Outcome='NOT_STARTED'; FailureStage=$null; BlockedStage=$null; ExitCode=$null; SqlErrorNumbers=@(); FailureCode=''; AttemptedGroupStages=@(); NextAction='Approve the reviewed acceptance run.'}
+    $report=[ordered]@{Mode='FAST_TRACK'; Server='shale.database.windows.net'; Database='ShaleMcpAcceptance'; CompletedThrough=$stages[$next-1].name; CompletedCount=$next; CompletedStages=@(); Outcome='NOT_STARTED'; FailureStage=$null; BlockedStage=$null; ExitCode=$null; SqlErrorNumbers=@(); Assertions=@(); SessionFailures=@(); FailureCode=''; AttemptedGroupStages=@(); NextAction='Approve the reviewed acceptance run.'}
     function Append-RunEvent($Record) {
         $Record.Index=$script:index
         $payload=$Record | ConvertTo-Json -Compress
@@ -89,14 +96,10 @@ try {
     while ($cursor -lt 51) {
         $start=$cursor; $user=$OperatorUser
         if ($stages[$cursor].PSObject.Properties.Name -contains 'user') { $user=$stages[$cursor].user }
-        do {
-            $restricted=$stages[$cursor].PSObject.Properties.Name -contains 'user'
-            $cursor++
-            # Seed is independently verified before the Stage 16 gate. Stage 28's
-            # private provisioning inputs cannot block the preceding ready stages.
-            if ($cursor -ge 51 -or $cursor -in @(19,30)) { break }
-            $nextUser=$OperatorUser; if ($stages[$cursor].PSObject.Properties.Name -contains 'user') { $nextUser=$stages[$cursor].user }
-        } while ($nextUser -ceq $user)
+        $restricted=$stages[$cursor].PSObject.Properties.Name -contains 'user'
+        $cursor++
+        # Identity equality does not imply session compatibility. Proof/OAuth and
+        # later installers require neutral leases; future stages default to isolation.
         $groups += [pscustomobject]@{Start=$start; End=$cursor; User=$user; Restricted=$restricted; Files=@(); Hashes=@()}
     }
     # Missing prerequisites before dispatch are a clean pause, never a pending SQL
@@ -121,8 +124,9 @@ try {
             $hashes[$stage.name]=Get-StageHash $dir $stage.name
             $restricted=$stage.PSObject.Properties.Name -contains 'user'
             $fence=$target+"`n"; if (-not $restricted) { $fence+=$owner+"`n" }; $fence+="GO`n"
+            $session="SELECT CAST(CONCAT('FAST_SESSION_STATE:$($stage.name):',CASE WHEN USER_NAME()=N'dbo' THEN 1 ELSE 0 END,':',CASE WHEN @@TRANCOUNT<>0 THEN 1 ELSE 0 END,':',CASE WHEN SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL THEN 1 ELSE 0 END,':',CASE WHEN SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL THEN 1 ELSE 0 END,':',CASE WHEN (@@OPTIONS & 2)<>0 THEN 1 ELSE 0 END) AS varchar(128)) AS SessionState;`nGO`n"
             $before=Join-Path $run ($stage.name+'-begin.sql'); $after=Join-Path $run ($stage.name+'-done.sql')
-            Write-FastTrackFile $before (":on error exit`n"+$fence+"SELECT CAST('FAST_STAGE_BEGIN:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")
+            Write-FastTrackFile $before (":on error exit`n"+$session+$fence+"SELECT CAST('FAST_STAGE_BEGIN:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")
             Write-FastTrackFile $after (":on error exit`n"+$fence+"SELECT CAST('FAST_STAGE_DONE:$($stage.name)' AS varchar(96)) AS FastTrackStatus;`nGO`n")
             $files+=@($before,(Join-Path $dir ($stage.name+'.sql')),$after)
         }
@@ -155,6 +159,9 @@ try {
         if ($capture.FailureCode -or $capture.ExitCode -ne 0 -or $numbers.Count -or -not $capture.PasswordPromptObserved -or -not $capture.PasswordInputReadyShown -or -not $parsed.Complete) {
             $report.FailureStage=if ($next -lt $group.End) {$stages[$next].name} else {$stages[$group.End-1].name}
             $report.ExitCode=$capture.ExitCode; $report.SqlErrorNumbers=$numbers
+            $report.Assertions=@(Get-SafeFastTrackAssertions $capture.Lines)
+            $report.SessionFailures=@(Get-SafeFastTrackSessionFailures $capture.Lines $report.FailureStage)
+            Write-Host ("STOP: stage="+$report.FailureStage+" exit="+$capture.ExitCode+" SQL-errors=["+($numbers -join ',')+"] assertions=["+($report.Assertions -join ',')+"] session-failures=["+($report.SessionFailures -join ',')+"]")
             $report.FailureCode=if ($capture.FailureCode) {$capture.FailureCode} elseif ($numbers.Count) {'SQL_ERROR'} elseif ($capture.ExitCode -ne 0) {'PROCESS_EXIT'} elseif (-not $capture.PasswordPromptObserved -or -not $capture.PasswordInputReadyShown) {'PASSWORD_PROMPT_NOT_CONFIRMED'} else {'INCOMPLETE_RESULTS'}
             Append-RunEvent ([ordered]@{Kind='failed';Stage=$report.FailureStage;Index=0})
             throw 'STOP: batch failed or outcome uncertain. Reconcile the failed group independently; no automatic retry.'

@@ -75,6 +75,7 @@ foreach ($file in $files) {
  if ($name.EndsWith('-done')) { $stage=$name.Substring(0,$name.Length-5); $lines.Add('FAST_STAGE_DONE:'+$stage); continue }
  $spec=$specs | Where-Object name -CEQ $name
  if (-not $spec) { throw 'Unknown stage dispatched' }
+ if (MODE -eq 'proof-fail' -and $name -ceq '21-proof') { $lines.Add('Msg 59400, Level 16, State 1, Server PRIVATE_NEVER_PRINT, Line 12'); $lines.Add('Fresh unscoped dbo lease required.'); $exit=16; break }
  if (MODE -eq 'sql-fail' -and $name -ceq '20-pr3') { $lines.Add('Msg 50001, Level 16, State 1, PRIVATE_NEVER_PRINT'); $exit=16; break }
  switch ($name) {
   '15c-seed' { $lines.Add('SYNTHETIC_ROWS_ONLY_NO_AUTHORITY') }
@@ -107,6 +108,8 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         command = pre + '& ' + quote(TOOL / 'Start-FastTrackAcceptance.ps1')
         for name, value in [('RenderedDirectory', self.rendered), ('AuthoritativeFixture', self.fixture), ('SqlcmdExecutable', self.client), ('OperatorUser', 'offline_owner')]:
             command += ' -' + name + ' ' + quote(value)
+        if hasattr(self, 'recovery_journal'):
+            command += ' -JournalPath ' + quote(self.recovery_journal)
         result = subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command],
                                 text=True, capture_output=True, timeout=90, cwd=ROOT)
         if (result.returncode == 0) != success:
@@ -119,7 +122,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         path = max(self.packet.glob('fast-track-*/report.json'), key=lambda p: p.stat().st_mtime_ns)
         return json.loads(path.read_text())
 
-    def test_complete_remaining_stages_one_approval_absolute_client_and_twenty_two_logins(self):
+    def test_complete_remaining_stages_one_approval_absolute_client_and_isolated_stage_logins(self):
         inputs = {p: p.read_bytes() for p in self.packet.glob('*.sql')}
         result = self.run_fast()
         report = self.report()
@@ -128,9 +131,10 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual([s['name'] for s in STAGES[18:]], report['CompletedStages'])
         self.assertEqual(1, self.approvals.read_text().count('approval'))
         calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
-        self.assertEqual(22, len(calls))
+        self.assertEqual(33, len(calls))
         self.assertEqual(['15c-seed'], self.dispatched_stages()[0])
         for args, group in zip(calls, self.dispatched_stages()):
+            self.assertEqual(1, len(group), "Each stage must own its session")
             expected_users = {s.get('user', 'offline_owner') for s in STAGES if s['name'] in group}
             self.assertEqual({args[args.index('-U')+1]}, expected_users)
             self.assertEqual('ShaleMcpAcceptance', args[args.index('-d')+1])
@@ -147,6 +151,19 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(before, self.calls.read_text())
         self.assertIn('outcome=COMPLETE', result.stdout)
 
+    def test_proof_assertion_is_allowlisted_and_failure_remains_pending(self):
+        result = self.run_fast('proof-fail', success=False)
+        report = self.report()
+        self.assertEqual(24, report['CompletedCount'])
+        self.assertEqual('21-proof', report['FailureStage'])
+        self.assertEqual([59400], report['SqlErrorNumbers'])
+        self.assertEqual(['PROOF_FRESH_UNSCOPED_DBO'], report['Assertions'])
+        self.assertIn('PROOF_FRESH_UNSCOPED_DBO', result.stdout)
+        self.assertEqual([['21-proof']], self.dispatched_stages()[-1:])
+        retained = (self.packet / 'fast-track.jsonl').read_bytes()
+        self.run_fast(success=False)
+        self.assertEqual(retained, (self.packet / 'fast-track.jsonl').read_bytes())
+
     def test_verified_seed_group_resumes_without_replaying_seed(self):
         self.run_fast('between-groups', success=False)
         self.assertEqual(19, self.report()['CompletedCount'])
@@ -154,7 +171,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.run_fast()
         self.assertEqual(51, self.report()['CompletedCount'])
         self.assertEqual('16-binding-preflight', self.report()['CompletedStages'][0])
-        self.assertEqual(22, len(self.calls.read_text().splitlines()))
+        self.assertEqual(33, len(self.calls.read_text().splitlines()))
 
     def test_unconfirmed_native_password_prompt_blocks_later_connections(self):
         self.run_fast('missing-prompt', success=False)
@@ -194,7 +211,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(23, report['CompletedCount'])
         self.assertEqual([50001], report['SqlErrorNumbers'])
         self.assertEqual(16, report['ExitCode'])
-        self.assertEqual(2, len(self.calls.read_text().splitlines()))
+        self.assertEqual(6, len(self.calls.read_text().splitlines()))
         before = self.calls.read_text()
         self.run_fast(success=False)
         self.assertEqual(before, self.calls.read_text())
@@ -263,7 +280,7 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(51, self.report()['CompletedCount'])
         self.assertEqual('16-binding-preflight', self.report()['CompletedStages'][0])
         self.assertEqual(1, sum(g.count('15c-seed') for g in self.dispatched_stages()))
-        self.assertEqual(22, len(self.dispatched_stages()))
+        self.assertEqual(33, len(self.dispatched_stages()))
         self.assertTrue((self.packet / 'fast-track.jsonl').read_bytes().startswith(retained))
 
     def test_future_provisioning_inputs_pause_only_at_stage28_then_resume(self):
@@ -278,14 +295,14 @@ if (MODE -eq 'zero-exit-error') { $lines.Add('Msg 50002, Level 16, State 1, PRIV
         self.assertEqual(30, self.report()['CompletedCount'])
         self.assertEqual('28-contained-users', self.report()['BlockedStage'])
         self.assertIn('twelve independent contained-user inputs required', self.report()['NextAction'])
-        self.assertEqual([['15c-seed'], [s['name'] for s in STAGES[19:30]]], self.dispatched_stages())
+        self.assertEqual([[s['name']] for s in STAGES[18:30]], self.dispatched_stages())
         self.assertEqual('verified', self.journal()[-1]['Kind'])
         path.write_text(ready)
         self.render()
         self.run_fast()
         self.assertEqual(51, self.report()['CompletedCount'])
         self.assertEqual('28-contained-users', self.report()['CompletedStages'][0])
-        self.assertEqual(22, len(self.dispatched_stages()))
+        self.assertEqual(33, len(self.dispatched_stages()))
 
     def test_seed_prerequisites_still_block_before_approval_or_sql(self):
         path = self.packet / 'seed.sql'
