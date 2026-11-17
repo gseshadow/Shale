@@ -7,6 +7,35 @@ function Get-LiveSources {
     }
     return $sources
 }
+function Get-LiveSettingMap {
+    # Property -> Azure name; ordinary application aliases are consumed explicitly by existing code.
+    $properties=@('SPRING_PROFILES_ACTIVE','SHALE_ALLOWED_CORS_ORIGINS','SHALE_AUTH_TOKEN_SECRET',
+      'SHALE_AUTH_TOKEN_TTL_SECONDS','SHALE_AUTH_SESSION_BINDING_CUTOVER_AT','PORT','WEBSITES_PORT',
+      'logging.level.io.modelcontextprotocol.modern.JsonRpc','shale.ai.oauth.identity',
+      'shale.ai.oauth.public-origin','shale.ai.oauth.browser-origin','shale.ai.mcp.allowed-origins',
+      'shale.ai.data.database','shale.ai.data.contract-version','shale.ai.cimd.contract-version',
+      'shale.ai.cimd.metadata-advertisement-enabled')+@($script:LiveControlProperties)
+    foreach ($prefix in (Get-LiveSources).Keys) {
+        if ($prefix.StartsWith('SHALE_')) { foreach ($suffix in @('_DB_URL','_DB_USER','_DB_PASSWORD')) { $properties+=($prefix+$suffix) } }
+        else { foreach ($suffix in @('.jdbc-url','.username','.password')) { $properties+=($prefix+$suffix) } }
+    }
+    $map=@{};$names=@{}
+    foreach ($property in $properties) {
+        $name=ConvertTo-LiveEnvironmentName $property
+        if ($names.ContainsKey($name)) { throw 'AZURE_SETTING_NAME_COLLISION' }
+        $names[$name]=$true;$map[$property]=$name
+    }
+    return $map
+}
+function Assert-LiveSettingNames($Settings) {
+    $reviewed=@((Get-LiveSettingMap).Values)
+    foreach ($key in $Settings.Keys) {
+        if ($key -cnotmatch '^[A-Za-z_][A-Za-z0-9_]*$') { throw 'INVALID_AZURE_SETTING_NAME' }
+        if ($key -iin $reviewed -and $key -cnotin $reviewed) { throw 'CONFIGURATION_ALIAS_REFUSED' }
+        if ($key -match '^(JAVA_OPTS|JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS|SPRING_APPLICATION_JSON|SPRING_CONFIG_.*|SPRING_MAIN_.*|WEBSITE_RUN_FROM_PACKAGE)$') { throw 'CONFIGURATION_OVERRIDE_REFUSED' }
+        if (($key -match '^SHALE_AI' -or $key -match '^LOGGING_LEVEL_') -and $key -cnotin $reviewed) { throw 'CONFIGURATION_ALIAS_REFUSED' }
+    }
+}
 function New-LiveSettings($Credentials,$Auth) {
     $settings=@{'SPRING_PROFILES_ACTIVE'='azure';'shale.ai.oauth.identity'='PRODUCTION';
       'shale.ai.oauth.public-origin'=$script:LiveOrigin;'shale.ai.oauth.browser-origin'=$script:LiveOrigin;
@@ -16,7 +45,7 @@ function New-LiveSettings($Credentials,$Auth) {
       'SHALE_AUTH_SESSION_BINDING_CUTOVER_AT'=$Auth.Cutover;
       'PORT'='8080';'WEBSITES_PORT'='8080';'logging.level.io.modelcontextprotocol.modern.JsonRpc'='OFF';
       'shale.ai.cimd.metadata-advertisement-enabled'='false'}
-    foreach ($key in $script:LiveControls) { $settings[$key]='false' }
+    foreach ($key in $script:LiveControlProperties) { $settings[$key]='false' }
     $sources=Get-LiveSources
     foreach ($prefix in $sources.Keys) {
         $name='mcpacc_'+$sources[$prefix]
@@ -28,6 +57,7 @@ function New-LiveSettings($Credentials,$Auth) {
         $settings[$url]='jdbc:sqlserver://shale.database.windows.net:1433;databaseName=ShaleMcpAcceptance'
         $settings[$user]=$name; $settings[$password]=$Credentials[$name].GetNetworkCredential().Password
     }
+    $settings=ConvertTo-LiveEnvironmentSettings $settings
     Assert-LiveSettings $settings $Credentials
     return $settings
 }
@@ -141,6 +171,33 @@ function Get-LiveAuthMaterial([string]$JournalHash) {
         return $retained
     } catch { throw 'ACCEPTANCE_SECRET_STORE_UNAVAILABLE' } finally { $passphrase=$null; $auth=$null }
 }
+function Get-LiveAzureRejection($Failure,[string]$Operation) {
+    # Read only structured status/code. Never emit response bodies, messages, headers or URLs.
+    $status=0;$code='HTTP_ERROR'
+    try {
+        $response=$Failure.Exception.Response
+        $status=[int]$response.StatusCode
+    } catch { }
+    if ($status -lt 400 -or $status -gt 599) { return 'ACCEPTANCE_CONFIGURATION_WRITE_FAILED' }
+    try {
+        $payload=$Failure.ErrorDetails.Message | ConvertFrom-Json -ErrorAction Stop
+        # ARM error envelopes and Microsoft.Web's top-level Code shape are both structured.
+        $errorBody=if ($payload.PSObject.Properties['error']) { $payload.error } else { $payload }
+        $azureCode=$errorBody.code
+        $allowed=@{BadRequest='BAD_REQUEST';InvalidRequestContent='INVALID_REQUEST_CONTENT';
+          InvalidParameter='INVALID_PARAMETER';Unauthorized='UNAUTHORIZED';AuthorizationFailed='AUTHORIZATION_FAILED';
+          Forbidden='FORBIDDEN';ResourceNotFound='RESOURCE_NOT_FOUND';ResourceGroupNotFound='RESOURCE_GROUP_NOT_FOUND';
+          Conflict='CONFLICT';TooManyRequests='TOO_MANY_REQUESTS';InternalServerError='INTERNAL_SERVER_ERROR';
+          ServiceUnavailable='SERVICE_UNAVAILABLE'}
+        if ($azureCode -is [string] -and $allowed.ContainsKey($azureCode)) { $code=$allowed[$azureCode] }
+    } catch { }
+    return ('ACCEPTANCE_AZURE_'+$Operation.ToUpperInvariant()+'_HTTP_'+$status+'_'+$code)
+}
+function Get-LiveSafeConfigurationFailure($Failure,[string]$Fallback='ACCEPTANCE_CONFIGURATION_FAILED') {
+    $safe=$Failure.Exception.Message
+    if ($safe -cmatch '^ACCEPTANCE_AZURE_(SETTINGS|STARTUP|HTTPS)_HTTP_[45][0-9]{2}_(HTTP_ERROR|BAD_REQUEST|INVALID_REQUEST_CONTENT|INVALID_PARAMETER|UNAUTHORIZED|AUTHORIZATION_FAILED|FORBIDDEN|RESOURCE_NOT_FOUND|RESOURCE_GROUP_NOT_FOUND|CONFLICT|TOO_MANY_REQUESTS|INTERNAL_SERVER_ERROR|SERVICE_UNAVAILABLE)$') { return $safe }
+    return $Fallback
+}
 function Invoke-LiveArm([ValidateSet('Settings','Startup','Https')][string]$Operation,$Properties) {
     # Fixed target and operation map. Never send a secret via CLI arguments, a request-body file or CLI HTTP logs.
     $suffix=switch($Operation){'Settings'{'/config/appsettings'} 'Startup'{'/config/web'} 'Https'{''}}
@@ -150,7 +207,7 @@ function Invoke-LiveArm([ValidateSet('Settings','Startup','Https')][string]$Oper
         $token=Invoke-CleanAzure @('account','get-access-token','--resource','https://management.azure.com/','--subscription',$script:CleanSubscription)
         $body=@{properties=$Properties} | ConvertTo-Json -Depth 6 -Compress
         [void](Invoke-RestMethod -Uri ("https://management.azure.com"+$script:LiveAppId+$suffix+'?api-version=2023-12-01') -Method $method -TimeoutSec 60 -MaximumRedirection 0 -Headers @{Authorization=('Bearer '+$token.accessToken)} -ContentType 'application/json' -Body $body -Verbose:$false -Debug:$false -ErrorAction Stop)
-    } catch { throw 'ACCEPTANCE_CONFIGURATION_WRITE_FAILED' } finally { $token=$null;$body=$null }
+    } catch { throw (Get-LiveAzureRejection $_ $Operation) } finally { $token=$null;$body=$null }
 }
 function Assert-LiveConfigurationTarget {
     Assert-CleanResources
@@ -166,7 +223,8 @@ function Initialize-LiveConfiguration($Credentials,[string]$JournalHash,[string]
     try {
         Assert-LiveConfigurationTarget
         $existing=Get-LiveSettings
-        foreach ($key in @($script:LiveControls)+@('shale.ai.cimd.metadata-advertisement-enabled')) {
+        Assert-LiveSettingNames $existing
+        foreach ($key in @($script:LiveControls)+@('SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED')) {
             if ($existing.ContainsKey($key) -and $existing[$key] -cne 'false') { throw 'CONFIGURATION_REQUIRES_OFF_CONTROLS' }
         }
         $auth=Get-LiveAuthMaterial $JournalHash
@@ -188,14 +246,16 @@ function Initialize-LiveConfiguration($Credentials,[string]$JournalHash,[string]
         foreach ($key in $settings.Keys) { if($actual[$key] -cne $settings[$key]){throw 'CONFIGURATION_READBACK_MISMATCH'} }
         New-CleanEvent (Join-Path $Run 'journal.jsonl') @{Kind='configuration-complete';Application='Stopped';Activation='OFF';SqlJournalHash=$JournalHash}
         $complete=$true
-    } catch { throw 'ACCEPTANCE_CONFIGURATION_FAILED' } finally {
+    } catch {
+        throw (Get-LiveSafeConfigurationFailure $_)
+    } finally {
         if ($started -and -not $complete) {
             # Configuration never writes SQL. Independently attempt OFF/stop if an Azure write fails.
             $off=$false;$stopped=$false
             try {
                 Set-LiveAppControls $false $Run
                 $observed=Get-LiveSettings
-                if (@(@($script:LiveControls)+@('shale.ai.cimd.metadata-advertisement-enabled') | Where-Object {$observed[$_] -cne 'false'}).Count) { throw 'OFF_UNCONFIRMED' }
+                if (@(@($script:LiveControls)+@('SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED') | Where-Object {$observed[$_] -cne 'false'}).Count) { throw 'OFF_UNCONFIRMED' }
                 $off=$true
             } catch { }
             try { [void](Invoke-CleanAzure @('webapp','stop','--ids',$script:LiveAppId));Assert-CleanResources;$stopped=$true } catch { }
