@@ -223,7 +223,11 @@ milliseconds and interruption flag. Categories distinguish the source-owned MCP 
 query timeout, connection failure, SQL error, refusal or unexpected failure. These fields observe
 failure only: no query, permission, contract, comparison, retry, timeout or ten-second budget changes.
 Driver messages/SQL states, credentials, URLs, identity values, RowVer and throwable causes remain
-excluded. Non-identity failures report substep NONE rather than a stale identity label.
+excluded. Platform failures distinguish caller/verifier connection opening from each first platform-property
+read. Later stages report substep NONE rather than a stale platform/identity label. A bounded
+16-node cause/next-exception inspection adds only a closed origin category: DNS, TLS, network
+timeout/connect/socket or UNCLASSIFIED. It never emits cause messages, class names, SQL states
+or target values, retains no throwable cause, and cannot turn a failure into acceptance.
 
 Audit compatibility: these are operational security-verification diagnostics without tenant/domain
 mutation or PHI disclosure; existing operational logs apply and no domain audit/schema is added.

@@ -50,10 +50,14 @@ public final class AiCaseDataAttestation {
         if(registryContract!=expected)throw refused();
     }
     public void verify() {
-        String stage="PLATFORM",identityStep="NONE";
+        String stage="PLATFORM",identityStep="CALLER_CONNECT";
         long started=System.nanoTime();
-        try(Connection caller=ai.getConnection();Connection review=verifier.getConnection()) {
+        try(Connection caller=ai.getConnection()) {
+            identityStep="VERIFIER_CONNECT";
+            try(Connection review=verifier.getConnection()) {
+            identityStep="CALLER_PLATFORM";
             Platform platform=platform(caller);
+            identityStep="VERIFIER_PLATFORM";
             if(platform(review)!=platform)throw refused();
             stage="IDENTITY";
             identityStep="CALLER_IDENTITY";
@@ -241,6 +245,7 @@ public final class AiCaseDataAttestation {
                     }
                 }
             }
+            }
         } catch(Exception failure) {
             String kind=failure instanceof SQLTimeoutException ? ("MCP deadline.".equals(failure.getMessage())?"DEADLINE":"QUERY_TIMEOUT")
                     : failure instanceof SQLTransientConnectionException || failure instanceof SQLNonTransientConnectionException ? "CONNECTION"
@@ -249,9 +254,28 @@ public final class AiCaseDataAttestation {
             // Closed operational metadata only. Do not retain driver messages, SQL, identity values or causes.
             throw new IllegalStateException("AI Case datasource attestation failed closed: "+stage
                     +(failure instanceof SQLException sql?" (SQL "+sql.getErrorCode()+")":"")
-                    +" [step="+(stage.equals("IDENTITY")?identityStep:"NONE")+" kind="+kind
+                    +" [step="+((stage.equals("IDENTITY")||stage.equals("PLATFORM"))?identityStep:"NONE")+" kind="+kind
+                    +" origin="+failureOrigin(failure)
                     +" elapsedMillis="+elapsedMillis+" interrupted="+Thread.currentThread().isInterrupted()+"]");
         }
+    }
+    // Inspect a bounded cause/next-exception graph without emitting messages, states or class names.
+    private static String failureOrigin(Throwable failure) {
+        var pending=new java.util.ArrayDeque<Throwable>();
+        var seen=java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable,Boolean>());
+        pending.add(failure);
+        for(int n=0;n<16&&!pending.isEmpty();n++) {
+            Throwable item=pending.removeFirst();
+            if(!seen.add(item))continue;
+            if(item instanceof java.net.UnknownHostException)return "DNS";
+            if(item instanceof javax.net.ssl.SSLException)return "TLS";
+            if(item instanceof java.net.SocketTimeoutException)return "NETWORK_TIMEOUT";
+            if(item instanceof java.net.ConnectException)return "NETWORK_CONNECT";
+            if(item instanceof java.net.SocketException)return "NETWORK_SOCKET";
+            if(item.getCause()!=null)pending.addLast(item.getCause());
+            if(item instanceof SQLException sql&&sql.getNextException()!=null)pending.addLast(sql.getNextException());
+        }
+        return "UNCLASSIFIED";
     }
     private record Identity(byte[] sid,String login,String database,String user,int userId,int sysadmin,String server) {}
     enum Platform { SQL_SERVER_OR_MI, AZURE_SQL_DATABASE }
