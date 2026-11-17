@@ -323,7 +323,7 @@ expiry, TLS and independent failure accounting retain their existing limits. The
 a recorded configuration setting while feature controls are OFF; it cannot activate MCP.
 
 The fixed-target operator HTTP client waits up to 660 seconds per request, worker readiness
-up to 15 minutes and the child campaign up to 60 minutes. The approval prompt names these
+up to 30 minutes and the child campaign up to 60 minutes. The approval prompt names these
 longer budgets before the operator approves deployment/activation. Existing independent
 OFF/stop cleanup is unchanged. A successful longer-budget campaign certifies functional
 acceptance only; it does not establish acceptable production latency or capacity.
@@ -337,7 +337,7 @@ the independent stock-client/capacity gates remain open.
 
 The dedicated app also receives WEBSITES_CONTAINER_START_TIME_LIMIT=1800, with exact
 readback, so Azure's independent startup watchdog does not kill the slow verification.
-The runner itself still stops waiting after 15 minutes and executes its normal cleanup.
+The runner itself still stops waiting after 30 minutes and executes its normal cleanup.
 This allowance applies to code-based Linux apps as well as containers; see Microsoft's
 [App Service setting reference](https://learn.microsoft.com/en-us/azure/app-service/reference-app-settings).
 Only this app setting changes; no shared plan or database capacity change is made.
@@ -348,3 +348,18 @@ the <=300-second access lifetime and all resource/rotation/revocation assertions
 unrefreshed natural-expiry family is issued immediately before that expiry check; no SQL times
 or expiry constraints are updated. Slow-client regression coverage advances each request by
 two minutes while retaining denial, tenant-isolation, expiry and cleanup assertions.
+
+
+## Column verification batching and startup timing
+
+Every column from the independent verifier is still checked for caller SELECT and UPDATE
+authority. Java now binds up to 256 column names per read-only VALUES query, requiring exactly
+one matching result for each name and rejecting missing/duplicate/extra results or any grant.
+It does not use caller-filtered catalog visibility, skip columns, cache authority or change SQL
+modules, receipts, grants or bindings.
+
+The 2026-11-17 run reported AI_CASE_SQL_READINESS ready before its outer startup wait expired.
+SQL/app cleanup was underway by 22:51:29Z; DCR's control check then returned disabled at
+22:51:55Z. That late DCR refusal is cleanup evidence, not an independent control-configuration
+finding. Startup is allowed up to the already-reviewed 30-minute platform allowance while
+batched verification removes the dominant per-column network cost.

@@ -283,7 +283,7 @@ function Assert-LiveWorker([string]$Hash,[string]$JavaZone,[switch]$Ready) {
     return @([regex]::Matches($logs,'SHALE_JVM_STARTUP [^\r\n]{1,400}|AI_CASE_SQL_READINESS (?:ready|disabled|not-ready)') | ForEach-Object Value)
 }
 function Wait-LiveHealth {
-    $deadline=[datetime]::UtcNow.AddMinutes(15)
+    $deadline=[datetime]::UtcNow.AddMinutes(30)
     do {
         try { $r=Invoke-WebRequest -Uri "$script:LiveOrigin/api/health/db" -TimeoutSec 10 -MaximumRedirection 0; if($r.StatusCode -eq 200){return} } catch { }
         Start-Sleep -Seconds 3

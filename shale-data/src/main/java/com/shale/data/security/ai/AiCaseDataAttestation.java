@@ -225,10 +225,7 @@ public final class AiCaseDataAttestation {
                     // SQL DENY at object level can have column-GRANT exceptions: check EVERY column.
                     try(var p=review.prepareStatement("SELECT c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name=? AND o.name=?")) {
                         p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setString(1,schema);p.setString(2,name);
-                        try(var columns=p.executeQuery()) {while(columns.next())try(var check=caller.prepareStatement("SELECT HAS_PERMS_BY_NAME(?,'OBJECT','SELECT',?,'COLUMN'),HAS_PERMS_BY_NAME(?,'OBJECT','UPDATE',?,'COLUMN')")) {
-                            check.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));check.setString(1,object);check.setString(2,columns.getString(1));check.setString(3,object);check.setString(4,columns.getString(1));
-                            try(var result=check.executeQuery()){if(!result.next()||result.getInt(1)==1||result.getInt(2)==1)throw refused();}
-                        }}
+                        try(var columns=p.executeQuery()) { AiColumnPermissionAttestation.verify(caller,object,columns); }
                     }
                 }
             }
