@@ -234,3 +234,43 @@ mutation or PHI disclosure; existing operational logs apply and no domain audit/
 Native enabled-worker acceptance remains unverified until a separately reviewed diagnostic JAR is
 run through the existing explicit acceptance approval gate. Local JDBC timing is diagnostic evidence,
 not certification of the Azure worker or permission to increase deadlines.
+
+## Azure implied metadata permission compatibility
+
+Azure SQL exposes VIEW SECURITY DEFINITION and VIEW PERFORMANCE DEFINITION as effective
+children of the already-required VIEW DEFINITION grant. The acceptance engine confirmed their
+covering_permission_name is VIEW DEFINITION via sys.fn_builtin_permissions('DATABASE').
+The verifier's effective-permission comparison accepts exactly these two implied permissions only when
+VIEW DEFINITION is already in that comparison's allowlist, at database or object scope.
+AI caller allowlists remain unchanged; CONTROL, data access, cryptographically secured
+definitions and state permissions remain forbidden. No SQL grant, ownership, schema, receipt,
+binding or audit mutation is introduced.
+
+The longer read-only diagnostic exposed this false rejection after catalog checks completed.
+The deployed ten-second full-attestation budget separately prevents completion on acceptance;
+passing local unit tests does not resolve that timing issue or certify MCP/OAuth acceptance.
+See [Microsoft's metadata visibility documentation](https://learn.microsoft.com/en-us/sql/relational-databases/security/metadata-visibility-configuration?view=sql-server-ver16)
+for the granular metadata permissions. Operational read-only verification adds no domain event.
+
+### Acceptance evidence for the compatibility correction (2026-11-17)
+
+A direct read-only probe of ShaleMcpAcceptance using the candidate correction completed the
+full predecessor V2/DCR_V3 attestation: PASS in 167,483 ms, 2,588 recorded operations.
+The original reviewed class failed OWNERSHIP because its verifier database permission
+comparison rejected the two implied definition permissions. Read-only counts showed zero
+owned schemas/objects/principals, zero grant-option permissions and zero unexpected direct
+AI-user grants. The engine's built-in permission hierarchy established the implication.
+
+The probe used the five existing dedicated predecessor, verifier, auth, runtime and bootstrap
+identities; private retained credentials were passed over stdin. It held a 600-second watchdog,
+180-second diagnostic reads/network timeout and 30-second login bound. These are probe-only
+transport settings; no deployed timeout, security check, query, grant or production resource
+changed. The original 51/51 SQL journal was revalidated unchanged and the acceptance app
+remained stopped with controls OFF. Private report and safe operation hashes are retained
+under work/readonly-attestation-0a144c59bdd647378c3b6cd216e621bc.
+
+This proves the complete read-only SQL verification can pass with the permission correction;
+it is not HTTP, MCP, OAuth or activation acceptance. The original ten-second full-verification
+budget remains a separate runtime blocker. Catalog/registry batches alone measured about
+7.5 and 16.7 seconds in the longer probe before the remaining per-object/column checks.
+Do not retry the unchanged runtime campaign or report it ready on this evidence.
