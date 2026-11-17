@@ -238,7 +238,7 @@ function Initialize-LiveConfiguration($Credentials,[string]$JournalHash,[string]
         $started=$true
         Invoke-LiveArm 'Settings' $merged
         Assert-CleanResources
-        Invoke-LiveArm 'Startup' @{linuxFxVersion='JAVA|21-java21';appCommandLine='java -jar /home/site/wwwroot/shale-server.jar --spring.profiles.active=azure';minTlsVersion='1.2';ftpsState='Disabled';numberOfWorkers=1;cors=@{allowedOrigins=@($script:LiveOrigin);supportCredentials=$false}}
+        Invoke-LiveArm 'Startup' @{linuxFxVersion='JAVA|21-java21';appCommandLine='java -jar /home/site/wwwroot/app.jar --spring.profiles.active=azure';minTlsVersion='1.2';ftpsState='Disabled';numberOfWorkers=1;cors=@{allowedOrigins=@($script:LiveOrigin);supportCredentials=$false}}
         Assert-CleanResources
         Invoke-LiveArm 'Https' @{httpsOnly=$true}
         Assert-LiveAzureConfiguration
