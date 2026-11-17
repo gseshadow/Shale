@@ -27,7 +27,7 @@ class LiveRuntimeTest(unittest.TestCase):
 
     def test_scripts_parse_and_import_without_network(self):
         self.ps(r'''
-foreach($name in @('Start-LiveRuntimeAcceptance.ps1','LiveRuntime.ps1')) {
+foreach($name in @('Start-LiveRuntimeAcceptance.ps1','LiveRuntime.ps1','LiveConfiguration.ps1')) {
  $errors=$null
  [void][Management.Automation.Language.Parser]::ParseFile((Join-Path ./build/azure-mcp-acceptance $name),[ref]$null,[ref]$errors)
  if($errors.Count){throw ($errors|Out-String)}

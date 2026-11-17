@@ -203,3 +203,13 @@ procedure and transactional global product-control audit. Operational SQL switch
 are evidenced by the private operator journal/Azure records; no new domain audit vocabulary, schema,
 permissions or binding change. The linked runbook defines evidence, failure paths and the narrower
 DCR automation scope; CIMD egress, browser UI, independent stock clients and capacity gates remain.
+
+The acceptance configuration successor handles an empty App Service settings collection before that
+existing campaign approval: read-only SQL prerequisites, fixed-target app-only OFF configuration,
+then verified readback. It maps the existing 17 contained credentials to their dedicated providers,
+generates a separate synthetic JWT key and retains it encrypted outside Git, and uses in-memory
+ARM requests for secret-bearing writes. CLI appsettings/connection-string reads use explicit name
+and resource group for compatibility. No SQL or production configuration is changed by preparation;
+operational configuration/secret-retention evidence uses the private journal and Azure activity
+records, without fabricated PHI/domain audit events or a new schema. See the runbook for encryption,
+retry/conflict behavior and platform-specific operator checks.
