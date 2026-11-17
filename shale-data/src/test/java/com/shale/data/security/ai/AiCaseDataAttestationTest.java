@@ -27,6 +27,35 @@ class AiCaseDataAttestationTest {
                     "Unconditional server catalog access after platform dispatch must remain visible to inspection.");
         }
     }
+    @Test void identityFailureDiagnosticsUseClosedSubstepsAndNeverRetainSensitiveCause() {
+        List<SQLException> failures=List.of(new SQLTimeoutException("MCP deadline."),
+                new SQLTimeoutException("PRIVATE_DRIVER_PASSWORD"),
+                new SQLTransientConnectionException("PRIVATE_DRIVER_PASSWORD"),
+                new SQLException("PRIVATE_DRIVER_PASSWORD", "private-state", 207));
+        List<String> kinds=List.of("DEADLINE","QUERY_TIMEOUT","CONNECTION","SQL");
+        for(int i=0;i<failures.size();i++) {
+            var observed=new ArrayList<String>();SQLException problem=failures.get(i);
+            DataSource broken=(DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},(p,m,a)->{throw problem;});
+            var failure=assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(
+                    source(azure("private-ai",10,observed)),source(azure("private-verifier",11,observed)),
+                    List.of(broken),"db","private-issuer","private-resource").verify());
+            String message=failure.getMessage();
+            assertTrue(message.contains("IDENTITY"),message);
+            assertTrue(message.contains("step=AUTH_CONNECT kind="+kinds.get(i)),message);
+            assertTrue(message.matches(".*elapsedMillis=[0-9]{1,6} interrupted=(true|false)\\]"),message);
+            for(String secret:List.of("PRIVATE_DRIVER_PASSWORD","private-state","private-ai","private-verifier","private-issuer","private-resource"))
+                assertFalse(message.contains(secret),"Attestation diagnostics must exclude private values");
+            assertNull(failure.getCause(),"Driver exceptions can carry SQL/credentials and must remain unchained");
+        }
+    }
+    @Test void laterStageFailuresDoNotClaimTheLastIdentitySubstep() {
+        var observed=new ArrayList<String>();
+        var failure=assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(
+                source(azure("ai",10,observed)),source(azure("catalog",11,observed)),List.of(),"db","issuer","resource").verify());
+        assertTrue(failure.getMessage().contains("CATALOG_RECEIPT"),failure.getMessage());
+        assertTrue(failure.getMessage().contains("step=NONE kind=SQL"),failure.getMessage());
+    }
+
     @Test void platformsMustBePositivelyIdentified()throws Exception {
         for(int edition:List.of(2,3,4,8))assertEquals(AiCaseDataAttestation.Platform.SQL_SERVER_OR_MI,AiCaseDataAttestation.platform(connection(q->rows(edition))));
         assertEquals(AiCaseDataAttestation.Platform.AZURE_SQL_DATABASE,AiCaseDataAttestation.platform(connection(q->rows(5))));

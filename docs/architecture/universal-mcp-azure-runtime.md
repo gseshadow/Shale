@@ -213,3 +213,20 @@ and resource group for compatibility. No SQL or production configuration is chan
 operational configuration/secret-retention evidence uses the private journal and Azure activity
 records, without fabricated PHI/domain audit events or a new schema. See the runbook for encryption,
 retry/conflict behavior and platform-specific operator checks.
+
+## Data-free attestation failure diagnostics
+
+The predecessor Case attestation preserves its existing fail-closed stage and numeric SQL code,
+adding a closed identity substep (caller/verifier metadata, each forbidden-source connect/platform/
+identity/close, containment and authority checks), exception category, bounded monotonic elapsed
+milliseconds and interruption flag. Categories distinguish the source-owned MCP deadline from a
+query timeout, connection failure, SQL error, refusal or unexpected failure. These fields observe
+failure only: no query, permission, contract, comparison, retry, timeout or ten-second budget changes.
+Driver messages/SQL states, credentials, URLs, identity values, RowVer and throwable causes remain
+excluded. Non-identity failures report substep NONE rather than a stale identity label.
+
+Audit compatibility: these are operational security-verification diagnostics without tenant/domain
+mutation or PHI disclosure; existing operational logs apply and no domain audit/schema is added.
+Native enabled-worker acceptance remains unverified until a separately reviewed diagnostic JAR is
+run through the existing explicit acceptance approval gate. Local JDBC timing is diagnostic evidence,
+not certification of the Azure worker or permission to increase deadlines.
