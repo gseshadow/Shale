@@ -60,10 +60,11 @@ try {
     Write-Host "$($result.Status): $run/report.json"
     if ($result.Status -cne 'PASS') { throw 'ACCEPTANCE_FAILED' }
 } catch {
+    $failureCode=Get-LiveSafeConfigurationFailure $_ 'PREFLIGHT_FAILED'
     if ($run -and -not $campaign) {
-        [IO.File]::WriteAllText((Join-Path $run 'report.json'),(@{Status='FAIL';Approved=$false;Failure='PREFLIGHT_FAILED';Operation=$operation} | ConvertTo-Json))
+        [IO.File]::WriteAllText((Join-Path $run 'report.json'),(@{Status='FAIL';Approved=$false;Failure=$failureCode;Operation=$operation} | ConvertTo-Json))
     }
-    throw "Acceptance failed during $operation. Preserve $run; inspect safe reports. No automatic retry or reset."
+    throw "Acceptance failed during $operation ($failureCode). Preserve $run; inspect safe reports. No automatic retry or reset."
 } finally {
     if ($null -ne $oldLock) { $oldLock.Dispose() }; if ($null -ne $lock) { $lock.Dispose() }
     $owner=$null; $credentials=$null; $humans=$null; $context=$null; $imports=$null; $script:CleanLastLines.Clear()

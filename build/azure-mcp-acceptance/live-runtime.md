@@ -60,6 +60,15 @@ The state written and checked is:
   twelve `shale.ai.cimd.runtime.<key>.{jdbc-url,username,password}` sources map to their exact
   `mcpacc_*` users in the successful run. Runtime setting keys are listed in
   [the runtime architecture](../../docs/architecture/universal-mcp-azure-runtime.md).
+- Azure setting names use Spring Boot's environment mapping: replace dots with underscores,
+  remove hyphens, uppercase. For example, `shale.ai.mcp.search-cases-enabled` becomes
+  `SHALE_AI_MCP_SEARCHCASESENABLED`, and `shale.ai.cimd.runtime.case.jdbc-url` becomes
+  `SHALE_AI_CIMD_RUNTIME_CASE_JDBCURL`. All 77 generated settings (including the 51 JDBC
+  settings for 17 identities, ten controls, advertisement and logging) use this mapping;
+  the established uppercase ordinary-auth/runtime aliases retain their names. Generation rejects
+  collisions. Readback, conflict checks, activation, OFF verification and cleanup use the same
+  Azure names. Legacy dotted keys and unreviewed AI aliases are refused before writes; the runner
+  does not silently migrate or delete existing conflicting settings.
 - Destination-only JDBC URL `jdbc:sqlserver://shale.database.windows.net:1433;databaseName=ShaleMcpAcceptance`
   (port and trailing semicolon optional), with no security overrides or embedded credentials.
   Existing Java providers enforce TLS. The runner intentionally rejects alternate URL spellings,
@@ -159,6 +168,13 @@ successful denial. HTTP requests use validated TLS, no ambient proxy or automati
 origin, deadlines and bounded response size. No callback listener is necessary: authorization redirects
 are validated in memory, never followed with a WEB bearer. This is automated HTTP authorization/consent,
 not browser UI automation. The child has a 15-minute watchdog and process-tree termination on timeout.
+
+Azure ARM rejections report a closed operation/status/code in the console and preflight report,
+for example `ACCEPTANCE_AZURE_SETTINGS_HTTP_400_BAD_REQUEST`. Only allowlisted Azure codes
+are retained; unknown or malformed bodies yield `HTTP_ERROR` with the HTTP status. Non-HTTP
+failures keep a generic safe code. No response message/body, setting value, URL, header, token or
+exception text is included. Configuration failure still independently attempts app controls OFF
+and app stop and records whether each was confirmed. There is no automatic retry.
 
 ## Cleanup and evidence
 

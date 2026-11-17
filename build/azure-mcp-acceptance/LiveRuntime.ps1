@@ -3,9 +3,24 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'CleanSlate.ps1')
 $script:LiveAppId="$script:CleanResource/Microsoft.Web/sites/shale-mcp-acceptance"
 $script:LiveOrigin='https://shale-mcp-acceptance.azurewebsites.net'
-$script:LiveControls=@('shale.ai.enabled','shale.ai.mcp.enabled','shale.ai.mcp.case-data-composition-enabled',
+function ConvertTo-LiveEnvironmentName([string]$Property) {
+    $name=$Property.Replace('.','_').Replace('-','').ToUpperInvariant()
+    if ($name -cnotmatch '^[A-Z_][A-Z0-9_]*$') { throw 'INVALID_AZURE_SETTING_NAME' }
+    return $name
+}
+function ConvertTo-LiveEnvironmentSettings($Properties) {
+    $settings=@{}
+    foreach ($property in $Properties.Keys) {
+        $name=ConvertTo-LiveEnvironmentName $property
+        if ($settings.ContainsKey($name)) { throw 'AZURE_SETTING_NAME_COLLISION' }
+        $settings[$name]=$Properties[$property]
+    }
+    return $settings
+}
+$script:LiveControlProperties=@('shale.ai.enabled','shale.ai.mcp.enabled','shale.ai.mcp.case-data-composition-enabled',
  'shale.ai.mcp.search-cases-enabled','shale.ai.mcp.get-case-overview-enabled','shale.ai.oauth.composition-enabled',
  'shale.ai.oauth.authorization-enabled','shale.ai.oauth.exchange-enabled','shale.ai.cimd.enabled','shale.ai.dcr.enabled')
+$script:LiveControls=@($script:LiveControlProperties | ForEach-Object {ConvertTo-LiveEnvironmentName $_})
 function New-LiveDirectory([string]$Path) {
     [void][IO.Directory]::CreateDirectory($Path)
     if ($IsWindows) {
@@ -63,29 +78,27 @@ function Get-LiveCredentials([string]$Directory) {
 function Get-LiveSettings {
     $values=@{}; $rows=Invoke-CleanAzure @('webapp','config','appsettings','list','--name','shale-mcp-acceptance','--resource-group','Shale','--subscription',$script:CleanSubscription)
     foreach ($row in $rows) { if ($values.ContainsKey($row.name)) { throw 'DUPLICATE_APP_SETTING' }; $values[$row.name]=$row.value }
+    Assert-LiveSettingNames $values
     return $values
 }
 function Assert-LiveSettings($Settings,$Credentials) {
-    # Refuse alternative property sources that could override the reviewed settings/startup.
-    foreach ($key in $Settings.Keys) {
-        if ($key -match '^(JAVA_OPTS|JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS|SPRING_APPLICATION_JSON|SPRING_CONFIG_.*|SPRING_MAIN_.*|WEBSITE_RUN_FROM_PACKAGE|SHALE_AI_.*)$') { throw 'CONFIGURATION_OVERRIDE_REFUSED' }
-        if ($key -match '^SHALE[._]AI' -and $key -cnotmatch '^shale\.ai\.') { throw 'CONFIGURATION_ALIAS_REFUSED' }
-    }
+    Assert-LiveSettingNames $Settings
     $required=@{'SPRING_PROFILES_ACTIVE'='azure';'shale.ai.oauth.identity'='PRODUCTION';
       'shale.ai.oauth.public-origin'=$script:LiveOrigin;'shale.ai.oauth.browser-origin'=$script:LiveOrigin;
       'shale.ai.mcp.allowed-origins'=$script:LiveOrigin;'shale.ai.data.database'='ShaleMcpAcceptance';
       'shale.ai.data.contract-version'='V2';'shale.ai.cimd.contract-version'='DCR_V3'}
+    $required=ConvertTo-LiveEnvironmentSettings $required
     foreach ($key in $required.Keys) { if ($Settings[$key] -cne $required[$key]) { throw 'REQUIRED_APP_CONFIGURATION' } }
     if (-not $Settings['SHALE_AUTH_TOKEN_SECRET'] -or $Settings['SHALE_AUTH_TOKEN_SECRET'].Length -lt 32 -or
         -not $Settings['SHALE_AUTH_SESSION_BINDING_CUTOVER_AT']) { throw 'ACCEPTANCE_AUTH_CONFIGURATION_REQUIRED' }
-    if ($Settings['shale.ai.cimd.metadata-advertisement-enabled'] -cne 'false') { throw 'ADVERTISEMENT_MUST_BE_OFF' }
+    if ($Settings['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED'] -cne 'false') { throw 'ADVERTISEMENT_MUST_BE_OFF' }
     foreach ($key in $script:LiveControls) { if ($Settings[$key] -cne 'false') { throw 'APP_CONTROLS_MUST_BE_OFF' } }
     $sources=Get-LiveSources
     foreach ($prefix in $sources.Keys) {
         $ordinary=$prefix.StartsWith('SHALE_')
-        $urlKey=if($ordinary){$prefix+'_DB_URL'}else{$prefix+'.jdbc-url'}
-        $userKey=if($ordinary){$prefix+'_DB_USER'}else{$prefix+'.username'}
-        $passKey=if($ordinary){$prefix+'_DB_PASSWORD'}else{$prefix+'.password'}
+        $urlKey=if($ordinary){$prefix+'_DB_URL'}else{ConvertTo-LiveEnvironmentName ($prefix+'.jdbc-url')}
+        $userKey=if($ordinary){$prefix+'_DB_USER'}else{ConvertTo-LiveEnvironmentName ($prefix+'.username')}
+        $passKey=if($ordinary){$prefix+'_DB_PASSWORD'}else{ConvertTo-LiveEnvironmentName ($prefix+'.password')}
         # Match the exact reviewed restricted URL subset. Runtime itself still does full native verification.
         if ($Settings[$urlKey] -cnotmatch '^jdbc:sqlserver://shale\.database\.windows\.net(?::1433)?;databaseName=ShaleMcpAcceptance;?$' -or
             $Settings[$userKey] -cne ('mcpacc_'+$sources[$prefix]) -or
@@ -98,9 +111,10 @@ function Assert-LiveSettings($Settings,$Credentials) {
 function Set-LiveAppControls([bool]$Enabled,[string]$Run) {
     # Only booleans, no credentials, enter Azure CLI argv/file/output.
     $settings=@{}; foreach ($key in $script:LiveControls) { $settings[$key]=$Enabled.ToString().ToLowerInvariant() }
-    $settings['shale.ai.cimd.metadata-advertisement-enabled']='false'
+    $settings['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED']='false'
     $path=Join-Path $Run 'controls.json'; [IO.File]::WriteAllText($path,($settings | ConvertTo-Json))
     $current=Get-LiveSettings
+    Assert-LiveSettingNames $current
     foreach($key in $settings.Keys){$current[$key]=$settings[$key]}
     Invoke-LiveArm 'Settings' $current
 }
@@ -197,7 +211,7 @@ function Stop-LiveAcceptance([pscredential]$Owner,$Credentials,[string]$Run) {
     try { Set-LiveSqlControls $false $Owner $Credentials; Assert-LiveSqlOff $Owner; $result.SqlOff=$true } catch { }
     try {
         Set-LiveAppControls $false $Run; $settings=Get-LiveSettings
-        if (@($script:LiveControls | Where-Object {$settings[$_] -cne 'false'}).Count -or $settings['shale.ai.cimd.metadata-advertisement-enabled'] -cne 'false') { throw 'OFF_NOT_CONFIRMED' }; $result.AppOff=$true
+        if (@($script:LiveControls | Where-Object {$settings[$_] -cne 'false'}).Count -or $settings['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED'] -cne 'false') { throw 'OFF_NOT_CONFIRMED' }; $result.AppOff=$true
     } catch { }
     try {
         [void](Invoke-CleanAzure @('webapp','stop','--ids',$script:LiveAppId))

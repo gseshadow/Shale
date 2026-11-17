@@ -42,7 +42,7 @@ foreach($fail in @('none','sql','settings','stop')) {
  function Set-LiveSqlControls {$script:trace.Add('sql');if($script:fail -eq 'sql'){throw 'secret SQL text'}}
  function Assert-LiveSqlOff {}
  function Set-LiveAppControls {$script:trace.Add('settings');if($script:fail -eq 'settings'){throw 'secret app settings'}}
- function Get-LiveSettings {$s=@{};foreach($key in $script:LiveControls){$s[$key]='false'};$s['shale.ai.cimd.metadata-advertisement-enabled']='false';return $s}
+ function Get-LiveSettings {$s=@{};foreach($key in $script:LiveControls){$s[$key]='false'};$s['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED']='false';return $s}
  function Invoke-CleanAzure($Arguments) {
   if($Arguments[1] -eq 'stop'){$script:trace.Add('stop');if($script:fail -eq 'stop'){throw 'secret Azure error'}}
   return @{id=$script:LiveAppId;state='Stopped'}
@@ -106,7 +106,7 @@ foreach($failure in @('decline','preflight','deploy','start','worker','binding',
     def test_runtime_settings_refuse_wrong_database_identity_and_override(self):
         self.ps(r'''
 $s=@{'SPRING_PROFILES_ACTIVE'='azure';'shale.ai.oauth.identity'='PRODUCTION';'shale.ai.oauth.public-origin'=$script:LiveOrigin;'shale.ai.oauth.browser-origin'=$script:LiveOrigin;'shale.ai.mcp.allowed-origins'=$script:LiveOrigin;'shale.ai.data.database'='ShaleMcpAcceptance';'shale.ai.data.contract-version'='V2';'shale.ai.cimd.contract-version'='DCR_V3';'SHALE_AUTH_TOKEN_SECRET'=('x'*40);'SHALE_AUTH_SESSION_BINDING_CUTOVER_AT'='2026-10-01T00:00:00Z'}
-foreach($k in $script:LiveControls){$s[$k]='false'};$s['shale.ai.cimd.metadata-advertisement-enabled']='false'
+foreach($k in $script:LiveControls){$s[$k]='false'};$s['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED']='false'
 $prefixes=@{'SHALE_APP'='auth';'SHALE_RT'='runtime';'shale.ai.data'='predecessor';'shale.ai.data.verifier'='verifier';'shale.ai.oauth.bootstrap'='bootstrap'}
 foreach($key in @('case','reviewer','publisher','approval','onboarding','browser','issuer','metadata','resolver','neutral','dcr-endpoint','dcr-metadata')){$prefixes['shale.ai.cimd.runtime.'+$key]=$key.Replace('-','_')}
 $c=@{}
@@ -115,8 +115,9 @@ foreach($p in $prefixes.Keys){
  $ordinary=$p.StartsWith('SHALE_');$u=if($ordinary){$p+'_DB_USER'}else{$p+'.username'};$pw=if($ordinary){$p+'_DB_PASSWORD'}else{$p+'.password'};$url=if($ordinary){$p+'_DB_URL'}else{$p+'.jdbc-url'}
  $s[$u]=$name;$s[$pw]=$c[$name].GetNetworkCredential().Password;$s[$url]='jdbc:sqlserver://shale.database.windows.net:1433;databaseName=ShaleMcpAcceptance'
 }
+$s=ConvertTo-LiveEnvironmentSettings $s
 Assert-LiveSettings $s $c
-foreach($test in @(@('SHALE_APP_DB_URL','jdbc:sqlserver://shale.database.windows.net;databaseName=Shale'),@('shale.ai.cimd.runtime.case.username','mcpacc_runtime'),@('shale.ai.data.password','wrong'),@('JAVA_TOOL_OPTIONS','-Dshale.ai.enabled=true'),@('SHALE_AI_ENABLED','true'),@('SPRING_PROFILES_ACTIVE','azure,dev'),@('shale.ai.cimd.contract-version','EXTERNAL_V2'),@('shale.ai.mcp.enabled','true'))){
+foreach($test in @(@('SHALE_APP_DB_URL','jdbc:sqlserver://shale.database.windows.net;databaseName=Shale'),@('SHALE_AI_CIMD_RUNTIME_CASE_USERNAME','mcpacc_runtime'),@('SHALE_AI_DATA_PASSWORD','wrong'),@('JAVA_TOOL_OPTIONS','-Dshale.ai.enabled=true'),@('SHALE_AI_ENABLED','true'),@('SPRING_PROFILES_ACTIVE','azure,dev'),@('SHALE_AI_CIMD_CONTRACTVERSION','EXTERNAL_V2'),@('SHALE_AI_MCP_ENABLED','true'))){
  $copy=$s.Clone();$copy[$test[0]]=$test[1];$refused=$false
  try{Assert-LiveSettings $copy $c}catch{$refused=$true}
  if(-not $refused){throw ('Unsafe configuration accepted: '+$test[0])}
