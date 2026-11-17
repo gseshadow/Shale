@@ -7,10 +7,26 @@ $script:CleanSubscription='cd334e90-1e97-4b68-b4e3-80bf7b438546'
 $script:CleanResource="/subscriptions/$script:CleanSubscription/resourceGroups/Shale/providers"
 $script:CleanLastLines=[Collections.Generic.List[string]]::new()
 $script:CleanSqlNumbers=@(); $script:CleanAssertions=@()
-function Invoke-CleanAzure([string[]]$Arguments) {
+function Invoke-CleanAzure([string[]]$Arguments,[switch]$PreserveSettingStrings) {
     # argv contains fixed resource identities only, never secrets. Never emit raw az errors.
     $value=& az @Arguments --only-show-errors --output json 2>$null
     if ($LASTEXITCODE -ne 0) { throw 'STOP: acceptance Azure resource operation failed.' }
+    if ($value -and $PreserveSettingStrings) {
+        # App Service settings are strings, including ISO timestamps. Avoid ConvertFrom-Json's
+        # automatic DateTime coercion; JsonDocument also works on the supported PowerShell 7.4.
+        $document=$null
+        try {
+            $document=[System.Text.Json.JsonDocument]::Parse([string]($value -join "`n"))
+            foreach ($row in $document.RootElement.EnumerateArray()) {
+                $name=$row.GetProperty('name');$setting=$row.GetProperty('value')
+                if ($name.ValueKind -ne [System.Text.Json.JsonValueKind]::String -or
+                    $setting.ValueKind -ne [System.Text.Json.JsonValueKind]::String) { throw 'INVALID_APP_SETTING_RESPONSE' }
+                [pscustomobject]@{name=$name.GetString();value=$setting.GetString()}
+            }
+        } catch { throw 'INVALID_APP_SETTING_RESPONSE' }
+        finally { if ($null -ne $document) { $document.Dispose() } }
+        return
+    }
     if ($value) { return ($value -join "`n" | ConvertFrom-Json) }
 }
 function Assert-CleanResources([switch]$StopApp) {

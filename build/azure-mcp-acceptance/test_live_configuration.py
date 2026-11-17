@@ -81,6 +81,29 @@ $s=New-LiveSettings $c $a
         self.assertEqual(expected['shale.ai.mcp.search-cases-enabled'], 'SHALE_AI_MCP_SEARCHCASESENABLED')
         self.assertEqual(expected['shale.ai.cimd.runtime.case.jdbc-url'], 'SHALE_AI_CIMD_RUNTIME_CASE_JDBCURL')
 
+    def test_real_azure_json_readback_preserves_setting_strings(self):
+        # Exercise the actual CLI parser: object mocks previously hid timestamp coercion.
+        self.ps(self.credentials() + r'''
+. ./build/azure-mcp-acceptance/CleanSlate.ps1
+$script:originalSettings=New-LiveSettings $c $a
+$script:originalSettings.ACCEPTANCE_OFFSET='2026-11-17T10:20:30.1234567-06:00'
+$script:originalSettings.ACCEPTANCE_TEXT='00123'
+$script:originalSettings.ACCEPTANCE_BOOLEAN='false'
+$script:originalSettings.ACCEPTANCE_EMPTY=''
+$script:jsonRows=@($script:originalSettings.Keys | ForEach-Object {[pscustomobject]@{name=$_;value=$script:originalSettings[$_];slotSetting=$false}}) | ConvertTo-Json -Compress
+function az { $global:LASTEXITCODE=0; return $script:jsonRows }
+$s=Get-LiveSettings
+foreach($key in $script:originalSettings.Keys){
+ if($s[$key] -isnot [string] -or $s[$key] -cne $script:originalSettings[$key]){throw 'Azure setting string changed during JSON parsing'}
+}
+Assert-LiveSettings $s $c
+$script:jsonRows='[]';if((Get-LiveSettings).Count -ne 0){throw 'Empty app settings not preserved'}
+$script:jsonRows='[{"name":"SHALE_AI_ENABLED","value":"false"},{"name":"SHALE_AI_ENABLED","value":"false"}]'
+$refused=$false;try{Get-LiveSettings}catch{$refused=$true};if(-not $refused){throw 'Duplicate settings accepted'}
+$script:jsonRows='[{"name":"SHALE_AI_ENABLED","value":false}]'
+$refused=$false;try{Get-LiveSettings}catch{$refused=$true};if(-not $refused){throw 'Non-string setting accepted'}
+''')
+
     def test_mapping_collisions_and_unsafe_readback_names_are_refused(self):
         self.ps(r'''
 foreach($properties in @(@{'shale.ai.a-b'='x';'shale.ai.ab'='y'},@{'a.b'='x';'a_b'='y'})){
