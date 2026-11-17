@@ -50,32 +50,48 @@ public final class AiCaseDataAttestation {
         if(registryContract!=expected)throw refused();
     }
     public void verify() {
-        String stage="PLATFORM";
+        String stage="PLATFORM",identityStep="NONE";
+        long started=System.nanoTime();
         try(Connection caller=ai.getConnection();Connection review=verifier.getConnection()) {
             Platform platform=platform(caller);
             if(platform(review)!=platform)throw refused();
             stage="IDENTITY";
+            identityStep="CALLER_IDENTITY";
             Identity identity=identity(caller,platform);
             if(!database.equals(identity.database())||identity.userId()==1||identity.sysadmin()!=0)throw refused();
+            identityStep="VERIFIER_IDENTITY";
             Identity catalogIdentity=identity(review,platform);
             if(!database.equals(catalogIdentity.database())||Arrays.equals(identity.sid(),catalogIdentity.sid())
                     ||platform==Platform.AZURE_SQL_DATABASE&&!identity.server().equals(catalogIdentity.server()))throw refused();
             var otherIdentities=new ArrayList<Identity>();
-            for(DataSource source:forbidden)try(Connection other=source.getConnection()) {
-                if(platform(other)!=platform)throw refused();
-                Identity otherIdentity=identity(other,platform);
-                if(platform==Platform.AZURE_SQL_DATABASE&&(!database.equals(otherIdentity.database())||!identity.server().equals(otherIdentity.server())))throw refused();
-                if(Arrays.equals(identity.sid(),otherIdentity.sid()))throw refused();
-                if(productionInfrastructure&&Arrays.equals(catalogIdentity.sid(),otherIdentity.sid()))throw refused();
-                otherIdentities.add(otherIdentity);
+            int sourceIndex=0;
+            for(DataSource source:forbidden) {
+                String role=switch(sourceIndex++){case 0 -> "AUTH";case 1 -> "RUNTIME";case 2 -> "BOOTSTRAP";default -> "EXTRA";};
+                identityStep=role+"_CONNECT";
+                try(Connection other=source.getConnection()) {
+                    identityStep=role+"_PLATFORM";
+                    if(platform(other)!=platform)throw refused();
+                    identityStep=role+"_IDENTITY";
+                    Identity otherIdentity=identity(other,platform);
+                    if(platform==Platform.AZURE_SQL_DATABASE&&(!database.equals(otherIdentity.database())||!identity.server().equals(otherIdentity.server())))throw refused();
+                    if(Arrays.equals(identity.sid(),otherIdentity.sid()))throw refused();
+                    if(productionInfrastructure&&Arrays.equals(catalogIdentity.sid(),otherIdentity.sid()))throw refused();
+                    otherIdentities.add(otherIdentity);
+                    identityStep=role+"_CLOSE";
+                }
             }
             // VIEW DEFINITION is a prerequisite, not an inference from an empty catalog.
+            identityStep="VERIFIER_VISIBILITY";
             requireOne(review,"SELECT HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','VIEW DEFINITION')");
             if(platform==Platform.AZURE_SQL_DATABASE) {
+                identityStep="CALLER_CONTAINED_AUTH";
                 contained(caller,review,identity);
+                identityStep="VERIFIER_CONTAINED_AUTH";
                 contained(review,review,catalogIdentity);
+                identityStep="AZURE_ISOLATION";
                 azureIsolation(review);
             }
+            identityStep="PUBLIC_AUTHORITY";
             publicAuthority(review);
             if(productionInfrastructure) {
                 if(otherIdentities.size()!=3)throw refused();
@@ -83,6 +99,7 @@ public final class AiCaseDataAttestation {
             }
             if(productionInfrastructure||platform==Platform.AZURE_SQL_DATABASE) {
                 if(catalogIdentity.userId()==1||catalogIdentity.sysadmin()!=0)throw refused();
+                identityStep="VERIFIER_TOKENS";
                 var catalogTokens=new HashSet<String>();
                 try(var s=statement(review);var r=s.executeQuery("SELECT name,type FROM sys.user_token")) {
                     while(r.next()) {
@@ -94,6 +111,7 @@ public final class AiCaseDataAttestation {
                 if(platform==Platform.SQL_SERVER_OR_MI)try(var s=statement(review);var r=s.executeQuery("SELECT name FROM sys.login_token")) {
                     while(r.next())if(!Set.of(catalogIdentity.login(),"public").contains(r.getString(1)))throw refused();
                 }
+                identityStep="VERIFIER_DIRECT_GRANTS";
                 try(var p=review.prepareStatement("SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND NOT(class=0 AND permission_name='CONNECT' AND state='G')")) {
                     p.setQueryTimeout(3);p.setInt(1,catalogIdentity.userId());
                     try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
@@ -102,6 +120,7 @@ public final class AiCaseDataAttestation {
                     p.setQueryTimeout(3);p.setBytes(1,catalogIdentity.sid());
                     try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
                 }
+                identityStep="VERIFIER_OWNERSHIP";
                 try(var p=review.prepareStatement("SELECT (SELECT COUNT(*) FROM sys.schemas WHERE principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.objects WHERE principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.database_principals WHERE owning_principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id IN(SELECT principal_id FROM sys.user_token) AND state='W')")) {
                     p.setQueryTimeout(3);
                     try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
@@ -222,7 +241,17 @@ public final class AiCaseDataAttestation {
                     }
                 }
             }
-        } catch(Exception failure) { throw new IllegalStateException("AI Case datasource attestation failed closed: "+stage+(failure instanceof SQLException sql?" (SQL "+sql.getErrorCode()+")":"")); }
+        } catch(Exception failure) {
+            String kind=failure instanceof SQLTimeoutException ? ("MCP deadline.".equals(failure.getMessage())?"DEADLINE":"QUERY_TIMEOUT")
+                    : failure instanceof SQLTransientConnectionException || failure instanceof SQLNonTransientConnectionException ? "CONNECTION"
+                    : failure instanceof SQLException ? "SQL" : failure instanceof IllegalStateException ? "REFUSED" : "UNEXPECTED";
+            long elapsedMillis=Math.min(600_000L,Math.max(0L,(System.nanoTime()-started)/1_000_000L));
+            // Closed operational metadata only. Do not retain driver messages, SQL, identity values or causes.
+            throw new IllegalStateException("AI Case datasource attestation failed closed: "+stage
+                    +(failure instanceof SQLException sql?" (SQL "+sql.getErrorCode()+")":"")
+                    +" [step="+(stage.equals("IDENTITY")?identityStep:"NONE")+" kind="+kind
+                    +" elapsedMillis="+elapsedMillis+" interrupted="+Thread.currentThread().isInterrupted()+"]");
+        }
     }
     private record Identity(byte[] sid,String login,String database,String user,int userId,int sysadmin,String server) {}
     enum Platform { SQL_SERVER_OR_MI, AZURE_SQL_DATABASE }
