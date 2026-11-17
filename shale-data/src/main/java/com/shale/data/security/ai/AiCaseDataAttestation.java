@@ -349,11 +349,20 @@ public final class AiCaseDataAttestation {
             if(!r.next()||r.getInt(1)!=expected||r.wasNull()||r.next())throw refused();
         }
     }
-    private static Set<String> allowed(Connection c,String object,String scope,Set<String> allow)throws SQLException {
+    static Set<String> allowed(Connection c,String object,String scope,Set<String> allow)throws SQLException {
         var actual=new HashSet<String>();
         try(var p=c.prepareStatement("SELECT permission_name FROM sys.fn_my_permissions(?,?)")) {
             p.setQueryTimeout(3);p.setString(1,object);p.setString(2,scope);
-            try(var r=p.executeQuery()){while(r.next()){String permission=r.getString(1);if(!allow.contains(permission))throw refused();actual.add(permission);}}
+            try(var r=p.executeQuery()) {
+                while(r.next()) {
+                    String permission=r.getString(1);
+                    // Azure/SQL 2022 exposes these children of the already-required VIEW DEFINITION.
+                    boolean impliedDefinition=allow.contains("VIEW DEFINITION")
+                            &&Set.of("VIEW SECURITY DEFINITION","VIEW PERFORMANCE DEFINITION").contains(permission);
+                    if(!allow.contains(permission)&&!impliedDefinition)throw refused();
+                    actual.add(permission);
+                }
+            }
         } catch(SQLException denied) {
             // Complete verifier inventory identifies the object; an invisible object has no effective permission.
             if(denied.getErrorCode()!=15151||!allow.isEmpty())throw denied;

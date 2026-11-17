@@ -116,6 +116,27 @@ class AiCaseDataAttestationTest {
         assertTrue(failure.getMessage().contains("step=NONE kind=SQL"),failure.getMessage());
     }
 
+    @Test void verifierDefinitionAuthorityIncludesOnlyItsTwoImpliedMetadataPermissions()throws Exception {
+        var reported=Set.of("VIEW DEFINITION","VIEW SECURITY DEFINITION","VIEW PERFORMANCE DEFINITION");
+        for(String scope:List.of("DATABASE","OBJECT")) {
+            Connection reviewer=connection(q->reported.stream().map(p->new Object[]{p}).toList());
+            assertEquals(reported,AiCaseDataAttestation.allowed(reviewer,scope.equals("OBJECT")?"[dbo].[example]":null,scope,Set.of("VIEW DEFINITION")));
+        }
+        for(String extra:List.of("CONTROL","SELECT","EXECUTE","ALTER","VIEW DATABASE STATE","VIEW CRYPTOGRAPHICALLY SECURED DEFINITION")) {
+            Connection overprivileged=connection(q->List.<Object[]>of(new Object[]{"VIEW DEFINITION"},new Object[]{extra}));
+            assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.allowed(
+                    overprivileged,null,"DATABASE",Set.of("VIEW DEFINITION")),extra+" is not implied metadata visibility");
+        }
+    }
+    @Test void impliedDefinitionPermissionsNeverBroadenTheAiCallerAuthority() {
+        for(String permission:List.of("VIEW DEFINITION","VIEW SECURITY DEFINITION","VIEW PERFORMANCE DEFINITION")) {
+            for(Set<String> allowed:List.of(Set.of("CONNECT"),Set.of("EXECUTE"),Set.<String>of())) {
+                Connection caller=connection(q->List.<Object[]>of(new Object[]{permission}));
+                assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.allowed(
+                        caller,null,"DATABASE",allowed),"AI caller must not gain "+permission);
+            }
+        }
+    }
     @Test void platformsMustBePositivelyIdentified()throws Exception {
         for(int edition:List.of(2,3,4,8))assertEquals(AiCaseDataAttestation.Platform.SQL_SERVER_OR_MI,AiCaseDataAttestation.platform(connection(q->rows(edition))));
         assertEquals(AiCaseDataAttestation.Platform.AZURE_SQL_DATABASE,AiCaseDataAttestation.platform(connection(q->rows(5))));
