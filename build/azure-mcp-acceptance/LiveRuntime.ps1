@@ -212,7 +212,7 @@ function Assert-LiveJar([string]$Path,[string]$Hash,[string]$Version) {
     $zip=[IO.Compression.ZipFile]::OpenRead($Path)
     try {
         $entries=@('BOOT-INF/classes/com/shale/server/ShaleServerApplication.class',
-          'BOOT-INF/classes/com/shale/server/oauth/CimdRuntimeConfiguration.class','BOOT-INF/classes/META-INF/build-info.properties')
+          'BOOT-INF/classes/com/shale/server/oauth/CimdRuntimeConfiguration.class','META-INF/build-info.properties')
         foreach ($entry in $entries) { if (-not $zip.GetEntry($entry)) { throw 'EXECUTABLE_SERVER_JAR_REQUIRED' } }
         if (@($zip.Entries | Where-Object FullName -match '(Fixture|LiveMetadata|ConnectionServer)\.class$').Count) { throw 'FIXTURE_JAR_REFUSED' }
         $reader=[IO.StreamReader]::new($zip.GetEntry($entries[2]).Open())
