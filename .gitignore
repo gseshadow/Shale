@@ -54,3 +54,7 @@ build/assets/javafx-jmods-21.0.10/
 target-backup/
 build/mac-handoff/
 *.propertiesbuild/mac-handoff/
+
+# Private acceptance campaign material and evidence (never commit).
+/work/live-mcp-configuration/
+/work/live-mcp-*/

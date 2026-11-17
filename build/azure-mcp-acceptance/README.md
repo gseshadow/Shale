@@ -334,3 +334,8 @@ reuses the existing successful state and evidence, requires one explicit operato
 deploys/starts only the acceptance app, runs automated MCP/OAuth/native/audit checks and finishes
 OFF/stopped. Do not invoke a clean-slate/reset command to perform runtime acceptance. Codex must
 not execute this operator deployment command.
+
+The same live runtime command now prepares an empty acceptance App Service configuration first:
+existing dedicated SQL credentials, encrypted retained synthetic JWT key, fixed origins/contracts
+and Java startup, all controls OFF and the app stopped. It then presents the existing campaign approval.
+No settings bootstrap command or manual secret-in-CLI step is needed. See [the runbook](live-runtime.md).

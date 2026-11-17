@@ -27,7 +27,7 @@ class LiveRuntimeTest(unittest.TestCase):
 
     def test_scripts_parse_and_import_without_network(self):
         self.ps(r'''
-foreach($name in @('Start-LiveRuntimeAcceptance.ps1','LiveRuntime.ps1')) {
+foreach($name in @('Start-LiveRuntimeAcceptance.ps1','LiveRuntime.ps1','LiveConfiguration.ps1')) {
  $errors=$null
  [void][Management.Automation.Language.Parser]::ParseFile((Join-Path ./build/azure-mcp-acceptance $name),[ref]$null,[ref]$errors)
  if($errors.Count){throw ($errors|Out-String)}
@@ -178,7 +178,7 @@ $refused=$false;try{Invoke-LiveNativeChecks @($bad) $c}catch{$refused=$true};if(
                 with zipfile.ZipFile(jar, 'w') as z:
                     z.writestr('BOOT-INF/classes/com/shale/server/ShaleServerApplication.class', b'offline')
                     z.writestr('BOOT-INF/classes/com/shale/server/oauth/CimdRuntimeConfiguration.class', b'offline')
-                    z.writestr('BOOT-INF/classes/META-INF/build-info.properties', 'build.artifact=shale-server\nbuild.version=1.2.3\n')
+                    z.writestr('META-INF/build-info.properties', 'build.artifact=shale-server\nbuild.version=1.2.3\n')
                     if fixture:
                         z.writestr('BOOT-INF/classes/LiveMetadata.class', b'offline')
                 return hashlib.sha256(jar.read_bytes()).hexdigest()
@@ -187,6 +187,41 @@ $refused=$false;try{Invoke-LiveNativeChecks @($bad) $c}catch{$refused=$true};if(
             self.ps(f"$refused=$false;try{{Assert-LiveJar '{jar}' '{digest}' 'wrong'}}catch{{$refused=$true}};if(-not $refused){{throw 'Wrong build accepted'}}")
             digest = write(True)
             self.ps(f"$refused=$false;try{{Assert-LiveJar '{jar}' '{digest}' '1.2.3'}}catch{{$refused=$true}};if(-not $refused){{throw 'Fixture accepted'}}")
+
+    def test_jar_server_1_0_138_root_metadata_preserves_artifact_hash_version_and_class_guards(self):
+        # The shipped executable keeps build-info at the archive root; classes stay under BOOT-INF.
+        import hashlib
+        import zipfile
+        classes = (
+            'BOOT-INF/classes/com/shale/server/ShaleServerApplication.class',
+            'BOOT-INF/classes/com/shale/server/oauth/CimdRuntimeConfiguration.class',
+        )
+        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+            jar = Path(directory) / 'shale-server-1.0.138.jar'
+            cases = [
+                ('root-metadata', classes, 'shale-server', '1.0.138', 'META-INF/build-info.properties', False, None),
+                ('wrong-hash', classes, 'shale-server', '1.0.138', 'META-INF/build-info.properties', True, 'EXACT_JAR_REQUIRED'),
+                ('wrong-artifact', classes, 'shale-desktop', '1.0.138', 'META-INF/build-info.properties', False, 'BUILD_INFO_MISMATCH'),
+                ('wrong-version', classes, 'shale-server', '1.0.137', 'META-INF/build-info.properties', False, 'BUILD_INFO_MISMATCH'),
+                ('missing-application-class', classes[1:], 'shale-server', '1.0.138', 'META-INF/build-info.properties', False, 'EXECUTABLE_SERVER_JAR_REQUIRED'),
+                ('missing-runtime-class', classes[:1], 'shale-server', '1.0.138', 'META-INF/build-info.properties', False, 'EXECUTABLE_SERVER_JAR_REQUIRED'),
+                ('missing-root-metadata', classes, 'shale-server', '1.0.138', 'BOOT-INF/classes/META-INF/build-info.properties', False, 'EXECUTABLE_SERVER_JAR_REQUIRED'),
+            ]
+            for name, entries, artifact, version, metadata, wrong_hash, expected_error in cases:
+                with self.subTest(name=name):
+                    with zipfile.ZipFile(jar, 'w') as z:
+                        for entry in entries:
+                            z.writestr(entry, b'offline synthetic class placeholder')
+                        z.writestr(metadata, f'build.artifact={artifact}\nbuild.version={version}\n')
+                    digest = hashlib.sha256(jar.read_bytes()).hexdigest()
+                    if wrong_hash:
+                        digest = ('0' if digest[0] != '0' else '1') + digest[1:]
+                    if expected_error is None:
+                        self.ps(f"Assert-LiveJar '{jar}' '{digest}' '1.0.138'")
+                    else:
+                        self.ps(f"$refused=$false;try{{Assert-LiveJar '{jar}' '{digest}' '1.0.138'}}"
+                                f"catch{{$refused=$true;if($_.Exception.Message -cne '{expected_error}'){{throw 'Unexpected rejection'}}}};"
+                                "if(-not $refused){throw 'Invalid JAR accepted'}")
 
     def test_live_client_failure_always_scrubs_and_revokes(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -41,11 +41,14 @@ try {
         if ($null -eq $c -or $c.UserName -cne $email) { throw 'EXACT_SYNTHETIC_LOGIN_REQUIRED' }; $humans[$email]=$c
     }
     $operation='azure-and-sql-preflight'
-    Assert-LiveAzureConfiguration; Assert-LiveSettings (Get-LiveSettings) $credentials
+    Assert-LiveConfigurationTarget
     Assert-LiveSqlOff $owner; Assert-LiveSynthetic $owner
     $zones=Get-LiveBinding $evidence.Directory $owner
     $specs=@(Get-Content (Join-Path $PSScriptRoot 'stages.json') -Raw | ConvertFrom-Json)
     Invoke-LiveRls $credentials; Invoke-LiveNativeChecks $specs $credentials $run
+    $operation='secure-acceptance-configuration'
+    Initialize-LiveConfiguration $credentials $evidence.JournalHash $run
+    Assert-LiveSqlOff $owner
     $context=@{Inventory=$inventory;Id=$id;Run=$run;Hash=$ExpectedJarSHA256;Version=$ExpectedBuildVersion;Jar=$jar;Evidence=$evidence;
       Owner=$owner;Credentials=$credentials;Humans=$humans;Zones=$zones;Specs=$specs}
     $operation='controlled-campaign'; $campaign=$true

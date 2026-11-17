@@ -61,7 +61,7 @@ function Get-LiveCredentials([string]$Directory) {
     return $credentials
 }
 function Get-LiveSettings {
-    $values=@{}; $rows=Invoke-CleanAzure @('webapp','config','appsettings','list','--ids',$script:LiveAppId)
+    $values=@{}; $rows=Invoke-CleanAzure @('webapp','config','appsettings','list','--name','shale-mcp-acceptance','--resource-group','Shale','--subscription',$script:CleanSubscription)
     foreach ($row in $rows) { if ($values.ContainsKey($row.name)) { throw 'DUPLICATE_APP_SETTING' }; $values[$row.name]=$row.value }
     return $values
 }
@@ -80,11 +80,7 @@ function Assert-LiveSettings($Settings,$Credentials) {
         -not $Settings['SHALE_AUTH_SESSION_BINDING_CUTOVER_AT']) { throw 'ACCEPTANCE_AUTH_CONFIGURATION_REQUIRED' }
     if ($Settings['shale.ai.cimd.metadata-advertisement-enabled'] -cne 'false') { throw 'ADVERTISEMENT_MUST_BE_OFF' }
     foreach ($key in $script:LiveControls) { if ($Settings[$key] -cne 'false') { throw 'APP_CONTROLS_MUST_BE_OFF' } }
-    $sources=@{'SHALE_APP'='auth';'SHALE_RT'='runtime';'shale.ai.data'='predecessor';
-      'shale.ai.data.verifier'='verifier';'shale.ai.oauth.bootstrap'='bootstrap'}
-    foreach ($cap in @('case','reviewer','publisher','approval','onboarding','browser','issuer','metadata','resolver','neutral','dcr-endpoint','dcr-metadata')) {
-        $sources['shale.ai.cimd.runtime.'+$cap]=$cap.Replace('-','_')
-    }
+    $sources=Get-LiveSources
     foreach ($prefix in $sources.Keys) {
         $ordinary=$prefix.StartsWith('SHALE_')
         $urlKey=if($ordinary){$prefix+'_DB_URL'}else{$prefix+'.jdbc-url'}
@@ -104,7 +100,9 @@ function Set-LiveAppControls([bool]$Enabled,[string]$Run) {
     $settings=@{}; foreach ($key in $script:LiveControls) { $settings[$key]=$Enabled.ToString().ToLowerInvariant() }
     $settings['shale.ai.cimd.metadata-advertisement-enabled']='false'
     $path=Join-Path $Run 'controls.json'; [IO.File]::WriteAllText($path,($settings | ConvertTo-Json))
-    [void](Invoke-CleanAzure @('webapp','config','appsettings','set','--ids',$script:LiveAppId,'--settings',('@'+$path)))
+    $current=Get-LiveSettings
+    foreach($key in $settings.Keys){$current[$key]=$settings[$key]}
+    Invoke-LiveArm 'Settings' $current
 }
 function Invoke-LiveOwner([string]$Sql,[pscredential]$Owner) {
     $guard="IF USER_NAME()<>N'dbo' OR ISNULL(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','CONTROL'),0)<>1 THROW 59801,'OWNER_REQUIRED',1;"
@@ -214,7 +212,7 @@ function Assert-LiveJar([string]$Path,[string]$Hash,[string]$Version) {
     $zip=[IO.Compression.ZipFile]::OpenRead($Path)
     try {
         $entries=@('BOOT-INF/classes/com/shale/server/ShaleServerApplication.class',
-          'BOOT-INF/classes/com/shale/server/oauth/CimdRuntimeConfiguration.class','BOOT-INF/classes/META-INF/build-info.properties')
+          'BOOT-INF/classes/com/shale/server/oauth/CimdRuntimeConfiguration.class','META-INF/build-info.properties')
         foreach ($entry in $entries) { if (-not $zip.GetEntry($entry)) { throw 'EXECUTABLE_SERVER_JAR_REQUIRED' } }
         if (@($zip.Entries | Where-Object FullName -match '(Fixture|LiveMetadata|ConnectionServer)\.class$').Count) { throw 'FIXTURE_JAR_REFUSED' }
         $reader=[IO.StreamReader]::new($zip.GetEntry($entries[2]).Open())
@@ -233,7 +231,7 @@ function Assert-LiveAzureConfiguration {
     if ($config.appCommandLine -cne 'java -jar /home/site/wwwroot/shale-server.jar --spring.profiles.active=azure' -or
         $config.linuxFxVersion -cnotmatch '^JAVA\|21(?:-java21)?$' -or $config.minTlsVersion -notin @('1.2','1.3') -or
         $config.ftpsState -cne 'Disabled' -or $config.numberOfWorkers -ne 1) { throw 'APP_STARTUP_CONFIGURATION_REQUIRED' }
-    $strings=Invoke-CleanAzure @('webapp','config','connection-string','list','--ids',$script:LiveAppId)
+    $strings=Invoke-CleanAzure @('webapp','config','connection-string','list','--name','shale-mcp-acceptance','--resource-group','Shale','--subscription',$script:CleanSubscription)
     if (@($strings.PSObject.Properties).Count -gt 0) { throw 'UNREVIEWED_CONNECTION_STRINGS' }
 }
 function Invoke-LiveRls($Credentials) {
@@ -379,3 +377,5 @@ function Invoke-LiveNativeChecks($Specs,$Credentials,[string]$Run) {
         if ($Run) { New-CleanEvent (Join-Path $Run 'journal.jsonl') @{Kind='native-check-complete';Stage=$spec.name;User=$spec.user;Result=$result} }
     }
 }
+
+. (Join-Path $PSScriptRoot 'LiveConfiguration.ps1')
