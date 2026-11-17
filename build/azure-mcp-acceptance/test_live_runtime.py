@@ -34,27 +34,80 @@ foreach($name in @('Start-LiveRuntimeAcceptance.ps1','LiveRuntime.ps1','LiveConf
 }
 ''')
 
-    def test_dormant_worker_uses_deployed_app_jar_and_separate_archive_commands(self):
+    def test_worker_archives_both_log_scopes_and_reads_fresh_application_evidence_without_shell(self):
         self.ps(r'''
-$script:commands=[Collections.Generic.List[string]]::new();$script:started=$false;$script:healthy=$false;$script:wrongHash=$false
+$script:paths=[Collections.Generic.List[string]]::new()
+$script:paths.Add('/home/LogFiles/old_docker.log');$script:paths.Add('/home/LogFiles/Application/spring.old.log')
+$script:archived=[Collections.Generic.List[string]]::new();$script:started=$false;$script:wrongHash=$false;$script:skipMove=$false
+function Get-LiveWorkerLogPaths {return $script:paths.ToArray()}
 function Invoke-LiveScm($Command){
- $script:commands.Add($Command)
- if($Command.StartsWith('sha256sum ')){return ($(if($script:wrongHash){'B'}else{'A'})*64)+'  /home/site/wwwroot/app.jar'}
- if($Command.Contains('tail -c')){return 'SHALE_JVM_STARTUP zoneId=UTC javaVersion=21.0.8 replicaId=offline' + "`nAI_CASE_SQL_READINESS disabled"}
- return ''
+ foreach($shellToken in @(([string][char]39),([string][char]34),'&&','*',';')){if($Command.Contains($shellToken)){throw 'SCM is not a shell'}}
+ $argv=$Command.Split(' ')
+ switch($argv[0]){
+  'mkdir' {return ''}
+  'mv' {if(-not $script:skipMove){[void]$script:paths.Remove($argv[2]);$script:archived.Add($argv[3])};return ''}
+  'sha256sum' {if($argv[1] -cne '/home/site/wwwroot/app.jar'){throw 'Wrong deployed artifact path'};return ($(if($script:wrongHash){'B'}else{'A'})*64)+'  /home/site/wwwroot/app.jar'}
+  'tail' {if(-not $script:paths.Contains($argv[3])){throw 'Read targeted an archived path'};if($argv[3].Contains('/Application/')){return 'SHALE_JVM_STARTUP zoneId=UTC javaVersion=21.0.8 replicaId=offline' + "`nAI_CASE_SQL_READINESS disabled"};return 'Platform startup succeeded'}
+  default {throw 'Unexpected remote operation'}
+ }
 }
-function Invoke-CleanAzure($Arguments){if($Arguments[1] -cne 'start'){throw 'Unexpected Azure operation'};$script:started=$true}
-function Wait-LiveHealth {$script:healthy=$true}
+function Invoke-CleanAzure($Arguments){
+ if($Arguments[1] -cne 'start' -or $script:paths.Count -ne 0){throw 'Started before stale logs were archived'}
+ $script:started=$true;$script:paths.Add('/home/LogFiles/new_docker.log');$script:paths.Add('/home/LogFiles/Application/spring.new.log')
+}
+function Wait-LiveHealth {}
 $archive='acceptance-'+('a'*32)+'-before-dormant'
 Start-LiveWorker $archive
 $markers=Assert-LiveWorker ('A'*64) 'UTC'
-if(-not $script:started -or -not $script:healthy -or $markers -cnotcontains 'AI_CASE_SQL_READINESS disabled'){throw 'Dormant verification did not complete'}
-if($script:commands[0] -cne ('mkdir -p /home/LogFiles/'+$archive)){throw 'Archive directory creation must be a separate command'}
-if($script:commands[1] -cne ('find /home/LogFiles -maxdepth 1 -type f -name ''*docker.log'' -exec mv -t /home/LogFiles/'+$archive+'/ -- {} +')){throw 'Archive must use an unescaped find terminator'}
-if($script:commands[2] -cne 'sha256sum /home/site/wwwroot/app.jar'){throw 'Fingerprint targeted a different deployment path'}
-if($script:commands[3] -cne 'find /home/LogFiles -maxdepth 1 -type f -name ''*docker.log'' -exec tail -c 200000 {} +'){throw 'Log read must use an unescaped find terminator'}
-$script:wrongHash=$true;$refused=$false;try{Assert-LiveWorker ('A'*64) 'UTC'}catch{$refused=$true}
-if(-not $refused){throw 'Wrong deployed artifact accepted'}
+if(-not $script:started -or $script:archived.Count -ne 2 -or -not $script:archived.Contains('/home/LogFiles/'+$archive+'/Application/spring.old.log') -or $markers -cnotcontains 'AI_CASE_SQL_READINESS disabled'){throw 'Fresh application evidence or archive preservation missing'}
+$script:wrongHash=$true;$refused=$false;try{Assert-LiveWorker ('A'*64) 'UTC'}catch{$refused=$true};if(-not $refused){throw 'Wrong deployed artifact accepted'}
+$script:skipMove=$true;$script:started=$false;$refused=$false
+try{Start-LiveWorker $archive}catch{$refused=$true;if($_.Exception.Message -cne 'WORKER_LOG_ARCHIVE_UNCONFIRMED'){throw 'Archive refusal diagnostic changed'}}
+if(-not $refused -or $script:started){throw 'Unconfirmed stale-log archive allowed startup'}
+''')
+
+    def test_worker_log_inventory_uses_fixed_vfs_scopes_and_refuses_unsafe_names(self):
+        self.ps(r'''
+$script:unsafe=$false;$script:missingApplication=$false
+function Invoke-CleanAzure {return @{accessToken='offline-not-a-secret'}}
+function Invoke-RestMethod($Uri){
+ if($Uri -ceq 'https://shale-mcp-acceptance.scm.azurewebsites.net/api/vfs/LogFiles/'){
+  if($script:unsafe){return ,@([pscustomobject]@{name='../escape_docker.log'})}
+  return ,@([pscustomobject]@{name='today_docker.log'},[pscustomobject]@{name='ignore.txt'})
+ }
+ if($Uri -ceq 'https://shale-mcp-acceptance.scm.azurewebsites.net/api/vfs/LogFiles/Application/'){
+  if($script:missingApplication){
+   $response=[Net.Http.HttpResponseMessage]::new([Net.HttpStatusCode]::NotFound)
+   throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('offline', $response)
+  }
+  return ,@([pscustomobject]@{name='spring.worker.log'})
+ }
+ throw 'Unexpected VFS target'
+}
+$paths=@(Get-LiveWorkerLogPaths)
+if($paths.Count -ne 2 -or $paths -cnotcontains '/home/LogFiles/Application/spring.worker.log' -or $paths -cnotcontains '/home/LogFiles/today_docker.log'){throw 'Real JSON array response did not inventory both scopes'}
+$script:missingApplication=$true;if(@(Get-LiveWorkerLogPaths).Count -ne 1){throw 'Absent initial application directory was not handled'}
+$script:unsafe=$true;$refused=$false;try{Get-LiveWorkerLogPaths}catch{$refused=$true;if($_.Exception.Message -cne 'WORKER_LOG_NAME_REFUSED'){throw 'Unsafe inventory diagnostic'}}
+if(-not $refused){throw 'Unsafe remote path accepted'}
+''')
+
+    def test_campaign_diagnostics_preserve_only_closed_failure_codes(self):
+        self.ps(r'''
+foreach($code in @('HEALTH_TIMEOUT','WORKER_READINESS_EVIDENCE_MISSING','SCM_COMMAND_FAILED','CAMPAIGN_HTTP_401','PRIVATE_SENTINEL','CAMPAIGN_HTTP_401_PRIVATE_SENTINEL')){
+ $expected=if($code.Contains('PRIVATE_SENTINEL')){'CAMPAIGN_FAILED'}else{$code}
+ try{throw $code}catch{$safe=Get-LiveSafeCampaignFailure $_}
+ if($safe -cne $expected){throw 'Safe campaign code changed or leaked raw error'}
+}
+$response=[Net.Http.HttpResponseMessage]::new([Net.HttpStatusCode]::Forbidden)
+try{throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('PRIVATE_SENTINEL',$response)}catch{$safe=Get-LiveSafeCampaignFailure $_}
+if($safe -cne 'CAMPAIGN_HTTP_403'){throw 'HTTP status was masked or raw error leaked'}
+$ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path ./build/azure-mcp-acceptance 'Start-LiveRuntimeAcceptance.ps1'),[ref]$null,[ref]$null)
+$entryTry=@($ast.EndBlock.Statements | Where-Object {$_ -is [Management.Automation.Language.TryStatementAst]})[0]
+$block=$entryTry.CatchClauses[0].Body.Extent.Text;$handler=[scriptblock]::Create($block.Substring(1,$block.Length-2))
+$campaign=$true;$result=@{FailureCode='WORKER_READINESS_EVIDENCE_MISSING'};$operation='controlled-campaign';$run='unused'
+$refused=$false
+try{try{throw 'ACCEPTANCE_FAILED'}catch{. $handler}}catch{$refused=$true;if(-not $_.Exception.Message.Contains($result.FailureCode) -or $_.Exception.Message.Contains('PREFLIGHT_FAILED')){throw 'Operator message masked the campaign failure'}}
+if(-not $refused){throw 'Failed campaign did not fail the operator command'}
 ''')
 
     def test_policy_reader_preserves_nullable_binary_version_and_refuses_bad_results(self):

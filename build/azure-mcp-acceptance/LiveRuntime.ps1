@@ -218,6 +218,49 @@ function Set-LiveSqlControls([bool]$Enabled,[pscredential]$Owner,$Credentials) {
 function Assert-LiveSqlOff([pscredential]$Owner) {
     [void](Invoke-CleanSource ([IO.File]::ReadAllText((Join-Path $PSScriptRoot '../../docs/sql/ai-integration/azure-acceptance/owner.sql'))) $Owner)
 }
+function Get-LiveWorkerLogPaths {
+    $paths=[Collections.Generic.List[string]]::new();$token=$null
+    try {
+        $token=Invoke-CleanAzure @('account','get-access-token','--resource','https://management.azure.com/','--subscription',$script:CleanSubscription)
+        foreach ($scope in @('','Application/')) {
+            try {
+                $entries=Invoke-RestMethod -Uri ('https://shale-mcp-acceptance.scm.azurewebsites.net/api/vfs/LogFiles/'+$scope) -Method Get -TimeoutSec 30 -MaximumRedirection 0 -Headers @{Authorization=('Bearer '+$token.accessToken)}
+            } catch {
+                $status=0;try {$status=[int]$_.Exception.Response.StatusCode}catch{}
+                if ($scope -ceq 'Application/' -and $status -eq 404) { continue }
+                throw 'WORKER_LOG_INVENTORY_FAILED'
+            }
+            foreach ($entry in $entries) {
+                $name=[string]$entry.name
+                $selected=if ($scope -ceq '') { $name.EndsWith('docker.log',[StringComparison]::Ordinal) } else { $name.EndsWith('.log',[StringComparison]::Ordinal) }
+                if (-not $selected) { continue }
+                if ($name -cnotmatch '^[A-Za-z0-9_.-]+$') { throw 'WORKER_LOG_NAME_REFUSED' }
+                $path='/home/LogFiles/'+$scope+$name
+                if ($paths.Contains($path)) { throw 'WORKER_LOG_INVENTORY_FAILED' }
+                $paths.Add($path)
+                if ($paths.Count -gt 64) { throw 'WORKER_LOG_BOUND_EXCEEDED' }
+            }
+        }
+        return $paths.ToArray()
+    } finally {$token=$null;$entries=$null}
+}
+function ConvertTo-LiveSafeCampaignCode([string]$Code) {
+    $allowed=@('OPERATOR_DECLINED','PRIOR_EVIDENCE_CHANGED','DEPLOYMENT_STARTED_APP_UNEXPECTEDLY',
+      'DEPLOYED_JAR_HASH_MISMATCH','WORKER_READINESS_EVIDENCE_MISSING','HEALTH_TIMEOUT',
+      'DORMANT_READINESS_REQUIRED','DORMANT_ROUTE_OPEN','SCM_COMMAND_FAILED',
+      'WORKER_LOG_INVENTORY_FAILED','WORKER_LOG_NAME_REFUSED','WORKER_LOG_BOUND_EXCEEDED',
+      'WORKER_LOG_ARCHIVE_UNCONFIRMED','SQL_ACTIVATION_FAILED','SQL_SHUTDOWN_NOT_CONFIRMED',
+      'TENANT_POLICY_READ_FAILED','CLEANUP_NOT_CONFIRMED','CAMPAIGN_FAILED')
+    if ($Code -cin $allowed -or $Code -cmatch '^CAMPAIGN_HTTP_[45][0-9]{2}$') { return $Code }
+    return 'CAMPAIGN_FAILED'
+}
+function Get-LiveSafeCampaignFailure($Failure) {
+    $code=ConvertTo-LiveSafeCampaignCode $Failure.Exception.Message
+    if ($code -cne 'CAMPAIGN_FAILED') { return $code }
+    $status=0;try {$status=[int]$Failure.Exception.Response.StatusCode}catch{}
+    if ($status -ge 400 -and $status -le 599) { return ('CAMPAIGN_HTTP_'+$status) }
+    return $code
+}
 function Invoke-LiveScm([string]$Command) {
     $token=Invoke-CleanAzure @('account','get-access-token','--resource','https://management.azure.com/')
     try {
@@ -229,7 +272,12 @@ function Assert-LiveWorker([string]$Hash,[string]$JavaZone,[switch]$Ready) {
     $remote=Invoke-LiveScm 'sha256sum /home/site/wwwroot/app.jar'
     if ($remote.Trim() -cnotmatch '^([a-fA-F0-9]{64})  /home/site/wwwroot/app.jar$' -or $Matches[1] -ine $Hash) { throw 'DEPLOYED_JAR_HASH_MISMATCH' }
     # Old worker logs are moved out of this directory before start; only closed markers are retained.
-    $logs=Invoke-LiveScm "find /home/LogFiles -maxdepth 1 -type f -name '*docker.log' -exec tail -c 200000 {} +"
+    $logs=[Text.StringBuilder]::new()
+    foreach ($path in @(Get-LiveWorkerLogPaths)) {
+        [void]$logs.AppendLine((Invoke-LiveScm ('tail -c 200000 '+$path)))
+        if ($logs.Length -gt 2000000) { throw 'WORKER_LOG_BOUND_EXCEEDED' }
+    }
+    $logs=$logs.ToString()
     $zone=[regex]::Escape($JavaZone)
     if ($logs -notmatch "SHALE_JVM_STARTUP zoneId=$zone javaVersion=21[.+]" -or ($Ready -and $logs -notmatch 'AI_CASE_SQL_READINESS ready')) { throw 'WORKER_READINESS_EVIDENCE_MISSING' }
     return @([regex]::Matches($logs,'SHALE_JVM_STARTUP [^\r\n]{1,400}|AI_CASE_SQL_READINESS (?:ready|disabled|not-ready)') | ForEach-Object Value)
@@ -338,15 +386,19 @@ function Invoke-LiveClient([string]$Run,$HumanCredentials) {
         return $report
     } finally { if ($started -and -not $process.HasExited) { try { $process.Kill($true); [void]$process.WaitForExit(10000) } catch { } }; $process.Dispose(); $inputs=$null }
 }
-function Start-LiveWorker([string]$Archive) {
-    # Preserve existing raw logs remotely before each launch to exclude stale readiness markers.
-    [void](Invoke-LiveScm "mkdir -p /home/LogFiles/$Archive")
-    [void](Invoke-LiveScm "find /home/LogFiles -maxdepth 1 -type f -name '*docker.log' -exec mv -t /home/LogFiles/$Archive/ -- {} +")
+function Start-LiveWorker([ValidatePattern('^acceptance-[a-f0-9]{32}-(before-dormant|dormant)$')][string]$Archive) {
+    # SCM executes argv, not a shell: no glob/quote/operator interpretation is assumed.
+    [void](Invoke-LiveScm ("mkdir -p /home/LogFiles/$Archive/Application"))
+    foreach ($path in @(Get-LiveWorkerLogPaths)) {
+        $relative=$path.Substring('/home/LogFiles/'.Length)
+        [void](Invoke-LiveScm ("mv -- $path /home/LogFiles/$Archive/$relative"))
+    }
+    if (@(Get-LiveWorkerLogPaths).Count) { throw 'WORKER_LOG_ARCHIVE_UNCONFIRMED' }
     [void](Invoke-CleanAzure @('webapp','start','--ids',$script:LiveAppId))
     Wait-LiveHealth
 }
 function Invoke-LiveCampaign($Context) {
-    $approved=$false; $sqlActivationAttempted=$false; $failure=$null; $phase='approval'; $cleanup=$null; $steps=[Collections.Generic.List[object]]::new()
+    $approved=$false; $sqlActivationAttempted=$false; $failure=$null; $failureCode=$null; $phase='approval'; $cleanup=$null; $steps=[Collections.Generic.List[object]]::new()
     try {
         # The ONLY approval. No Force/switch/environment/parameter can supply this acknowledgement.
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
@@ -396,10 +448,11 @@ function Invoke-LiveCampaign($Context) {
         Assert-LiveAudits $Context.Owner $baseline $client.disclosures $client.overviews
         [void](Get-LiveBinding $Context.Evidence.Directory $Context.Owner); Assert-LiveSynthetic $Context.Owner
         $steps.Add(@{Id='durable-audits-unchanged-binding-and-fixture';Status='PASS'})
-    } catch { $failure=$phase } finally {
+    } catch { $failure=$phase; $failureCode=Get-LiveSafeCampaignFailure $_ } finally {
         if ($approved) { $cleanup=Stop-LiveAcceptance $Context.Owner $Context.Credentials $Context.Run -VerifySqlOnly:(-not $sqlActivationAttempted) }
         $pass=$approved -and -not $failure -and $cleanup.SqlOff -and $cleanup.AppOff -and $cleanup.ApplicationStopped
-        $result=@{Status=$(if($pass){'PASS'}else{'FAIL'});Approved=$approved;Failure=$failure;Cleanup=$cleanup;Steps=$steps.ToArray();
+        if (-not $failure -and -not $pass) { $failureCode='CLEANUP_NOT_CONFIRMED' }
+        $result=@{Status=$(if($pass){'PASS'}else{'FAIL'});Approved=$approved;Failure=$failure;FailureCode=$failureCode;Cleanup=$cleanup;Steps=$steps.ToArray();
           JarSHA256=$Context.Hash;BuildVersion=$Context.Version;SqlJournalHash=$Context.Evidence.JournalHash;
           Scope='Synthetic acceptance DCR/OAuth/MCP runtime; no production or CIMD/stock-browser certification'}
         [IO.File]::WriteAllText((Join-Path $Context.Run 'report.json'),($result | ConvertTo-Json -Depth 12))
