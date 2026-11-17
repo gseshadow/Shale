@@ -48,7 +48,7 @@ starts/deploys the app or changes SQL. The existing explicit campaign approval f
 The state written and checked is:
 
 - Linux Java 21 stack, one worker, HTTPS only, TLS >= 1.2, FTPS disabled; startup exactly
-  `java -jar /home/site/wwwroot/shale-server.jar --spring.profiles.active=azure`.
+  `java -jar /home/site/wwwroot/app.jar --spring.profiles.active=azure`.
 - `SPRING_PROFILES_ACTIVE=azure`; `shale.ai.oauth.identity=PRODUCTION` (runtime identity grammar,
   with the acceptance destination). Case `V2`, CIMD `DCR_V3`, database `ShaleMcpAcceptance`.
 - All ten [app controls](../../docs/universal-mcp-azure-readiness.md#3-required-azure-configuration-and-acceptance)
@@ -141,7 +141,7 @@ startup or SQL mutation occurs. All post-approval paths, including repeated pref
 The runner then:
 
 1. Rechecks the prerequisites/evidence and deploys only that JAR with restart disabled to
-   `/home/site/wwwroot/shale-server.jar`. A deployment that unexpectedly starts the app fails.
+   `/home/site/wwwroot/app.jar`. A deployment that unexpectedly starts the app fails.
 2. Starts dormant, verifies DB health, deployed hash, actual worker JVM Java 21/zone matching the
    unchanged binding, disabled readiness and closed MCP/OAuth POST routes. Stops again.
 3. Revalidates native identity/catalog/binding/RLS prerequisites. Enables only the acceptance SQL
@@ -184,13 +184,25 @@ no timestamp normalization, setting repair, credential rotation or approval bypa
 This is operational configuration validation only; existing journal/Azure evidence and audit schemas
 remain unchanged. Preserve failed run evidence and use a new operator-approved run after correction.
 
+Java OneDeploy deploys this JAR as `/home/site/wwwroot/app.jar`. Startup and remote fingerprint
+verification use that exact path; the local reviewed evidence copy remains `shale-server.jar`.
+Log-directory creation and log archiving are separate SCM commands. Archive/read `find -exec`
+commands use the `+` terminator, avoiding shell-dependent semicolon escaping. Existing raw logs
+are retained remotely, and only closed startup markers enter the report.
+
 ## Cleanup and evidence
 
-Every approved run finishes through `finally`: revoke issued families/logout original WEB sessions
-when the client can run cleanup; independently attempt all five SQL switches and both synthetic tenant
-policies OFF, all app/advertisement controls OFF, and Azure app stop. Each SQL switch/policy is attempted
-even after another fails. App OFF/stop attempts still run if SQL fails. Fresh reads must confirm SQL OFF,
-all app controls OFF and `Stopped`. **Cleanup uncertainty makes the entire report FAIL.**
+Every approved run finishes through `finally`. Before any SQL activation attempt, cleanup verifies
+SQL OFF read-only, avoiding unnecessary policy writes. The activation-attempt flag is set before
+SQL dispatch: a partial/failed activation receives full shutdown, never the read-only shortcut.
+After attempted activation, independently attempt all five SQL switches and both synthetic tenant
+policies OFF; revoke issued families/logout original WEB sessions when client cleanup can run.
+Each SQL switch/policy is attempted even after another fails. All paths independently attempt app
+controls OFF and Azure stop. Fresh reads must confirm SQL OFF, app OFF and `Stopped`.
+**Cleanup uncertainty makes the entire report FAIL.** Tenant policy RowVer is read through the
+existing permitted `AiGetTenantPolicyV1` procedure using a typed reader and its own transaction,
+then supplied to the existing audited `AiSetTenantPolicyV1`. No direct-table grant, audit/schema
+change, outer/INSERT-EXEC transaction, RowVer logging or concurrency bypass is introduced.
 Historical schema, binding, users, base records, existing credentials and evidence remain; new audited
 synthetic approvals, registrations, sessions, credential hashes, access evidence and revocations persist.
 No reset/deletion follows a failure. A repeated campaign creates a new DCR client/run; it does not resume

@@ -280,7 +280,7 @@ function Get-LiveAuthMaterial {return $a}
 function Invoke-LiveArm($Operation,$Properties){
  $script:trace.Add($Operation)
  if($Operation -ceq 'Settings'){$script:settings=$Properties.Clone()}
- if($Operation -ceq 'Startup' -and ($Properties.linuxFxVersion -cne 'JAVA|21-java21' -or $Properties.appCommandLine -cne 'java -jar /home/site/wwwroot/shale-server.jar --spring.profiles.active=azure')){throw 'Wrong startup'}
+ if($Operation -ceq 'Startup' -and ($Properties.linuxFxVersion -cne 'JAVA|21-java21' -or $Properties.appCommandLine -cne 'java -jar /home/site/wwwroot/app.jar --spring.profiles.active=azure')){throw 'Wrong startup'}
 }
 function Assert-CleanResources {$script:trace.Add('stopped')}
 function Assert-LiveAzureConfiguration {$script:trace.Add('readback')}

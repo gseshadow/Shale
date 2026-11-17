@@ -34,6 +34,98 @@ foreach($name in @('Start-LiveRuntimeAcceptance.ps1','LiveRuntime.ps1','LiveConf
 }
 ''')
 
+    def test_dormant_worker_uses_deployed_app_jar_and_separate_archive_commands(self):
+        self.ps(r'''
+$script:commands=[Collections.Generic.List[string]]::new();$script:started=$false;$script:healthy=$false;$script:wrongHash=$false
+function Invoke-LiveScm($Command){
+ $script:commands.Add($Command)
+ if($Command.StartsWith('sha256sum ')){return ($(if($script:wrongHash){'B'}else{'A'})*64)+'  /home/site/wwwroot/app.jar'}
+ if($Command.Contains('tail -c')){return 'SHALE_JVM_STARTUP zoneId=UTC javaVersion=21.0.8 replicaId=offline' + "`nAI_CASE_SQL_READINESS disabled"}
+ return ''
+}
+function Invoke-CleanAzure($Arguments){if($Arguments[1] -cne 'start'){throw 'Unexpected Azure operation'};$script:started=$true}
+function Wait-LiveHealth {$script:healthy=$true}
+$archive='acceptance-'+('a'*32)+'-before-dormant'
+Start-LiveWorker $archive
+$markers=Assert-LiveWorker ('A'*64) 'UTC'
+if(-not $script:started -or -not $script:healthy -or $markers -cnotcontains 'AI_CASE_SQL_READINESS disabled'){throw 'Dormant verification did not complete'}
+if($script:commands[0] -cne ('mkdir -p /home/LogFiles/'+$archive)){throw 'Archive directory creation must be a separate command'}
+if($script:commands[1] -cne ('find /home/LogFiles -maxdepth 1 -type f -name ''*docker.log'' -exec mv -t /home/LogFiles/'+$archive+'/ -- {} +')){throw 'Archive must use an unescaped find terminator'}
+if($script:commands[2] -cne 'sha256sum /home/site/wwwroot/app.jar'){throw 'Fingerprint targeted a different deployment path'}
+if($script:commands[3] -cne 'find /home/LogFiles -maxdepth 1 -type f -name ''*docker.log'' -exec tail -c 200000 {} +'){throw 'Log read must use an unescaped find terminator'}
+$script:wrongHash=$true;$refused=$false;try{Assert-LiveWorker ('A'*64) 'UTC'}catch{$refused=$true}
+if(-not $refused){throw 'Wrong deployed artifact accepted'}
+''')
+
+    def test_policy_reader_preserves_nullable_binary_version_and_refuses_bad_results(self):
+        self.ps(r'''
+$script:setupSql=[Collections.Generic.List[string]]::new();$script:disposed=$false
+function Invoke-CleanCommand($Connection,$Sql,$Lines){$script:setupSql.Add($Sql)}
+function New-CleanConnection {
+ $connection=[pscustomobject]@{State='Closed'}
+ $connection | Add-Member ScriptMethod Open {$this.State='Open'}
+ $connection | Add-Member ScriptMethod Dispose {$script:disposed=$true}
+ $connection | Add-Member ScriptMethod CreateCommand {
+  $cmd=[pscustomobject]@{CommandText='';CommandTimeout=0}
+  $cmd | Add-Member ScriptMethod Dispose {}
+  $cmd | Add-Member ScriptMethod ExecuteReader {
+   if($this.CommandText -cne 'EXEC dbo.AiGetTenantPolicyV1;'){throw 'Policy getter transaction boundary changed'}
+   return ,($script:policyTable.CreateDataReader())
+  }
+  return $cmd
+ }
+ return $connection
+}
+$credential=[pscredential]::new('mcpacc_runtime',(ConvertTo-SecureString 'offline-only' -AsPlainText -Force))
+foreach($mode in @('absent','empty-off','empty-on','present','bad-length','duplicate','missing')){
+ $script:disposed=$false;$script:setupSql.Clear()
+ $script:policyTable=[Data.DataTable]::new()
+ [void]$script:policyTable.Columns.Add('Enabled',[bool]);[void]$script:policyTable.Columns.Add('RowVer',[byte[]])
+ if($mode -cne 'missing'){
+  $row=$script:policyTable.NewRow();$row.Enabled=($mode -ceq 'empty-on')
+  if($mode -ceq 'absent'){$row.RowVer=[DBNull]::Value}else{$row.RowVer=[byte[]]::new($(if($mode -ceq 'bad-length'){7}elseif($mode -cin @('empty-off','empty-on')){0}else{8}))}
+  [void]$script:policyTable.Rows.Add($row)
+  if($mode -ceq 'duplicate'){$script:policyTable.ImportRow($row)}
+ }
+ $refused=$false
+ try{$version=Get-LiveTenantPolicyVersion 7 71 $credential}catch{$refused=$true}
+ if($refused -ne ($mode -cin @('empty-on','bad-length','duplicate','missing'))){throw 'Policy result validation changed'}
+ if(-not $refused -and $version -cne $(if($mode -cin @('absent','empty-off')){'NULL'}else{'0x0000000000000000'})){throw 'Binary/null version changed'}
+ if(-not $script:disposed -or -not $script:setupSql[0].Contains('ShaleMcpAcceptance') -or -not $script:setupSql[1].Contains("@key=N'PrincipalUserId',@value=71")){throw 'Policy read skipped target/context/disposal'}
+}
+''')
+
+    def test_tenant_activation_and_shutdown_use_procedure_only_policy_read(self):
+        self.ps(r'''
+$script:tenantSql=[Collections.Generic.List[string]]::new()
+function Invoke-LiveOwner {}
+function Get-LiveTenantPolicyVersion {return '0x0000000000000001'}
+function Invoke-CleanSource($Sql,$Credential){$script:tenantSql.Add($Sql)}
+foreach($enabled in @($true,$false)){
+ $script:tenantSql.Clear()
+ Set-LiveSqlControls $enabled $null @{'mcpacc_runtime'=$null}
+ if($script:tenantSql.Count -ne 2){throw 'Both synthetic tenants must receive the policy operation'}
+ foreach($sql in $script:tenantSql){
+  if($sql.Contains('FROM dbo.TenantAiIntegrationPolicy') -or -not $sql.Contains('DECLARE @v varbinary(8)=0x0000000000000001')){throw 'Runtime crossed the procedure-only policy boundary'}
+  if(-not $sql.Contains('@ExpectedRowVer=@v') -or -not $sql.Contains("@key=N'PrincipalUserId'")){throw 'Tenant actor or optimistic concurrency removed'}
+ }
+}
+''')
+
+    def test_before_activation_cleanup_verifies_sql_off_without_mutating_it(self):
+        self.ps(r'''
+function Set-LiveSqlControls {throw 'Pre-activation cleanup must not mutate SQL'}
+function Set-LiveAppControls {}
+function Get-LiveSettings {$s=@{};foreach($key in $script:LiveControls){$s[$key]='false'};$s['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED']='false';return $s}
+function Invoke-CleanAzure {return @{id=$script:LiveAppId;state='Stopped'}}
+foreach($off in @($true,$false)){
+ $script:off=$off
+ function Assert-LiveSqlOff {if(-not $script:off){throw 'SQL_OFF_NOT_VERIFIED'}}
+ $r=Stop-LiveAcceptance $null @{} 'unused' -VerifySqlOnly
+ if($r.SqlOff -ne $off -or -not $r.AppOff -or -not $r.ApplicationStopped){throw 'Read-only cleanup falsely certified or skipped independent channels'}
+}
+''')
+
     def test_independent_cleanup_survives_each_failed_channel(self):
         # A failed SQL shutdown must never suppress app OFF or Azure stop.
         self.ps(r'''
@@ -57,6 +149,7 @@ foreach($fail in @('none','sql','settings','stop')) {
         self.ps(r'''
 $script:ownerCalls=0;$script:tenantCalls=0;$script:productSql=''
 function Invoke-LiveOwner($Sql,$Owner) {$script:ownerCalls++;if($Sql.Contains('UPDATE dbo.AiProductCapability')){$script:productSql=$Sql};throw 'simulated single control failure'}
+function Get-LiveTenantPolicyVersion {return 'NULL'}
 function Invoke-CleanSource($Sql,$Credential) {$script:tenantCalls++;throw 'simulated tenant failure'}
 $refused=$false;try{Set-LiveSqlControls $false $null @{'mcpacc_runtime'=$null}}catch{$refused=$true}
 if(-not $refused -or $script:ownerCalls -ne 5 -or $script:tenantCalls -ne 2){throw 'SQL cleanup short-circuited'}
@@ -90,7 +183,7 @@ function Set-LiveSqlControls {Hit 'sql-on'}
 function Set-LiveAppControls {Hit 'app-on'}
 function Invoke-LiveClient {Hit 'client';return @{disclosures=8;overviews=6}}
 function Assert-LiveAudits {Hit 'audits'}
-function Stop-LiveAcceptance {Hit 'cleanup';return @{SqlOff=($script:failure -ne 'cleanup-fail');AppOff=$true;ApplicationStopped=$true}}
+function Stop-LiveAcceptance($Owner,$Credentials,$Run,[switch]$VerifySqlOnly) {$script:verifySqlOnly=[bool]$VerifySqlOnly;Hit 'cleanup';return @{SqlOff=($script:failure -ne 'cleanup-fail');AppOff=$true;ApplicationStopped=$true}}
 foreach($failure in @('decline','preflight','deploy','start','worker','binding','rls','native','sql-on','app-on','client','audits','cleanup-fail','none')) {
  $script:failure=$failure;$script:trace.Clear()
  $dir=Join-Path 'DIRECTORY' $failure;[void][IO.Directory]::CreateDirectory($dir)
@@ -99,6 +192,7 @@ foreach($failure in @('decline','preflight','deploy','start','worker','binding',
  if(($r.Status -ceq 'PASS') -ne ($failure -ceq 'none')){throw "False campaign result: $failure"}
  if($failure -ceq 'decline') {if($script:trace.Contains('deploy') -or $script:trace.Contains('cleanup')){throw 'Unapproved mutation'}}
  elseif(-not $script:trace.Contains('cleanup')){throw "Cleanup absent after $failure"}
+ if($failure -cne 'decline'){$beforeActivation=$failure -cin @('preflight','deploy','start','worker','binding','rls','native');if($script:verifySqlOnly -ne $beforeActivation){throw 'Partial activation or dormant failure used the wrong SQL cleanup mode'}}
  if([IO.File]::ReadAllText((Join-Path $dir 'report.json')).Contains('PRIVATE_SENTINEL')){throw 'Sensitive failure leaked'}
 }
 '''.replace('DIRECTORY', directory))

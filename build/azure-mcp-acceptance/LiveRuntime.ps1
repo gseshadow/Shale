@@ -156,6 +156,39 @@ IF (SELECT COUNT(*) FROM dbo.AiCaseDataDeployment)<>1 OR NOT EXISTS(SELECT 1 FRO
     foreach ($pair in $pairs) { $sql+="`nIF CONVERT(datetime2(7),(CONVERT(datetime2(7),'$($pair.Groups[1].Value)') AT TIME ZONE 'UTC') AT TIME ZONE N'$($zones.Sql)')<>CONVERT(datetime2(7),'$($pair.Groups[2].Value)') THROW 59804,'BINDING_SAMPLE_MISMATCH',1;" }
     [void](Invoke-LiveOwner $sql $Owner); return $zones
 }
+function Get-LiveTenantPolicyVersion([int]$Tenant,[int]$User,[pscredential]$Credential) {
+    if (-not (($Tenant -eq 7 -and $User -eq 71) -or ($Tenant -eq 8 -and $User -eq 81)) -or
+        $Credential.UserName -cne 'mcpacc_runtime') { throw 'SYNTHETIC_TENANT_POLICY_IDENTITY_REQUIRED' }
+    $connection=New-CleanConnection $Credential;$command=$null;$reader=$null
+    $lines=[Collections.Generic.List[string]]::new();$version='NULL'
+    try {
+        $connection.Open()
+        $target=[IO.File]::ReadAllText((Join-Path $PSScriptRoot '../../docs/sql/ai-integration/azure-acceptance/target.sql'))
+        Invoke-CleanCommand $connection $target $lines
+        $setup="SET NOCOUNT ON; SET IMPLICIT_TRANSACTIONS OFF; SET XACT_ABORT ON; SET ANSI_NULLS ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET QUOTED_IDENTIFIER ON; SET NUMERIC_ROUNDABORT OFF; EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=$Tenant; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=$User;"
+        Invoke-CleanCommand $connection $setup $lines
+        # Execute directly: INSERT EXEC would add a transaction and violate AiLockV1's contract.
+        $command=$connection.CreateCommand();$command.CommandTimeout=30;$command.CommandText='EXEC dbo.AiGetTenantPolicyV1;'
+        $reader=$command.ExecuteReader()
+        if ($reader.FieldCount -ne 2 -or $reader.GetName(0) -cne 'Enabled' -or $reader.GetName(1) -cne 'RowVer' -or -not $reader.Read()) { throw 'TENANT_POLICY_RESULT_REQUIRED' }
+        if (-not $reader.IsDBNull(1)) {
+            $bytes=$reader.GetValue(1)
+            if ($bytes -isnot [byte[]]) { throw 'TENANT_POLICY_VERSION_REQUIRED' }
+            # This driver returns an empty timestamp for the getter's absent-policy LEFT JOIN.
+            # Treat it as NULL only for an OFF result; the setter still enforces creation/RowVer rules.
+            if ($bytes.Length -eq 0 -and -not $reader.GetBoolean(0)) { $version='NULL' }
+            elseif ($bytes.Length -eq 8) { $version='0x'+[Convert]::ToHexString($bytes) }
+            else { throw 'TENANT_POLICY_VERSION_REQUIRED' }
+        }
+        if ($reader.Read() -or $reader.NextResult()) { throw 'TENANT_POLICY_SINGLE_RESULT_REQUIRED' }
+        $reader.Dispose();$reader=$null
+        Invoke-CleanCommand $connection "IF @@TRANCOUNT<>0 THROW 59800,'SOURCE_TRANSACTION_OPEN',1;" $lines
+        return $version
+    } catch { throw 'TENANT_POLICY_READ_FAILED' } finally {
+        if ($null -ne $reader) { $reader.Dispose() };if ($null -ne $command) { $command.Dispose() }
+        $connection.Dispose();$bytes=$null;$lines.Clear()
+    }
+}
 function Set-LiveSqlControls([bool]$Enabled,[pscredential]$Owner,$Credentials) {
     $bit=if($Enabled){1}else{0}
     $failed=$false
@@ -172,8 +205,12 @@ function Set-LiveSqlControls([bool]$Enabled,[pscredential]$Owner,$Credentials) {
     try { [void](Invoke-LiveOwner $sql $Owner) } catch { $failed=$true; if($Enabled){throw 'SQL_ACTIVATION_FAILED'} }
     foreach ($pair in @(@(7,71),@(8,81))) {
         $tenant=$pair[0];$user=$pair[1]
-        $sql="EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=$tenant; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=$user; DECLARE @v varbinary(8),@c uniqueidentifier=NEWID(); SELECT @v=RowVer FROM dbo.TenantAiIntegrationPolicy WHERE ShaleClientId=$tenant; EXEC dbo.AiSetTenantPolicyV1 @Enabled=$bit,@ExpectedRowVer=@v,@CorrelationId=@c;"
-        try { [void](Invoke-CleanSource $sql $Credentials['mcpacc_runtime']) } catch { $failed=$true; if($Enabled){throw 'SQL_ACTIVATION_FAILED'} }
+        try {
+            $version=Get-LiveTenantPolicyVersion $tenant $user $Credentials['mcpacc_runtime']
+            if ($version -cnotmatch '^(NULL|0x[A-F0-9]{16})$') { throw 'TENANT_POLICY_VERSION_REQUIRED' }
+            $sql="EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=$tenant; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=$user; DECLARE @v varbinary(8)=$version,@c uniqueidentifier=NEWID(); EXEC dbo.AiSetTenantPolicyV1 @Enabled=$bit,@ExpectedRowVer=@v,@CorrelationId=@c;"
+            [void](Invoke-CleanSource $sql $Credentials['mcpacc_runtime'])
+        } catch { $failed=$true; if($Enabled){throw 'SQL_ACTIVATION_FAILED'} }
     }
     if($failed){throw 'SQL_SHUTDOWN_NOT_CONFIRMED'}
 }
@@ -189,10 +226,10 @@ function Invoke-LiveScm([string]$Command) {
     } finally { $token=$null }
 }
 function Assert-LiveWorker([string]$Hash,[string]$JavaZone,[switch]$Ready) {
-    $remote=Invoke-LiveScm 'sha256sum /home/site/wwwroot/shale-server.jar'
-    if ($remote.Trim() -cnotmatch '^([a-fA-F0-9]{64})  /home/site/wwwroot/shale-server.jar$' -or $Matches[1] -ine $Hash) { throw 'DEPLOYED_JAR_HASH_MISMATCH' }
+    $remote=Invoke-LiveScm 'sha256sum /home/site/wwwroot/app.jar'
+    if ($remote.Trim() -cnotmatch '^([a-fA-F0-9]{64})  /home/site/wwwroot/app.jar$' -or $Matches[1] -ine $Hash) { throw 'DEPLOYED_JAR_HASH_MISMATCH' }
     # Old worker logs are moved out of this directory before start; only closed markers are retained.
-    $logs=Invoke-LiveScm "find /home/LogFiles -maxdepth 1 -type f -name '*docker.log' -exec tail -c 200000 {} \;"
+    $logs=Invoke-LiveScm "find /home/LogFiles -maxdepth 1 -type f -name '*docker.log' -exec tail -c 200000 {} +"
     $zone=[regex]::Escape($JavaZone)
     if ($logs -notmatch "SHALE_JVM_STARTUP zoneId=$zone javaVersion=21[.+]" -or ($Ready -and $logs -notmatch 'AI_CASE_SQL_READINESS ready')) { throw 'WORKER_READINESS_EVIDENCE_MISSING' }
     return @([regex]::Matches($logs,'SHALE_JVM_STARTUP [^\r\n]{1,400}|AI_CASE_SQL_READINESS (?:ready|disabled|not-ready)') | ForEach-Object Value)
@@ -205,10 +242,10 @@ function Wait-LiveHealth {
     } while ([datetime]::UtcNow -lt $deadline)
     throw 'HEALTH_TIMEOUT'
 }
-function Stop-LiveAcceptance([pscredential]$Owner,$Credentials,[string]$Run) {
+function Stop-LiveAcceptance([pscredential]$Owner,$Credentials,[string]$Run,[switch]$VerifySqlOnly) {
     # Independent attempts: SQL failure cannot suppress app OFF/stop, or vice versa.
     $result=@{SqlOff=$false;AppOff=$false;ApplicationStopped=$false}
-    try { Set-LiveSqlControls $false $Owner $Credentials; Assert-LiveSqlOff $Owner; $result.SqlOff=$true } catch { }
+    try { if (-not $VerifySqlOnly) { Set-LiveSqlControls $false $Owner $Credentials }; Assert-LiveSqlOff $Owner; $result.SqlOff=$true } catch { }
     try {
         Set-LiveAppControls $false $Run; $settings=Get-LiveSettings
         if (@($script:LiveControls | Where-Object {$settings[$_] -cne 'false'}).Count -or $settings['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED'] -cne 'false') { throw 'OFF_NOT_CONFIRMED' }; $result.AppOff=$true
@@ -242,7 +279,7 @@ function Assert-LiveAzureConfiguration {
     $app=Invoke-CleanAzure @('webapp','show','--ids',$script:LiveAppId)
     if (-not $app.httpsOnly -or $app.defaultHostName -cne 'shale-mcp-acceptance.azurewebsites.net' -or $app.kind -notmatch 'linux') { throw 'HTTPS_LINUX_APP_REQUIRED' }
     $config=Invoke-CleanAzure @('webapp','config','show','--ids',$script:LiveAppId)
-    if ($config.appCommandLine -cne 'java -jar /home/site/wwwroot/shale-server.jar --spring.profiles.active=azure' -or
+    if ($config.appCommandLine -cne 'java -jar /home/site/wwwroot/app.jar --spring.profiles.active=azure' -or
         $config.linuxFxVersion -cnotmatch '^JAVA\|21(?:-java21)?$' -or $config.minTlsVersion -notin @('1.2','1.3') -or
         $config.ftpsState -cne 'Disabled' -or $config.numberOfWorkers -ne 1) { throw 'APP_STARTUP_CONFIGURATION_REQUIRED' }
     $strings=Invoke-CleanAzure @('webapp','config','connection-string','list','--name','shale-mcp-acceptance','--resource-group','Shale','--subscription',$script:CleanSubscription)
@@ -303,12 +340,13 @@ function Invoke-LiveClient([string]$Run,$HumanCredentials) {
 }
 function Start-LiveWorker([string]$Archive) {
     # Preserve existing raw logs remotely before each launch to exclude stale readiness markers.
-    [void](Invoke-LiveScm "mkdir -p /home/LogFiles/$Archive && find /home/LogFiles -maxdepth 1 -type f -name '*docker.log' -exec mv {} /home/LogFiles/$Archive/ \;")
+    [void](Invoke-LiveScm "mkdir -p /home/LogFiles/$Archive")
+    [void](Invoke-LiveScm "find /home/LogFiles -maxdepth 1 -type f -name '*docker.log' -exec mv -t /home/LogFiles/$Archive/ -- {} +")
     [void](Invoke-CleanAzure @('webapp','start','--ids',$script:LiveAppId))
     Wait-LiveHealth
 }
 function Invoke-LiveCampaign($Context) {
-    $approved=$false; $failure=$null; $phase='approval'; $cleanup=$null; $steps=[Collections.Generic.List[object]]::new()
+    $approved=$false; $sqlActivationAttempted=$false; $failure=$null; $phase='approval'; $cleanup=$null; $steps=[Collections.Generic.List[object]]::new()
     try {
         # The ONLY approval. No Force/switch/environment/parameter can supply this acknowledgement.
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
@@ -323,7 +361,7 @@ function Invoke-LiveCampaign($Context) {
         Assert-LiveSynthetic $Context.Owner
         Assert-LiveJar $Context.Jar $Context.Hash $Context.Version
         $phase='guarded-deployment'
-        [void](Invoke-CleanAzure @('webapp','deploy','--ids',$script:LiveAppId,'--src-path',$Context.Jar,'--type','jar','--target-path','/home/site/wwwroot/shale-server.jar','--restart','false','--clean','false','--track-status','false'))
+        [void](Invoke-CleanAzure @('webapp','deploy','--ids',$script:LiveAppId,'--src-path',$Context.Jar,'--type','jar','--restart','false','--clean','false','--track-status','false'))
         $app=Invoke-CleanAzure @('webapp','show','--ids',$script:LiveAppId)
         if ($app.state -cne 'Stopped') { throw 'DEPLOYMENT_STARTED_APP_UNEXPECTEDLY' }
         $phase='dormant-startup'
@@ -344,6 +382,7 @@ function Invoke-LiveCampaign($Context) {
         $steps.Add(@{Id='native-identities-catalogs-binding-rls';Status='PASS'})
         $baseline=Get-LiveAuditBaseline $Context.Owner
         $phase='synthetic-activation'
+        $sqlActivationAttempted=$true # Set before dispatch: partial activation must receive full shutdown.
         Set-LiveSqlControls $true $Context.Owner $Context.Credentials
         Set-LiveAppControls $true $Context.Run
         Assert-CleanResources
@@ -358,7 +397,7 @@ function Invoke-LiveCampaign($Context) {
         [void](Get-LiveBinding $Context.Evidence.Directory $Context.Owner); Assert-LiveSynthetic $Context.Owner
         $steps.Add(@{Id='durable-audits-unchanged-binding-and-fixture';Status='PASS'})
     } catch { $failure=$phase } finally {
-        if ($approved) { $cleanup=Stop-LiveAcceptance $Context.Owner $Context.Credentials $Context.Run }
+        if ($approved) { $cleanup=Stop-LiveAcceptance $Context.Owner $Context.Credentials $Context.Run -VerifySqlOnly:(-not $sqlActivationAttempted) }
         $pass=$approved -and -not $failure -and $cleanup.SqlOff -and $cleanup.AppOff -and $cleanup.ApplicationStopped
         $result=@{Status=$(if($pass){'PASS'}else{'FAIL'});Approved=$approved;Failure=$failure;Cleanup=$cleanup;Steps=$steps.ToArray();
           JarSHA256=$Context.Hash;BuildVersion=$Context.Version;SqlJournalHash=$Context.Evidence.JournalHash;
