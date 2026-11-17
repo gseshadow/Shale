@@ -289,3 +289,26 @@ Audit compatibility remains the existing operational configuration journal and A
 records, with unchanged transactional policy and disclosure audits. No SQL schema, grants,
 receipt, binding, audit vocabulary or production deployment is introduced. Longer-budget
 functional acceptance is not evidence of production latency or capacity suitability.
+
+
+## Preserve column authority checks while batching transport
+
+The predecessor and registry identity verifiers use the independent catalog's unchanged column
+inventory. Up to 256 bound names are checked per caller-identity VALUES query, using the same
+HAS_PERMS_BY_NAME SELECT/UPDATE predicates. SQL NULL continues to mean no demonstrated
+grant, as before. Every inventoried name must occur exactly once in the response; missing,
+duplicate or extra rows fail closed. Names never become SQL source. Empty inventories retain
+their original behavior. Identity, object permissions, source/receipt hashes and all other
+attestation checks remain fresh and unchanged.
+
+This removes per-column network round trips between the acceptance App Service (South Central
+US) and database (East US). No SQL installation, authority, feature switch, tenant isolation,
+audit schema or business mutation changes. These remain operational read-only verification
+queries, so no new domain audit event is introduced.
+
+The full corrected read-only predecessor V2/DCR_V3 probe passed on ShaleMcpAcceptance
+in 79,767 ms with 1,057 recorded operations, versus 167,483 ms and 2,588 operations
+before batching, from the same operator workstation. This is a diagnostic comparison,
+not an Azure-worker latency or capacity certificate. The private candidate class/log hashes
+are retained under work/readonly-batched-attestation-24f6bf9d081e40f7927681656228c9fd.
+Original 51/51 SQL evidence remains unchanged; no deployment or activation was performed.

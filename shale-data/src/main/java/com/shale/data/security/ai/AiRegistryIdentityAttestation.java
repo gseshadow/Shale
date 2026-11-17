@@ -82,10 +82,7 @@ public final class AiRegistryIdentityAttestation {
                 // Use the independent catalog, never the caller's permission-filtered column inventory.
                 try(var p=review.prepareStatement("SELECT c.name FROM sys.columns c WHERE c.object_id=OBJECT_ID(?)")) {
                     p.setString(1,object);p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));
-                    try(var columns=p.executeQuery()){while(columns.next())try(var check=caller.prepareStatement("SELECT HAS_PERMS_BY_NAME(?,'OBJECT','SELECT',?,'COLUMN'),HAS_PERMS_BY_NAME(?,'OBJECT','UPDATE',?,'COLUMN')")) {
-                        check.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));check.setString(1,object);check.setString(2,columns.getString(1));check.setString(3,object);check.setString(4,columns.getString(1));
-                        try(var r=check.executeQuery()){if(!r.next()||r.getInt(1)==1||r.getInt(2)==1)throw refused();}
-                    }}
+                    try(var columns=p.executeQuery()) { AiColumnPermissionAttestation.verify(caller,object,columns); }
                 }
             }
         }
