@@ -48,6 +48,66 @@ class AiCaseDataAttestationTest {
             assertNull(failure.getCause(),"Driver exceptions can carry SQL/credentials and must remain unchained");
         }
     }
+    @Test void platformFailuresIdentifyTheExactConnectionOrPropertyReadAndCloseAcquiredLeases() {
+        for(String expected:List.of("CALLER_CONNECT","VERIFIER_CONNECT","CALLER_PLATFORM","VERIFIER_PLATFORM")) {
+            var events=new ArrayList<String>();
+            DataSource caller=platformSource("CALLER",expected,events);
+            DataSource verifier=platformSource("VERIFIER",expected,events);
+            var failure=assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(
+                    caller,verifier,List.of(),"private-db","private-issuer","private-resource").verify());
+            assertTrue(failure.getMessage().contains("PLATFORM (SQL 0) [step="+expected+" kind=CONNECTION origin=UNCLASSIFIED"),
+                    failure.getMessage());
+            List<String> acquired=events.stream().filter(e->e.endsWith("_OPEN")).map(e->e.replace("_OPEN","_CLOSE")).toList();
+            var closed=events.stream().filter(e->e.endsWith("_CLOSE")).toList();
+            var reversed=new ArrayList<>(acquired);Collections.reverse(reversed);
+            assertEquals(reversed,closed,"Every acquired lease must close in reverse order, including verifier-open failure");
+            assertNull(failure.getCause());
+        }
+    }
+    @Test void connectionOriginDiagnosticsUseOnlyClosedCategoriesAcrossNestedAndNextExceptions() {
+        List<Throwable> causes=List.of(new java.net.UnknownHostException("PRIVATE_HOST"),
+                new javax.net.ssl.SSLHandshakeException("PRIVATE_CERTIFICATE"),
+                new java.net.SocketTimeoutException("PRIVATE_ENDPOINT"),
+                new java.net.ConnectException("PRIVATE_ENDPOINT"),new java.net.SocketException("PRIVATE_ENDPOINT"));
+        List<String> origins=List.of("DNS","TLS","NETWORK_TIMEOUT","NETWORK_CONNECT","NETWORK_SOCKET");
+        for(int i=0;i<causes.size();i++)for(boolean next:List.of(false,true)) {
+            var driver=new SQLException("PRIVATE_DRIVER_PASSWORD","PRIVATE_STATE",0,causes.get(i));
+            var pooled=new SQLTransientConnectionException("PRIVATE_POOL_AND_URL");
+            if(next)pooled.setNextException(driver);else pooled.initCause(driver);
+            DataSource broken=(DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},(p,m,a)->{throw pooled;});
+            var failure=assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(
+                    broken,broken,List.of(),"PRIVATE_DATABASE","PRIVATE_ISSUER","PRIVATE_RESOURCE").verify());
+            assertTrue(failure.getMessage().contains("step=CALLER_CONNECT kind=CONNECTION origin="+origins.get(i)),failure.getMessage());
+            assertFalse(failure.getMessage().contains("PRIVATE_"),"Neither exception messages, states nor targets may escape");
+            assertNull(failure.getCause());
+        }
+    }
+    @Test void cyclicAndLongCauseGraphsRemainBoundedAndDoNotRetainPrivateCauses() {
+        for(boolean cycle:List.of(false,true)) {
+            var root=new SQLException("PRIVATE_ROOT");var tail=root;
+            for(int i=0;i<(cycle?1:32);i++){var next=new SQLException("PRIVATE_NESTED");tail.initCause(next);tail=next;}
+            tail.initCause(cycle?root:new java.net.UnknownHostException("PRIVATE_HOST"));
+            DataSource broken=(DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},(p,m,a)->{throw root;});
+            var failure=assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),()->assertThrows(IllegalStateException.class,
+                    ()->new AiCaseDataAttestation(broken,broken,List.of(),"db","issuer","resource").verify()));
+            assertTrue(failure.getMessage().contains("origin=UNCLASSIFIED"),failure.getMessage());
+            assertFalse(failure.getMessage().contains("PRIVATE_"));assertNull(failure.getCause());
+        }
+    }
+    private static DataSource platformSource(String role,String failedStep,List<String> events) {
+        return (DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},(p,m,a)->{
+            if(!m.getName().equals("getConnection"))throw new UnsupportedOperationException();
+            if(failedStep.equals(role+"_CONNECT"))throw new SQLTransientConnectionException("PRIVATE_DRIVER_PASSWORD");
+            events.add(role+"_OPEN");
+            Connection delegate=connection(q->{events.add(role+"_PLATFORM");return rows(5);});
+            return Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class[]{Connection.class},(cp,cm,ca)->{
+                if(cm.getName().equals("close")){events.add(role+"_CLOSE");return null;}
+                if(cm.getName().equals("createStatement")&&failedStep.equals(role+"_PLATFORM"))
+                    throw new SQLTransientConnectionException("PRIVATE_DRIVER_PASSWORD");
+                try{return cm.invoke(delegate,ca);}catch(java.lang.reflect.InvocationTargetException e){throw e.getCause();}
+            });
+        });
+    }
     @Test void laterStageFailuresDoNotClaimTheLastIdentitySubstep() {
         var observed=new ArrayList<String>();
         var failure=assertThrows(IllegalStateException.class,()->new AiCaseDataAttestation(
