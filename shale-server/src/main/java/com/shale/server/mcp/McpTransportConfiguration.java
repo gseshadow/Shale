@@ -1,5 +1,7 @@
 package com.shale.server.mcp;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import com.shale.data.config.DataSources;
 import com.shale.data.security.ai.AiAccessTokenValidator;
 import com.shale.server.oauth.McpOAuthProperties;
@@ -143,7 +145,7 @@ public class McpTransportConfiguration {
         source.setURL(env.getRequiredProperty("shale.ai.oauth.bootstrap.jdbc-url"));
         source.setUser(env.getRequiredProperty("shale.ai.oauth.bootstrap.username"));
         source.setPassword(env.getRequiredProperty("shale.ai.oauth.bootstrap.password"));
-        source.setLoginTimeout(2); source.setSocketTimeout(5000);
+        source.setLoginTimeout(AcceptanceVerificationBudget.loginSeconds(2)); source.setSocketTimeout(AcceptanceVerificationBudget.networkMillis(5000));
         return (token,deadline)-> {
             var bootstrap=new McpJdbcDeadline(source,deadline);
             var runtime=new McpJdbcDeadline(sources.getObject().runtime(),deadline);

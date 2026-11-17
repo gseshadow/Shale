@@ -252,7 +252,7 @@ foreach($failure in @('decline','preflight','deploy','start','worker','binding',
 
     def test_runtime_settings_refuse_wrong_database_identity_and_override(self):
         self.ps(r'''
-$s=@{'SPRING_PROFILES_ACTIVE'='azure';'shale.ai.oauth.identity'='PRODUCTION';'shale.ai.oauth.public-origin'=$script:LiveOrigin;'shale.ai.oauth.browser-origin'=$script:LiveOrigin;'shale.ai.mcp.allowed-origins'=$script:LiveOrigin;'shale.ai.data.database'='ShaleMcpAcceptance';'shale.ai.data.contract-version'='V2';'shale.ai.cimd.contract-version'='DCR_V3';'SHALE_AUTH_TOKEN_SECRET'=('x'*40);'SHALE_AUTH_SESSION_BINDING_CUTOVER_AT'='2026-10-01T00:00:00Z'}
+$s=@{'WEBSITES_CONTAINER_START_TIME_LIMIT'='1800';'SPRING_PROFILES_ACTIVE'='azure';'shale.ai.oauth.identity'='PRODUCTION';'shale.ai.oauth.public-origin'=$script:LiveOrigin;'shale.ai.oauth.browser-origin'=$script:LiveOrigin;'shale.ai.mcp.allowed-origins'=$script:LiveOrigin;'shale.ai.data.database'='ShaleMcpAcceptance';'shale.ai.data.contract-version'='V2';'shale.ai.cimd.contract-version'='DCR_V3';'shale.ai.acceptance.slow-verification'='true';'SHALE_AUTH_TOKEN_SECRET'=('x'*40);'SHALE_AUTH_SESSION_BINDING_CUTOVER_AT'='2026-10-01T00:00:00Z'}
 foreach($k in $script:LiveControls){$s[$k]='false'};$s['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED']='false'
 $prefixes=@{'SHALE_APP'='auth';'SHALE_RT'='runtime';'shale.ai.data'='predecessor';'shale.ai.data.verifier'='verifier';'shale.ai.oauth.bootstrap'='bootstrap'}
 foreach($key in @('case','reviewer','publisher','approval','onboarding','browser','issuer','metadata','resolver','neutral','dcr-endpoint','dcr-metadata')){$prefixes['shale.ai.cimd.runtime.'+$key]=$key.Replace('-','_')}

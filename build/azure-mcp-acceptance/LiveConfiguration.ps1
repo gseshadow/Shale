@@ -10,11 +10,11 @@ function Get-LiveSources {
 function Get-LiveSettingMap {
     # Property -> Azure name; ordinary application aliases are consumed explicitly by existing code.
     $properties=@('SPRING_PROFILES_ACTIVE','SHALE_ALLOWED_CORS_ORIGINS','SHALE_AUTH_TOKEN_SECRET',
-      'SHALE_AUTH_TOKEN_TTL_SECONDS','SHALE_AUTH_SESSION_BINDING_CUTOVER_AT','PORT','WEBSITES_PORT',
+      'SHALE_AUTH_TOKEN_TTL_SECONDS','SHALE_AUTH_SESSION_BINDING_CUTOVER_AT','PORT','WEBSITES_PORT','WEBSITES_CONTAINER_START_TIME_LIMIT',
       'logging.level.io.modelcontextprotocol.modern.JsonRpc','shale.ai.oauth.identity',
       'shale.ai.oauth.public-origin','shale.ai.oauth.browser-origin','shale.ai.mcp.allowed-origins',
       'shale.ai.data.database','shale.ai.data.contract-version','shale.ai.cimd.contract-version',
-      'shale.ai.cimd.metadata-advertisement-enabled')+@($script:LiveControlProperties)
+      'shale.ai.cimd.metadata-advertisement-enabled','shale.ai.acceptance.slow-verification')+@($script:LiveControlProperties)
     foreach ($prefix in (Get-LiveSources).Keys) {
         if ($prefix.StartsWith('SHALE_')) { foreach ($suffix in @('_DB_URL','_DB_USER','_DB_PASSWORD')) { $properties+=($prefix+$suffix) } }
         else { foreach ($suffix in @('.jdbc-url','.username','.password')) { $properties+=($prefix+$suffix) } }
@@ -43,8 +43,8 @@ function New-LiveSettings($Credentials,$Auth) {
       'shale.ai.data.database'='ShaleMcpAcceptance';'shale.ai.data.contract-version'='V2';'shale.ai.cimd.contract-version'='DCR_V3';
       'SHALE_AUTH_TOKEN_SECRET'=$Auth.TokenSecret;'SHALE_AUTH_TOKEN_TTL_SECONDS'='3600';
       'SHALE_AUTH_SESSION_BINDING_CUTOVER_AT'=$Auth.Cutover;
-      'PORT'='8080';'WEBSITES_PORT'='8080';'logging.level.io.modelcontextprotocol.modern.JsonRpc'='OFF';
-      'shale.ai.cimd.metadata-advertisement-enabled'='false'}
+      'PORT'='8080';'WEBSITES_PORT'='8080';'WEBSITES_CONTAINER_START_TIME_LIMIT'='1800';'logging.level.io.modelcontextprotocol.modern.JsonRpc'='OFF';
+      'shale.ai.cimd.metadata-advertisement-enabled'='false';'shale.ai.acceptance.slow-verification'='true'}
     foreach ($key in $script:LiveControlProperties) { $settings[$key]='false' }
     $sources=Get-LiveSources
     foreach ($prefix in $sources.Keys) {

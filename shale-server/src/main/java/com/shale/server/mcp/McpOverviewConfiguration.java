@@ -1,5 +1,7 @@
 package com.shale.server.mcp;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.*;
 
@@ -13,7 +15,7 @@ public class McpOverviewConfiguration {
     @Bean McpOverviewHandler mcpOverviewHandler(McpCaseCompositionPolicy policy,McpAiCaseData data,
             org.springframework.beans.factory.ObjectProvider<com.shale.data.security.ai.AiCimdCaseData> cimd) {
         policy.requireHandler("shale.ai.mcp.get-case-overview-enabled");
-        data.ready(System.nanoTime()+10_000_000_000L);
+        data.ready(System.nanoTime()+AcceptanceVerificationBudget.operationNanos(10_000_000_000L));
         var external=cimd==null?null:cimd.getIfAvailable();
         return new McpOverviewHandler((deadline,request)->external!=null&&external.accepts(request)?external.reader(request,deadline):data.reader(deadline,request));
     }

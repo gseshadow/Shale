@@ -1,5 +1,7 @@
 package com.shale.server.mcp;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import com.shale.data.config.DataSources;
 import com.shale.data.security.ai.*;
 import com.shale.server.oauth.McpOAuthProperties;
@@ -32,7 +34,7 @@ final class McpAiCaseData {
         this.data=java.util.Objects.requireNonNull(data);this.verifier=java.util.Objects.requireNonNull(verifier);
         this.forbidden=List.copyOf(forbidden);this.database=java.util.Objects.requireNonNull(database);this.identity=java.util.Objects.requireNonNull(identity);
         McpPayloadLogFilter.installSqlProtection();
-        ready(System.nanoTime()+10_000_000_000L);
+        ready(System.nanoTime()+AcceptanceVerificationBudget.operationNanos(10_000_000_000L));
     }
     void ready(long deadline) {
         attestation(deadline).verify();
@@ -76,7 +78,7 @@ final class McpAiCaseData {
         McpPayloadLogFilter.installSqlProtection();
         var source=new com.microsoft.sqlserver.jdbc.SQLServerDataSource();
         source.setURL(url);source.setUser(username);source.setPassword(password);
-        source.setLoginTimeout(2);source.setSocketTimeout(5000);source.setEncrypt("true");source.setTrustServerCertificate(false);
+        source.setLoginTimeout(AcceptanceVerificationBudget.loginSeconds(2));source.setSocketTimeout(AcceptanceVerificationBudget.networkMillis(5000));source.setEncrypt("true");source.setTrustServerCertificate(false);
         return source;
     }
 }

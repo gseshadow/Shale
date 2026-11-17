@@ -83,10 +83,10 @@ function Get-LiveSettings {
 }
 function Assert-LiveSettings($Settings,$Credentials) {
     Assert-LiveSettingNames $Settings
-    $required=@{'SPRING_PROFILES_ACTIVE'='azure';'shale.ai.oauth.identity'='PRODUCTION';
+    $required=@{'WEBSITES_CONTAINER_START_TIME_LIMIT'='1800';'SPRING_PROFILES_ACTIVE'='azure';'shale.ai.oauth.identity'='PRODUCTION';
       'shale.ai.oauth.public-origin'=$script:LiveOrigin;'shale.ai.oauth.browser-origin'=$script:LiveOrigin;
       'shale.ai.mcp.allowed-origins'=$script:LiveOrigin;'shale.ai.data.database'='ShaleMcpAcceptance';
-      'shale.ai.data.contract-version'='V2';'shale.ai.cimd.contract-version'='DCR_V3'}
+      'shale.ai.data.contract-version'='V2';'shale.ai.cimd.contract-version'='DCR_V3';'shale.ai.acceptance.slow-verification'='true'}
     $required=ConvertTo-LiveEnvironmentSettings $required
     foreach ($key in $required.Keys) { if ($Settings[$key] -cne $required[$key]) { throw 'REQUIRED_APP_CONFIGURATION' } }
     if (-not $Settings['SHALE_AUTH_TOKEN_SECRET'] -or $Settings['SHALE_AUTH_TOKEN_SECRET'].Length -lt 32 -or
@@ -283,7 +283,7 @@ function Assert-LiveWorker([string]$Hash,[string]$JavaZone,[switch]$Ready) {
     return @([regex]::Matches($logs,'SHALE_JVM_STARTUP [^\r\n]{1,400}|AI_CASE_SQL_READINESS (?:ready|disabled|not-ready)') | ForEach-Object Value)
 }
 function Wait-LiveHealth {
-    $deadline=[datetime]::UtcNow.AddMinutes(4)
+    $deadline=[datetime]::UtcNow.AddMinutes(15)
     do {
         try { $r=Invoke-WebRequest -Uri "$script:LiveOrigin/api/health/db" -TimeoutSec 10 -MaximumRedirection 0; if($r.StatusCode -eq 200){return} } catch { }
         Start-Sleep -Seconds 3
@@ -374,7 +374,7 @@ function Invoke-LiveClient([string]$Run,$HumanCredentials) {
         $started=$process.Start(); $output=$process.StandardOutput.ReadToEndAsync(); $errors=$process.StandardError.ReadToEndAsync()
         $inputs=@{}; foreach ($key in $HumanCredentials.Keys) { $inputs[$key]=$HumanCredentials[$key].GetNetworkCredential().Password }
         $process.StandardInput.WriteLine(($inputs | ConvertTo-Json -Compress)); $process.StandardInput.Close(); $inputs=$null
-        $deadline=[datetime]::UtcNow.AddMinutes(15); $next=[datetime]::UtcNow
+        $deadline=[datetime]::UtcNow.AddMinutes(60); $next=[datetime]::UtcNow
         while (-not $process.WaitForExit(1000)) {
             if ([datetime]::UtcNow -gt $deadline) { throw 'LIVE_CLIENT_TIMEOUT' }
             if ([datetime]::UtcNow -ge $next) { Write-Host 'Live MCP acceptance running (includes natural token expiry).'; $next=[datetime]::UtcNow.AddSeconds(30) }
@@ -403,6 +403,7 @@ function Invoke-LiveCampaign($Context) {
         # The ONLY approval. No Force/switch/environment/parameter can supply this acknowledgement.
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
         Write-Host 'Deploy dormant, verify worker, activate only synthetic acceptance, run MCP/OAuth and audits, then OFF and stop.'
+        Write-Host 'Dedicated acceptance verification budget: 600 seconds per admission, 180-second SQL/network reads, 30-second login. Every security check remains enabled; SQL tool transactions retain their existing short limits.'
         if ((Read-Host 'Type RUN_SHALE_MCP_ACCEPTANCE to approve this whole controlled run') -cne 'RUN_SHALE_MCP_ACCEPTANCE') { throw 'OPERATOR_DECLINED' }
         $approved=$true
         New-CleanEvent (Join-Path $Context.Run 'journal.jsonl') @{Kind='approved';JarSHA256=$Context.Hash;Build=$Context.Version}

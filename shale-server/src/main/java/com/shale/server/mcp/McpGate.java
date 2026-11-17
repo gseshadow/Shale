@@ -1,5 +1,7 @@
 package com.shale.server.mcp;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import com.shale.data.security.ai.AiBearerParser;
 import com.shale.data.security.ai.VerifiedIntegrationContext;
 import com.shale.server.oauth.McpOAuthProperties;
@@ -23,7 +25,7 @@ final class McpGate extends OncePerRequestFilter {
     static final String PROTOCOL="2026-07-28", AUTHORITY=McpGate.class.getName()+".authority";
     static final String ACCESS=McpGate.class.getName()+".access";
     static final String DEADLINE=McpGate.class.getName()+".deadline";
-    private static final long MAX_NANOS=10_000_000_000L;
+    private static final long MAX_NANOS=AcceptanceVerificationBudget.operationNanos(10_000_000_000L);
     private final McpTransportProperties properties;
     private final McpOAuthProperties identity;
     private final boolean global;

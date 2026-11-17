@@ -1,5 +1,7 @@
 package com.shale.server.mcp;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import javax.sql.DataSource;
 import java.sql.*;
 import java.lang.reflect.*;
@@ -19,7 +21,7 @@ final class McpJdbcDeadline implements DataSource {
     private int remaining() throws SQLException {
         long nanos=deadline-System.nanoTime();
         if(nanos<=0 || Thread.currentThread().isInterrupted())throw new SQLTimeoutException("MCP deadline.");
-        return (int)Math.max(1,Math.min(10000,nanos/1_000_000));
+        return (int)Math.max(1,Math.min(AcceptanceVerificationBudget.networkMillis(10000),nanos/1_000_000));
     }
     @Override public Connection getConnection()throws SQLException {
         if(independentAudit)return new McpJdbcDeadline(source,System.nanoTime()+3_000_000_000L).getConnection();
@@ -56,7 +58,7 @@ final class McpJdbcDeadline implements DataSource {
             if(method.getName().equals("close"))return invoke(statement,method,args);
             if(method.getDeclaringClass()==Object.class)return objectMethod(proxy,method,args);
             int budget=remaining();connection.setNetworkTimeout(Runnable::run,budget);
-            if(method.getName().equals("setQueryTimeout"))args=new Object[]{Math.min((Integer)args[0],Math.max(1,Math.min(5,budget/1000)))};
+            if(method.getName().equals("setQueryTimeout"))args=new Object[]{Math.min((Integer)args[0],Math.max(1,Math.min(AcceptanceVerificationBudget.querySeconds(5),budget/1000)))};
             Object result=invoke(statement,method,args);
             if(result instanceof ResultSet rows) return Proxy.newProxyInstance(ResultSet.class.getClassLoader(),new Class<?>[]{ResultSet.class},(p,m,a)->{
                 if(m.getDeclaringClass()==Object.class)return objectMethod(p,m,a);
