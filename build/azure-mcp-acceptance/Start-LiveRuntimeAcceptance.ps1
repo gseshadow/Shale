@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'LiveRuntime.ps1')
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$lock=$null; $oldLock=$null; $run=$null; $operation='tools'; $campaign=$false
+$lock=$null; $oldLock=$null; $run=$null; $operation='tools'; $campaign=$false; $result=$null
 try {
     $id=[guid]::NewGuid().ToString('N'); $run=Join-Path $repo ('work/live-mcp-'+$id); New-LiveDirectory $run
     foreach ($tool in @('az','python')) { if(-not (Get-Command $tool -CommandType Application -ErrorAction SilentlyContinue)){throw 'TOOLS_REQUIRED'} }
@@ -53,14 +53,14 @@ try {
       Owner=$owner;Credentials=$credentials;Humans=$humans;Zones=$zones;Specs=$specs}
     $operation='controlled-campaign'; $campaign=$true
     $result=Invoke-LiveCampaign $context
-    foreach ($item in $inventory) { if ((Get-FileHash -LiteralPath $item.Path).Hash -cne $item.SHA256) { $result.Status='FAIL'; $result.Failure='PRIOR_EVIDENCE_CHANGED' } }
+    foreach ($item in $inventory) { if ((Get-FileHash -LiteralPath $item.Path).Hash -cne $item.SHA256) { $result.Status='FAIL'; $result.Failure='PRIOR_EVIDENCE_CHANGED'; $result.FailureCode='PRIOR_EVIDENCE_CHANGED' } }
     [IO.File]::WriteAllText((Join-Path $run 'report.json'),($result | ConvertTo-Json -Depth 12))
     $files=@(Get-ChildItem -LiteralPath $run -File | Where-Object Name -CNE 'sha256.json' | ForEach-Object {@{File=$_.Name;SHA256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
     [IO.File]::WriteAllText((Join-Path $run 'sha256.json'),($files | ConvertTo-Json -Depth 4))
     Write-Host "$($result.Status): $run/report.json"
     if ($result.Status -cne 'PASS') { throw 'ACCEPTANCE_FAILED' }
 } catch {
-    $failureCode=Get-LiveSafeConfigurationFailure $_ 'PREFLIGHT_FAILED'
+    $failureCode=if ($campaign) { if ($null -ne $result) { ConvertTo-LiveSafeCampaignCode $result.FailureCode } else { 'CAMPAIGN_FAILED' } } else { Get-LiveSafeConfigurationFailure $_ 'PREFLIGHT_FAILED' }
     if ($run -and -not $campaign) {
         [IO.File]::WriteAllText((Join-Path $run 'report.json'),(@{Status='FAIL';Approved=$false;Failure=$failureCode;Operation=$operation} | ConvertTo-Json))
     }

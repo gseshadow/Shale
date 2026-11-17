@@ -118,7 +118,7 @@ After configuration, all required settings/startup fields are read back and SQL 
 The command needs existing Kudu **Microsoft Entra bearer** access to the acceptance SCM endpoint and
 permission to deploy/start/stop/update acceptance app controls. Publishing-password fallback is absent.
 Kudu `/api/command` must support the fixed hash/log commands on this Linux app. Existing container
-stdout files under `/home/LogFiles/*docker.log` must contain the application's startup markers.
+logs under `/home/LogFiles/*docker.log` and `/home/LogFiles/Application/*.log` are inventoried; the application scope normally contains JVM/readiness markers.
 Missing SCM support, logs, native permissions or prerequisites is a FAIL; no broadening of privileges,
 TLS relaxation, fake worker/provider or alternate target is attempted.
 
@@ -186,9 +186,12 @@ remain unchanged. Preserve failed run evidence and use a new operator-approved r
 
 Java OneDeploy deploys this JAR as `/home/site/wwwroot/app.jar`. Startup and remote fingerprint
 verification use that exact path; the local reviewed evidence copy remains `shale-server.jar`.
-Log-directory creation and log archiving are separate SCM commands. Archive/read `find -exec`
-commands use the `+` terminator, avoiding shell-dependent semicolon escaping. Existing raw logs
-are retained remotely, and only closed startup markers enter the report.
+SCM commands execute arguments without shell operators, glob expansion or single-quote processing.
+The runner inventories fixed root container-log and `Application/*.log` scopes through the Kudu VFS
+API, validates every filename, and issues explicit `mkdir`, per-file `mv`, and bounded `tail` commands.
+Both scopes are archived before startup; a second inventory must confirm no stale candidate files
+remain before the app can start. Application JVM/readiness markers are read alongside platform logs.
+Existing raw logs are retained remotely, and only closed startup markers enter the report.
 
 ## Cleanup and evidence
 
@@ -211,7 +214,8 @@ or erase the previous run. Inspect a failure before running again.
 New private `work/live-mcp-<guid>/` (owner-only ACL/0700) contains:
 
 - `report.json`: overall PASS/FAIL, approval, failed phase, exact JAR/build, original SQL journal hash,
-  per-step status, allowlisted startup markers, independently confirmed cleanup booleans.
+  per-step status, allowlisted startup markers, independently confirmed cleanup booleans, and a closed
+  `FailureCode` distinguishing health, artifact, worker evidence, log inventory/archive and SQL failures.
 - `http-report.json`: individual PASS checks, failed check, protocol/client versions, disclosure and
   Overview counts and credential cleanup. Written incrementally; abrupt child failure preserves the prefix.
 - `journal.jsonl`: new hash-chained approval/completion events; no mutation of the successful SQL journal. Configuration events include setting names and
@@ -220,7 +224,7 @@ New private `work/live-mcp-<guid>/` (owner-only ACL/0700) contains:
 - Exact JAR, control booleans, and `sha256.json` for final run files. No raw SQL results, driver exceptions,
   HTTP bodies, patient values, secret settings, plaintext passwords or OAuth tokens are exported.
 
-Before each startup, existing raw container logs are moved, without deletion, into remote
+Before each startup, existing raw container and application logs are moved, without deletion, into remote
 `/home/LogFiles/acceptance-<run-id>-before-dormant/` or `...-dormant/`. This preserves evidence and excludes
 stale startup markers. The enabled run's raw logs remain at the original remote log path; the report
 retains only closed startup markers. Preserve both local run and remote log archives under the existing
