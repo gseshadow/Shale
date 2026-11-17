@@ -1,5 +1,7 @@
 package com.shale.data.security.ai;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
@@ -52,7 +54,7 @@ public final class AiRegistryIdentityAttestation {
         }
         if(!names.equals(Set.of(identity.user,"public",role))||identity.id<=4)throw refused();
         try(var check=review.prepareStatement("SELECT sid,type,authentication_type FROM sys.database_principals WHERE principal_id=? AND name=?")) {
-            check.setQueryTimeout(3);check.setInt(1,identity.id);check.setString(2,identity.user);
+            check.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));check.setInt(1,identity.id);check.setString(2,identity.user);
             try(var r=check.executeQuery()){if(!r.next()||!Arrays.equals(identity.sid,r.getBytes(1))||!"S".equals(r.getString(2))
                     ||r.getInt(3)!=(platform==AiCaseDataAttestation.Platform.AZURE_SQL_DATABASE?2:1)||r.next())throw refused();}
         }
@@ -65,7 +67,7 @@ public final class AiRegistryIdentityAttestation {
             permissions(caller,null,"SERVER",Set.of("CONNECT SQL","VIEW ANY DATABASE"));
             try(var s=statement(review);var dbs=s.executeQuery("SELECT name FROM sys.databases WHERE database_id>4 AND name<>DB_NAME()")) {
                 while(dbs.next())try(var p=caller.prepareStatement("SELECT HAS_DBACCESS(?)")) {
-                    p.setString(1,dbs.getString(1));p.setQueryTimeout(3);
+                    p.setString(1,dbs.getString(1));p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));
                     try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0||r.wasNull())throw refused();}
                 }
             }
@@ -79,9 +81,9 @@ public final class AiRegistryIdentityAttestation {
                 if(permissions(caller,object,"OBJECT",allow).contains("EXECUTE"))executable.add(name);
                 // Use the independent catalog, never the caller's permission-filtered column inventory.
                 try(var p=review.prepareStatement("SELECT c.name FROM sys.columns c WHERE c.object_id=OBJECT_ID(?)")) {
-                    p.setString(1,object);p.setQueryTimeout(3);
+                    p.setString(1,object);p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));
                     try(var columns=p.executeQuery()){while(columns.next())try(var check=caller.prepareStatement("SELECT HAS_PERMS_BY_NAME(?,'OBJECT','SELECT',?,'COLUMN'),HAS_PERMS_BY_NAME(?,'OBJECT','UPDATE',?,'COLUMN')")) {
-                        check.setQueryTimeout(3);check.setString(1,object);check.setString(2,columns.getString(1));check.setString(3,object);check.setString(4,columns.getString(1));
+                        check.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));check.setString(1,object);check.setString(2,columns.getString(1));check.setString(3,object);check.setString(4,columns.getString(1));
                         try(var r=check.executeQuery()){if(!r.next()||r.getInt(1)==1||r.getInt(2)==1)throw refused();}
                     }}
                 }
@@ -99,7 +101,7 @@ public final class AiRegistryIdentityAttestation {
     private static Set<String> permissions(Connection c,String object,String scope,Set<String> allow)throws SQLException {
         var found=new HashSet<String>();
         try(var p=c.prepareStatement("SELECT permission_name FROM sys.fn_my_permissions(?,?)")) {
-            p.setString(1,object);p.setString(2,scope);p.setQueryTimeout(3);
+            p.setString(1,object);p.setString(2,scope);p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));
             try(var r=p.executeQuery()){while(r.next()){String value=r.getString(1);if(!allow.contains(value))throw refused();found.add(value);}}
         }catch(SQLException denied){if(denied.getErrorCode()!=15151||!allow.isEmpty())throw denied;}
         return found;
@@ -108,7 +110,7 @@ public final class AiRegistryIdentityAttestation {
         try(var s=statement(c)){boolean more=s.execute(sql);while(true){if(more)try(var r=s.getResultSet()){while(r.next()){} }else if(s.getUpdateCount()==-1)break;more=s.getMoreResults(Statement.CLOSE_CURRENT_RESULT);}}
     }
     private static int count(Connection c,String sql)throws SQLException {try(var s=statement(c);var r=s.executeQuery(sql)){if(!r.next())throw refused();return r.getInt(1);}}
-    private static Statement statement(Connection c)throws SQLException {var s=c.createStatement();s.setQueryTimeout(3);return s;}
+    private static Statement statement(Connection c)throws SQLException {var s=c.createStatement();s.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));return s;}
     private static String quote(String s){return "["+s.replace("]","]]")+"]";}
     private static IllegalStateException refused(){return new IllegalStateException("Registry SQL identity attestation failed closed.");}
 }

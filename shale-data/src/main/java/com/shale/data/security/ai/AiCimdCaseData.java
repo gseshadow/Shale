@@ -1,5 +1,7 @@
 package com.shale.data.security.ai;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
@@ -38,7 +40,7 @@ public final class AiCimdCaseData implements AutoCloseable {
             if(stream==null)throw unavailable();
             verification=new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         } catch(Exception failure) { throw unavailable(); }
-        ready(System.nanoTime()+10_000_000_000L);
+        ready(System.nanoTime()+AcceptanceVerificationBudget.operationNanos(10_000_000_000L));
     }
 
     /** Unchanged predecessor verification followed by the complete additive checks. */
@@ -152,8 +154,8 @@ public final class AiCimdCaseData implements AutoCloseable {
         }
     }
     private static void checkDeadline(long deadline) { if(deadline-System.nanoTime()<=0||Thread.currentThread().isInterrupted())throw unavailable(); }
-    private static int millis(long deadline) { checkDeadline(deadline);return (int)Math.max(1,Math.min(10_000,(deadline-System.nanoTime())/1_000_000)); }
-    private static int seconds(long deadline) { return Math.max(1,Math.min(5,millis(deadline)/1000)); }
+    private static int millis(long deadline) { checkDeadline(deadline);return (int)Math.max(1,Math.min(AcceptanceVerificationBudget.networkMillis(10_000),(deadline-System.nanoTime())/1_000_000)); }
+    private static int seconds(long deadline) { return Math.max(1,Math.min(AcceptanceVerificationBudget.querySeconds(5),millis(deadline)/1000)); }
     @Override public synchronized void close() { closed=true; } // Sources belong to the composition root.
     private static IllegalStateException unavailable() { return new IllegalStateException("CIMD Case composition unavailable; verification required."); }
 }

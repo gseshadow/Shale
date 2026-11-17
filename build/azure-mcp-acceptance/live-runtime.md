@@ -63,7 +63,7 @@ The state written and checked is:
 - Azure setting names use Spring Boot's environment mapping: replace dots with underscores,
   remove hyphens, uppercase. For example, `shale.ai.mcp.search-cases-enabled` becomes
   `SHALE_AI_MCP_SEARCHCASESENABLED`, and `shale.ai.cimd.runtime.case.jdbc-url` becomes
-  `SHALE_AI_CIMD_RUNTIME_CASE_JDBCURL`. All 77 generated settings (including the 51 JDBC
+  `SHALE_AI_CIMD_RUNTIME_CASE_JDBCURL`. All 79 generated settings (including the 51 JDBC
   settings for 17 identities, ten controls, advertisement and logging) use this mapping;
   the established uppercase ordinary-auth/runtime aliases retain their names. Generation rejects
   collisions. Readback, conflict checks, activation, OFF verification and cleanup use the same
@@ -304,3 +304,47 @@ Diff whitespace and relative-link checks PASS. Tests use mock Azure/REST/SQL sea
 AES-GCM encryption on synthetic material. Windows DPAPI and live Azure behavior remain operator-only;
 the runner verifies encrypted-store readback before any settings upload. No Azure configuration,
 deployment, activation or database mutation was executed by Codex.
+
+
+## Dedicated acceptance verification budget
+
+The read-only acceptance probe exposed a complete predecessor attestation taking 167.5 seconds
+from the operator workstation and a false rejection of two metadata permissions implied by
+VIEW DEFINITION (corrected separately). The runner now explicitly configures
+SHALE_AI_ACCEPTANCE_SLOWVERIFICATION=true on this dedicated app. Java enables this only if
+WEBSITE_SITE_NAME, Azure profile, production identity grammar, public origin, database name
+and all 17 datasource URLs match this exact acceptance destination. Any requested override
+outside that fence fails closed. Missing/false keeps every ordinary runtime default.
+
+This permits 600 seconds per startup/admission verification, 180-second metadata/network reads
+and 30-second login. It skips or caches no security, identity, ownership, catalog, source hash,
+binding or RLS check. Feature controls, SQL invocation/transaction deadlines, quotas, token
+expiry, TLS and independent failure accounting retain their existing limits. The flag remains
+a recorded configuration setting while feature controls are OFF; it cannot activate MCP.
+
+The fixed-target operator HTTP client waits up to 660 seconds per request, worker readiness
+up to 15 minutes and the child campaign up to 60 minutes. The approval prompt names these
+longer budgets before the operator approves deployment/activation. Existing independent
+OFF/stop cleanup is unchanged. A successful longer-budget campaign certifies functional
+acceptance only; it does not establish acceptable production latency or capacity.
+
+The pinned Python SDK 2.3.0 also owns a separate hardcoded ten-second auto-discovery timer.
+The operator child explicitly raises that timer to 660 seconds in its own process and records
+sdk_discovery_timeout_seconds in client-version evidence, alongside the public Client/HTTP
+read timeouts. Auto negotiation, protocol checks and authoritative result assertions still run.
+This deliberate diagnostic timer override does not certify unmodified stock-client timing;
+the independent stock-client/capacity gates remain open.
+
+The dedicated app also receives WEBSITES_CONTAINER_START_TIME_LIMIT=1800, with exact
+readback, so Azure's independent startup watchdog does not kill the slow verification.
+The runner itself still stops waiting after 15 minutes and executes its normal cleanup.
+This allowance applies to code-based Linux apps as well as containers; see Microsoft's
+[App Service setting reference](https://learn.microsoft.com/en-us/azure/app-service/reference-app-settings).
+Only this app setting changes; no shared plan or database capacity change is made.
+
+Long verification must not age one short-lived bearer across the complete SDK scenario.
+The child rotates the real OAuth refresh token before SDK discovery/list/tool requests, retaining
+the <=300-second access lifetime and all resource/rotation/revocation assertions. A separate
+unrefreshed natural-expiry family is issued immediately before that expiry check; no SQL times
+or expiry constraints are updated. Slow-client regression coverage advances each request by
+two minutes while retaining denial, tenant-isolation, expiry and cleanup assertions.

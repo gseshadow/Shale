@@ -274,3 +274,18 @@ it is not HTTP, MCP, OAuth or activation acceptance. The original ten-second ful
 budget remains a separate runtime blocker. Catalog/registry batches alone measured about
 7.5 and 16.7 seconds in the longer probe before the remaining per-object/column checks.
 Do not retry the unchanged runtime campaign or report it ready on this evidence.
+
+
+## Fenced long-budget acceptance verification
+
+The dedicated acceptance runner can explicitly enable the longer bounded verification budget
+documented in its runbook. Java requires the exact App Service name, acceptance origin/database,
+Azure profile/identity grammar and all 17 fixed SQL destination URLs. Normal runtimes retain all
+existing defaults. This changes startup/admission and read-only attestation transport time only;
+it neither skips nor caches verification and does not extend SQL tool transaction/invocation
+leases, quota reservations, token lifetimes or independent failure-audit accounting.
+
+Audit compatibility remains the existing operational configuration journal and Azure lifecycle
+records, with unchanged transactional policy and disclosure audits. No SQL schema, grants,
+receipt, binding, audit vocabulary or production deployment is introduced. Longer-budget
+functional acceptance is not evidence of production latency or capacity suitability.

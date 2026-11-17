@@ -64,7 +64,7 @@ class Acceptance:
             body = (json.dumps(body) if kind == 'json' else urllib.parse.urlencode(body, doseq=True)).encode()
         req = urllib.request.Request(BASE + path, data=body, headers=h)
         try:
-            response = self.client.open(req, timeout=12)
+            response = self.client.open(req, timeout=660)
         except urllib.error.HTTPError as error:
             response = error
         with response:
@@ -148,25 +148,57 @@ class Acceptance:
         import httpx2
         from mcp import Client
         from mcp.client.streamable_http import streamable_http_client
+        # SDK 2.3.0's auto-discovery has a separate fixed 10s limit, independent of
+        # Client.read_timeout_seconds. Override only that timer in this fixed-target
+        # operator process; preserve auto negotiation and all real result assertions.
+        sdk_session = importlib.import_module('mcp.client.session')
+        require(sdk_session.DISCOVER_TIMEOUT_SECONDS in (10.0, 660.0))
+        sdk_session.DISCOVER_TIMEOUT_SECONDS = 660.0
+        self.versions['sdk_discovery_timeout_seconds'] = 660.0
+        # Long full-catalog verification must not accidentally age a five-minute
+        # access token across multiple requests. Rotate through the real OAuth
+        # endpoint before each SDK request; never extend SQL credential timestamps.
+        owned = [(client_id, family) for client_id, family in self.families if family.get('access_token') == token]
+        require(bool(owned))
+        client_id, family = owned[0]
+
+        def renew():
+            refreshed = self.ok('/oauth/mcp/token', {'grant_type': 'refresh_token', 'client_id': client_id,
+                'resource': BASE + '/mcp', 'refresh_token': family['refresh_token']})
+            require(refreshed['token_type'].lower() == 'bearer' and 0 < refreshed['expires_in'] <= 300
+                    and refreshed['refresh_token'] != family['refresh_token'])
+            # Retain every issued generation for cleanup before replacing the
+            # caller's current pair; do not assume revoking one generation revokes all.
+            self.families.append((client_id, dict(family)))
+            family.update(refreshed)
+            return family['access_token']
+
+        token = renew()
         # Reuse the existing authoritative acceptance result/schema assertions.
         harness = runpy.run_path(str(pathlib.Path(__file__).with_name('authoritative-python.py')))
         own, foreign = (100, 200) if tenant == 7 else (200, 100)
-        async with httpx2.AsyncClient(headers={'Authorization': 'Bearer ' + token}, timeout=10, trust_env=False) as http:
-            async with Client(streamable_http_client(BASE + '/mcp', http_client=http), mode='auto') as client:
+        async with httpx2.AsyncClient(headers={'Authorization': 'Bearer ' + token}, timeout=660, trust_env=False) as http:
+            async with Client(streamable_http_client(BASE + '/mcp', http_client=http), mode='auto', read_timeout_seconds=660) as client:
                 require(client.protocol_version == PROTOCOL)
+
+                async def call(name, arguments):
+                    http.headers['Authorization'] = 'Bearer ' + renew()
+                    return await client.call_tool(name, arguments)
+
+                http.headers['Authorization'] = 'Bearer ' + renew()
                 require([harness['obj'](t)['name'] for t in (await client.list_tools()).tools] == ['search_cases', 'get_case_overview'])
-                result = harness['value'](await client.call_tool('get_case_overview', {'caseId': own}))
+                result = harness['value'](await call('get_case_overview', {'caseId': own}))
                 harness['item'](result['case'])
                 require(result['case']['caseId'] == own)
                 self.disclosures += 1
                 self.overviews += 1
                 if full:
-                    result = harness['value'](await client.call_tool('search_cases', {'query': 'Literal'}))
+                    result = harness['value'](await call('search_cases', {'query': 'Literal'}))
                     require([r['caseId'] for r in result['items']] == [own])
                     self.disclosures += 1
                     for case in (foreign, 300, 999):
-                        harness['error'](await client.call_tool('get_case_overview', {'caseId': case}), 'CASE_UNAVAILABLE')
-                    harness['error'](await client.call_tool('search_cases', {'query': 'Literal', 'tenantId': 8}), 'INVALID_INPUT')
+                        harness['error'](await call('get_case_overview', {'caseId': case}), 'CASE_UNAVAILABLE')
+                    harness['error'](await call('search_cases', {'query': 'Literal', 'tenantId': 8}), 'INVALID_INPUT')
 
     async def execute(self):
         metadata = self.ok('/.well-known/oauth-authorization-server/oauth/mcp')
@@ -227,6 +259,9 @@ class Acceptance:
         self.ok('/oauth/mcp/revoke', {'client_id': client, 'token': 'synthetic-unknown'})
         self.record(self.current)
         self.current = 'natural-credential-expiry'
+        # Issue the independent expiry probe here: earlier families may naturally
+        # expire during the deliberately slow SDK tests. Do not refresh this probe.
+        expiry, issued = self.authorize(client, a)
         # Keep an independent, unrevoked family. Never update credential timestamps or disable SQL constraints.
         require(self.raw_discover(expiry['access_token'])[0] == 200)
         deadline = issued + math.ceil(expiry['expires_in']) + 2

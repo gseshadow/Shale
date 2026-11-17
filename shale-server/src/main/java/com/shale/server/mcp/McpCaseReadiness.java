@@ -1,5 +1,7 @@
 package com.shale.server.mcp;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -20,7 +22,7 @@ public final class McpCaseReadiness {
             policy.requireBoundary();
             var data = boundary.getIfAvailable();
             if (data == null) return "not-ready";
-            data.ready(System.nanoTime() + 10_000_000_000L);
+            data.ready(System.nanoTime() + AcceptanceVerificationBudget.operationNanos(10_000_000_000L));
             return "ready";
         } catch (RuntimeException unavailable) {
             return "not-ready";

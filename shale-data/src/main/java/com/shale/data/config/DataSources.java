@@ -71,8 +71,8 @@ public final class DataSources implements AutoCloseable {
             c.setMaxLifetime(15 * 60 * 1000L);
             c.addDataSourceProperty("encrypt", "true");
             c.addDataSourceProperty("trustServerCertificate", "false");
-            c.addDataSourceProperty("loginTimeout", "3");
-            c.addDataSourceProperty("socketTimeout", "5000");
+            c.addDataSourceProperty("loginTimeout", Integer.toString(AcceptanceVerificationBudget.loginSeconds(3)));
+            c.addDataSourceProperty("socketTimeout", Integer.toString(AcceptanceVerificationBudget.networkMillis(5000)));
             c.addDataSourceProperty("applicationName", "ShaleAiCaseData");
             aiCaseData = new HikariDataSource(c);
         }

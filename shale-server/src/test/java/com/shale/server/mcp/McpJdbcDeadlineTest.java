@@ -1,5 +1,7 @@
 package com.shale.server.mcp;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import javax.sql.DataSource;
 import java.sql.*;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,32 @@ class McpJdbcDeadlineTest {
             }
         }
         verify(raw).setNetworkTimeout(any(),eq(10000));verify(raw).close();
+    }
+    @Test void longerAcceptanceMetadataReadsStillRespectShortToolAndFailureAuditDeadlines()throws Exception {
+        try(var timing=mockStatic(AcceptanceVerificationBudget.class,CALLS_REAL_METHODS)) {
+            timing.when(()->AcceptanceVerificationBudget.networkMillis(10000)).thenReturn(180000);
+            timing.when(()->AcceptanceVerificationBudget.querySeconds(5)).thenReturn(180);
+            var source=mock(DataSource.class);var raw=mock(Connection.class);var statement=mock(PreparedStatement.class);
+            when(source.getConnection()).thenReturn(raw);when(raw.prepareStatement(anyString())).thenReturn(statement);
+            try(var lease=new McpJdbcDeadline(source,System.nanoTime()+600_000_000_000L).getConnection();
+                var query=lease.prepareStatement("metadata")) {
+                query.setQueryTimeout(180);
+                verify(statement).setQueryTimeout(180);
+                verify(raw,atLeastOnce()).setNetworkTimeout(any(),eq(180000));
+            }
+            clearInvocations(raw,statement);
+            try(var lease=new McpJdbcDeadline(source,System.nanoTime()+2_000_000_000L).getConnection();
+                var query=lease.prepareStatement("short-tool")) {
+                query.setQueryTimeout(180);
+                verify(statement).setQueryTimeout(intThat(t->t>0&&t<=2));
+                verify(raw,atLeastOnce()).setNetworkTimeout(any(),intThat(t->t>0&&t<=2000));
+            }
+            clearInvocations(raw);
+            try(var audit=McpJdbcDeadline.failureAudit(source).getConnection()) {
+                audit.getAutoCommit();
+                verify(raw,atLeastOnce()).setNetworkTimeout(any(),intThat(t->t>0&&t<=3000));
+            }
+        }
     }
     @Test void requestPoolBorrowHasItsOwnDeadlineWithoutChangingOrdinaryPoolConfiguration()throws Exception {
         var source=mock(DataSource.class);var raw=mock(Connection.class);when(source.getConnection()).thenReturn(raw);

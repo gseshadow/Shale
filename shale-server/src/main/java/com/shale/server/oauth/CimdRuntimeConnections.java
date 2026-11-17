@@ -1,5 +1,7 @@
 package com.shale.server.oauth;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.config.AiJdbcUrl;
@@ -76,8 +78,8 @@ final class CimdRuntimeConnections {
         source.setPassword(settings.password());
         source.setEncrypt("true");
         source.setTrustServerCertificate(false);
-        source.setLoginTimeout(2);
-        source.setSocketTimeout(5000);
+        source.setLoginTimeout(AcceptanceVerificationBudget.loginSeconds(2));
+        source.setSocketTimeout(AcceptanceVerificationBudget.networkMillis(5000));
         return source;
     }
 
@@ -153,8 +155,8 @@ final class CimdRuntimeConnections {
 
     private static Identity identity(DataSource source, String role) throws SQLException {
         try (var connection = source.getConnection(); var statement = connection.createStatement()) {
-            connection.setNetworkTimeout(Runnable::run, 5000);
-            statement.setQueryTimeout(5);
+            connection.setNetworkTimeout(Runnable::run, AcceptanceVerificationBudget.networkMillis(5000));
+            statement.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(5));
             try (var rows = statement.executeQuery("""
                     SELECT DB_NAME(), CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')), p.sid,
                       USER_NAME(), USER_ID(), ORIGINAL_LOGIN(), p.type, p.authentication_type,
@@ -175,7 +177,7 @@ final class CimdRuntimeConnections {
                         throw unavailable();
                     String user = rows.getString(4);
                     try (var tokens = connection.createStatement()) {
-                        tokens.setQueryTimeout(5);
+                        tokens.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(5));
                         try (var tokenRows = tokens.executeQuery("SELECT name FROM sys.user_token")) {
                             var names = new HashSet<String>();
                             while (tokenRows.next()) names.add(tokenRows.getString(1));

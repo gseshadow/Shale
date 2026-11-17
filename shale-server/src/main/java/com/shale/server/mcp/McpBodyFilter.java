@@ -1,5 +1,7 @@
 package com.shale.server.mcp;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.*;
@@ -12,7 +14,7 @@ final class McpBodyFilter extends OncePerRequestFilter {
     static final String ADMISSION=McpBodyFilter.class.getName()+".admission";
     private final Semaphore active=new Semaphore(5);
     static final class Admission {
-        final long deadline=System.nanoTime()+10_000_000_000L;
+        final long deadline=System.nanoTime()+AcceptanceVerificationBudget.operationNanos(10_000_000_000L);
         final ByteArrayOutputStream bytes=new ByteArrayOutputStream();
         final AtomicBoolean dispatched=new AtomicBoolean(),released=new AtomicBoolean();
     }
@@ -30,7 +32,7 @@ final class McpBodyFilter extends OncePerRequestFilter {
         var admission=new Admission();request.setAttribute(ADMISSION,admission);
         AsyncContext async;
         try {async=request.startAsync();}catch(RuntimeException unavailable){release(request,admission);reject(response,503,"unavailable");return;}
-        async.setTimeout(10000);
+        async.setTimeout(AcceptanceVerificationBudget.operationMillis(10000));
         async.addListener(new AsyncListener() {
             @Override public void onComplete(AsyncEvent event){release(request,admission);}
             @Override public void onError(AsyncEvent event){admission.dispatched.set(true);release(request,admission);}

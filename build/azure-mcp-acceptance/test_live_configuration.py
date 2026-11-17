@@ -35,12 +35,24 @@ $a=@{TokenSecret=[Convert]::ToBase64String([Security.Cryptography.RandomNumberGe
         self.ps(self.credentials() + r'''
 $s=New-LiveSettings $c $a
 Assert-LiveSettings $s $c
+if($s.WEBSITES_CONTAINER_START_TIME_LIMIT -cne '1800'){throw 'Platform startup budget missing'}
+if($s.SHALE_AI_ACCEPTANCE_SLOWVERIFICATION -cne 'true'){throw 'Explicit acceptance budget missing'}
 if(@($s.Keys|Where-Object {$_ -match '_PASSWORD$'}).Count -ne 17){throw 'Missing dedicated credentials'}
 if(@($script:LiveControls|Where-Object {$s[$_] -cne 'false'}).Count -or $s['SHALE_AI_CIMD_METADATAADVERTISEMENTENABLED'] -cne 'false'){throw 'Configuration enabled AI'}
 if($s.SHALE_AUTH_TOKEN_SECRET -cin @($c.Values|ForEach-Object {$_.GetNetworkCredential().Password})){throw 'JWT reused SQL credential'}
 if($s.SHALE_ALLOWED_CORS_ORIGINS -cne $script:LiveOrigin -or $s.SHALE_AUTH_TOKEN_TTL_SECONDS -cne '3600'){throw 'Ordinary auth/CORS missing'}
 $c.Remove('mcpacc_case');$refused=$false;try{New-LiveSettings $c $a}catch{$refused=$true};if(-not $refused){throw 'Missing SQL credential accepted'}
 ''')
+
+    def test_slow_verification_is_explicit_and_required_in_acceptance_readback(self):
+        self.ps(self.credentials() + r"""
+$s=New-LiveSettings $c $a
+foreach($value in @('false','TRUE','')) {
+ $wrong=$s.Clone();$wrong.SHALE_AI_ACCEPTANCE_SLOWVERIFICATION=$value
+ $refused=$false;try{Assert-LiveSettings $wrong $c}catch{$refused=$true}
+ if(-not $refused){throw 'Unreviewed verification budget accepted'}
+}
+""")
 
     def test_every_generated_name_maps_to_its_spring_property_or_explicit_alias(self):
         # Independent inventory prevents an omitted source/control or incorrect hyphen mapping.
@@ -51,13 +63,14 @@ $s=New-LiveSettings $c $a
 '''))
         aliases = ['SPRING_PROFILES_ACTIVE', 'SHALE_ALLOWED_CORS_ORIGINS',
                    'SHALE_AUTH_TOKEN_SECRET', 'SHALE_AUTH_TOKEN_TTL_SECONDS',
-                   'SHALE_AUTH_SESSION_BINDING_CUTOVER_AT', 'PORT', 'WEBSITES_PORT']
+                   'SHALE_AUTH_SESSION_BINDING_CUTOVER_AT', 'PORT', 'WEBSITES_PORT', 'WEBSITES_CONTAINER_START_TIME_LIMIT']
         properties = [
             'logging.level.io.modelcontextprotocol.modern.JsonRpc',
             'shale.ai.oauth.identity', 'shale.ai.oauth.public-origin',
             'shale.ai.oauth.browser-origin', 'shale.ai.mcp.allowed-origins',
             'shale.ai.data.database', 'shale.ai.data.contract-version',
             'shale.ai.cimd.contract-version', 'shale.ai.cimd.metadata-advertisement-enabled',
+            'shale.ai.acceptance.slow-verification',
             'shale.ai.enabled', 'shale.ai.mcp.enabled',
             'shale.ai.mcp.case-data-composition-enabled', 'shale.ai.mcp.search-cases-enabled',
             'shale.ai.mcp.get-case-overview-enabled', 'shale.ai.oauth.composition-enabled',

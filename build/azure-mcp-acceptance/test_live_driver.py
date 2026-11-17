@@ -118,11 +118,21 @@ class FakeAcceptance(live.Acceptance):
 
     def client_modules(self):
         acceptance = self
+
+        def admitted(token):
+            if getattr(acceptance, 'slow_mcp', False):
+                acceptance.clock += 120
+            live.require(acceptance.raw_discover(token)[0] == 200)
+
         required = json.loads((ROOT / 'shale-server/src/main/resources/mcp/search-cases.json').read_text())['outputSchema']['$defs']['Case']['required']
 
         class Http:
             def __init__(self, headers=None, **kwargs):
-                self.token = headers['Authorization'][7:]
+                live.require(kwargs.get('timeout') == 660)
+                self.headers = headers
+            @property
+            def token(self):
+                return self.headers['Authorization'][7:]
             async def __aenter__(self):
                 return self
             async def __aexit__(self, *args):
@@ -131,15 +141,21 @@ class FakeAcceptance(live.Acceptance):
         class Client:
             protocol_version = live.PROTOCOL
             def __init__(self, token, **kwargs):
-                self.token = token
+                live.require(kwargs.get('mode') == 'auto' and kwargs.get('read_timeout_seconds') == 660)
+                self.http = token
+            @property
+            def token(self):
+                return self.http.token
             async def __aenter__(self):
-                live.require(acceptance.raw_discover(self.token)[0] == 200)
+                admitted(self.token)
                 return self
             async def __aexit__(self, *args):
                 pass
             async def list_tools(self):
+                admitted(self.token)
                 return types.SimpleNamespace(tools=[{'name': 'search_cases'}, {'name': 'get_case_overview'}])
             async def call_tool(self, tool, args):
+                admitted(self.token)
                 tenant = acceptance.tokens[self.token]['tenant']
                 own = 100 if tenant == 7 else 200
                 def error(code):
@@ -155,7 +171,8 @@ class FakeAcceptance(live.Acceptance):
                 return {'isError': False, 'structuredContent': result, 'content': [{'text': json.dumps(result)}]}
 
         return {'httpx2': types.SimpleNamespace(AsyncClient=Http), 'mcp': types.SimpleNamespace(Client=Client),
-                'mcp.client.streamable_http': types.SimpleNamespace(streamable_http_client=lambda url, http_client: http_client.token)}
+                'mcp.client.session': types.SimpleNamespace(DISCOVER_TIMEOUT_SECONDS=10.0),
+                'mcp.client.streamable_http': types.SimpleNamespace(streamable_http_client=lambda url, http_client: http_client)}
 
 
 class LiveDriverTest(unittest.TestCase):
@@ -172,11 +189,22 @@ class LiveDriverTest(unittest.TestCase):
         code, report, a = self.campaign()
         self.assertEqual(code, 0, report)
         self.assertEqual(report['status'], 'PASS')
+        self.assertEqual(a.versions['sdk_discovery_timeout_seconds'], 660.0)
         self.assertEqual(report['disclosures'], 8)
         self.assertEqual(report['overviews'], 6)
         self.assertEqual(len(report['records']), 8)
         self.assertGreaterEqual(a.clock, 1302)
         self.assertTrue(all(family['revoked'] for family in a.tokens.values()))
+
+    def test_slow_verification_uses_real_refresh_and_keeps_the_natural_expiry_probe_independent(self):
+        code, report, a = self.campaign('slow_mcp')
+        self.assertEqual(code, 0, report)
+        self.assertEqual(report['status'], 'PASS')
+        self.assertEqual(report['disclosures'], 8)
+        self.assertEqual(report['overviews'], 6)
+        self.assertGreater(a.clock, 4000, 'Simulate verification taking minutes across many requests')
+        self.assertTrue(all(family['expires_in'] <= 300 for _, family in a.families))
+        self.assertTrue(all(token['revoked'] for token in a.tokens.values()))
 
     def test_cross_tenant_result_is_not_accepted_as_success(self):
         code, report, _ = self.campaign('spoof_tenant')

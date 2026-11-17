@@ -1,5 +1,7 @@
 package com.shale.data.security.ai;
 
+import com.shale.data.config.AcceptanceVerificationBudget;
+
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
@@ -117,16 +119,16 @@ public final class AiCaseDataAttestation {
                 }
                 identityStep="VERIFIER_DIRECT_GRANTS";
                 try(var p=review.prepareStatement("SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND NOT(class=0 AND permission_name='CONNECT' AND state='G')")) {
-                    p.setQueryTimeout(3);p.setInt(1,catalogIdentity.userId());
+                    p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setInt(1,catalogIdentity.userId());
                     try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
                 }
                 if(platform==Platform.SQL_SERVER_OR_MI)try(var p=review.prepareStatement("SELECT COUNT(*) FROM sys.server_permissions p JOIN sys.server_principals s ON s.principal_id=p.grantee_principal_id WHERE s.sid=? AND p.state IN('G','W') AND NOT(p.class=100 AND p.state='G' AND p.permission_name IN('CONNECT SQL','VIEW ANY DATABASE','VIEW ANY DEFINITION'))")) {
-                    p.setQueryTimeout(3);p.setBytes(1,catalogIdentity.sid());
+                    p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setBytes(1,catalogIdentity.sid());
                     try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
                 }
                 identityStep="VERIFIER_OWNERSHIP";
                 try(var p=review.prepareStatement("SELECT (SELECT COUNT(*) FROM sys.schemas WHERE principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.objects WHERE principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.database_principals WHERE owning_principal_id IN(SELECT principal_id FROM sys.user_token))+(SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id IN(SELECT principal_id FROM sys.user_token) AND state='W')")) {
-                    p.setQueryTimeout(3);
+                    p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));
                     try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
                 }
             }
@@ -151,7 +153,7 @@ public final class AiCaseDataAttestation {
                 try(var s=statement(review);var r=s.executeQuery("SELECT HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DEFINITION')")){if(!r.next()||r.getInt(1)!=1)throw refused();}
                 stage="SERVER_TOKEN_GRANTS";
                 try(var p=review.prepareStatement("SELECT COUNT(*) FROM sys.server_permissions p JOIN sys.server_principals s ON s.principal_id=p.grantee_principal_id LEFT JOIN sys.endpoints e ON p.class=105 AND p.major_id=e.endpoint_id WHERE (s.sid=? OR s.name='public') AND p.state IN('G','W') AND NOT(p.class=100 AND p.state='G' AND p.permission_name IN('CONNECT SQL','VIEW ANY DATABASE') OR s.name='public' AND p.state='G' AND p.class=105 AND p.permission_name='CONNECT' AND e.is_admin_endpoint=0 AND e.type=2 AND e.name IN('TSQL Local Machine','TSQL Named Pipes','TSQL Default TCP','TSQL Default VIA'))")) {
-                    p.setQueryTimeout(3);p.setBytes(1,identity.sid());try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
+                    p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setBytes(1,identity.sid());try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
                 }
                 stage="PUBLIC_DDL_GRANTS";
                 // Specific public impersonation/DDL grants need not appear as database-wide permissions.
@@ -160,7 +162,7 @@ public final class AiCaseDataAttestation {
                 try(var s=statement(review);var r=s.executeQuery("SELECT HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DATABASE')")){if(!r.next()||r.getInt(1)!=1)throw refused();}
                 try(var s=statement(review);var databases=s.executeQuery("SELECT name FROM sys.databases WHERE database_id>4 AND name<>DB_NAME()")) {
                     while(databases.next())try(var p=caller.prepareStatement("SELECT HAS_DBACCESS(?)")) {
-                        p.setQueryTimeout(3);p.setString(1,databases.getString(1));try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0||r.wasNull())throw refused();}
+                        p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setString(1,databases.getString(1));try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0||r.wasNull())throw refused();}
                     }
                 }
             }
@@ -180,12 +182,12 @@ public final class AiCaseDataAttestation {
             if(registryPresent)try(var s=statement(review)) { boolean more=s.execute(registryCatalog);while(true){if(more)try(var r=s.getResultSet()){while(r.next()){} }else if(s.getUpdateCount()==-1)break;more=s.getMoreResults(Statement.CLOSE_CURRENT_RESULT);} }
             stage="SOURCE_RECEIPT";
             try(var p=review.prepareStatement("SELECT CONVERT(varchar(64),CONVERT(varbinary(32),value),2) FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.AiCaseDataInvocation') AND name=N'Shale.AiCaseData"+contract+".Source'")) {
-                p.setQueryTimeout(3);try(var r=p.executeQuery()){if(!r.next()||!definitions.getProperty("Source").equalsIgnoreCase(r.getString(1))||r.next())throw refused();}
+                p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));try(var r=p.executeQuery()){if(!r.next()||!definitions.getProperty("Source").equalsIgnoreCase(r.getString(1))||r.next())throw refused();}
             }
             stage="MODULE_BODIES";
             for(String module:definitions.stringPropertyNames())if(!module.equals("Source")) {
                 try(var p=review.prepareStatement("SELECT m.definition,m.execute_as_principal_id,COALESCE(o.principal_id,s.principal_id),s.name FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE s.name='dbo' AND o.name=?")) {
-                    p.setQueryTimeout(3);p.setString(1,module);
+                    p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setString(1,module);
                     try(var r=p.executeQuery()) {
                         if(!r.next()||!definitions.getProperty(module).equals(HexFormat.of().formatHex(AiSql.hash(r.getString(1).getBytes(StandardCharsets.UTF_16LE))))||r.getInt(3)!=1)throw refused();
                         int execution=r.getInt(2);boolean callerIdentity=r.wasNull();
@@ -196,13 +198,13 @@ public final class AiCaseDataAttestation {
             }
             stage="OWNERSHIP";
             for(int token:tokens)try(var p=review.prepareStatement("SELECT (SELECT COUNT(*) FROM sys.schemas WHERE principal_id=?)+(SELECT COUNT(*) FROM sys.objects WHERE principal_id=?)+(SELECT COUNT(*) FROM sys.database_principals WHERE owning_principal_id=?)+(SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND state='W')")) {
-                p.setQueryTimeout(3);for(int n=1;n<=4;n++)p.setInt(n,token);
+                p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));for(int n=1;n<=4;n++)p.setInt(n,token);
                 try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
             }
             // Reject positive grants to the login itself, including column exceptions to role DENY.
             // Complete metadata comes from the verifier; AI metadata visibility is intentionally limited.
             try(var p=review.prepareStatement("SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND NOT(class=0 AND permission_name='CONNECT' AND state='G')")) {
-                p.setQueryTimeout(3);p.setInt(1,identity.userId());
+                p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setInt(1,identity.userId());
                 try(var r=p.executeQuery()){if(!r.next()||r.getInt(1)!=0)throw refused();}
             }
             if(platform==Platform.AZURE_SQL_DATABASE) {
@@ -222,9 +224,9 @@ public final class AiCaseDataAttestation {
                     }
                     // SQL DENY at object level can have column-GRANT exceptions: check EVERY column.
                     try(var p=review.prepareStatement("SELECT c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name=? AND o.name=?")) {
-                        p.setQueryTimeout(3);p.setString(1,schema);p.setString(2,name);
+                        p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setString(1,schema);p.setString(2,name);
                         try(var columns=p.executeQuery()) {while(columns.next())try(var check=caller.prepareStatement("SELECT HAS_PERMS_BY_NAME(?,'OBJECT','SELECT',?,'COLUMN'),HAS_PERMS_BY_NAME(?,'OBJECT','UPDATE',?,'COLUMN')")) {
-                            check.setQueryTimeout(3);check.setString(1,object);check.setString(2,columns.getString(1));check.setString(3,object);check.setString(4,columns.getString(1));
+                            check.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));check.setString(1,object);check.setString(2,columns.getString(1));check.setString(3,object);check.setString(4,columns.getString(1));
                             try(var result=check.executeQuery()){if(!result.next()||result.getInt(1)==1||result.getInt(2)==1)throw refused();}
                         }}
                     }
@@ -240,7 +242,7 @@ public final class AiCaseDataAttestation {
                 for(int year=2025;year<=2028;year++)for(int month:List.of(1,3,4,7,10,11,12)) {
                     Instant sample=LocalDate.of(year,month,15).atStartOfDay(ZoneOffset.UTC).toInstant();
                     try(var p=review.prepareStatement("SELECT CONVERT(datetime2(7),(CONVERT(datetime2(7),?) AT TIME ZONE 'UTC') AT TIME ZONE ?)")) {
-                        p.setQueryTimeout(3);com.shale.data.util.UtcJdbcTimestamp.set(p,1,sample);p.setString(2,sqlZone);
+                        p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));com.shale.data.util.UtcJdbcTimestamp.set(p,1,sample);p.setString(2,sqlZone);
                         try(var dates=p.executeQuery()){if(!dates.next()||!dates.getTimestamp(1).toLocalDateTime().equals(LocalDateTime.ofInstant(sample,zone)))throw refused();}
                     }
                 }
@@ -305,7 +307,7 @@ public final class AiCaseDataAttestation {
         requireOne(session,"SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE session_id=@@SPID AND authenticating_database_id=DB_ID() AND original_security_id=(SELECT sid FROM sys.database_principals WHERE principal_id=USER_ID())");
         String sql="SELECT sid,type,authentication_type FROM sys.database_principals WHERE principal_id=? AND name=?";
         for(Connection c:List.of(session,review))try(var p=c.prepareStatement(sql)) {
-            p.setQueryTimeout(3);p.setInt(1,identity.userId());p.setString(2,identity.user());
+            p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setInt(1,identity.userId());p.setString(2,identity.user());
             try(var r=p.executeQuery()) {
                 if(!r.next()||!Arrays.equals(identity.sid(),r.getBytes(1))||!"S".equals(r.getString(2))||r.getInt(3)!=2||r.wasNull()||r.next())throw refused();
             }
@@ -352,7 +354,7 @@ public final class AiCaseDataAttestation {
     static Set<String> allowed(Connection c,String object,String scope,Set<String> allow)throws SQLException {
         var actual=new HashSet<String>();
         try(var p=c.prepareStatement("SELECT permission_name FROM sys.fn_my_permissions(?,?)")) {
-            p.setQueryTimeout(3);p.setString(1,object);p.setString(2,scope);
+            p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setString(1,object);p.setString(2,scope);
             try(var r=p.executeQuery()) {
                 while(r.next()) {
                     String permission=r.getString(1);
@@ -370,6 +372,6 @@ public final class AiCaseDataAttestation {
         return actual;
     }
     private static String quote(String name){return "["+name.replace("]","]]")+"]";}
-    private static Statement statement(Connection c)throws SQLException {var s=c.createStatement();s.setQueryTimeout(3);return s;}
+    private static Statement statement(Connection c)throws SQLException {var s=c.createStatement();s.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));return s;}
     private static IllegalStateException refused(){return new IllegalStateException("AI Case datasource attestation failed closed.");}
 }
