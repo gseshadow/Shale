@@ -67,6 +67,8 @@ class AiColumnPermissionAttestationTest {
             assertTrue(lease.sql.contains("HAS_PERMS_BY_NAME")&&lease.sql.contains(" FROM (VALUES "));
             assertFalse(lease.sql.contains("sys.columns"),"Never use caller-filtered column inventory");
             assertFalse(lease.sql.contains("quoted]]object")||lease.sql.contains("odd'"),"Names must remain bound values");
+            assertEquals("[dbo].[quoted]]object]",lease.bindings.get(1),"SELECT must target the independently inventoried object");
+            assertEquals("[dbo].[quoted]]object]",lease.bindings.get(2),"UPDATE must target that same object");
             assertEquals(3,lease.timeout);assertTrue(lease.closed&&lease.rowsClosed);
             assertTrue(lease.bindings.size()<=258,"Stay well below SQL Server's parameter limit");
         }
@@ -99,6 +101,9 @@ class AiColumnPermissionAttestationTest {
         AiColumnPermissionAttestation.verify(jdbc.caller,"object",inventory(List.of()));assertTrue(jdbc.leases.isEmpty());
         assertThrows(IllegalStateException.class,()->AiColumnPermissionAttestation.verify(jdbc.caller,"object",inventory(List.of("a","a"))));
         assertThrows(IllegalStateException.class,()->AiColumnPermissionAttestation.verify(jdbc.caller,"object",inventory(Arrays.asList("a",null))));
+        var acrossBatches=new ArrayList<>(names(256));acrossBatches.add(acrossBatches.getFirst());
+        assertThrows(IllegalStateException.class,()->AiColumnPermissionAttestation.verify(jdbc.caller,"object",inventory(acrossBatches)),
+                "A duplicate must not become acceptable merely because the first batch was consumed");
     }
     @Test void queryFailurePropagatesAndClosesTheStatement() {
         var jdbc=new Jdbc(AiColumnPermissionAttestationTest::denied);jdbc.failure=new SQLException("PRIVATE_DRIVER_TEXT");
