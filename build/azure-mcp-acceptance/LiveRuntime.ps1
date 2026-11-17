@@ -76,7 +76,7 @@ function Get-LiveCredentials([string]$Directory) {
     return $credentials
 }
 function Get-LiveSettings {
-    $values=@{}; $rows=Invoke-CleanAzure @('webapp','config','appsettings','list','--name','shale-mcp-acceptance','--resource-group','Shale','--subscription',$script:CleanSubscription)
+    $values=@{}; $rows=Invoke-CleanAzure @('webapp','config','appsettings','list','--name','shale-mcp-acceptance','--resource-group','Shale','--subscription',$script:CleanSubscription) -PreserveSettingStrings
     foreach ($row in $rows) { if ($values.ContainsKey($row.name)) { throw 'DUPLICATE_APP_SETTING' }; $values[$row.name]=$row.value }
     Assert-LiveSettingNames $values
     return $values

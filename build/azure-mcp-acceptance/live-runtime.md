@@ -176,6 +176,14 @@ failures keep a generic safe code. No response message/body, setting value, URL,
 exception text is included. Configuration failure still independently attempts app controls OFF
 and app stop and records whether each was confirmed. There is no automatic retry.
 
+App-setting readback preserves JSON strings exactly, including the session cutoff timestamp and
+unrelated date-like values. PowerShell's default JSON parser converts timestamps to date objects;
+that conversion previously caused a false readback mismatch after successful Azure writes. The
+settings-only parser avoids conversion on PowerShell 7.4 and later. Comparisons remain exact;
+no timestamp normalization, setting repair, credential rotation or approval bypass is introduced.
+This is operational configuration validation only; existing journal/Azure evidence and audit schemas
+remain unchanged. Preserve failed run evidence and use a new operator-approved run after correction.
+
 ## Cleanup and evidence
 
 Every approved run finishes through `finally`: revoke issued families/logout original WEB sessions
