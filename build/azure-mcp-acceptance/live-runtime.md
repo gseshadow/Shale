@@ -296,8 +296,8 @@ No tenant/domain or PHI mutation occurs during preparation, so no SQL audit row/
 The approved campaign retains its existing SQL policy/product/read audit semantics.
 
 Configuration successor verification (2026-11-16): `python -m unittest discover -s
-build/azure-mcp-acceptance -p 'test_live_*.py' -v` â€” **26 PASS** (10 configuration regressions and
-16 existing live-driver/runtime regressions). `mvn test` via the existing local JDK/Maven wrapper â€”
+build/azure-mcp-acceptance -p 'test_live_*.py' -v` — **26 PASS** (10 configuration regressions and
+16 existing live-driver/runtime regressions). `mvn test` via the existing local JDK/Maven wrapper —
 **283 PASS**, zero failures/errors/skips. Selector executed against `origin/codex/latest`; no affected
 Maven area maps to these operator scripts, and the all-tests suggestion remains informational.
 Diff whitespace and relative-link checks PASS. Tests use mock Azure/REST/SQL seams and real portable
