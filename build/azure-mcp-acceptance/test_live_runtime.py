@@ -101,6 +101,22 @@ print('OFFLINE_REAL_SDK_PASS')
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn('OFFLINE_REAL_SDK_PASS', result.stdout)
 
+    def test_progress_reports_completed_responses_and_never_untrusted_text(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+            report = Path(directory) / 'http-report.json'
+            report.write_text(json.dumps({'currentCheck': 'refresh-rotation-resource-binding',
+                'records': [{'status': 'PASS'}] * 4, 'disclosures': 5, 'overviews': 3,
+                'sdkDiagnostics': {'requests': [{'status': 200}, {'status': None}]}}))
+            out = self.ps(f"Get-LiveClientProgress '{directory}' 62")
+            for expected in ('elapsed=62 min', 'phase=refresh-rotation-resource-binding',
+                             'checkpoints=4/8', 'SDK responses=1', 'disclosures=5', 'overviews=3'):
+                self.assertIn(expected, out)
+            report.write_text(json.dumps({'currentCheck': 'PRIVATE_SENTINEL', 'records': [],
+                'disclosures': 'PRIVATE_SENTINEL', 'overviews': 0, 'sdkDiagnostics': {'requests': []}}))
+            out = self.ps(f"Get-LiveClientProgress '{directory}' 63")
+            self.assertNotIn('PRIVATE_', out)
+            self.assertIn('waiting for checkpoint evidence', out)
+
     def test_nested_sdk_errors_keep_only_closed_kinds_and_numeric_codes(self):
         mcp_error = type('MCPError', (Exception,), {'__module__': 'mcp.shared.exceptions', 'code': -32603})
         error = ExceptionGroup('PRIVATE_GROUP_SENTINEL', [ValueError('PRIVATE_VALUE'), mcp_error('PRIVATE_MESSAGE')])

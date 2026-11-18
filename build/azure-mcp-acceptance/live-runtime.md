@@ -488,3 +488,24 @@ rate. The fixed-target acceptance runner permits up to 180 minutes for the whole
 prints that cap before explicit approval. Per-admission 600-second and HTTP 660-second limits,
 SQL transaction/tool deadlines, heartbeat, natural expiry and OFF/stop cleanup are unchanged.
 This is a bounded completion allowance, not production latency/capacity certification.
+
+
+## Independent stage authority and visible progress
+
+Run 0223157dabdc4991a5bab72cc67e05b8 passed the complete SDK Case read/isolation checkpoint,
+with 5 disclosures and 3 overviews, then failed during refresh-stage overview admission.
+Read-only native evidence shows the original synthetic admin WEB session lasted exactly
+3600 seconds and expired during this long campaign. SQL admission bounds authority by the
+WEB session and immutable grant deadlines; refreshing a five-minute ACCESS credential cannot
+remove those limits. The grant creation module also caps consent at one hour.
+Independent tenant SDK scenarios, refresh/resource-binding, natural-expiry and approval-revocation
+stages now acquire fresh WEB login and OAuth authorization through the existing real endpoints.
+Each stage retains its own normal session/grant lifetime, and every generation/session remains
+in cleanup tracking. No SQL timestamps, TTLs, permissions or server behavior are changed.
+The independent natural-expiry family still receives no refresh while waiting for expiration.
+A slow offline regression enforces immutable one-hour WEB/grant deadlines and reproduces the
+same old refresh-stage failure at 5/3; the corrected full workflow passes, while reusing initial
+authority fails again. SDK response hooks now persist bounded progress after each response.
+The parent heartbeat prints elapsed minutes, allowlisted checkpoint and numeric completed
+response/disclosure counts; it never echoes report text, tokens, payloads or credentials.
+Audit vocabulary/schema are unchanged; extra login/authorization uses existing lifecycle paths.

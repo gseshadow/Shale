@@ -41,9 +41,16 @@ class FakeAcceptance(live.Acceptance):
         self.web_denials = []
         self.slow_oauth_denials = False
         self.protocol_probe_ages = []
+        self.web_sessions = {}
+        self.slow_lifecycle = False
 
     def request(self, path, body=None, bearer=None, kind='form', headers=None):
         body = body or {}
+        browser = path.startswith('/oauth/mcp/authorize') or path.startswith('/oauth/mcp/consent') or path in ('/oauth/mcp/onboarding','/oauth/mcp/approval')
+        profile = self.web_sessions.get(bearer)
+        if browser and (not profile or profile['expiry'] <= self.clock):
+            return 401, {}, {}
+
         if path.startswith('/.well-known/oauth-authorization'):
             return 200, {'issuer': live.BASE + '/oauth/mcp', 'authorization_endpoint': live.BASE + '/oauth/mcp/authorize',
                          'token_endpoint': live.BASE + '/oauth/mcp/token', 'registration_endpoint': live.BASE + '/oauth/mcp/register'}, {}
@@ -51,18 +58,21 @@ class FakeAcceptance(live.Acceptance):
             return 200, {'resource': live.BASE + '/mcp', 'authorization_servers': [live.BASE + '/oauth/mcp']}, {}
         if path == '/api/auth/login':
             tenant, user = {'admin@example.invalid': (7, 71), 'badmin@example.invalid': (8, 81), 'a72@example.invalid': (7, 72)}[body['email']]
-            return 200, {'accessToken': WEB_TOKENS[user], 'user': {'userId': user, 'shaleClientId': tenant}}, {}
+            self.counter += 1
+            web = WEB_TOKENS[user] + '-' + str(self.counter)
+            self.web_sessions[web] = {'user': user, 'tenant': tenant, 'created': self.clock, 'expiry': self.clock + 3600}
+            return 200, {'accessToken': web, 'user': {'userId': user, 'shaleClientId': tenant}}, {}
         if path == '/api/auth/logout':
             return 200, {}, {}
         if path == '/oauth/mcp/register':
             return 201, {'client_id': 'dcr.synthetic'}, {}
         if path in ('/oauth/mcp/onboarding', '/oauth/mcp/approval'):
-            tenant = 8 if bearer == WEB_TOKENS[81] else 7
+            tenant = profile['tenant']
             if path.endswith('approval'):
-                if bearer == WEB_TOKENS[72] or body['approval_id'] != str(tenant):
+                if profile['user'] == 72 or body['approval_id'] != str(tenant):
                     return 401, {}, {}
                 self.approvals[tenant] = body['decision'] == 'APPROVE'
-            return 200, {'state': 'APPROVED' if self.approvals.get(tenant) else 'PENDING', 'admin': bearer != WEB_TOKENS[72],
+            return 200, {'state': 'APPROVED' if self.approvals.get(tenant) else 'PENDING', 'admin': profile['user'] != 72,
                          'tenant': tenant, 'approval_id': str(tenant), 'approval_version': '0000000000000001'}, {}
         if path.startswith('/oauth/mcp/authorize?'):
             params = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlsplit(path).query).items()}
@@ -89,16 +99,20 @@ class FakeAcceptance(live.Acceptance):
                 if params['code_challenge'] != actual:
                     return 400, {}, {}
                 del self.codes[body['code']]
-                tenant = 8 if web == WEB_TOKENS[81] else 7
+                tenant = self.web_sessions[web]['tenant']
+                grant_expiry = min(self.clock + 3600, self.web_sessions[web]['expiry'])
             else:
                 old = self.tokens.get(body['refresh_token'])
                 if not old or old['revoked'] or old['used'] or not self.approvals.get(old['tenant']):
                     return 400, {}, {}
+                if old['grant_expiry'] <= self.clock or self.web_sessions[old['web']]['expiry'] <= self.clock:
+                    return 400, {}, {}
                 tenant = old['tenant']
+                web, grant_expiry = old['web'], old['grant_expiry']
                 old['used'] = True
             self.counter += 1
             access, refresh = 'access-' + str(self.counter), 'refresh-' + str(self.counter)
-            family = {'tenant': tenant, 'expiry': self.clock + 300, 'revoked': False, 'used': False, 'kind': 'ACCESS'}
+            family = {'tenant': tenant, 'expiry': self.clock + 300, 'revoked': False, 'used': False, 'kind': 'ACCESS', 'web': web, 'grant_expiry': grant_expiry}
             self.tokens[access] = family
             self.tokens[refresh] = dict(family, kind='REFRESH')
             # Keep the family's shared revocation membership explicitly.
@@ -112,6 +126,8 @@ class FakeAcceptance(live.Acceptance):
                 self.tokens[family['peer']]['revoked'] = True
             return 200, {}, {}
         if path == '/mcp':
+            if self.slow_lifecycle and self.current == 'oauth-s256-state-code-replay':
+                self.clock += 120
             if self.slow_oauth_denials and self.current == 'oauth-s256-state-code-replay':
                 self.clock += 180
             if bearer and len('Bearer ' + bearer) > 50:
@@ -121,12 +137,19 @@ class FakeAcceptance(live.Acceptance):
             if headers and headers.get('Origin') == 'https://attacker.invalid':
                 return 403, {}, {}
             token = self.tokens.get(bearer)
-            good = token and token['kind'] == 'ACCESS' and not token['revoked'] and self.approvals.get(token['tenant']) and (self.accept_expired or token['expiry'] > self.clock)
+            good = token and token['kind'] == 'ACCESS' and not token['revoked'] and self.approvals.get(token['tenant']) and token['grant_expiry'] > self.clock and self.web_sessions[token['web']]['expiry'] > self.clock and (self.accept_expired or token['expiry'] > self.clock)
             if headers and headers.get('MCP-Protocol-Version') == '2099-01-01':
                 self.protocol_probe_ages.append(None if not token else 300 - (token['expiry'] - self.clock))
                 return (400 if good else 401), {}, {}
             return (200 if good else 401), {}, {'WWW-Authenticate': 'Bearer resource_metadata="' + live.BASE + '/.well-known/oauth-protected-resource/mcp"'}
         raise AssertionError('Unexpected route')
+
+    def fresh_authority(self, client, email, tenant, user):
+        if getattr(self, 'reuse_initial_authority', False):
+            web = next(token for token, profile in self.web_sessions.items() if profile['user'] == user)
+            family = next(family for _, family in self.families if self.tokens[family['access_token']]['tenant'] == tenant)
+            return web, family, 0
+        return super().fresh_authority(client, email, tenant, user)
 
     def renew_access(self, client_id, family):
         if getattr(self, 'skip_probe_renewal', False) and self.current == 'oauth-s256-state-code-replay':
@@ -140,6 +163,8 @@ class FakeAcceptance(live.Acceptance):
         acceptance = self
 
         def admitted(token):
+            if acceptance.slow_lifecycle:
+                acceptance.clock += 147
             if getattr(acceptance, 'slow_mcp', False):
                 acceptance.clock += 120
             live.require(acceptance.raw_discover(token)[0] == 200)
@@ -201,6 +226,8 @@ class LiveDriverTest(unittest.TestCase):
             a = FakeAcceptance(directory)
             if mutation:
                 setattr(a, mutation, True)
+            if mutation == 'reuse_initial_authority':
+                a.slow_lifecycle = True
             if mutation == 'skip_probe_renewal':
                 a.slow_oauth_denials = True
             with patch.dict(sys.modules, a.client_modules()), patch.object(live.time, 'monotonic', lambda: a.clock), patch.object(live.asyncio, 'sleep', a.sleep):
@@ -247,6 +274,20 @@ class LiveDriverTest(unittest.TestCase):
         self.assertEqual(code, 1, report)
         self.assertEqual(report['failureDiagnostic']['substep'], 'REJECT_PROTOCOL')
         self.assertGreater(stale.protocol_probe_ages[0], 300)
+
+    def test_full_slow_campaign_uses_fresh_stage_web_sessions_and_fixed_grant_lifetimes(self):
+        code, report, a = self.campaign('slow_lifecycle')
+        self.assertEqual(code, 0, report)
+        self.assertGreater(a.clock, 4600, 'The full scenario must cross the original one-hour lifetime')
+        self.assertEqual(report['disclosures'], 8)
+        self.assertEqual(report['overviews'], 6)
+        self.assertTrue(all(token['revoked'] for token in a.tokens.values()))
+        self.assertTrue(all(profile['expiry']-profile['created'] == 3600 for profile in a.web_sessions.values()))
+        code, report, _ = self.campaign('reuse_initial_authority')
+        self.assertEqual(code, 1)
+        self.assertEqual(report['failedCheck'], 'refresh-rotation-resource-binding')
+        self.assertEqual(report['disclosures'], 5)
+        self.assertEqual(report['overviews'], 3)
 
     def test_cross_tenant_result_is_not_accepted_as_success(self):
         code, report, _ = self.campaign('spoof_tenant')

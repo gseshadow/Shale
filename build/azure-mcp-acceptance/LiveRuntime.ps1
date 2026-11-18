@@ -414,6 +414,25 @@ SELECT CONCAT('LIVE_AUDIT_PASS:',@matched) AS AcceptanceResult;
 "@
     [void](Invoke-LiveOwner $sql $Owner)
 }
+function Get-LiveClientProgress([string]$Run,[int]$ElapsedMinutes=0) {
+    $stream=$null;$reader=$null
+    try {
+        # Allow the child's atomic replacement while this snapshot is being read on Windows.
+        $stream=[IO.File]::Open((Join-Path $Run 'http-report.json'),'Open','Read',([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        $reader=[IO.StreamReader]::new($stream)
+        $report=$reader.ReadToEnd() | ConvertFrom-Json
+        $phases=@('https-discovery','synthetic-web-login-registration-approval','oauth-s256-state-code-replay',
+            'sdk-initialize-tools-case-reads-isolation-denials','refresh-rotation-resource-binding',
+            'revocation-access-refresh-denied','natural-credential-expiry','approval-revocation-tenant-isolation')
+        $phase=if($report.currentCheck -cin $phases){$report.currentCheck}else{'pending'}
+        $completed=@($report.records | Where-Object {$_.status -ceq 'PASS'}).Count
+        $responses=@($report.sdkDiagnostics.requests | Where-Object {$null -ne $_.status}).Count
+        $disclosures=[int]$report.disclosures;$overviews=[int]$report.overviews
+        if($completed -gt 8 -or $responses -gt 128 -or $disclosures -lt 0 -or $disclosures -gt 10000 -or $overviews -lt 0 -or $overviews -gt 10000){throw 'INVALID_PROGRESS'}
+        return "Live MCP acceptance: elapsed=$ElapsedMinutes min; phase=$phase; checkpoints=$completed/8; SDK responses=$responses; disclosures=$disclosures; overviews=$overviews."
+    } catch { return "Live MCP acceptance running: elapsed=$ElapsedMinutes min; waiting for checkpoint evidence." }
+    finally { if($reader){$reader.Dispose()}elseif($stream){$stream.Dispose()} }
+}
 function Invoke-LiveClient([string]$Run,$HumanCredentials) {
     $psi=[Diagnostics.ProcessStartInfo]::new()
     try {
@@ -435,10 +454,10 @@ function Invoke-LiveClient([string]$Run,$HumanCredentials) {
             $inputs=@{}; foreach ($key in $HumanCredentials.Keys) { $inputs[$key]=$HumanCredentials[$key].GetNetworkCredential().Password }
             $process.StandardInput.WriteLine(($inputs | ConvertTo-Json -Compress)); $process.StandardInput.Close()
         } catch { throw 'LIVE_CLIENT_INPUT_FAILED' } finally {$inputs=$null}
-        $deadline=[datetime]::UtcNow.AddMinutes($script:LiveClientWatchdogMinutes); $next=[datetime]::UtcNow
+        $startedAt=[datetime]::UtcNow; $deadline=$startedAt.AddMinutes($script:LiveClientWatchdogMinutes); $next=$startedAt
         while (-not $process.WaitForExit(1000)) {
             if ([datetime]::UtcNow -gt $deadline) { throw 'LIVE_CLIENT_TIMEOUT' }
-            if ([datetime]::UtcNow -ge $next) { Write-Host 'Live MCP acceptance running (includes natural token expiry).'; $next=[datetime]::UtcNow.AddSeconds(30) }
+            if ([datetime]::UtcNow -ge $next) { Write-Host (Get-LiveClientProgress $Run ([int][math]::Floor(([datetime]::UtcNow-$startedAt).TotalMinutes))); $next=[datetime]::UtcNow.AddSeconds(30) }
         }
         # Raw child streams are never copied into console/reports. The child persists closed evidence fields.
         if ($process.ExitCode -ne 0) { throw 'LIVE_CLIENT_FAILED' }
