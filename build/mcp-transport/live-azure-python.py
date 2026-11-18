@@ -4,6 +4,7 @@ No fixture/setup import, SQL, credential expiry mutation, insecure TLS or proxy 
 import asyncio
 import base64
 import hashlib
+from http.cookiejar import CookieJar, DefaultCookiePolicy
 import importlib.metadata
 import platform
 import json
@@ -75,6 +76,15 @@ def closed_errors(error):
         if isinstance(children, (tuple, list)):
             pending.extend(child for child in children[:32] if isinstance(child, BaseException))
     return result or [{'kind': 'UNKNOWN', 'code': None}]
+
+
+class NoCookies(DefaultCookiePolicy):
+    # The dedicated MCP client is bearer-only, including behind affinity-setting proxies.
+    def set_ok(self, cookie, request):
+        return False
+
+    def return_ok(self, cookie, request):
+        return False
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -233,6 +243,7 @@ class Acceptance:
         require(sdk_session.DISCOVER_TIMEOUT_SECONDS in (10.0, 660.0))
         sdk_session.DISCOVER_TIMEOUT_SECONDS = 660.0
         self.versions['sdk_discovery_timeout_seconds'] = 660.0
+        self.versions['sdk_cookie_policy'] = 'reject-all'
         # Long full-catalog verification must not accidentally age a five-minute
         # access token across multiple requests. Rotate through the real OAuth
         # endpoint before each SDK request; never extend SQL credential timestamps.
@@ -253,8 +264,10 @@ class Acceptance:
             now = time.monotonic()
             age = None if self.last_refresh_at is None else int(max(0, min(3_600_000, (now-self.last_refresh_at)*1000)))
             entry = {'substep': self.substep if self.substep in SUBSTEPS else 'UNKNOWN',
-                     'status': None, 'elapsedMillis': None, 'refreshAgeMillis': age}
+                     'status': None, 'elapsedMillis': None, 'refreshAgeMillis': age,
+                     'cookiePresent': 'cookie' in request.headers}
             self.sdk_requests.append(entry)
+            require(not entry['cookiePresent'])
             request.extensions['shale_acceptance_observation'] = (now, entry)
             self.last_http = {'operation': 'MCP', 'status': None}
 
@@ -266,7 +279,7 @@ class Acceptance:
 
         self.substep = 'SDK_DISCOVERY'
         async with httpx2.AsyncClient(headers={'Authorization': 'Bearer ' + token}, timeout=660, trust_env=False,
-                event_hooks={'request': [observe_request], 'response': [observe_response]}) as http:
+                cookies=CookieJar(policy=NoCookies()), event_hooks={'request': [observe_request], 'response': [observe_response]}) as http:
             async with Client(streamable_http_client(BASE + '/mcp', http_client=http), mode='auto', read_timeout_seconds=660) as client:
                 require(client.protocol_version == PROTOCOL)
 
