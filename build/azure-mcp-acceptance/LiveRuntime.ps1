@@ -253,6 +253,12 @@ function ConvertTo-LiveSafeCampaignCode([string]$Code) {
       'TENANT_POLICY_READ_FAILED','CLEANUP_NOT_CONFIRMED','CAMPAIGN_FAILED',
       'LIVE_CLIENT_START_FAILED','LIVE_CLIENT_INPUT_FAILED','LIVE_CLIENT_FAILED','LIVE_CLIENT_TIMEOUT','LIVE_CLIENT_REPORT_FAILED')
     if ($Code -cin $allowed -or $Code -cmatch '^CAMPAIGN_HTTP_[45][0-9]{2}$') { return $Code }
+    # Reuse the configuration writer's closed ARM-code grammar during activation.
+    try { throw $Code } catch {
+        $configurationCode=Get-LiveSafeConfigurationFailure $_
+        if ($configurationCode -cne 'ACCEPTANCE_CONFIGURATION_FAILED') { return $configurationCode }
+    }
+    if ($Code -ceq 'ACCEPTANCE_CONFIGURATION_WRITE_FAILED') { return $Code }
     return 'CAMPAIGN_FAILED'
 }
 function Get-LiveSafeCampaignFailure($Failure) {
@@ -261,6 +267,25 @@ function Get-LiveSafeCampaignFailure($Failure) {
     $status=0;try {$status=[int]$Failure.Exception.Response.StatusCode}catch{}
     if ($status -ge 400 -and $status -le 599) { return ('CAMPAIGN_HTTP_'+$status) }
     return $code
+}
+function Get-LiveCampaignDiagnostic($Failure) {
+    # No messages, paths, stack text, SQL, response bodies or arbitrary type names are retained.
+    $source='unknown';$line=0;$kind='UNKNOWN'
+    try {
+        $candidate=[IO.Path]::GetFileName($Failure.InvocationInfo.ScriptName)
+        if ($candidate -cin @('LiveRuntime.ps1','LiveConfiguration.ps1','CleanSlate.ps1')) {
+            $source=$candidate;$line=[int]$Failure.InvocationInfo.ScriptLineNumber
+        }
+    } catch { }
+    $cause=$Failure.Exception
+    for ($depth=0;$null -ne $cause -and $depth -lt 8;$depth++) {
+        if ($cause -is [TimeoutException]) { $kind='TIMEOUT';break }
+        if ($cause -is [OperationCanceledException]) { $kind='CANCELED';break }
+        if ($cause -is [Net.Http.HttpRequestException]) { $kind='HTTP_TRANSPORT';break }
+        if ($cause -is [IO.IOException]) { $kind='IO';break }
+        $cause=$cause.InnerException
+    }
+    return @{Source=$source;Line=$line;Kind=$kind}
 }
 function Invoke-LiveScm([string]$Command) {
     $token=Invoke-CleanAzure @('account','get-access-token','--resource','https://management.azure.com/')
@@ -413,7 +438,7 @@ function Start-LiveWorker([ValidatePattern('^acceptance-[a-f0-9]{32}-(before-dor
     Wait-LiveHealth
 }
 function Invoke-LiveCampaign($Context) {
-    $approved=$false; $sqlActivationAttempted=$false; $failure=$null; $failureCode=$null; $phase='approval'; $cleanup=$null; $steps=[Collections.Generic.List[object]]::new()
+    $approved=$false; $sqlActivationAttempted=$false; $failure=$null; $failureCode=$null; $diagnostic=$null; $phase='approval'; $cleanup=$null; $steps=[Collections.Generic.List[object]]::new()
     try {
         # The ONLY approval. No Force/switch/environment/parameter can supply this acknowledgement.
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
@@ -449,12 +474,16 @@ function Invoke-LiveCampaign($Context) {
         Invoke-LiveNativeChecks $Context.Specs $Context.Credentials $Context.Run
         $steps.Add(@{Id='native-identities-catalogs-binding-rls';Status='PASS'})
         $baseline=Get-LiveAuditBaseline $Context.Owner
-        $phase='synthetic-activation'
+        $phase='synthetic-sql-activation'
         $sqlActivationAttempted=$true # Set before dispatch: partial activation must receive full shutdown.
         Set-LiveSqlControls $true $Context.Owner $Context.Credentials
+        $phase='synthetic-app-activation'
         Set-LiveAppControls $true $Context.Run
+        $phase='activation-resource-verification'
         Assert-CleanResources
+        $phase='enabled-worker-start-and-health'
         Start-LiveWorker ('acceptance-'+$Context.Id+'-dormant')
+        $phase='enabled-worker-evidence'
         $markers=Assert-LiveWorker $Context.Hash $Context.Zones.Java -Ready
         $steps.Add(@{Id='enabled-startup';Status='PASS';Markers=$markers})
         $phase='live-client'
@@ -464,11 +493,11 @@ function Invoke-LiveCampaign($Context) {
         Assert-LiveAudits $Context.Owner $baseline $client.disclosures $client.overviews
         [void](Get-LiveBinding $Context.Evidence.Directory $Context.Owner); Assert-LiveSynthetic $Context.Owner
         $steps.Add(@{Id='durable-audits-unchanged-binding-and-fixture';Status='PASS'})
-    } catch { $failure=$phase; $failureCode=Get-LiveSafeCampaignFailure $_ } finally {
+    } catch { $failure=$phase; $failureCode=Get-LiveSafeCampaignFailure $_; $diagnostic=Get-LiveCampaignDiagnostic $_ } finally {
         if ($approved) { $cleanup=Stop-LiveAcceptance $Context.Owner $Context.Credentials $Context.Run -VerifySqlOnly:(-not $sqlActivationAttempted) }
         $pass=$approved -and -not $failure -and $cleanup.SqlOff -and $cleanup.AppOff -and $cleanup.ApplicationStopped
         if (-not $failure -and -not $pass) { $failureCode='CLEANUP_NOT_CONFIRMED' }
-        $result=@{Status=$(if($pass){'PASS'}else{'FAIL'});Approved=$approved;Failure=$failure;FailureCode=$failureCode;Cleanup=$cleanup;Steps=$steps.ToArray();
+        $result=@{Status=$(if($pass){'PASS'}else{'FAIL'});Approved=$approved;Failure=$failure;FailureCode=$failureCode;FailureDiagnostic=$diagnostic;Cleanup=$cleanup;Steps=$steps.ToArray();
           JarSHA256=$Context.Hash;BuildVersion=$Context.Version;SqlJournalHash=$Context.Evidence.JournalHash;
           Scope='Synthetic acceptance DCR/OAuth/MCP runtime; no production or CIMD/stock-browser certification'}
         [IO.File]::WriteAllText((Join-Path $Context.Run 'report.json'),($result | ConvertTo-Json -Depth 12))
