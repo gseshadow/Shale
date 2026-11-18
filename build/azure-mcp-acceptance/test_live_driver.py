@@ -21,6 +21,9 @@ live = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(live)
 
 
+WEB_TOKENS = {user: 'web-' + str(user) + '-' + 'x' * 64 for user in (71, 72, 81)}
+
+
 class FakeAcceptance(live.Acceptance):
     def __init__(self, directory):
         super().__init__(directory, {'admin@example.invalid': 'synthetic', 'badmin@example.invalid': 'synthetic', 'a72@example.invalid': 'synthetic'})
@@ -33,6 +36,9 @@ class FakeAcceptance(live.Acceptance):
         self.cases = []
         self.spoof_tenant = False
         self.accept_expired = False
+        self.wrong_web_denial = False
+        self.accept_web_token = False
+        self.web_denials = []
 
     def request(self, path, body=None, bearer=None, kind='form', headers=None):
         body = body or {}
@@ -43,18 +49,18 @@ class FakeAcceptance(live.Acceptance):
             return 200, {'resource': live.BASE + '/mcp', 'authorization_servers': [live.BASE + '/oauth/mcp']}, {}
         if path == '/api/auth/login':
             tenant, user = {'admin@example.invalid': (7, 71), 'badmin@example.invalid': (8, 81), 'a72@example.invalid': (7, 72)}[body['email']]
-            return 200, {'accessToken': 'web-' + str(user), 'user': {'userId': user, 'shaleClientId': tenant}}, {}
+            return 200, {'accessToken': WEB_TOKENS[user], 'user': {'userId': user, 'shaleClientId': tenant}}, {}
         if path == '/api/auth/logout':
             return 200, {}, {}
         if path == '/oauth/mcp/register':
             return 201, {'client_id': 'dcr.synthetic'}, {}
         if path in ('/oauth/mcp/onboarding', '/oauth/mcp/approval'):
-            tenant = 8 if bearer == 'web-81' else 7
+            tenant = 8 if bearer == WEB_TOKENS[81] else 7
             if path.endswith('approval'):
-                if bearer == 'web-72' or body['approval_id'] != str(tenant):
+                if bearer == WEB_TOKENS[72] or body['approval_id'] != str(tenant):
                     return 401, {}, {}
                 self.approvals[tenant] = body['decision'] == 'APPROVE'
-            return 200, {'state': 'APPROVED' if self.approvals.get(tenant) else 'PENDING', 'admin': bearer != 'web-72',
+            return 200, {'state': 'APPROVED' if self.approvals.get(tenant) else 'PENDING', 'admin': bearer != WEB_TOKENS[72],
                          'tenant': tenant, 'approval_id': str(tenant), 'approval_version': '0000000000000001'}, {}
         if path.startswith('/oauth/mcp/authorize?'):
             params = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlsplit(path).query).items()}
@@ -81,7 +87,7 @@ class FakeAcceptance(live.Acceptance):
                 if params['code_challenge'] != actual:
                     return 400, {}, {}
                 del self.codes[body['code']]
-                tenant = 8 if web == 'web-81' else 7
+                tenant = 8 if web == WEB_TOKENS[81] else 7
             else:
                 old = self.tokens.get(body['refresh_token'])
                 if not old or old['revoked'] or old['used'] or not self.approvals.get(old['tenant']):
@@ -104,6 +110,10 @@ class FakeAcceptance(live.Acceptance):
                 self.tokens[family['peer']]['revoked'] = True
             return 200, {}, {}
         if path == '/mcp':
+            if bearer and len('Bearer ' + bearer) > 50:
+                status = 200 if self.accept_web_token else 401 if self.wrong_web_denial else 400
+                self.web_denials.append(status)
+                return status, {}, {}
             if headers and headers.get('Origin') == 'https://attacker.invalid':
                 return 403, {}, {}
             if headers and headers.get('MCP-Protocol-Version') == '2099-01-01':
@@ -195,6 +205,16 @@ class LiveDriverTest(unittest.TestCase):
         self.assertEqual(len(report['records']), 8)
         self.assertGreaterEqual(a.clock, 1302)
         self.assertTrue(all(family['revoked'] for family in a.tokens.values()))
+
+    def test_real_size_web_jwt_requires_header_rejection_and_never_acceptance(self):
+        code, report, a = self.campaign()
+        self.assertEqual(code, 0, report)
+        self.assertEqual(a.web_denials, [400])
+        for mutation in ('wrong_web_denial', 'accept_web_token'):
+            code, report, _ = self.campaign(mutation)
+            self.assertEqual(code, 1, mutation)
+            self.assertEqual(report['failedCheck'], 'oauth-s256-state-code-replay')
+            self.assertEqual(report['failureDiagnostic']['substep'], 'REJECT_WEB_JWT')
 
     def test_slow_verification_uses_real_refresh_and_keeps_the_natural_expiry_probe_independent(self):
         code, report, a = self.campaign('slow_mcp')

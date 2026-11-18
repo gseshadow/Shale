@@ -24,7 +24,8 @@ SCOPES = ['cases.search', 'cases.overview.read']
 REDIRECT = 'http://127.0.0.1:27891/callback'
 SUBSTEPS = frozenset(('LOGIN_ADMIN', 'LOGIN_BADMIN', 'LOGIN_MEMBER', 'REGISTER_CLIENT',
     'ONBOARD_MEMBER', 'DENY_MEMBER_APPROVAL', 'DENY_CROSS_TENANT_APPROVAL',
-    'ONBOARD_ADMIN_A', 'APPROVE_ADMIN_A', 'ONBOARD_ADMIN_B', 'APPROVE_ADMIN_B'))
+    'ONBOARD_ADMIN_A', 'APPROVE_ADMIN_A', 'ONBOARD_ADMIN_B', 'APPROVE_ADMIN_B',
+    'REJECT_WEB_JWT', 'REJECT_REFRESH_TOKEN', 'REJECT_ORIGIN', 'REJECT_PROTOCOL'))
 OPERATIONS = {'/api/auth/login': 'WEB_LOGIN', '/api/auth/logout': 'WEB_LOGOUT',
     '/oauth/mcp/register': 'CLIENT_REGISTRATION', '/oauth/mcp/onboarding': 'ONBOARDING',
     '/oauth/mcp/approval': 'APPROVAL', '/oauth/mcp/authorize': 'AUTHORIZATION',
@@ -163,6 +164,12 @@ class Acceptance:
                                 'io.modelcontextprotocol/clientCapabilities': {}}}}, token, 'json',
             {'MCP-Protocol-Version': PROTOCOL, 'Mcp-Method': 'server/discover', **(extra_headers or {})})
 
+    def expect_discovery_status(self, token, expected, extra_headers=None):
+        code, _, _ = self.raw_discover(token, extra_headers)
+        if self.last_http is not None:
+            self.last_http['expectedStatus'] = expected
+        require(code == expected)
+
     async def tools(self, token, tenant, *, full=True):
         import httpx2
         from mcp import Client
@@ -257,9 +264,18 @@ class Acceptance:
         fa, _ = self.authorize(client, a)
         fb, _ = self.authorize(client, b)
         expiry, issued = self.authorize(client, a)
-        require(self.raw_discover(a)[0] == 401 and self.raw_discover(fa['refresh_token'])[0] == 401)
-        require(self.raw_discover(fa['access_token'], {'Origin': 'https://attacker.invalid'})[0] == 403)
-        require(self.raw_discover(fa['access_token'], {'MCP-Protocol-Version': '2099-01-01'})[0] == 400)
+        # Real WEB JWTs exceed McpGate's 50-character Authorization ceiling.
+        # The header check precedes authentication: require its exact 400 rejection.
+        self.substep = 'REJECT_WEB_JWT'
+        require(len('Bearer ' + a) > 50)
+        self.expect_discovery_status(a, 400)
+        self.substep = 'REJECT_REFRESH_TOKEN'
+        self.expect_discovery_status(fa['refresh_token'], 401)
+        self.substep = 'REJECT_ORIGIN'
+        self.expect_discovery_status(fa['access_token'], 403, {'Origin': 'https://attacker.invalid'})
+        self.substep = 'REJECT_PROTOCOL'
+        self.expect_discovery_status(fa['access_token'], 400, {'MCP-Protocol-Version': '2099-01-01'})
+        self.substep = None
         self.record(self.current)
         self.current = 'sdk-initialize-tools-case-reads-isolation-denials'
         await self.tools(fa['access_token'], 7)
