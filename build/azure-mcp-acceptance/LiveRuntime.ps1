@@ -248,6 +248,7 @@ function ConvertTo-LiveSafeCampaignCode([string]$Code) {
     $allowed=@('OPERATOR_DECLINED','PRIOR_EVIDENCE_CHANGED','DEPLOYMENT_STARTED_APP_UNEXPECTEDLY',
       'DEPLOYED_JAR_HASH_MISMATCH','WORKER_READINESS_EVIDENCE_MISSING','HEALTH_TIMEOUT',
       'DORMANT_READINESS_REQUIRED','DORMANT_ROUTE_OPEN','SCM_COMMAND_FAILED',
+      'SCM_READ_TIMEOUT','SCM_READ_TRANSPORT_FAILED','SCM_READ_COMMAND_REFUSED',
       'WORKER_LOG_INVENTORY_FAILED','WORKER_LOG_NAME_REFUSED','WORKER_LOG_BOUND_EXCEEDED',
       'WORKER_LOG_ARCHIVE_UNCONFIRMED','SQL_ACTIVATION_FAILED','SQL_SHUTDOWN_NOT_CONFIRMED',
       'TENANT_POLICY_READ_FAILED','CLEANUP_NOT_CONFIRMED','CAMPAIGN_FAILED',
@@ -287,20 +288,41 @@ function Get-LiveCampaignDiagnostic($Failure) {
     }
     return @{Source=$source;Line=$line;Kind=$kind}
 }
-function Invoke-LiveScm([string]$Command) {
+function Invoke-LiveScm([string]$Command,[switch]$ReadOnly) {
+    # Only these fixed evidence reads may receive the longer transport budget and one retry.
+    if ($ReadOnly -and $Command -cne 'sha256sum /home/site/wwwroot/app.jar' -and
+        $Command -cnotmatch '^tail -c 200000 /home/LogFiles/(?:Application/)?[A-Za-z0-9_.-]+\.log$') {
+        throw 'SCM_READ_COMMAND_REFUSED'
+    }
+    $timeout=if($ReadOnly){180}else{45};$attempts=if($ReadOnly){2}else{1}
     $token=Invoke-CleanAzure @('account','get-access-token','--resource','https://management.azure.com/')
     try {
-        $result=Invoke-RestMethod -Uri 'https://shale-mcp-acceptance.scm.azurewebsites.net/api/command' -Method Post -TimeoutSec 45 -Headers @{Authorization=('Bearer '+$token.accessToken)} -ContentType 'application/json' -Body (@{command=$Command;dir='/home/site/wwwroot'} | ConvertTo-Json)
-        if ($result.ExitCode -ne 0 -or $result.Output.Length -gt 2000000) { throw 'SCM_COMMAND_FAILED' }; return $result.Output
+        for($attempt=1;$attempt -le $attempts;$attempt++) {
+            try {
+                $result=Invoke-RestMethod -Uri 'https://shale-mcp-acceptance.scm.azurewebsites.net/api/command' -Method Post -TimeoutSec $timeout -MaximumRedirection 0 -Headers @{Authorization=('Bearer '+$token.accessToken)} -ContentType 'application/json' -Body (@{command=$Command;dir='/home/site/wwwroot'} | ConvertTo-Json)
+            } catch {
+                if(-not $ReadOnly){throw} # Archive/move mutations are never replayed.
+                $failure=$_;$kind=(Get-LiveCampaignDiagnostic $failure).Kind;$status=0
+                try{$status=[int]$failure.Exception.Response.StatusCode}catch{}
+                $transient=if($status -ge 400){$status -in @(408,429,500,502,503,504)}else{$kind -cin @('TIMEOUT','CANCELED','HTTP_TRANSPORT')}
+                if($transient -and $attempt -lt $attempts){Start-Sleep -Seconds 2;continue}
+                if($kind -cin @('TIMEOUT','CANCELED')){throw 'SCM_READ_TIMEOUT'}
+                if($kind -ceq 'HTTP_TRANSPORT' -and $status -eq 0){throw 'SCM_READ_TRANSPORT_FAILED'}
+                throw $failure
+            }
+            # Invalid output or failed commands are evidence failures, never retry candidates.
+            if ($result.ExitCode -ne 0 -or $result.Output.Length -gt 2000000) { throw 'SCM_COMMAND_FAILED' }
+            return $result.Output
+        }
     } finally { $token=$null }
 }
 function Assert-LiveWorker([string]$Hash,[string]$JavaZone,[switch]$Ready) {
-    $remote=Invoke-LiveScm 'sha256sum /home/site/wwwroot/app.jar'
+    $remote=Invoke-LiveScm 'sha256sum /home/site/wwwroot/app.jar' -ReadOnly
     if ($remote.Trim() -cnotmatch '^([a-fA-F0-9]{64})  /home/site/wwwroot/app.jar$' -or $Matches[1] -ine $Hash) { throw 'DEPLOYED_JAR_HASH_MISMATCH' }
     # Old worker logs are moved out of this directory before start; only closed markers are retained.
     $logs=[Text.StringBuilder]::new()
     foreach ($path in @(Get-LiveWorkerLogPaths)) {
-        [void]$logs.AppendLine((Invoke-LiveScm ('tail -c 200000 '+$path)))
+        [void]$logs.AppendLine((Invoke-LiveScm ('tail -c 200000 '+$path) -ReadOnly))
         if ($logs.Length -gt 2000000) { throw 'WORKER_LOG_BOUND_EXCEEDED' }
     }
     $logs=$logs.ToString()

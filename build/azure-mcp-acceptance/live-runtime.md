@@ -390,3 +390,17 @@ records exception text, stack paths, response bodies or credential material. Str
 rejection codes use the existing configuration classifier and survive campaign reporting.
 No retry, deadline, approval, verification, shutdown or domain audit behavior changes.
 These fields are operational evidence; no SQL schema or application audit event is introduced.
+
+
+## SCM evidence transport budget
+
+The 19f2db2e3eca418a96464da183f3af02 run passed enabled health, then canceled an SCM
+command request during worker-evidence verification under the independent 45-second timeout.
+Only fixed app.jar hashing and bounded current-log tail commands use a 180-second timeout,
+with at most two attempts and two seconds between transient transport/408/429/500/502/503/504
+failures. Authentication/authorization failures, command failures, malformed output, hash mismatches
+and missing readiness markers remain failures. Archive/move commands keep one 45-second attempt.
+This retries evidence reads only, never a deployment, activation, SQL operation or campaign.
+Redirects remain disabled. Hash, fresh-log and readiness assertions are unchanged. Read timeout
+and transport failures retain closed campaign codes. Operational evidence uses the existing
+private run report; no domain audit action or SQL schema change applies.
