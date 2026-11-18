@@ -100,7 +100,8 @@ $script:paths=[Collections.Generic.List[string]]::new()
 $script:paths.Add('/home/LogFiles/old_docker.log');$script:paths.Add('/home/LogFiles/Application/spring.old.log')
 $script:archived=[Collections.Generic.List[string]]::new();$script:started=$false;$script:wrongHash=$false;$script:skipMove=$false
 function Get-LiveWorkerLogPaths {return $script:paths.ToArray()}
-function Invoke-LiveScm($Command){
+function Invoke-LiveScm($Command,[switch]$ReadOnly){
+ if(($Command.StartsWith('sha256sum ') -or $Command.StartsWith('tail ')) -ne [bool]$ReadOnly){throw 'Evidence read budget missing or mutation retry enabled'}
  foreach($shellToken in @(([string][char]39),([string][char]34),'&&','*',';')){if($Command.Contains($shellToken)){throw 'SCM is not a shell'}}
  $argv=$Command.Split(' ')
  switch($argv[0]){
@@ -124,6 +125,40 @@ $script:wrongHash=$true;$refused=$false;try{Assert-LiveWorker ('A'*64) 'UTC'}cat
 $script:skipMove=$true;$script:started=$false;$refused=$false
 try{Start-LiveWorker $archive}catch{$refused=$true;if($_.Exception.Message -cne 'WORKER_LOG_ARCHIVE_UNCONFIRMED'){throw 'Archive refusal diagnostic changed'}}
 if(-not $refused -or $script:started){throw 'Unconfirmed stale-log archive allowed startup'}
+''')
+
+    def test_scm_read_budget_retry_and_fail_closed_contract(self):
+        self.ps(r'''
+$script:calls=0;$script:sleeps=0;$script:mode='recover';$script:expectedTimeout=180
+function Invoke-CleanAzure {return @{accessToken='SYNTHETIC_SECRET_SENTINEL'}}
+function Start-Sleep($Seconds){if($Seconds -ne 2){throw 'Unbounded backoff'};$script:sleeps++}
+function Invoke-RestMethod($Uri,$Method,$TimeoutSec,$MaximumRedirection,$Headers,$Body){
+ $script:calls++
+ if($TimeoutSec -ne $script:expectedTimeout -or $MaximumRedirection -ne 0 -or $Uri -cne 'https://shale-mcp-acceptance.scm.azurewebsites.net/api/command'){throw 'Fixed transport contract changed'}
+ if($script:mode -ceq 'recover' -and $script:calls -eq 1){throw [TimeoutException]::new('PRIVATE_SENTINEL')}
+ if($script:mode -ceq 'timeout'){throw [OperationCanceledException]::new('PRIVATE_SENTINEL')}
+ if($script:mode -ceq 'transport'){throw [Net.Http.HttpRequestException]::new('PRIVATE_SENTINEL')}
+ if($script:mode -ceq 'forbidden'){$r=[Net.Http.HttpResponseMessage]::new([Net.HttpStatusCode]::Forbidden);throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('PRIVATE_SENTINEL',$r)}
+ if($script:mode -ceq 'throttled' -and $script:calls -eq 1){$r=[Net.Http.HttpResponseMessage]::new([Net.HttpStatusCode]::TooManyRequests);throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('PRIVATE_SENTINEL',$r)}
+ return @{ExitCode=$(if($script:mode -ceq 'bad-command'){1}else{0});Output='evidence'}
+}
+foreach($mode in @('recover','throttled')){
+ $script:mode=$mode;$script:calls=0;$script:sleeps=0
+ if((Invoke-LiveScm 'sha256sum /home/site/wwwroot/app.jar' -ReadOnly) -cne 'evidence' -or $script:calls -ne 2 -or $script:sleeps -ne 1){throw 'Bounded evidence retry failed'}
+}
+foreach($pair in @(@('timeout',2,'SCM_READ_TIMEOUT'),@('transport',2,'SCM_READ_TRANSPORT_FAILED'),@('forbidden',1,'CAMPAIGN_HTTP_403'),@('bad-command',1,'SCM_COMMAND_FAILED'))){
+ $script:mode=$pair[0];$script:calls=0;$safe='unexpected-success'
+ try{Invoke-LiveScm 'tail -c 200000 /home/LogFiles/Application/spring.worker.log' -ReadOnly}catch{$safe=Get-LiveSafeCampaignFailure $_}
+ if($safe -cne $pair[2] -or $script:calls -ne $pair[1]){throw ('Read failure contract: mode='+$pair[0]+' calls='+$script:calls+' code='+$safe)}
+}
+$script:expectedTimeout=45;$script:mode='timeout';$script:calls=0
+try{Invoke-LiveScm 'mv -- /home/LogFiles/a.log /home/LogFiles/archive/a.log'}catch{}
+if($script:calls -ne 1){throw 'Mutation was retried'}
+foreach($command in @('mkdir -p /home/LogFiles/archive','tail -c 200000 /etc/passwd','tail -c 200000 /home/LogFiles/../secrets.log','sha256sum /home/site/wwwroot/other.jar')){
+ $script:calls=0;$safe='unexpected-success'
+ try{Invoke-LiveScm $command -ReadOnly}catch{$safe=Get-LiveSafeCampaignFailure $_}
+ if($safe -cne 'SCM_READ_COMMAND_REFUSED' -or $script:calls -ne 0){throw 'Unsafe retry command dispatched'}
+}
 ''')
 
     def test_worker_log_inventory_uses_fixed_vfs_scopes_and_refuses_unsafe_names(self):
