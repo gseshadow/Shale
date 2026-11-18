@@ -26,6 +26,63 @@ class LiveRuntimeTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
+
+    def test_real_sdk_failure_records_http_and_closed_errors_without_network(self):
+        interpreter = ROOT / '.venv-mcp-acceptance/Scripts/python.exe'
+        if not interpreter.is_file():
+            self.skipTest('Operator SDK environment unavailable')
+        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+            script = r"""
+import asyncio,importlib.util,json,pathlib,sys,time
+from unittest.mock import patch
+import httpx2
+root=pathlib.Path.cwd()
+spec=importlib.util.spec_from_file_location('live_driver',root/'build/mcp-transport/live-azure-python.py')
+live=importlib.util.module_from_spec(spec);spec.loader.exec_module(live)
+a=live.Acceptance(sys.argv[1],{})
+family={'access_token':'a'*43,'refresh_token':'b'*43,'expires_in':300}
+a.families.append(('dcr.synthetic',family))
+def renew(client,current):
+    a.last_refresh_at=time.monotonic()
+    return current['access_token']
+a.renew_access=renew
+a.ok=lambda *args,**kwargs:{}
+real_client=httpx2.AsyncClient
+def handler(request):
+    return httpx2.Response(401,json={'PRIVATE_PAYLOAD_SENTINEL':'PRIVATE_TOKEN_SENTINEL'})
+def client(**kwargs):
+    return real_client(**kwargs,transport=httpx2.MockTransport(handler))
+async def execute():
+    a.current='sdk-initialize-tools-case-reads-isolation-denials'
+    await a.tools(family['access_token'],7)
+a.execute=execute
+with patch.object(httpx2,'AsyncClient',client):
+    assert asyncio.run(a.run_all())==1
+report=json.loads((pathlib.Path(sys.argv[1])/'http-report.json').read_text())
+assert report['failureDiagnostic']['substep']=='SDK_DISCOVERY',report['failureDiagnostic']
+assert report['failureDiagnostic']['operation']=='MCP'
+assert report['failureDiagnostic']['status']==401
+assert report['failureDiagnostic']['kind']=='MCP_ERROR',report['sdkDiagnostics']
+requests=report['sdkDiagnostics']['requests']
+assert 1<=len(requests)<=128
+assert all(r['status']==401 and r['elapsedMillis']>=0 and r['refreshAgeMillis']>=0 for r in requests)
+assert any(e=={'kind':'MCP_ERROR','code':-32603} for e in report['sdkDiagnostics']['errors'])
+assert 'PRIVATE_' not in json.dumps(report)
+assert report['credentialCleanup']
+print('OFFLINE_REAL_SDK_PASS')
+"""
+            result = subprocess.run([str(interpreter), '-c', script, directory], cwd=ROOT,
+                                    text=True, capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn('OFFLINE_REAL_SDK_PASS', result.stdout)
+
+    def test_nested_sdk_errors_keep_only_closed_kinds_and_numeric_codes(self):
+        mcp_error = type('MCPError', (Exception,), {'__module__': 'mcp.shared.exceptions', 'code': -32603})
+        error = ExceptionGroup('PRIVATE_GROUP_SENTINEL', [ValueError('PRIVATE_VALUE'), mcp_error('PRIVATE_MESSAGE')])
+        self.assertEqual(live.closed_errors(error), [{'kind': 'MCP_ERROR', 'code': -32603}])
+        mcp_error.code = 'PRIVATE_CODE_SENTINEL'
+        self.assertEqual(live.closed_errors(error), [{'kind': 'MCP_ERROR', 'code': None}])
+
     def test_real_client_process_uses_one_python_path_and_utf8_stdin_without_network(self):
         # Exercise the real entrypoint/process pipes; only the first HTTP attempt is blocked.
         with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
