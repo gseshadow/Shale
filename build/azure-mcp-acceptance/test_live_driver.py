@@ -39,6 +39,8 @@ class FakeAcceptance(live.Acceptance):
         self.wrong_web_denial = False
         self.accept_web_token = False
         self.web_denials = []
+        self.slow_oauth_denials = False
+        self.protocol_probe_ages = []
 
     def request(self, path, body=None, bearer=None, kind='form', headers=None):
         body = body or {}
@@ -110,18 +112,26 @@ class FakeAcceptance(live.Acceptance):
                 self.tokens[family['peer']]['revoked'] = True
             return 200, {}, {}
         if path == '/mcp':
+            if self.slow_oauth_denials and self.current == 'oauth-s256-state-code-replay':
+                self.clock += 180
             if bearer and len('Bearer ' + bearer) > 50:
                 status = 200 if self.accept_web_token else 401 if self.wrong_web_denial else 400
                 self.web_denials.append(status)
                 return status, {}, {}
             if headers and headers.get('Origin') == 'https://attacker.invalid':
                 return 403, {}, {}
-            if headers and headers.get('MCP-Protocol-Version') == '2099-01-01':
-                return 400, {}, {}
             token = self.tokens.get(bearer)
             good = token and token['kind'] == 'ACCESS' and not token['revoked'] and self.approvals.get(token['tenant']) and (self.accept_expired or token['expiry'] > self.clock)
+            if headers and headers.get('MCP-Protocol-Version') == '2099-01-01':
+                self.protocol_probe_ages.append(None if not token else 300 - (token['expiry'] - self.clock))
+                return (400 if good else 401), {}, {}
             return (200 if good else 401), {}, {'WWW-Authenticate': 'Bearer resource_metadata="' + live.BASE + '/.well-known/oauth-protected-resource/mcp"'}
         raise AssertionError('Unexpected route')
+
+    def renew_access(self, client_id, family):
+        if getattr(self, 'skip_probe_renewal', False) and self.current == 'oauth-s256-state-code-replay':
+            return family['access_token']
+        return super().renew_access(client_id, family)
 
     async def sleep(self, seconds):
         self.clock += seconds
@@ -191,6 +201,8 @@ class LiveDriverTest(unittest.TestCase):
             a = FakeAcceptance(directory)
             if mutation:
                 setattr(a, mutation, True)
+            if mutation == 'skip_probe_renewal':
+                a.slow_oauth_denials = True
             with patch.dict(sys.modules, a.client_modules()), patch.object(live.time, 'monotonic', lambda: a.clock), patch.object(live.asyncio, 'sleep', a.sleep):
                 code = asyncio.run(a.run_all())
             return code, json.loads((pathlib.Path(directory) / 'http-report.json').read_text()), a
@@ -225,6 +237,16 @@ class LiveDriverTest(unittest.TestCase):
         self.assertGreater(a.clock, 4000, 'Simulate verification taking minutes across many requests')
         self.assertTrue(all(family['expires_in'] <= 300 for _, family in a.families))
         self.assertTrue(all(token['revoked'] for token in a.tokens.values()))
+
+    def test_slow_denial_checks_refresh_before_the_authenticated_protocol_probe(self):
+        code, report, a = self.campaign('slow_oauth_denials')
+        self.assertEqual(code, 0, report)
+        self.assertEqual(a.protocol_probe_ages, [180])
+        self.assertTrue(all(token['revoked'] for token in a.tokens.values()))
+        code, report, stale = self.campaign('skip_probe_renewal')
+        self.assertEqual(code, 1, report)
+        self.assertEqual(report['failureDiagnostic']['substep'], 'REJECT_PROTOCOL')
+        self.assertGreater(stale.protocol_probe_ages[0], 300)
 
     def test_cross_tenant_result_is_not_accepted_as_success(self):
         code, report, _ = self.campaign('spoof_tenant')

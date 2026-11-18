@@ -430,3 +430,20 @@ The offline workflow now uses realistically long WEB tokens and models header re
 authentication, with mutations proving 401 and 200 cannot satisfy this specific probe.
 No server, SQL, permission, token lifetime, header limit or audit behavior changes. This is a
 client assertion correction, not permission to use WEB credentials for MCP.
+
+
+## Fresh authority for authenticated denial probes
+
+The protocol-denial probe requires a valid ACCESS credential before the server checks an
+unsupported protocol. Earlier slow denial checks can age the originally issued five-minute
+token before that probe, turning the expected 400 into an authentication 401. The client
+uses its existing real refresh/rotation path immediately before origin and protocol probes,
+as it already does for SDK requests. Every previous generation stays in cleanup tracking.
+The fake now authenticates before rejecting protocol and simulates three minutes per denial
+request; the old client reproduces REJECT_PROTOCOL failure, while fresh tokens pass. Removing
+probe refresh fails again. Access TTL remains <=300 seconds, every denial status remains exact,
+and the independent unrefreshed natural-expiry probe is unchanged. No SQL timestamp rewrite,
+server configuration change, cached authority, bypass or added acceptance retry is introduced.
+The live 401 identifies an authentication failure; token aging is reproduced locally but any
+additional live admission issue still requires a separately approved campaign. Audit behavior
+is unchanged; refreshed credentials use the existing OAuth endpoints and cleanup lifecycle.
