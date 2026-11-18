@@ -22,6 +22,16 @@ BASE = 'https://shale-mcp-acceptance.azurewebsites.net'
 PROTOCOL = '2026-07-28'
 SCOPES = ['cases.search', 'cases.overview.read']
 REDIRECT = 'http://127.0.0.1:27891/callback'
+SUBSTEPS = frozenset(('LOGIN_ADMIN', 'LOGIN_BADMIN', 'LOGIN_MEMBER', 'REGISTER_CLIENT',
+    'ONBOARD_MEMBER', 'DENY_MEMBER_APPROVAL', 'DENY_CROSS_TENANT_APPROVAL',
+    'ONBOARD_ADMIN_A', 'APPROVE_ADMIN_A', 'ONBOARD_ADMIN_B', 'APPROVE_ADMIN_B'))
+OPERATIONS = {'/api/auth/login': 'WEB_LOGIN', '/api/auth/logout': 'WEB_LOGOUT',
+    '/oauth/mcp/register': 'CLIENT_REGISTRATION', '/oauth/mcp/onboarding': 'ONBOARDING',
+    '/oauth/mcp/approval': 'APPROVAL', '/oauth/mcp/authorize': 'AUTHORIZATION',
+    '/oauth/mcp/consent': 'CONSENT', '/oauth/mcp/token': 'TOKEN',
+    '/oauth/mcp/revoke': 'REVOCATION', '/mcp': 'MCP',
+    '/.well-known/oauth-authorization-server/oauth/mcp': 'AUTHORIZATION_METADATA',
+    '/.well-known/oauth-protected-resource/mcp': 'RESOURCE_METADATA'}
 
 
 def require(condition):
@@ -42,6 +52,9 @@ class Acceptance:
         self.families = []
         self.records = []
         self.current = 'https-discovery'
+        self.substep = None
+        self.last_http = None
+        self.failure_diagnostic = None
         self.versions = {'python': platform.python_version()}
         for package in ('mcp', 'httpx2'):
             try:
@@ -62,12 +75,14 @@ class Acceptance:
         if body is not None:
             h['Content-Type'] = 'application/json' if kind == 'json' else 'application/x-www-form-urlencoded'
             body = (json.dumps(body) if kind == 'json' else urllib.parse.urlencode(body, doseq=True)).encode()
+        self.last_http = {'operation': OPERATIONS.get(path.split('?', 1)[0], 'UNKNOWN'), 'status': None}
         req = urllib.request.Request(BASE + path, data=body, headers=h)
         try:
             response = self.client.open(req, timeout=660)
         except urllib.error.HTTPError as error:
             response = error
         with response:
+            self.last_http['status'] = int(response.status)
             raw = response.read(262145)
             require(len(raw) <= 262144)
             data = json.loads(raw) if raw and 'application/json' in response.headers.get('Content-Type', '') else {}
@@ -75,6 +90,8 @@ class Acceptance:
 
     def ok(self, path, body=None, bearer=None, kind='form', status=200):
         code, data, _ = self.request(path, body, bearer, kind)
+        if self.last_http is not None:
+            self.last_http['expectedStatus'] = status
         require(code == status)
         return data
 
@@ -87,13 +104,15 @@ class Acceptance:
         result = {'status': status, 'failedCheck': self.current if status == 'FAIL' else None,
                   'protocol': PROTOCOL, 'clientVersions': self.versions, 'records': self.records,
                   'disclosures': self.disclosures, 'overviews': self.overviews,
-                  'credentialCleanup': cleanup}
+                  'credentialCleanup': cleanup, 'failureDiagnostic': self.failure_diagnostic}
         target = self.run / 'http-report.json'
         temp = target.with_suffix('.tmp')
         temp.write_text(json.dumps(result, indent=2))
         temp.replace(target)
 
     def login(self, email, tenant, user):
+        self.substep = {'admin@example.invalid': 'LOGIN_ADMIN', 'badmin@example.invalid': 'LOGIN_BADMIN',
+                        'a72@example.invalid': 'LOGIN_MEMBER'}.get(email)
         result = self.ok('/api/auth/login', {'email': email, 'password': self.inputs[email]}, kind='json')
         token = result['accessToken']
         self.web.append(token)
@@ -215,18 +234,25 @@ class Acceptance:
         a = self.login('admin@example.invalid', 7, 71)
         b = self.login('badmin@example.invalid', 8, 81)
         member = self.login('a72@example.invalid', 7, 72)
+        self.substep = 'REGISTER_CLIENT'
         client = self.ok('/oauth/mcp/register', {'client_name': 'Synthetic automated acceptance',
             'redirect_uris': [REDIRECT], 'grant_types': ['authorization_code', 'refresh_token'],
             'response_types': ['code'], 'scope': ' '.join(SCOPES), 'token_endpoint_auth_method': 'none'}, kind='json', status=201)['client_id']
         require(client.startswith('dcr.'))
+        self.substep = 'ONBOARD_MEMBER'
         state = self.onboard(client, member)
         require(not state['admin'] and state['tenant'] == 7)
+        self.substep = 'DENY_MEMBER_APPROVAL'
         self.decide(client, state, member, expected=401)
+        self.substep = 'DENY_CROSS_TENANT_APPROVAL'
         self.decide(client, state, b, expected=401)
-        for web in (a, b):
+        for web, tenant_label in ((a, 'A'), (b, 'B')):
+            self.substep = 'ONBOARD_ADMIN_' + tenant_label
             state = self.onboard(client, web)
+            self.substep = 'APPROVE_ADMIN_' + tenant_label
             require(self.decide(client, state, web)['state'] == 'APPROVED')
         self.record(self.current)
+        self.substep = None
         self.current = 'oauth-s256-state-code-replay'
         fa, _ = self.authorize(client, a)
         fb, _ = self.authorize(client, b)
@@ -288,8 +314,21 @@ class Acceptance:
         try:
             await self.execute()
             status = 'PASS'
-        except Exception:
-            pass  # Only closed failedCheck goes to evidence; never exception/payload/token text.
+        except Exception as error:
+            # Capture BEFORE cleanup replaces the last HTTP operation. Never retain payload/error text.
+            reason = error.reason if isinstance(error, urllib.error.URLError) else error
+            kind = ('TIMEOUT' if isinstance(reason, TimeoutError) else
+                    'HTTP_TRANSPORT' if isinstance(error, (urllib.error.URLError, OSError)) else
+                    'RESPONSE_JSON' if isinstance(error, json.JSONDecodeError) else
+                    'RESPONSE_SCHEMA' if isinstance(error, (KeyError, TypeError)) else
+                    'ASSERTION' if isinstance(error, AssertionError) else 'UNKNOWN')
+            last = self.last_http or {}
+            number = lambda value: value if type(value) is int and 100 <= value <= 599 else None
+            self.failure_diagnostic = {
+                'substep': self.substep if self.substep in SUBSTEPS else 'UNKNOWN', 'kind': kind,
+                'operation': last.get('operation') if last.get('operation') in OPERATIONS.values() else 'UNKNOWN',
+                'status': number(last.get('status')), 'expectedStatus': number(last.get('expectedStatus'))}
+
         finally:
             for client, family in self.families:
                 try:

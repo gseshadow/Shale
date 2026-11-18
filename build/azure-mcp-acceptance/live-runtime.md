@@ -404,3 +404,15 @@ This retries evidence reads only, never a deployment, activation, SQL operation 
 Redirects remain disabled. Hash, fresh-log and readiness assertions are unchanged. Read timeout
 and transport failures retain closed campaign codes. Operational evidence uses the existing
 private run report; no domain audit action or SQL schema change applies.
+
+
+## Functional client failure details
+
+The first functional checkpoint (HTTPS discovery and anonymous denial) passed in run
+473e806d7dc843658446a9dcb8f38d89. The grouped login/registration/approval checkpoint failed,
+but its original HTTP response was discarded. Client failureDiagnostic now records a closed
+synthetic substep, closed endpoint operation, numeric actual/expected HTTP status and closed
+error category. Capture precedes logout/revocation cleanup so cleanup cannot replace the failed
+operation. No response bodies, URLs/queries, emails, tokens, exception messages or credentials
+are recorded. HTTP assertions and cleanup behavior remain unchanged; no retries or live
+requests are introduced. This is operational evidence, with no application audit/schema change.
