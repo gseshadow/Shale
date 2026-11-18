@@ -252,7 +252,7 @@ function ConvertTo-LiveSafeCampaignCode([string]$Code) {
       'SCM_READ_TIMEOUT','SCM_READ_TRANSPORT_FAILED','SCM_READ_COMMAND_REFUSED',
       'WORKER_LOG_INVENTORY_FAILED','WORKER_LOG_NAME_REFUSED','WORKER_LOG_BOUND_EXCEEDED',
       'WORKER_LOG_ARCHIVE_UNCONFIRMED','SQL_ACTIVATION_FAILED','SQL_SHUTDOWN_NOT_CONFIRMED',
-      'TENANT_POLICY_READ_FAILED','CLEANUP_NOT_CONFIRMED','CAMPAIGN_FAILED',
+      'TENANT_POLICY_READ_FAILED','CLEANUP_NOT_CONFIRMED','CAMPAIGN_FAILED','DURABLE_AUDIT_VERIFICATION_FAILED',
       'LIVE_CLIENT_START_FAILED','LIVE_CLIENT_INPUT_FAILED','LIVE_CLIENT_FAILED','LIVE_CLIENT_TIMEOUT','LIVE_CLIENT_REPORT_FAILED')
     if ($Code -cin $allowed -or $Code -cmatch '^CAMPAIGN_HTTP_[45][0-9]{2}$') { return $Code }
     # Reuse the configuration writer's closed ARM-code grammar during activation.
@@ -398,22 +398,55 @@ function Get-LiveAuditBaseline([pscredential]$Owner) {
 }
 function Assert-LiveAudits([pscredential]$Owner,$Baseline,[int]$Disclosures,[int]$Overviews) {
     if ($Disclosures -lt 7 -or $Overviews -lt 5) { throw 'LIVE_DISCLOSURES_REQUIRED' }
+    try {if($null -eq $Baseline.Access -or $null -eq $Baseline.Phi){throw 'MISSING_BASELINE'};$access=[long]$Baseline.Access;$phi=[long]$Baseline.Phi;if($access -lt 0 -or $phi -lt 0){throw 'INVALID_BASELINE'}}catch{throw 'AUDIT_BASELINE_REQUIRED'}
     $sql=@"
 DECLARE @matched bigint=(SELECT COUNT(DISTINCT i.InvocationId) FROM dbo.AiCimdInvocationV1 i
  JOIN dbo.IntegrationAccessAuditLog a ON a.ShaleClientId=i.ShaleClientId AND a.Id=i.ReadEventId AND a.InvocationId=i.InvocationId AND a.UserId=i.UserId AND a.Stage='READ' AND a.Outcome='ALLOWED_READ'
  JOIN dbo.IntegrationAccessAuditResource r ON r.ShaleClientId=a.ShaleClientId AND r.EventId=a.Id AND r.Relation='RETURNED'
  JOIN dbo.AiQuotaReservation q ON q.InvocationId=i.InvocationId AND q.ShaleClientId=i.ShaleClientId AND q.UserId=i.UserId AND q.ReleasedAt IS NOT NULL
- WHERE i.HandoffConsumed=1 AND a.Id>$($Baseline.Access));
-IF @matched<>$Disclosures OR (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Id>$($Baseline.Access) AND Stage='READ' AND Outcome='ALLOWED_READ')<>$Disclosures
- OR (SELECT COUNT_BIG(*) FROM dbo.auditLog WHERE FieldName='Case.Overview.Read')-$($Baseline.Phi)<>$Overviews
+ WHERE i.HandoffConsumed=1 AND a.Id>$access);
+IF @matched<>$Disclosures OR (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Id>$access AND Stage='READ' AND Outcome='ALLOWED_READ')<>$Disclosures
+ OR (SELECT COUNT_BIG(*) FROM dbo.auditLog WHERE FieldName='Case.Overview.Read')-$phi<>$Overviews
  OR EXISTS(SELECT 1 FROM dbo.IntegrationAccessAuditResource r JOIN dbo.IntegrationAccessAuditLog a ON a.ShaleClientId=r.ShaleClientId AND a.Id=r.EventId
- WHERE a.Id>$($Baseline.Access) AND r.Relation='RETURNED' AND NOT ((r.ShaleClientId=7 AND r.CaseId=100) OR (r.ShaleClientId=8 AND r.CaseId=200)))
- OR (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Id>$($Baseline.Access) AND Outcome IN('DENIED','INVALID_INPUT'))<6
+ WHERE a.Id>$access AND r.Relation='RETURNED' AND NOT ((r.ShaleClientId=7 AND r.CaseId=100) OR (r.ShaleClientId=8 AND r.CaseId=200)))
+ OR (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Id>$access AND Tool='get_case_overview' AND Stage='READ' AND Outcome='UNAVAILABLE' AND Reason='CASE_UNAVAILABLE' AND ReturnedCount=0)<>6
+ OR (SELECT COUNT(*) FROM dbo.IntegrationAccessAuditLog WHERE Id>$access AND Tool='search_cases' AND Stage='READ' AND Outcome='INVALID_INPUT' AND Reason='INPUT' AND ReturnedCount=0)<>2
+ OR EXISTS(SELECT 1 FROM dbo.IntegrationAccessAuditLog WHERE Id>$access AND Outcome='UNAVAILABLE' AND (Reason IS NULL OR Reason<>'CASE_UNAVAILABLE'))
  THROW 59804,'DURABLE_AUDIT_ACCEPTANCE_FAILED',1;
 SELECT CONCAT('LIVE_AUDIT_PASS:',@matched) AS AcceptanceResult;
 "@
-    [void](Invoke-LiveOwner $sql $Owner)
+    try {[void](Invoke-LiveOwner $sql $Owner)}catch{throw 'DURABLE_AUDIT_VERIFICATION_FAILED'}
 }
+function Get-LiveRecoveredAuditBaseline([string]$Run,[pscredential]$Owner,[int]$Disclosures,[int]$Overviews,[string]$SqlZone) {
+    if($Disclosures -ne 8 -or $Overviews -ne 6 -or $SqlZone -cnotmatch '^[A-Za-z0-9_+./: -]{1,100}$'){throw 'AUDIT_RECOVERY_REFUSED'}
+    $start=(Get-Item -LiteralPath $Run).CreationTimeUtc.ToString('yyyy-MM-ddTHH:mm:ss.fffffff')
+    $finish=(Get-Item -LiteralPath (Join-Path $Run 'report.json')).LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ss.fffffff')
+    $sql=@"
+DECLARE @start datetime2(7)='$start',@finish datetime2(7)='$finish';
+DECLARE @first bigint,@last bigint,@events bigint,@phi bigint,@totalPhi bigint;
+SELECT @first=MIN(Id),@last=MAX(Id),@events=COUNT_BIG(*) FROM dbo.IntegrationAccessAuditLog WHERE OccurredAt>=@start AND OccurredAt<=@finish;
+IF @first IS NULL OR @events<>16 OR @last<>(SELECT MAX(Id) FROM dbo.IntegrationAccessAuditLog)
+ OR EXISTS(SELECT 1 FROM dbo.IntegrationAccessAuditLog WHERE Id>=@first AND (OccurredAt<@start OR OccurredAt>@finish))
+ THROW 59804,'AUDIT_RECOVERY_WINDOW_REFUSED',1;
+SELECT @phi=COUNT_BIG(*) FROM dbo.auditLog WHERE FieldName='Case.Overview.Read'
+ AND (TRY_CONVERT(datetime2(7),EntryDate) AT TIME ZONE N'$SqlZone') AT TIME ZONE 'UTC'>=@start
+ AND (TRY_CONVERT(datetime2(7),EntryDate) AT TIME ZONE N'$SqlZone') AT TIME ZONE 'UTC'<=@finish;
+IF @phi<>6 OR EXISTS(SELECT 1 FROM dbo.auditLog WHERE FieldName='Case.Overview.Read' AND (TRY_CONVERT(datetime2(7),EntryDate) IS NULL OR (TRY_CONVERT(datetime2(7),EntryDate) AT TIME ZONE N'$SqlZone') AT TIME ZONE 'UTC'>@finish)) OR EXISTS(SELECT 1 FROM dbo.auditLog WHERE FieldName='Case.Overview.Read'
+ AND (TRY_CONVERT(datetime2(7),EntryDate) AT TIME ZONE N'$SqlZone') AT TIME ZONE 'UTC'>=@start
+ AND (TRY_CONVERT(datetime2(7),EntryDate) AT TIME ZONE N'$SqlZone') AT TIME ZONE 'UTC'<=@finish
+ AND (ObjectTypeId IS NULL OR ObjectTypeId<>1 OR TRY_CONVERT(int,FieldCode) IS NULL OR TRY_CONVERT(int,FieldCode)<>4 OR StringValue IS NULL OR StringValue<>'action=READ;screen=Case.Overview'
+ OR ShaleClientId IS NULL OR UserId IS NULL OR ObjectId IS NULL OR NOT ((ShaleClientId=7 AND UserId=71 AND ObjectId=100) OR (ShaleClientId=8 AND UserId=81 AND ObjectId=200))))
+ THROW 59804,'AUDIT_RECOVERY_PHI_REFUSED',1;
+SELECT @totalPhi=COUNT_BIG(*) FROM dbo.auditLog WHERE FieldName='Case.Overview.Read';
+SELECT CONCAT('LIVE_RECOVER_BASE:',@first-1,':',@totalPhi-@phi) AS AcceptanceResult;
+"@
+    try {$lines=Invoke-LiveOwner $sql $Owner}catch{throw 'AUDIT_RECOVERY_REFUSED'}
+    $markers=@($lines | Where-Object {$_ -cmatch '^LIVE_RECOVER_BASE:[0-9]+:[0-9]+$'})
+    if($markers.Count -ne 1){throw 'AUDIT_RECOVERY_REFUSED'}
+    $parts=$markers[0].Split(':')
+    return @{Access=[long]$parts[1];Phi=[long]$parts[2];Source='RECOVERED_WINDOW';WindowStartUtc=$start;WindowEndUtc=$finish}
+}
+
 function Get-LiveClientProgress([string]$Run,[int]$ElapsedMinutes=0) {
     $stream=$null;$reader=$null
     try {
@@ -517,6 +550,8 @@ function Invoke-LiveCampaign($Context) {
         Invoke-LiveNativeChecks $Context.Specs $Context.Credentials $Context.Run
         $steps.Add(@{Id='native-identities-catalogs-binding-rls';Status='PASS'})
         $baseline=Get-LiveAuditBaseline $Context.Owner
+        [IO.File]::WriteAllText((Join-Path $Context.Run 'audit-baseline.json'),($baseline|ConvertTo-Json))
+        New-CleanEvent (Join-Path $Context.Run 'journal.jsonl') @{Kind='audit-baseline';Access=$baseline.Access;Phi=$baseline.Phi}
         $phase='synthetic-sql-activation'
         $sqlActivationAttempted=$true # Set before dispatch: partial activation must receive full shutdown.
         Set-LiveSqlControls $true $Context.Owner $Context.Credentials
