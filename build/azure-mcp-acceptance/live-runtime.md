@@ -363,3 +363,19 @@ SQL/app cleanup was underway by 22:51:29Z; DCR's control check then returned dis
 22:51:55Z. That late DCR refusal is cleanup evidence, not an independent control-configuration
 finding. Startup is allowed up to the already-reviewed 30-minute platform allowance while
 batched verification removes the dominant per-column network cost.
+
+
+## Real client process handoff
+
+Windows Get-Command can return multiple Python ApplicationInfo entries. The child launcher
+selects the first Source, matching preflight PATH precedence, instead of converting the complete
+array into one invalid executable filename. Credential JSON uses explicit UTF-8 without a BOM
+over redirected stdin; PYTHONIOENCODING=utf-8 fixes the child decoding contract without putting
+credentials in environment variables. Startup, input, exit, timeout and report failures retain
+separate closed failure codes instead of collapsing to CAMPAIGN_FAILED.
+
+A real-process offline regression starts the actual Python entrypoint with synthetic credentials,
+multiple interpreter matches and Unicode stdin. A test-only sitecustomize blocks HTTP before
+any connection and confirms the child creates its normal failed-check/cleanup report. No live
+resource or credential is used. This closes the process-launch coverage gap left by workflow
+tests that previously replaced Invoke-LiveClient.
