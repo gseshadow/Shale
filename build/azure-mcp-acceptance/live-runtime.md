@@ -416,3 +416,17 @@ error category. Capture precedes logout/revocation cleanup so cleanup cannot rep
 operation. No response bodies, URLs/queries, emails, tokens, exception messages or credentials
 are recorded. HTTP assertions and cleanup behavior remain unchanged; no retries or live
 requests are introduced. This is operational evidence, with no application audit/schema change.
+
+
+## WEB JWT rejection at the MCP header boundary
+
+Run 38196d41124e4eb4a8da84f09c3ad9ba passed synthetic logins, registration and approvals.
+The first post-exchange denial probe sends an ordinary WEB JWT to MCP. Its Authorization
+header exceeds McpGate's existing 50-character ceiling; header validation precedes credential
+admission and returns 400. The client requires that exact rejection, separately from the 401
+required for a refresh credential. A JWT must actually exceed the ceiling for this probe;
+no successful response or alternative status is accepted. Origin/version denials remain exact.
+The offline workflow now uses realistically long WEB tokens and models header rejection before
+authentication, with mutations proving 401 and 200 cannot satisfy this specific probe.
+No server, SQL, permission, token lifetime, header limit or audit behavior changes. This is a
+client assertion correction, not permission to use WEB credentials for MCP.

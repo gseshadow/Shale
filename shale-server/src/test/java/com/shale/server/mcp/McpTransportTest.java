@@ -95,7 +95,11 @@ class McpTransportTest {
         var tokens=new com.shale.server.runtime.ShaleAuthTokenService("synthetic-ordinary-shale-jwt-secret-32-bytes",3600,java.time.Clock.systemUTC());
         String jwt=tokens.issue(new com.shale.server.runtime.ServerPrincipal(42,7,null));
         assertTrue(tokens.verifyToken(jwt).isPresent());
-        for(String value:List.of("Bearer "+jwt,"Bearer malformed.jwt.like","Bearer "+"b".repeat(43),"Basic bad")) {
+        assertTrue(("Bearer "+jwt).length()>50,"Ordinary WEB JWT exceeds the MCP header ceiling");
+        var web=request("server/discover");web.removeHeader("Authorization");web.addHeader("Authorization","Bearer "+jwt);
+        assertEquals(400,send(web).getStatus(),"Oversized WEB JWT is rejected before credential admission");
+        assertEquals(0,authentications.get(),"Header rejection must not invoke credential admission");
+        for(String value:List.of("Bearer malformed.jwt.like","Bearer "+"b".repeat(43),"Basic bad")) {
             var r=request("server/discover");r.removeHeader("Authorization");r.addHeader("Authorization",value);
             assertTrue(send(r).getStatus()>=400);
         }
