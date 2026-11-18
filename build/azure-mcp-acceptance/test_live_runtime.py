@@ -497,6 +497,8 @@ $refused=$false;try{Invoke-LiveNativeChecks @($bad) $c}catch{$refused=$true};if(
             a.families = [('dcr.synthetic', {'access_token': 'PRIVATE_ACCESS_SENTINEL'})]
             async def fail():
                 a.current = 'oauth-s256-state-code-replay'
+                a.substep = 'PRIVATE_SUBSTEP_SENTINEL'
+                a.last_http = {'operation': 'PRIVATE_OPERATION_SENTINEL', 'status': True}
                 raise RuntimeError('PRIVATE_EXCEPTION_SENTINEL')
             a.execute = fail
             calls = []
@@ -506,6 +508,37 @@ $refused=$false;try{Invoke-LiveNativeChecks @($bad) $c}catch{$refused=$true};if(
             report = (Path(directory) / 'http-report.json').read_text()
             self.assertNotIn('PRIVATE_', report)
             self.assertEqual(json.loads(report)['status'], 'FAIL')
+
+    def test_client_failure_details_preserve_login_status_before_cleanup_without_secrets(self):
+        for mode, kind, status in (('unauthorized', 'ASSERTION', 401),
+                                   ('schema', 'RESPONSE_SCHEMA', 200),
+                                   ('json', 'RESPONSE_JSON', 200),
+                                   ('timeout', 'TIMEOUT', None)):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                a = live.Acceptance(directory, {'admin@example.invalid': 'PRIVATE_PASSWORD_SENTINEL'})
+                a.web.append('PRIVATE_WEB_SENTINEL')
+                class Response:
+                    headers = {'Content-Type': 'application/json'}
+                    def __init__(self, code, malformed=False): self.status, self.malformed = code, malformed
+                    def __enter__(self): return self
+                    def __exit__(self, *args): pass
+                    def read(self, *args): return b'PRIVATE_MALFORMED_SENTINEL' if self.malformed else b'{"PRIVATE_PAYLOAD_SENTINEL":true}'
+                def open_request(request, **kwargs):
+                    if request.full_url.endswith('/api/auth/logout'): return Response(200)
+                    if mode == 'timeout': raise TimeoutError('PRIVATE_EXCEPTION_SENTINEL')
+                    return Response(status, mode == 'json')
+                a.client.open = open_request
+                async def execute():
+                    a.current = 'synthetic-web-login-registration-approval'
+                    a.login('admin@example.invalid', 7, 71)
+                a.execute = execute
+                self.assertEqual(asyncio.run(a.run_all()), 1)
+                report = json.loads((Path(directory) / 'http-report.json').read_text())
+                self.assertEqual(report['failureDiagnostic'], {'substep': 'LOGIN_ADMIN',
+                    'kind': kind, 'operation': 'WEB_LOGIN', 'status': status,
+                    'expectedStatus': None if mode in ('timeout', 'json') else 200})
+                self.assertTrue(report['credentialCleanup'])
+                self.assertNotIn('PRIVATE_', json.dumps(report))
 
     def test_live_client_cleanup_failure_cannot_pass(self):
         with tempfile.TemporaryDirectory() as directory:
