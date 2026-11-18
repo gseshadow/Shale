@@ -250,7 +250,8 @@ function ConvertTo-LiveSafeCampaignCode([string]$Code) {
       'DORMANT_READINESS_REQUIRED','DORMANT_ROUTE_OPEN','SCM_COMMAND_FAILED',
       'WORKER_LOG_INVENTORY_FAILED','WORKER_LOG_NAME_REFUSED','WORKER_LOG_BOUND_EXCEEDED',
       'WORKER_LOG_ARCHIVE_UNCONFIRMED','SQL_ACTIVATION_FAILED','SQL_SHUTDOWN_NOT_CONFIRMED',
-      'TENANT_POLICY_READ_FAILED','CLEANUP_NOT_CONFIRMED','CAMPAIGN_FAILED')
+      'TENANT_POLICY_READ_FAILED','CLEANUP_NOT_CONFIRMED','CAMPAIGN_FAILED',
+      'LIVE_CLIENT_START_FAILED','LIVE_CLIENT_INPUT_FAILED','LIVE_CLIENT_FAILED','LIVE_CLIENT_TIMEOUT','LIVE_CLIENT_REPORT_FAILED')
     if ($Code -cin $allowed -or $Code -cmatch '^CAMPAIGN_HTTP_[45][0-9]{2}$') { return $Code }
     return 'CAMPAIGN_FAILED'
 }
@@ -366,14 +367,26 @@ SELECT CONCAT('LIVE_AUDIT_PASS:',@matched) AS AcceptanceResult;
     [void](Invoke-LiveOwner $sql $Owner)
 }
 function Invoke-LiveClient([string]$Run,$HumanCredentials) {
-    $psi=[Diagnostics.ProcessStartInfo]::new(); $psi.FileName=(Get-Command python -CommandType Application).Source
+    $psi=[Diagnostics.ProcessStartInfo]::new()
+    try {
+        # Get-Command may return multiple ApplicationInfo objects on Windows.
+        # Match the first executable that the preflight's plain python invocation uses.
+        $psi.FileName=Get-Command python -CommandType Application | Select-Object -First 1 -ExpandProperty Source
+        if ([string]::IsNullOrWhiteSpace($psi.FileName)) { throw 'PYTHON_UNAVAILABLE' }
+    } catch { throw 'LIVE_CLIENT_START_FAILED' }
     $psi.UseShellExecute=$false; $psi.RedirectStandardInput=$true; $psi.RedirectStandardOutput=$true; $psi.RedirectStandardError=$true
+    $psi.StandardInputEncoding=[Text.UTF8Encoding]::new($false)
+    $psi.Environment['PYTHONIOENCODING']='utf-8'
     $psi.ArgumentList.Add((Join-Path $PSScriptRoot '../mcp-transport/live-azure-python.py')); $psi.ArgumentList.Add($Run)
     $process=[Diagnostics.Process]::new(); $process.StartInfo=$psi; $started=$false
     try {
-        $started=$process.Start(); $output=$process.StandardOutput.ReadToEndAsync(); $errors=$process.StandardError.ReadToEndAsync()
-        $inputs=@{}; foreach ($key in $HumanCredentials.Keys) { $inputs[$key]=$HumanCredentials[$key].GetNetworkCredential().Password }
-        $process.StandardInput.WriteLine(($inputs | ConvertTo-Json -Compress)); $process.StandardInput.Close(); $inputs=$null
+        try { $started=$process.Start(); if (-not $started) { throw 'START_REFUSED' } }
+        catch { throw 'LIVE_CLIENT_START_FAILED' }
+        $output=$process.StandardOutput.ReadToEndAsync(); $errors=$process.StandardError.ReadToEndAsync()
+        try {
+            $inputs=@{}; foreach ($key in $HumanCredentials.Keys) { $inputs[$key]=$HumanCredentials[$key].GetNetworkCredential().Password }
+            $process.StandardInput.WriteLine(($inputs | ConvertTo-Json -Compress)); $process.StandardInput.Close()
+        } catch { throw 'LIVE_CLIENT_INPUT_FAILED' } finally {$inputs=$null}
         $deadline=[datetime]::UtcNow.AddMinutes(60); $next=[datetime]::UtcNow
         while (-not $process.WaitForExit(1000)) {
             if ([datetime]::UtcNow -gt $deadline) { throw 'LIVE_CLIENT_TIMEOUT' }
@@ -381,8 +394,10 @@ function Invoke-LiveClient([string]$Run,$HumanCredentials) {
         }
         # Raw child streams are never copied into console/reports. The child persists closed evidence fields.
         if ($process.ExitCode -ne 0) { throw 'LIVE_CLIENT_FAILED' }
-        $report=Get-Content -LiteralPath (Join-Path $Run 'http-report.json') -Raw | ConvertFrom-Json
-        if ($report.status -cne 'PASS' -or -not $report.credentialCleanup) { throw 'LIVE_CLIENT_REPORT_FAILED' }
+        try {
+            $report=Get-Content -LiteralPath (Join-Path $Run 'http-report.json') -Raw | ConvertFrom-Json
+            if ($report.status -cne 'PASS' -or -not $report.credentialCleanup) { throw 'REPORT_REFUSED' }
+        } catch { throw 'LIVE_CLIENT_REPORT_FAILED' }
         return $report
     } finally { if ($started -and -not $process.HasExited) { try { $process.Kill($true); [void]$process.WaitForExit(10000) } catch { } }; $process.Dispose(); $inputs=$null }
 }

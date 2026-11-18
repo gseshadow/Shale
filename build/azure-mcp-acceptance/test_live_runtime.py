@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -24,6 +25,65 @@ class LiveRuntimeTest(unittest.TestCase):
             cwd=ROOT, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
+
+    def test_real_client_process_uses_one_python_path_and_utf8_stdin_without_network(self):
+        # Exercise the real entrypoint/process pipes; only the first HTTP attempt is blocked.
+        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+            root = Path(directory)
+            parsed = root / 'input-ok'
+            blocked = root / 'network-blocked'
+            (root / 'sitecustomize.py').write_text(
+                "import json,pathlib,urllib.request\n"
+                "original=json.loads\n"
+                "def loads(text,*args,**kwargs):\n"
+                " result=original(text,*args,**kwargs)\n"
+                " if isinstance(result,dict) and set(result)=={'admin@example.invalid','badmin@example.invalid','a72@example.invalid'}:\n"
+                "  assert all(value=='synthetic_\\u03a9' for value in result.values())\n"
+                f"  pathlib.Path({str(parsed)!r}).touch()\n"
+                " return result\n"
+                "json.loads=loads\n"
+                "def deny(*args,**kwargs):\n"
+                f" pathlib.Path({str(blocked)!r}).touch()\n"
+                " raise RuntimeError('OFFLINE_NETWORK_BLOCKED')\n"
+                "urllib.request.OpenerDirector.open=deny\n",
+                encoding='utf-8')
+            body = r"""
+$run='DIRECTORY'
+$python='PYTHON_EXECUTABLE'
+function Get-Command($Name,$CommandType) {
+ if($Name -cne 'python'){throw 'Unexpected executable lookup'}
+ return @([pscustomobject]@{Source=$python},[pscustomobject]@{Source='SYNTHETIC_SECOND_EXECUTABLE'},[pscustomobject]@{Source='SYNTHETIC_THIRD_EXECUTABLE'})
+}
+$env:PYTHONPATH=$run
+$credentials=@{}
+foreach($email in @('admin@example.invalid','badmin@example.invalid','a72@example.invalid')){
+ $credentials[$email]=[pscredential]::new($email,(ConvertTo-SecureString ('synthetic_'+[char]0x03a9) -AsPlainText -Force))
+}
+$code=$null;try{Invoke-LiveClient $run $credentials}catch{$code=$_.Exception.Message}
+if($code -cne 'LIVE_CLIENT_FAILED'){throw 'Actual child process did not reach the intentionally blocked HTTP step'}
+if((ConvertTo-LiveSafeCampaignCode $code) -cne $code){throw 'Safe client exit code was hidden'}
+"""
+            self.ps(body.replace('DIRECTORY', directory.replace("'", "''"))
+                        .replace('PYTHON_EXECUTABLE', sys.executable.replace("'", "''")))
+            self.assertTrue(parsed.exists(), 'Real child must receive the Unicode JSON correctly')
+            self.assertTrue(blocked.exists(), 'Real entrypoint must reach the offline HTTP seam')
+            report = json.loads((root / 'http-report.json').read_text())
+            self.assertEqual(report['status'], 'FAIL')
+            self.assertEqual(report['failedCheck'], 'https-discovery')
+            self.assertTrue(report['credentialCleanup'])
+            self.assertEqual(report['records'], [])
+            self.assertNotIn('synthetic_', (root / 'http-report.json').read_text())
+
+    def test_client_start_and_safe_failure_codes_do_not_expose_paths(self):
+        self.ps(r"""
+function Get-Command($Name,$CommandType){return @([pscustomobject]@{Source='PRIVATE_UNAVAILABLE_EXECUTABLE'},[pscustomobject]@{Source='PRIVATE_FALLBACK_EXECUTABLE'})}
+$code=$null;try{Invoke-LiveClient 'unused' @{}}catch{$code=$_.Exception.Message}
+if($code -cne 'LIVE_CLIENT_START_FAILED'){throw 'Process start must produce a closed failure code'}
+foreach($code in @('LIVE_CLIENT_START_FAILED','LIVE_CLIENT_INPUT_FAILED','LIVE_CLIENT_FAILED','LIVE_CLIENT_TIMEOUT','LIVE_CLIENT_REPORT_FAILED')){
+ if((ConvertTo-LiveSafeCampaignCode $code) -cne $code){throw 'Safe client failure code hidden'}
+}
+if((ConvertTo-LiveSafeCampaignCode 'LIVE_CLIENT_FAILED_PRIVATE_PAYLOAD') -cne 'CAMPAIGN_FAILED'){throw 'Private suffix accepted'}
+""")
 
     def test_scripts_parse_and_import_without_network(self):
         self.ps(r'''
