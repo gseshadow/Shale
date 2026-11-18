@@ -25,7 +25,8 @@ REDIRECT = 'http://127.0.0.1:27891/callback'
 SUBSTEPS = frozenset(('LOGIN_ADMIN', 'LOGIN_BADMIN', 'LOGIN_MEMBER', 'REGISTER_CLIENT',
     'ONBOARD_MEMBER', 'DENY_MEMBER_APPROVAL', 'DENY_CROSS_TENANT_APPROVAL',
     'ONBOARD_ADMIN_A', 'APPROVE_ADMIN_A', 'ONBOARD_ADMIN_B', 'APPROVE_ADMIN_B',
-    'REJECT_WEB_JWT', 'REJECT_REFRESH_TOKEN', 'REJECT_ORIGIN', 'REJECT_PROTOCOL'))
+    'REJECT_WEB_JWT', 'REJECT_REFRESH_TOKEN', 'REJECT_ORIGIN', 'REJECT_PROTOCOL',
+    'SDK_DISCOVERY', 'SDK_LIST_TOOLS', 'SDK_TOOL_CALL'))
 OPERATIONS = {'/api/auth/login': 'WEB_LOGIN', '/api/auth/logout': 'WEB_LOGOUT',
     '/oauth/mcp/register': 'CLIENT_REGISTRATION', '/oauth/mcp/onboarding': 'ONBOARDING',
     '/oauth/mcp/approval': 'APPROVAL', '/oauth/mcp/authorize': 'AUTHORIZATION',
@@ -38,6 +39,42 @@ OPERATIONS = {'/api/auth/login': 'WEB_LOGIN', '/api/auth/logout': 'WEB_LOGOUT',
 def require(condition):
     if not condition:
         raise AssertionError('Acceptance contract failed')
+
+
+def closed_errors(error):
+    pending, seen, result = [error], set(), []
+    for _ in range(32):
+        if not pending:
+            break
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        reason = current.reason if isinstance(current, urllib.error.URLError) else current
+        name, module = type(current).__name__, type(current).__module__
+        code = None
+        if module == 'mcp.shared.exceptions' and name == 'MCPError':
+            kind = 'MCP_ERROR'
+            value = current.code
+            code = value if type(value) is int and -(2**31) <= value < 2**31 else None
+        elif isinstance(reason, TimeoutError) or (module.startswith('httpx2') and name in ('ReadTimeout', 'ConnectTimeout', 'WriteTimeout', 'PoolTimeout')):
+            kind = 'TIMEOUT'
+        elif isinstance(current, (urllib.error.URLError, OSError)) or (module.startswith('httpx2') and name in ('HTTPStatusError', 'TransportError', 'ReadError', 'ConnectError', 'RemoteProtocolError')):
+            kind = 'HTTP_TRANSPORT'
+        elif isinstance(current, json.JSONDecodeError):
+            kind = 'RESPONSE_JSON'
+        elif isinstance(current, (KeyError, TypeError)) or (module.startswith('pydantic') and name == 'ValidationError'):
+            kind = 'RESPONSE_SCHEMA'
+        elif isinstance(current, AssertionError):
+            kind = 'ASSERTION'
+        else:
+            kind = 'UNKNOWN'
+        if kind != 'UNKNOWN' and {'kind': kind, 'code': code} not in result:
+            result.append({'kind': kind, 'code': code})
+        children = getattr(current, 'exceptions', ())
+        if isinstance(children, (tuple, list)):
+            pending.extend(child for child in children[:32] if isinstance(child, BaseException))
+    return result or [{'kind': 'UNKNOWN', 'code': None}]
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -56,6 +93,9 @@ class Acceptance:
         self.substep = None
         self.last_http = None
         self.failure_diagnostic = None
+        self.sdk_requests = []
+        self.sdk_errors = []
+        self.last_refresh_at = None
         self.versions = {'python': platform.python_version()}
         for package in ('mcp', 'httpx2'):
             try:
@@ -105,7 +145,8 @@ class Acceptance:
         result = {'status': status, 'failedCheck': self.current if status == 'FAIL' else None,
                   'protocol': PROTOCOL, 'clientVersions': self.versions, 'records': self.records,
                   'disclosures': self.disclosures, 'overviews': self.overviews,
-                  'credentialCleanup': cleanup, 'failureDiagnostic': self.failure_diagnostic}
+                  'credentialCleanup': cleanup, 'failureDiagnostic': self.failure_diagnostic,
+                  'sdkDiagnostics': {'requests': self.sdk_requests, 'errors': self.sdk_errors}}
         target = self.run / 'http-report.json'
         temp = target.with_suffix('.tmp')
         temp.write_text(json.dumps(result, indent=2))
@@ -178,6 +219,7 @@ class Acceptance:
         # Snapshot every issued generation before replacement so cleanup retains them all.
         self.families.append((client_id, dict(family)))
         family.update(refreshed)
+        self.last_refresh_at = time.monotonic()
         return family['access_token']
 
     async def tools(self, token, tenant, *, full=True):
@@ -205,14 +247,35 @@ class Acceptance:
         # Reuse the existing authoritative acceptance result/schema assertions.
         harness = runpy.run_path(str(pathlib.Path(__file__).with_name('authoritative-python.py')))
         own, foreign = (100, 200) if tenant == 7 else (200, 100)
-        async with httpx2.AsyncClient(headers={'Authorization': 'Bearer ' + token}, timeout=660, trust_env=False) as http:
+        async def observe_request(request):
+            require(str(request.url) == BASE + '/mcp')
+            require(len(self.sdk_requests) < 128)
+            now = time.monotonic()
+            age = None if self.last_refresh_at is None else int(max(0, min(3_600_000, (now-self.last_refresh_at)*1000)))
+            entry = {'substep': self.substep if self.substep in SUBSTEPS else 'UNKNOWN',
+                     'status': None, 'elapsedMillis': None, 'refreshAgeMillis': age}
+            self.sdk_requests.append(entry)
+            request.extensions['shale_acceptance_observation'] = (now, entry)
+            self.last_http = {'operation': 'MCP', 'status': None}
+
+        async def observe_response(response):
+            start, entry = response.request.extensions['shale_acceptance_observation']
+            entry['status'] = int(response.status_code)
+            entry['elapsedMillis'] = int(max(0, min(3_600_000, (time.monotonic()-start)*1000)))
+            self.last_http = {'operation': 'MCP', 'status': int(response.status_code)}
+
+        self.substep = 'SDK_DISCOVERY'
+        async with httpx2.AsyncClient(headers={'Authorization': 'Bearer ' + token}, timeout=660, trust_env=False,
+                event_hooks={'request': [observe_request], 'response': [observe_response]}) as http:
             async with Client(streamable_http_client(BASE + '/mcp', http_client=http), mode='auto', read_timeout_seconds=660) as client:
                 require(client.protocol_version == PROTOCOL)
 
                 async def call(name, arguments):
+                    self.substep = 'SDK_TOOL_CALL'
                     http.headers['Authorization'] = 'Bearer ' + renew()
                     return await client.call_tool(name, arguments)
 
+                self.substep = 'SDK_LIST_TOOLS'
                 http.headers['Authorization'] = 'Bearer ' + renew()
                 require([harness['obj'](t)['name'] for t in (await client.list_tools()).tools] == ['search_cases', 'get_case_overview'])
                 result = harness['value'](await call('get_case_overview', {'caseId': own}))
@@ -227,6 +290,7 @@ class Acceptance:
                     for case in (foreign, 300, 999):
                         harness['error'](await call('get_case_overview', {'caseId': case}), 'CASE_UNAVAILABLE')
                     harness['error'](await call('search_cases', {'query': 'Literal', 'tenantId': 8}), 'INVALID_INPUT')
+        self.substep = None
 
     async def execute(self):
         metadata = self.ok('/.well-known/oauth-authorization-server/oauth/mcp')
@@ -334,12 +398,8 @@ class Acceptance:
             status = 'PASS'
         except Exception as error:
             # Capture BEFORE cleanup replaces the last HTTP operation. Never retain payload/error text.
-            reason = error.reason if isinstance(error, urllib.error.URLError) else error
-            kind = ('TIMEOUT' if isinstance(reason, TimeoutError) else
-                    'HTTP_TRANSPORT' if isinstance(error, (urllib.error.URLError, OSError)) else
-                    'RESPONSE_JSON' if isinstance(error, json.JSONDecodeError) else
-                    'RESPONSE_SCHEMA' if isinstance(error, (KeyError, TypeError)) else
-                    'ASSERTION' if isinstance(error, AssertionError) else 'UNKNOWN')
+            self.sdk_errors = closed_errors(error)
+            kind = self.sdk_errors[0]['kind']
             last = self.last_http or {}
             number = lambda value: value if type(value) is int and 100 <= value <= 599 else None
             self.failure_diagnostic = {

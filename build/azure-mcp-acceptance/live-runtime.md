@@ -447,3 +447,17 @@ server configuration change, cached authority, bypass or added acceptance retry 
 The live 401 identifies an authentication failure; token aging is reproduced locally but any
 additional live admission issue still requires a separately approved campaign. Audit behavior
 is unchanged; refreshed credentials use the existing OAuth endpoints and cleanup lifecycle.
+
+
+## SDK failure evidence
+
+Run a1fa53cd50a04de0b735c56d221146fa passed three functional checkpoints and entered the
+real SDK phase. Its old report retained only the preceding token response, hiding the failed
+SDK request/exception. Request/response hooks now record only a bounded substep, status,
+HTTP elapsed milliseconds and age since the latest refresh response. They retain no URL,
+headers, body, token, user identity or exception text and do not refresh/retry requests.
+A bounded exception-group walk records closed kinds and numeric MCP error codes only.
+Discovery, tool listing and tool calls are distinguished. SDK auto negotiation, timers,
+credential lifecycle and all protocol/result assertions remain unchanged. Actual SDK tests
+use an in-memory mock transport with no socket. This is operational evidence, not a runtime
+fix or live acceptance PASS; no domain audit/schema behavior changes.
