@@ -170,6 +170,16 @@ class Acceptance:
             self.last_http['expectedStatus'] = expected
         require(code == expected)
 
+    def renew_access(self, client_id, family):
+        refreshed = self.ok('/oauth/mcp/token', {'grant_type': 'refresh_token', 'client_id': client_id,
+            'resource': BASE + '/mcp', 'refresh_token': family['refresh_token']})
+        require(refreshed['token_type'].lower() == 'bearer' and 0 < refreshed['expires_in'] <= 300
+                and refreshed['refresh_token'] != family['refresh_token'])
+        # Snapshot every issued generation before replacement so cleanup retains them all.
+        self.families.append((client_id, dict(family)))
+        family.update(refreshed)
+        return family['access_token']
+
     async def tools(self, token, tenant, *, full=True):
         import httpx2
         from mcp import Client
@@ -189,15 +199,7 @@ class Acceptance:
         client_id, family = owned[0]
 
         def renew():
-            refreshed = self.ok('/oauth/mcp/token', {'grant_type': 'refresh_token', 'client_id': client_id,
-                'resource': BASE + '/mcp', 'refresh_token': family['refresh_token']})
-            require(refreshed['token_type'].lower() == 'bearer' and 0 < refreshed['expires_in'] <= 300
-                    and refreshed['refresh_token'] != family['refresh_token'])
-            # Retain every issued generation for cleanup before replacing the
-            # caller's current pair; do not assume revoking one generation revokes all.
-            self.families.append((client_id, dict(family)))
-            family.update(refreshed)
-            return family['access_token']
+            return self.renew_access(client_id, family)
 
         token = renew()
         # Reuse the existing authoritative acceptance result/schema assertions.
@@ -272,9 +274,9 @@ class Acceptance:
         self.substep = 'REJECT_REFRESH_TOKEN'
         self.expect_discovery_status(fa['refresh_token'], 401)
         self.substep = 'REJECT_ORIGIN'
-        self.expect_discovery_status(fa['access_token'], 403, {'Origin': 'https://attacker.invalid'})
+        self.expect_discovery_status(self.renew_access(client, fa), 403, {'Origin': 'https://attacker.invalid'})
         self.substep = 'REJECT_PROTOCOL'
-        self.expect_discovery_status(fa['access_token'], 400, {'MCP-Protocol-Version': '2099-01-01'})
+        self.expect_discovery_status(self.renew_access(client, fa), 400, {'MCP-Protocol-Version': '2099-01-01'})
         self.substep = None
         self.record(self.current)
         self.current = 'sdk-initialize-tools-case-reads-isolation-denials'
