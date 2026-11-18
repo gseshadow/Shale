@@ -3,6 +3,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'CleanSlate.ps1')
 $script:LiveAppId="$script:CleanResource/Microsoft.Web/sites/shale-mcp-acceptance"
 $script:LiveOrigin='https://shale-mcp-acceptance.azurewebsites.net'
+$script:LiveClientWatchdogMinutes=180
 function ConvertTo-LiveEnvironmentName([string]$Property) {
     $name=$Property.Replace('.','_').Replace('-','').ToUpperInvariant()
     if ($name -cnotmatch '^[A-Z_][A-Z0-9_]*$') { throw 'INVALID_AZURE_SETTING_NAME' }
@@ -434,7 +435,7 @@ function Invoke-LiveClient([string]$Run,$HumanCredentials) {
             $inputs=@{}; foreach ($key in $HumanCredentials.Keys) { $inputs[$key]=$HumanCredentials[$key].GetNetworkCredential().Password }
             $process.StandardInput.WriteLine(($inputs | ConvertTo-Json -Compress)); $process.StandardInput.Close()
         } catch { throw 'LIVE_CLIENT_INPUT_FAILED' } finally {$inputs=$null}
-        $deadline=[datetime]::UtcNow.AddMinutes(60); $next=[datetime]::UtcNow
+        $deadline=[datetime]::UtcNow.AddMinutes($script:LiveClientWatchdogMinutes); $next=[datetime]::UtcNow
         while (-not $process.WaitForExit(1000)) {
             if ([datetime]::UtcNow -gt $deadline) { throw 'LIVE_CLIENT_TIMEOUT' }
             if ([datetime]::UtcNow -ge $next) { Write-Host 'Live MCP acceptance running (includes natural token expiry).'; $next=[datetime]::UtcNow.AddSeconds(30) }
@@ -466,6 +467,7 @@ function Invoke-LiveCampaign($Context) {
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
         Write-Host 'Deploy dormant, verify worker, activate only synthetic acceptance, run MCP/OAuth and audits, then OFF and stop.'
         Write-Host 'Dedicated acceptance verification budget: 600 seconds per admission, 180-second SQL/network reads, 30-second login. Every security check remains enabled; SQL tool transactions retain their existing short limits.'
+        Write-Host "Whole client campaign watchdog: $script:LiveClientWatchdogMinutes minutes; per-admission and SQL transaction limits remain unchanged."
         if ((Read-Host 'Type RUN_SHALE_MCP_ACCEPTANCE to approve this whole controlled run') -cne 'RUN_SHALE_MCP_ACCEPTANCE') { throw 'OPERATOR_DECLINED' }
         $approved=$true
         New-CleanEvent (Join-Path $Context.Run 'journal.jsonl') @{Kind='approved';JarSHA256=$Context.Hash;Build=$Context.Version}

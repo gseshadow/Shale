@@ -323,7 +323,7 @@ expiry, TLS and independent failure accounting retain their existing limits. The
 a recorded configuration setting while feature controls are OFF; it cannot activate MCP.
 
 The fixed-target operator HTTP client waits up to 660 seconds per request, worker readiness
-up to 30 minutes and the child campaign up to 60 minutes. The approval prompt names these
+up to 30 minutes and the child campaign up to 180 minutes. The approval prompt names these
 longer budgets before the operator approves deployment/activation. Existing independent
 OFF/stop cleanup is unchanged. A successful longer-budget campaign certifies functional
 acceptance only; it does not establish acceptable production latency or capacity.
@@ -461,3 +461,30 @@ Discovery, tool listing and tool calls are distinguished. SDK auto negotiation, 
 credential lifecycle and all protocol/result assertions remain unchanged. Actual SDK tests
 use an in-memory mock transport with no socket. This is operational evidence, not a runtime
 fix or live acceptance PASS; no domain audit/schema behavior changes.
+
+
+## Bearer-only SDK behind Azure affinity
+
+Run 18fd310f694b45ef99c4833908ccb2d7 recorded successful SDK discovery (200, 148.7s),
+then tool-list rejection (401, 172ms) immediately after refresh. The acceptance App Service
+has affinity enabled. The actual installed SDK/httpx2 reproduces this sequence offline when
+discovery sets an ARRAffinity cookie: its default cookie jar sends it on tools/list, while
+McpGate deliberately rejects any cookie before credential admission.
+The dedicated SDK client now uses a rejecting stdlib CookieJar policy, records reject-all
+as its cookie policy, and verifies no outgoing Cookie header. Only a boolean cookie presence
+is retained in diagnostics. The real SDK regression returns a valid discovery response with
+a synthetic affinity cookie and verifies the next request carries no cookie and reaches an
+intentional JSON-RPC error rather than the cookie 401. The pre-fix test reproduces the exact
+200/401 sequence. No cookie value, body or token appears in evidence. Server cookie rejection,
+Azure affinity settings, bearer refresh, protocol mode and all result assertions are unchanged.
+No deployment, activation, SQL/audit schema change or automatic acceptance retry is introduced.
+This closes a reproduced client defect; full native tool/audit acceptance remains unverified.
+
+
+The observed 148.7-second successful discovery also exposes a whole-run budget mismatch:
+the offline scenario issues 38 MCP requests, with many requiring complete native verification.
+The former 60-minute child watchdog could expire before the complete scenario finishes at that
+rate. The fixed-target acceptance runner permits up to 180 minutes for the whole child and
+prints that cap before explicit approval. Per-admission 600-second and HTTP 660-second limits,
+SQL transaction/tool deadlines, heartbeat, natural expiry and OFF/stop cleanup are unchanged.
+This is a bounded completion allowance, not production latency/capacity certification.
