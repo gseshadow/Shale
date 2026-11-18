@@ -170,6 +170,25 @@ try{try{throw 'ACCEPTANCE_FAILED'}catch{. $handler}}catch{$refused=$true;if(-not
 if(-not $refused){throw 'Failed campaign did not fail the operator command'}
 ''')
 
+    def test_campaign_diagnostic_keeps_closed_metadata_and_arm_codes_only(self):
+        self.ps(r'''
+foreach($code in @('ACCEPTANCE_AZURE_SETTINGS_HTTP_429_TOO_MANY_REQUESTS','ACCEPTANCE_CONFIGURATION_WRITE_FAILED')) {
+ try {throw $code} catch {$safe=Get-LiveSafeCampaignFailure $_}
+ if($safe -cne $code){throw 'Activation ARM failure was masked'}
+}
+foreach($code in @('ACCEPTANCE_AZURE_SETTINGS_HTTP_429_TOO_MANY_REQUESTS_PRIVATE_SENTINEL','ACCEPTANCE_AZURE_SETTINGS_HTTP_429_PRIVATE_SENTINEL')) {
+ try {throw $code} catch {$safe=Get-LiveSafeCampaignFailure $_}
+ if($safe -cne 'CAMPAIGN_FAILED'){throw 'Untrusted ARM suffix accepted'}
+}
+try {Get-LiveTenantPolicyVersion 0 0 $null;throw 'Guard unexpectedly accepted'} catch {$d=Get-LiveCampaignDiagnostic $_}
+if($d.Source -cne 'LiveRuntime.ps1' -or $d.Line -lt 1){throw 'Allowlisted source location was lost'}
+foreach($pair in @(@([TimeoutException],'TIMEOUT'),@([OperationCanceledException],'CANCELED'),@([Net.Http.HttpRequestException],'HTTP_TRANSPORT'),@([IO.IOException],'IO'),@([Exception],'UNKNOWN'))) {
+ try {throw ($pair[0]::new('PRIVATE_SENTINEL'))} catch {$d=Get-LiveCampaignDiagnostic $_}
+ if($d.Kind -cne $pair[1]){throw 'Closed transport category lost'}
+ if(($d|ConvertTo-Json).Contains('PRIVATE_SENTINEL') -or $d.Source -cne 'unknown' -or $d.Line -ne 0){throw 'Private diagnostic escaped'}
+}
+''')
+
     def test_policy_reader_preserves_nullable_binary_version_and_refuses_bad_results(self):
         self.ps(r'''
 $script:setupSql=[Collections.Generic.List[string]]::new();$script:disposed=$false
@@ -284,8 +303,8 @@ function Assert-LiveSqlOff {}
 function Assert-LiveSynthetic {}
 function Assert-LiveJar {}
 function Invoke-CleanAzure($Arguments) {if($Arguments[1] -eq 'deploy'){Hit 'deploy'};return @{state='Stopped'}}
-function Start-LiveWorker {Hit 'start'}
-function Assert-LiveWorker($Hash,$JavaZone,[switch]$Ready){Hit 'worker';if($Ready){return 'AI_CASE_SQL_READINESS ready'};return 'AI_CASE_SQL_READINESS disabled'}
+function Start-LiveWorker($Archive) {Hit 'start';if(-not $Archive.EndsWith('-before-dormant')){Hit 'enabled-start'}}
+function Assert-LiveWorker($Hash,$JavaZone,[switch]$Ready){Hit 'worker';if($Ready){Hit 'enabled-evidence';return 'AI_CASE_SQL_READINESS ready'};return 'AI_CASE_SQL_READINESS disabled'}
 function Invoke-WebRequest {return @{StatusCode=404}}
 function Assert-CleanResources {}
 function Get-LiveBinding {Hit 'binding'}
@@ -297,7 +316,7 @@ function Set-LiveAppControls {Hit 'app-on'}
 function Invoke-LiveClient {Hit 'client';return @{disclosures=8;overviews=6}}
 function Assert-LiveAudits {Hit 'audits'}
 function Stop-LiveAcceptance($Owner,$Credentials,$Run,[switch]$VerifySqlOnly) {$script:verifySqlOnly=[bool]$VerifySqlOnly;Hit 'cleanup';return @{SqlOff=($script:failure -ne 'cleanup-fail');AppOff=$true;ApplicationStopped=$true}}
-foreach($failure in @('decline','preflight','deploy','start','worker','binding','rls','native','sql-on','app-on','client','audits','cleanup-fail','none')) {
+foreach($failure in @('decline','preflight','deploy','start','worker','binding','rls','native','sql-on','app-on','enabled-start','enabled-evidence','client','audits','cleanup-fail','none')) {
  $script:failure=$failure;$script:trace.Clear()
  $dir=Join-Path 'DIRECTORY' $failure;[void][IO.Directory]::CreateDirectory($dir)
  $ctx=@{Run=$dir;Hash=('A'*64);Version='1.0.0';Id='offline';Jar='unused';Zones=@{Java='UTC'};Evidence=@{Directory='unused';JournalHash=('B'*64)};Credentials=@{};Humans=@{};Owner=$null;Inventory=@();Specs=@()}
@@ -306,6 +325,11 @@ foreach($failure in @('decline','preflight','deploy','start','worker','binding',
  if($failure -ceq 'decline') {if($script:trace.Contains('deploy') -or $script:trace.Contains('cleanup')){throw 'Unapproved mutation'}}
  elseif(-not $script:trace.Contains('cleanup')){throw "Cleanup absent after $failure"}
  if($failure -cne 'decline'){$beforeActivation=$failure -cin @('preflight','deploy','start','worker','binding','rls','native');if($script:verifySqlOnly -ne $beforeActivation){throw 'Partial activation or dormant failure used the wrong SQL cleanup mode'}}
+ if($failure -ceq 'enabled-start' -and $r.Failure -cne 'enabled-worker-start-and-health'){throw 'Enabled startup attribution lost'}
+ if($failure -ceq 'enabled-evidence' -and $r.Failure -cne 'enabled-worker-evidence'){throw 'Enabled evidence attribution lost'}
+ if($failure -ceq 'app-on' -and $r.Failure -cne 'synthetic-app-activation'){throw 'App activation failure attribution lost'}
+ if($failure -ceq 'sql-on' -and $r.Failure -cne 'synthetic-sql-activation'){throw 'SQL activation failure attribution lost'}
+ if($failure -ceq 'none' -and $null -ne $r.FailureDiagnostic){throw 'Successful run recorded a failure diagnostic'}
  if([IO.File]::ReadAllText((Join-Path $dir 'report.json')).Contains('PRIVATE_SENTINEL')){throw 'Sensitive failure leaked'}
 }
 '''.replace('DIRECTORY', directory))

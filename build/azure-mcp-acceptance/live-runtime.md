@@ -379,3 +379,14 @@ multiple interpreter matches and Unicode stdin. A test-only sitecustomize blocks
 any connection and confirms the child creates its normal failed-check/cleanup report. No live
 resource or credential is used. This closes the process-launch coverage gap left by workflow
 tests that previously replaced Invoke-LiveClient.
+
+
+## Failure attribution after activation
+
+Activation SQL, activation settings, stopped-resource verification, enabled worker startup/health
+and enabled worker evidence have separate failure phases. FailureDiagnostic records only an
+allowlisted local source filename, numeric source line and closed transport category. It never
+records exception text, stack paths, response bodies or credential material. Structured ARM
+rejection codes use the existing configuration classifier and survive campaign reporting.
+No retry, deadline, approval, verification, shutdown or domain audit behavior changes.
+These fields are operational evidence; no SQL schema or application audit event is introduced.
