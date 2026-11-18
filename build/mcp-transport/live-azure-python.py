@@ -27,7 +27,7 @@ SUBSTEPS = frozenset(('LOGIN_ADMIN', 'LOGIN_BADMIN', 'LOGIN_MEMBER', 'REGISTER_C
     'ONBOARD_MEMBER', 'DENY_MEMBER_APPROVAL', 'DENY_CROSS_TENANT_APPROVAL',
     'ONBOARD_ADMIN_A', 'APPROVE_ADMIN_A', 'ONBOARD_ADMIN_B', 'APPROVE_ADMIN_B',
     'REJECT_WEB_JWT', 'REJECT_REFRESH_TOKEN', 'REJECT_ORIGIN', 'REJECT_PROTOCOL',
-    'SDK_DISCOVERY', 'SDK_LIST_TOOLS', 'SDK_TOOL_CALL'))
+    'SDK_DISCOVERY', 'SDK_LIST_TOOLS', 'SDK_TOOL_CALL', 'STAGE_AUTHORIZATION'))
 OPERATIONS = {'/api/auth/login': 'WEB_LOGIN', '/api/auth/logout': 'WEB_LOGOUT',
     '/oauth/mcp/register': 'CLIENT_REGISTRATION', '/oauth/mcp/onboarding': 'ONBOARDING',
     '/oauth/mcp/approval': 'APPROVAL', '/oauth/mcp/authorize': 'AUTHORIZATION',
@@ -152,7 +152,7 @@ class Acceptance:
         print(name, flush=True)
 
     def save(self, status, cleanup=None):
-        result = {'status': status, 'failedCheck': self.current if status == 'FAIL' else None,
+        result = {'status': status, 'currentCheck': self.current, 'currentSubstep': self.substep if self.substep in SUBSTEPS else None, 'failedCheck': self.current if status == 'FAIL' else None,
                   'protocol': PROTOCOL, 'clientVersions': self.versions, 'records': self.records,
                   'disclosures': self.disclosures, 'overviews': self.overviews,
                   'credentialCleanup': cleanup, 'failureDiagnostic': self.failure_diagnostic,
@@ -221,6 +221,15 @@ class Acceptance:
             self.last_http['expectedStatus'] = expected
         require(code == expected)
 
+    def fresh_authority(self, client, email, tenant, user):
+        # Independent stages must not inherit another stage's one-hour WEB/grant deadline.
+        web = self.login(email, tenant, user)
+        self.substep = 'STAGE_AUTHORIZATION'
+        self.save('RUNNING')
+        family, issued = self.authorize(client, web)
+        self.substep = None
+        return web, family, issued
+
     def renew_access(self, client_id, family):
         refreshed = self.ok('/oauth/mcp/token', {'grant_type': 'refresh_token', 'client_id': client_id,
             'resource': BASE + '/mcp', 'refresh_token': family['refresh_token']})
@@ -276,6 +285,7 @@ class Acceptance:
             entry['status'] = int(response.status_code)
             entry['elapsedMillis'] = int(max(0, min(3_600_000, (time.monotonic()-start)*1000)))
             self.last_http = {'operation': 'MCP', 'status': int(response.status_code)}
+            self.save('RUNNING')
 
         self.substep = 'SDK_DISCOVERY'
         async with httpx2.AsyncClient(headers={'Authorization': 'Bearer ' + token}, timeout=660, trust_env=False,
@@ -357,11 +367,15 @@ class Acceptance:
         self.substep = None
         self.record(self.current)
         self.current = 'sdk-initialize-tools-case-reads-isolation-denials'
+        a, fa, _ = self.fresh_authority(client, 'admin@example.invalid', 7, 71)
         await self.tools(fa['access_token'], 7)
+        b, fb, _ = self.fresh_authority(client, 'badmin@example.invalid', 8, 81)
         await self.tools(fb['access_token'], 8)
+        a, expiry, _ = self.fresh_authority(client, 'admin@example.invalid', 7, 71)
         await self.tools(expiry['access_token'], 7, full=False)
         self.record(self.current)
         self.current = 'refresh-rotation-resource-binding'
+        a, fa, _ = self.fresh_authority(client, 'admin@example.invalid', 7, 71)
         require(self.request('/oauth/mcp/token', {'grant_type': 'refresh_token', 'client_id': client,
             'resource': BASE + '/wrong', 'refresh_token': fa['refresh_token']})[0] in (400, 401))
         rotated = self.ok('/oauth/mcp/token', {'grant_type': 'refresh_token', 'client_id': client,
@@ -382,7 +396,7 @@ class Acceptance:
         self.current = 'natural-credential-expiry'
         # Issue the independent expiry probe here: earlier families may naturally
         # expire during the deliberately slow SDK tests. Do not refresh this probe.
-        expiry, issued = self.authorize(client, a)
+        a, expiry, issued = self.fresh_authority(client, 'admin@example.invalid', 7, 71)
         # Keep an independent, unrevoked family. Never update credential timestamps or disable SQL constraints.
         require(self.raw_discover(expiry['access_token'])[0] == 200)
         deadline = issued + math.ceil(expiry['expires_in']) + 2
@@ -392,14 +406,14 @@ class Acceptance:
         self.record(self.current)
         self.current = 'approval-revocation-tenant-isolation'
         # Tenant B's fresh family remains usable after tenant A revokes its approval.
-        fresh_a, _ = self.authorize(client, a)
+        a, fresh_a, _ = self.fresh_authority(client, 'admin@example.invalid', 7, 71)
         await self.tools(fresh_a['access_token'], 7, full=False)
         state = self.onboard(client, a)
         self.decide(client, state, a, decision='REVOKE')
         require(self.raw_discover(fresh_a['access_token'])[0] == 401)
         require(self.request('/oauth/mcp/token', {'grant_type': 'refresh_token', 'client_id': client,
             'resource': BASE + '/mcp', 'refresh_token': fresh_a['refresh_token']})[0] in (400, 401))
-        fresh_b, _ = self.authorize(client, b)
+        b, fresh_b, _ = self.fresh_authority(client, 'badmin@example.invalid', 8, 81)
         await self.tools(fresh_b['access_token'], 8, full=False)
         self.record(self.current)
 
