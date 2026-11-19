@@ -41,8 +41,8 @@ public class AcceptanceBrowserConfiguration {
                 FilterChain chain) throws ServletException, IOException {
             String path = request.getRequestURI().substring(request.getContextPath().length());
             boolean asset = path.matches("/assets/[A-Za-z0-9_-]+\\.(js|css|svg|png|woff2)");
-            boolean page = (path.equals("/login") || path.equals("/oauth/mcp/authorize")) &&
-                request.getQueryString() == null && request.getHeader("Accept") != null &&
+            boolean page = (path.equals("/login") || (path.equals("/oauth/mcp/authorize") &&
+                request.getQueryString() == null)) && request.getHeader("Accept") != null &&
                 request.getHeader("Accept").contains("text/html") && request.getHeader("Authorization") == null;
             if (!request.getMethod().equals("GET") || (!asset && !page)) {
                 chain.doFilter(request, response); return;

@@ -19,6 +19,7 @@ class AcceptanceBrowserConfigurationTest {
     @Test void fragmentNavigationServesExistingUiWithoutCreatingSession() throws Exception {
         for (String path : java.util.List.of("/login", "/oauth/mcp/authorize")) {
             var request = new MockHttpServletRequest("GET", path); request.addHeader("Accept", "text/html");
+            if (path.equals("/login")) request.setQueryString("returnTo=%2Foauth%2Fmcp%2Fauthorize");
             var response = new MockHttpServletResponse();
             new AcceptanceBrowserConfiguration.BrowserAssets("browser-fixture/").doFilter(request, response, (q,s) -> fail("UI navigation reached API"));
             assertEquals(200, response.getStatus());
