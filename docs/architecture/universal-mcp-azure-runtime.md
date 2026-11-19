@@ -348,3 +348,27 @@ ten-second admission and stock-client timing remain unproven. Candidate class/me
 and the private report are preserved under work/readonly-authority-batch-531bac799cd24e0b9ce33f64f0c838de.
 The accepted JAR, original 51/51 SQL journal, completed 8/8 client run and final audit completion
 remain separate unchanged evidence. No deployment or activation was performed.
+
+
+## Fresh module and timezone transport batches
+
+The predecessor module-body verifier now binds up to 64 module names in a UNION ALL batch.
+Each branch retains the original dbo/schema/object/module lookup, UTF-16LE body digest,
+effective dbo ownership and caller-versus-owner execution rules. Fixed numeric ordinals
+associate each returned row with its expected manifest entry; missing, extra, duplicated
+or out-of-range rows fail closed. No names or definitions are interpolated into SQL.
+
+Timezone verification binds all original 28 UTC samples (January, March, April, July,
+October, November and December 15 in 2025-2028) in one VALUES query, using the existing
+UTC JDBC Calendar binding and identical datetime2/AT TIME ZONE conversion. Every returned
+wall time must still match the Java zone exactly, with a unique expected sample ordinal.
+The 13 installed module reads and 28 timezone reads become two SQL executions. Existing
+query/admission budgets, independent verifier identity and per-admission freshness remain.
+
+The three packaged catalog scripts, hashes/receipts, immutable binding, authority checks,
+withdrawal, transaction deadlines, quotas and disclosure audits are unchanged. These are
+operational read-only metadata checks, with existing operational evidence and no fabricated
+PHI/entity audit events, schema/grant change, deployment or activation. The preceding
+S3 capacity comparison restored S0; this batching comparison requires no capacity change.
+Read-only candidate timings are separate from the preserved completed acceptance evidence;
+normal ten-second admission and changed-worker/client acceptance remain unverified.
