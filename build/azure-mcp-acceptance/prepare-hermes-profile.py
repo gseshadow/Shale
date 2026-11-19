@@ -18,7 +18,7 @@ def prepare(source, destination):
     if not selected.get("default"):
         raise RuntimeError("MODEL_REQUIRED")
     destination.mkdir(exist_ok=False)
-    (destination / "config.yaml").write_text(yaml.safe_dump({"model": selected, "toolsets": ["mcp"], "telemetry": {"enabled": False}}), encoding="utf-8")
+    (destination / "config.yaml").write_text(yaml.safe_dump({"model": selected, "telemetry": {"enabled": False}}), encoding="utf-8")
     print(json.dumps({"Result": "LOCAL_PROFILE_PREPARED", "Model": selected["default"]}))
 
 if __name__ == "__main__":

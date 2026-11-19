@@ -5,7 +5,7 @@ function Invoke-HermesAcceptanceWindow($Context) {
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
         Write-Host 'Deploy dormant, verify worker, activate only synthetic acceptance, open a private Hermes browser/client window, then OFF and stop.'
         Write-Host 'Dedicated acceptance verification budget: 600 seconds per admission, 180-second SQL/network reads, 30-second login. Every security check remains enabled; SQL tool transactions retain their existing short limits.'
-        Write-Host "Whole client campaign watchdog: $script:LiveClientWatchdogMinutes minutes; per-admission and SQL transaction limits remain unchanged."
+        Write-Host 'Hermes connection/discovery budget: 600 seconds; interactive chat window: 30 minutes. No natural-expiry campaign replay.'
         if ((Read-Host 'Type CONNECT_SHALE_MCP_HERMES_ACCEPTANCE to approve this whole controlled run') -cne 'CONNECT_SHALE_MCP_HERMES_ACCEPTANCE') { throw 'OPERATOR_DECLINED' }
         $approved=$true
         New-CleanEvent (Join-Path $Context.Run 'journal.jsonl') @{Kind='approved';JarSHA256=$Context.Hash;Build=$Context.Version}
@@ -58,7 +58,7 @@ function Invoke-HermesAcceptanceWindow($Context) {
         Write-Host 'Exit Hermes when finished. The window has a 30-minute limit, followed by OFF and stop.'
         & hermes mcp add shale-acceptance --url ($script:LiveOrigin+'/mcp') --auth oauth --connect-timeout 600
         if ($LASTEXITCODE -ne 0) { throw 'HERMES_CONNECTION_FAILED' }
-        $clientProcess=Start-Process -FilePath (Get-Command hermes -CommandType Application).Source -NoNewWindow -PassThru
+        $clientProcess=Start-Process -FilePath (Get-Command hermes -CommandType Application).Source -ArgumentList @("chat","--cli","--toolsets","shale-acceptance") -NoNewWindow -PassThru
         try {
             if (-not $clientProcess.WaitForExit(1800000)) { $clientProcess.Kill($true); throw 'HERMES_WINDOW_TIMEOUT' }
             if ($clientProcess.ExitCode -ne 0) { throw 'HERMES_CLIENT_FAILED' }
@@ -79,4 +79,3 @@ function Invoke-HermesAcceptanceWindow($Context) {
     }
     return $result
 }
-
