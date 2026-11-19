@@ -17,7 +17,23 @@ build_spec=importlib.util.spec_from_file_location("browser_builder", TOOL / "pre
 browser_builder=importlib.util.module_from_spec(build_spec)
 build_spec.loader.exec_module(browser_builder)
 
+summary_spec=importlib.util.spec_from_file_location("client_summary", TOOL / "summarize-hermes-client.py")
+client_summary=importlib.util.module_from_spec(summary_spec)
+summary_spec.loader.exec_module(client_summary)
+
 class HermesAcceptanceTest(unittest.TestCase):
+    def test_client_summary_keeps_only_closed_events_and_expiry_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run=Path(tmp);private=run/'hermes-private';(private/'logs').mkdir(parents=True);(private/'mcp-tokens').mkdir()
+            (private/'logs/agent.log').write_text('2026-11-19 16:09:04 legacy handshake rejected SENSITIVE_CODE SENSITIVE_URL\nSENSITIVE_PROMPT\n2026-11-19 16:10:00 initial connection failed SENSITIVE_TOKEN',encoding='utf-8')
+            (private/'mcp-tokens/shale-acceptance.json').write_text(json.dumps({'access_token':'SENSITIVE_TOKEN','refresh_token':'SENSITIVE_REFRESH','expires_in':300,'expires_at':1900000000,'client_id':'SENSITIVE_CLIENT'}))
+            result=client_summary.summarize(run)
+            self.assertNotIn('SENSITIVE',json.dumps(result));self.assertEqual(['LEGACY_TO_DISCOVER','CONNECT_RETRY'],[x['Code'] for x in result['Events']])
+            self.assertEqual('2026-11-19 16:09:04',result['Events'][0]['LogTime']);self.assertEqual(300,result['TokenMetadata']['expires_in']);self.assertTrue(result['TokenMetadata']['RefreshPresent'])
+            self.assertEqual({'FileModifiedUtc','RefreshPresent','expires_in','expires_at'},set(result['TokenMetadata']))
+    def test_empty_profile_summary_does_not_invent_authentication(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result=client_summary.summarize(Path(tmp));self.assertFalse(result['ProfilePresent']);self.assertEqual({},result['TokenMetadata']);self.assertEqual([],result['Events'])
     def test_builder_selects_versioned_maven_artifact_and_rejects_missing_runtime(self):
         with tempfile.TemporaryDirectory() as tmp:
             target=Path(tmp)
