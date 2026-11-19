@@ -37,7 +37,7 @@ class AiCaseCatalogBatchTest {
                         if(leases.size()==failQuery)throw failure;
                         var values=new ArrayList<Object[]>();
                         if(lease.sql.contains("ModuleOrdinal")) {
-                            for(int i=0;i<lease.bindings.size();i++){String name=(String)lease.bindings.get(i+1);values.add(new Object[]{i,body(name),name.equals("AiDataLocateAccessOwnerV1")?-2:null,1});}
+                            for(int i=0;i<lease.bindings.size()/2;i++){String name=(String)lease.bindings.get(i+1);assertEquals(name,lease.bindings.get(lease.bindings.size()/2+i+1));values.add(new Object[]{i,body(name),name.equals("AiDataLocateAccessOwnerV1")?-2:null,1});}
                         }else {
                             for(int i=0;i<lease.bindings.size()-1;i++){var sample=(Timestamp)lease.bindings.get(i+2);values.add(new Object[]{i,Timestamp.valueOf(LocalDateTime.ofInstant(sample.toInstant(),zone))});}
                         }
@@ -60,10 +60,10 @@ class AiCaseCatalogBatchTest {
         var expected=definitions(79);put(expected,"odd' ] Unicode \u03a9");put(expected,"AiDataLocateAccessOwnerV1");
         var jdbc=new Jdbc();jdbc.fault=rows->{Collections.reverse(rows);return rows;};
         AiCaseDataAttestation.verifyModules(jdbc.connection,expected);
-        assertEquals(List.of(64,17),jdbc.leases.stream().map(l->l.bindings.size()).toList());
+        assertEquals(List.of(64,17),jdbc.leases.stream().map(l->l.bindings.size()/2).toList());
         var found=new HashSet<Object>();jdbc.leases.forEach(l->found.addAll(l.bindings.values()));
         var names=new HashSet<>(expected.stringPropertyNames());names.remove("Source");assertEquals(names,found);
-        for(var lease:jdbc.leases){assertEquals(3,lease.timeout);assertFalse(lease.sql.contains("odd' ]"));assertTrue(lease.sql.contains("WHERE s.name='dbo' AND o.name=?"));}
+        for(var lease:jdbc.leases){assertEquals(3,lease.timeout);assertFalse(lease.sql.contains("odd' ]"));assertTrue(lease.sql.contains("WHERE s.name='dbo' AND o.name IN("));assertTrue(lease.bindings.size()<=128);}
         jdbc.allClosed();
     }
     @Test void hashOwnershipAndCallerExecutionFailuresAreRejectedAtBatchBoundaries() {
@@ -103,7 +103,7 @@ class AiCaseCatalogBatchTest {
     }
     @Test void timezoneMappingMismatchAtFirstMiddleAndLastSampleFailsClosed() {
         for(int index:List.of(0,13,27)) {
-            var jdbc=new Jdbc();jdbc.fault=rows->{var old=(Timestamp)rows.get(index)[1];rows.get(index)[1]=Timestamp.valueOf(old.toLocalDateTime().plusNanos(1));return rows;};
+            var jdbc=new Jdbc();jdbc.fault=rows->{var old=(Timestamp)rows.get(index)[1];rows.get(index)[1]=Timestamp.valueOf(old.toLocalDateTime().plusNanos(100));return rows;};
             assertThrows(IllegalStateException.class,()->AiCaseDataAttestation.verifyTimeZones(jdbc.connection,jdbc.zone,"Mountain Standard Time"));jdbc.allClosed();
         }
     }

@@ -227,12 +227,17 @@ public final class AiCaseDataAttestation {
         var modules=definitions.stringPropertyNames().stream().filter(name->!name.equals("Source")).sorted().toList();
         for(int start=0;start<modules.size();start+=64) {
             var batch=modules.subList(start,Math.min(start+64,modules.size()));
-            var selects=new ArrayList<String>();
-            for(int index=0;index<batch.size();index++)selects.add("SELECT "+index+" AS ModuleOrdinal,m.definition,m.execute_as_principal_id,COALESCE(o.principal_id,s.principal_id) AS OwnerPrincipalId "
-                    +"FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE s.name='dbo' AND o.name=?");
-            try(var query=review.prepareStatement(String.join(" UNION ALL ",selects))) {
+            var cases=new ArrayList<String>();
+            for(int index=0;index<batch.size();index++)cases.add("WHEN o.name=? THEN "+index);
+            String sql="SELECT CASE "+String.join(" ",cases)+" ELSE -1 END AS ModuleOrdinal,m.definition,m.execute_as_principal_id,"
+                    +"COALESCE(o.principal_id,s.principal_id) AS OwnerPrincipalId FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id "
+                    +"JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE s.name='dbo' AND o.name IN("
+                    +String.join(",",Collections.nCopies(batch.size(),"?"))+")";
+            try(var query=review.prepareStatement(sql)) {
                 query.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));
-                for(int index=0;index<batch.size();index++)query.setString(index+1,batch.get(index));
+                for(int index=0;index<batch.size();index++) {
+                    query.setString(index+1,batch.get(index));query.setString(batch.size()+index+1,batch.get(index));
+                }
                 var seen=new HashSet<Integer>();
                 try(var rows=query.executeQuery()) {
                     while(rows.next()) {

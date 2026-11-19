@@ -572,8 +572,9 @@ remain separate unchanged evidence. No deployment or activation was performed.
 
 ## Fresh module and timezone transport batches
 
-The predecessor module-body verifier now binds up to 64 module names in a UNION ALL batch.
-Each branch retains the original dbo/schema/object/module lookup, UTF-16LE body digest,
+The predecessor module-body verifier now binds up to 64 module names in one catalog query.
+Bound CASE comparisons attribute each requested name, and the bound IN filter retains the
+original dbo/schema/object/module lookup, UTF-16LE body digest,
 effective dbo ownership and caller-versus-owner execution rules. Fixed numeric ordinals
 associate each returned row with its expected manifest entry; missing, extra, duplicated
 or out-of-range rows fail closed. No names or definitions are interpolated into SQL.
