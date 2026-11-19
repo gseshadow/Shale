@@ -22,7 +22,7 @@ class AiObjectAuthorityAttestationTest {
         final Set<String> invisible=new HashSet<>();
         Function<List<List<Object[]>>,List<List<Object[]>>> permissionFault=Function.identity();
         Function<List<Object[]>,List<Object[]>> columnFault=Function.identity();
-        String callerGrant,reviewerGrant,columnGrant;SQLException queryFailure;int inventories,resultSets,closedResultSets;
+        String callerGrant,reviewerGrant,columnGrant;String callerPermission="CONTROL",reviewerPermission="CONTROL";SQLException queryFailure;int inventories,resultSets,closedResultSets;
         final Connection caller=connection(false),review=connection(true);
         Jdbc(int objects,int columns) {
             for(int i=0;i<objects;i++) {
@@ -48,7 +48,7 @@ class AiObjectAuthorityAttestationTest {
                             for(int i=0;i<lease.bindings.size();i++) {
                                 String name=lease.bindings.get(i+1);var rows=new ArrayList<Object[]>();
                                 if(!reviewer&&invisible.contains(name))rows.add(new Object[]{i,null,1});
-                                else if(name.equals(reviewer?reviewerGrant:callerGrant))rows.add(new Object[]{i,"CONTROL",0});
+                                else if(name.equals(reviewer?reviewerGrant:callerGrant))rows.add(new Object[]{i,reviewer?reviewerPermission:callerPermission,0});
                                 else if(reviewer){rows.add(new Object[]{i,"VIEW DEFINITION",0});rows.add(new Object[]{i,"VIEW SECURITY DEFINITION",0});rows.add(new Object[]{i,"VIEW PERFORMANCE DEFINITION",0});}
                                 else if(roots.stream().anyMatch(r->name.equals("[dbo].["+r.replace("]","]]")+"]")))rows.add(new Object[]{i,"EXECUTE",0});
                                 else rows.add(new Object[]{i,null,0});
@@ -153,6 +153,24 @@ class AiObjectAuthorityAttestationTest {
             switch(fault){case "duplicate"->jdbc.inventory.add(jdbc.inventory.getFirst().clone());case "nullMixed"->jdbc.inventory.add(new Object[]{"dbo","object_0","U",null});case "emptyDuplicate"->{jdbc.inventory.getFirst()[3]=null;jdbc.inventory.add(jdbc.inventory.getFirst().clone());}case "type"->jdbc.inventory.getFirst()[2]="unknown";case "nullName"->jdbc.inventory.getFirst()[1]=null;}
             assertThrows(IllegalStateException.class,jdbc::verify,fault);assertEquals(1,jdbc.leases.size());jdbc.allClosed();
         }
+    }
+    @Test void boxedEngineStillChecksCallerAndIndependentColumnsWithoutExtraReviewerAuthority()throws Exception {
+        var jdbc=new Jdbc(70,2);
+        AiObjectAuthorityAttestation.verify(jdbc.caller,jdbc.review,jdbc.roots,false);
+        assertTrue(jdbc.leases.stream().filter(l->l.sql.contains("fn_my_permissions")).noneMatch(l->l.reviewer));
+        assertEquals(1,jdbc.inventories);jdbc.allClosed();
+        jdbc.columnGrant=object(69)+":column_1";
+        assertThrows(IllegalStateException.class,()->AiObjectAuthorityAttestation.verify(jdbc.caller,jdbc.review,jdbc.roots,false));jdbc.allClosed();
+    }
+    @Test void reviewerMetadataReadExceptionsStayLimitedToTheirOriginalObjects()throws Exception {
+        for(String name:List.of("AiCaseDataDeployment","AiDataUnicodeRange","AiDataUnicodeLower","AiDataWordTransition")) {
+            var jdbc=new Jdbc(1,0);jdbc.inventory.add(new Object[]{"dbo",name,"U",null});
+            jdbc.reviewerGrant="[dbo].["+name+"]";jdbc.reviewerPermission="SELECT";jdbc.verify();jdbc.allClosed();
+        }
+        var reviewer=new Jdbc(2,0);reviewer.reviewerGrant=object(1);reviewer.reviewerPermission="SELECT";
+        assertThrows(IllegalStateException.class,reviewer::verify);reviewer.allClosed();
+        var caller=new Jdbc(2,0);caller.callerGrant=object(1);caller.callerPermission="VIEW SECURITY DEFINITION";
+        assertThrows(IllegalStateException.class,caller::verify);caller.allClosed();
     }
     @Test void laterAdmissionsSeeChangedAuthorityAndSqlErrorsNeverFallback()throws Exception {
         var jdbc=new Jdbc(2,1);jdbc.verify();jdbc.callerGrant=object(1);

@@ -560,3 +560,11 @@ These are operational metadata reads: existing operational evidence applies; no 
 audit entry is fabricated and the established disclosure audits remain unchanged. Candidate
 read-only timings must be recorded separately from the accepted original artifact; only a
 separately approved deployment/campaign can establish changed-worker functional acceptance.
+
+Candidate read-only comparison on the same acceptance database completed PASS in 59,828 ms
+with 112 SQL executions, versus 106,090 ms / 1,064 executions for the accepted artifact
+(43.6% elapsed reduction). The unchanged catalog batches still took 44.2 seconds; normal
+ten-second admission and stock-client timing remain unproven. Candidate class/metrics hashes
+and the private report are preserved under work/readonly-authority-batch-531bac799cd24e0b9ce33f64f0c838de.
+The accepted JAR, original 51/51 SQL journal, completed 8/8 client run and final audit completion
+remain separate unchanged evidence. No deployment or activation was performed.
