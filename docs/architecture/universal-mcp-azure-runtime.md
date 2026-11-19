@@ -312,3 +312,39 @@ before batching, from the same operator workstation. This is a diagnostic compar
 not an Azure-worker latency or capacity certificate. The private candidate class/log hashes
 are retained under work/readonly-batched-attestation-24f6bf9d081e40f7927681656228c9fd.
 Original 51/51 SQL evidence remains unchanged; no deployment or activation was performed.
+
+
+## Fresh object-authority transport batching
+
+A read-only profile of the accepted D131 artifact took 106,090 ms for complete predecessor
+and external readiness from the operator workstation: 1,064 SQL executions, approximately
+51.8 seconds of repeated object permissions/column inventory/column permissions and 45.9
+seconds in the three existing catalog batches. Acceptance SQL/client/audit evidence stays
+unchanged. This timing is not an Azure-worker or stock-client latency certificate.
+
+The predecessor now obtains its unchanged object/type/column inventory in one independent
+verifier query, retaining objects without columns. Object permissions use up to 64 bound
+objects per transport batch under each original identity. Each object's 15151 visibility
+error has its own TRY/CATCH result; it cannot imply empty permissions for other objects.
+Required roots and the reviewer metadata allowlist, including the existing implied VIEW
+DEFINITION children, retain their previous rules. Column SELECT/UPDATE checks bind up to
+256 independent object/column pairs per query. Null permission answers preserve the prior
+no-demonstrated-grant behavior. Missing/extra/misattributed responses, malformed inventories
+and unexpected errors fail closed. No cross-request cache or skipped verification is added.
+
+The three packaged catalog verifiers, source/receipt checks, binding/time samples, identity
+boundaries, defaults, admission placement, withdrawal, tool transactions, quotas and expiry
+remain unchanged. Registry publication identity verification retains its existing path.
+No SQL installation, permission, schema, persistent setting or domain mutation is introduced.
+These are operational metadata reads: existing operational evidence applies; no PHI/entity
+audit entry is fabricated and the established disclosure audits remain unchanged. Candidate
+read-only timings must be recorded separately from the accepted original artifact; only a
+separately approved deployment/campaign can establish changed-worker functional acceptance.
+
+Candidate read-only comparison on the same acceptance database completed PASS in 59,828 ms
+with 112 SQL executions, versus 106,090 ms / 1,064 executions for the accepted artifact
+(43.6% elapsed reduction). The unchanged catalog batches still took 44.2 seconds; normal
+ten-second admission and stock-client timing remain unproven. Candidate class/metrics hashes
+and the private report are preserved under work/readonly-authority-batch-531bac799cd24e0b9ce33f64f0c838de.
+The accepted JAR, original 51/51 SQL journal, completed 8/8 client run and final audit completion
+remain separate unchanged evidence. No deployment or activation was performed.
