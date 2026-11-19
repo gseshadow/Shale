@@ -211,25 +211,7 @@ public final class AiCaseDataAttestation {
                 allowed(review,null,"DATABASE",Set.of("CONNECT","VIEW DEFINITION","VIEW ANY COLUMN ENCRYPTION KEY DEFINITION","VIEW ANY COLUMN MASTER KEY DEFINITION"));
             }
             stage="OBJECT_AUTHORITY";
-            var executable=new HashSet<String>();
-            try(var s=statement(review);var r=s.executeQuery("SELECT s.name,o.name,o.type FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE o.is_ms_shipped=0 AND o.type IN('U','V','P','FN','IF','TF','SN','FS','FT','PC')")) {
-                while(r.next()) {
-                    String schema=r.getString(1),name=r.getString(2),object=quote(schema)+"."+quote(name);
-                    Set<String> permitted=schema.equals("dbo")&&PUBLIC.contains(name)?Set.of("EXECUTE"):Set.of();
-                    Set<String> actual=allowed(caller,object,"OBJECT",permitted);
-                    if(actual.contains("EXECUTE"))executable.add(name);
-                    if(platform==Platform.AZURE_SQL_DATABASE) {
-                        Set<String> metadata=schema.equals("dbo")&&Set.of("AiCaseDataDeployment","AiDataUnicodeRange","AiDataUnicodeLower","AiDataWordTransition").contains(name)?Set.of("SELECT","VIEW DEFINITION"):Set.of("VIEW DEFINITION");
-                        allowed(review,object,"OBJECT",metadata);
-                    }
-                    // SQL DENY at object level can have column-GRANT exceptions: check EVERY column.
-                    try(var p=review.prepareStatement("SELECT c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name=? AND o.name=?")) {
-                        p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setString(1,schema);p.setString(2,name);
-                        try(var columns=p.executeQuery()) { AiColumnPermissionAttestation.verify(caller,object,columns); }
-                    }
-                }
-            }
-            if(!executable.equals(PUBLIC))throw refused();
+            AiObjectAuthorityAttestation.verify(caller,review,PUBLIC,platform==Platform.AZURE_SQL_DATABASE);
             stage="DEPLOYMENT_TIMEZONE";
             try(var s=statement(review);var r=s.executeQuery("SELECT Issuer,Resource,JavaTimeZone,SqlTimeZone FROM dbo.AiCaseDataDeployment WHERE Id=1")) {
                 if(!r.next()||!issuer.equals(r.getString(1))||!resource.equals(r.getString(2))||!ZoneId.systemDefault().equals(ZoneId.of(r.getString(3))))throw refused();
@@ -368,7 +350,6 @@ public final class AiCaseDataAttestation {
         }
         return actual;
     }
-    private static String quote(String name){return "["+name.replace("]","]]")+"]";}
     private static Statement statement(Connection c)throws SQLException {var s=c.createStatement();s.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));return s;}
     private static IllegalStateException refused(){return new IllegalStateException("AI Case datasource attestation failed closed.");}
 }
