@@ -68,7 +68,7 @@ function Invoke-HermesAcceptanceWindow($Context) {
         Write-Host 'Sign in as admin@example.invalid in the browser; approve the application and separately consent.'
         Write-Host 'In Hermes, ask it to search synthetic cases and open Case 100. Case 200 must not disclose tenant B data.'
         Write-Host 'Exit Hermes when finished. The window has a 30-minute limit, followed by OFF and stop.'
-        $anonymous=Invoke-WebRequest -Uri ($script:LiveOrigin+'/mcp') -Method Post -ContentType 'application/json' -Body '{}' -SkipHttpErrorCheck -MaximumRedirection 0 -TimeoutSec 30
+        $anonymous=Invoke-WebRequest -Uri ($script:LiveOrigin+'/mcp') -Method Post -Headers @{Accept='application/json'} -ContentType 'application/json' -Body '{}' -SkipHttpErrorCheck -MaximumRedirection 0 -TimeoutSec 30
         if ($anonymous.StatusCode -ne 401) { throw 'MCP_AUTH_CHALLENGE_REQUIRED' }
         Assert-HermesCookieFreeResponse $anonymous
         $steps.Add(@{Id='cookie-free-anonymous-mcp-challenge';Status='PASS'})
@@ -83,7 +83,7 @@ function Invoke-HermesAcceptanceWindow($Context) {
         [void](Get-LiveBinding $Context.Evidence.Directory $Context.Owner); Assert-LiveSynthetic $Context.Owner
         $steps.Add(@{Id='operator-functional-check';Status='MANUAL_REVIEW_REQUIRED'})
         $clientWindowCompleted=$true
-    } catch { $failure=$phase; $failureCode=if($_.Exception.Message -cin @('HERMES_CONNECTION_TIMEOUT','HERMES_CONNECTION_FAILED','HERMES_CLIENT_TIMEOUT','HERMES_CLIENT_FAILED','HERMES_AZURE_TIMEOUT','HERMES_AZURE_FAILED')){$_.Exception.Message}else{Get-LiveSafeCampaignFailure $_}; $diagnostic=Get-LiveCampaignDiagnostic $_ } finally {
+    } catch { $failure=$phase; $failureCode=if($_.Exception.Message -cin @('HERMES_CONNECTION_TIMEOUT','HERMES_CONNECTION_FAILED','HERMES_CLIENT_TIMEOUT','HERMES_CLIENT_FAILED','HERMES_AZURE_TIMEOUT','HERMES_AZURE_FAILED','COOKIE_FREE_DORMANT_APP_REQUIRED','MCP_COOKIE_RESPONSE_REFUSED','MCP_AUTH_CHALLENGE_REQUIRED')){$_.Exception.Message}else{Get-LiveSafeCampaignFailure $_}; $diagnostic=Get-LiveCampaignDiagnostic $_ } finally {
         if ($approved) { $cleanup=Stop-LiveAcceptance $Context.Owner $Context.Credentials $Context.Run -VerifySqlOnly:(-not $sqlActivationAttempted) }
         if ($approved -and -not $clientWindowCompleted -and -not $failure) { $failure=$phase; $failureCode='HERMES_WINDOW_INTERRUPTED' }
         $pass=$approved -and $clientWindowCompleted -and -not $failure -and $cleanup.SqlOff -and $cleanup.AppOff -and $cleanup.ApplicationStopped

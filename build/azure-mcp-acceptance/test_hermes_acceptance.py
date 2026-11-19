@@ -76,7 +76,7 @@ function Assert-LiveSqlOff { param($x) };function Assert-LiveSynthetic { param($
 function Assert-LiveJar { param($a,$b,$c) };function Assert-CleanResources {}
 function Invoke-CleanAzure { param($a) if($a[1] -ceq 'update'){$script:Events.Add('affinity-disabled')};@{state='Stopped';clientAffinityEnabled=$false} }
 function Start-LiveWorker { param($a) };function Assert-LiveWorker { param($a,$b,[switch]$Ready) if($Ready){'ready'}else{'AI_CASE_SQL_READINESS disabled'} }
-function Invoke-WebRequest { param($Uri,$Method,$ContentType,$Body,[switch]$SkipHttpErrorCheck,$MaximumRedirection,$TimeoutSec,$Headers) if($Uri.EndsWith('/login')){@{StatusCode=200;Content='<div id="root">';Headers=@{}}}elseif($script:Events.Contains('app-enabled')){@{StatusCode=401;Headers=@{}}}else{@{StatusCode=404;Headers=@{}}} }
+function Invoke-WebRequest { param($Uri,$Method,$ContentType,$Body,[switch]$SkipHttpErrorCheck,$MaximumRedirection,$TimeoutSec,$Headers) if($Uri.EndsWith('/login')){@{StatusCode=200;Content='<div id="root">';Headers=@{}}}elseif($script:Events.Contains('app-enabled')){if($Headers.Accept -cne 'application/json'){throw 'JSON_CHALLENGE_REQUIRED'};@{StatusCode=401;Headers=@{}}}else{@{StatusCode=404;Headers=@{}}} }
 function Get-LiveBinding { param($a,$b) };function Invoke-LiveRls { param($a) }
 function Invoke-LiveNativeChecks { param($a,$b,$c) };function Get-LiveAuditBaseline { param($a) @{Access=1;Phi=1} }
 function Set-LiveSqlControls { param($enabled,$a,$b) $script:Events.Add('sql-enabled') }
