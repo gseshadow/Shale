@@ -8,7 +8,8 @@ function Invoke-HermesAcceptanceWindow($Context) {
     try {
         # The ONLY approval. No Force/switch/environment/parameter can supply this acknowledgement.
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
-        Write-Host 'Deploy dormant, verify worker, activate only synthetic acceptance, open a private Hermes browser/client window, then OFF and stop.'
+        Write-Host 'Disable affinity cookies on the single-worker acceptance app, deploy dormant, verify worker, activate synthetic acceptance, open Hermes, then OFF and stop.'
+        Write-Host 'Affinity will remain disabled on acceptance for future stock-client connections.'
         Write-Host 'Dedicated acceptance verification budget: 600 seconds per admission, 180-second SQL/network reads, 30-second login. Every security check remains enabled; SQL tool transactions retain their existing short limits.'
         Write-Host 'Hermes connection/discovery budget: 600 seconds; interactive chat window: 30 minutes. No natural-expiry campaign replay.'
         if ((Read-Host 'Type CONNECT_SHALE_MCP_HERMES_ACCEPTANCE to approve this whole controlled run') -cne 'CONNECT_SHALE_MCP_HERMES_ACCEPTANCE') { throw 'OPERATOR_DECLINED' }
@@ -20,6 +21,11 @@ function Invoke-HermesAcceptanceWindow($Context) {
         Assert-LiveAzureConfiguration; Assert-LiveSettings (Get-LiveSettings) $Context.Credentials; Assert-LiveSqlOff $Context.Owner
         Assert-LiveSynthetic $Context.Owner
         Assert-LiveJar $Context.Jar $Context.Hash $Context.Version
+        $phase='cookie-free-app-configuration'
+        [void](Invoke-CleanAzure @('webapp','update','--ids',$script:LiveAppId,'--client-affinity-enabled','false'))
+        $cookieFreeApp=Invoke-CleanAzure @('webapp','show','--ids',$script:LiveAppId)
+        if ($cookieFreeApp.clientAffinityEnabled -ne $false -or $cookieFreeApp.state -cne 'Stopped') { throw 'COOKIE_FREE_DORMANT_APP_REQUIRED' }
+        $steps.Add(@{Id='acceptance-affinity-cookies-disabled';Status='PASS'})
         $phase='guarded-deployment'
         [void](Invoke-CleanAzure @('webapp','deploy','--ids',$script:LiveAppId,'--src-path',$Context.Jar,'--type','jar','--restart','false','--clean','false','--track-status','false'))
         $app=Invoke-CleanAzure @('webapp','show','--ids',$script:LiveAppId)
@@ -31,6 +37,7 @@ function Invoke-HermesAcceptanceWindow($Context) {
         foreach ($route in @('/mcp','/oauth/mcp/register','/oauth/mcp/token')) {
             $r=Invoke-WebRequest -Uri ($script:LiveOrigin+$route) -Method Post -ContentType 'application/json' -Body '{}' -SkipHttpErrorCheck -MaximumRedirection 0 -TimeoutSec 10
             if ($r.StatusCode -ne 404) { throw 'DORMANT_ROUTE_OPEN' }
+            Assert-HermesCookieFreeResponse $r
         }
         $steps.Add(@{Id='dormant-worker';Status='PASS';Markers=$markers})
         [void](Invoke-CleanAzure @('webapp','stop','--ids',$script:LiveAppId)); Assert-CleanResources
@@ -61,6 +68,10 @@ function Invoke-HermesAcceptanceWindow($Context) {
         Write-Host 'Sign in as admin@example.invalid in the browser; approve the application and separately consent.'
         Write-Host 'In Hermes, ask it to search synthetic cases and open Case 100. Case 200 must not disclose tenant B data.'
         Write-Host 'Exit Hermes when finished. The window has a 30-minute limit, followed by OFF and stop.'
+        $anonymous=Invoke-WebRequest -Uri ($script:LiveOrigin+'/mcp') -Method Post -Headers @{Accept='application/json'} -ContentType 'application/json' -Body '{}' -SkipHttpErrorCheck -MaximumRedirection 0 -TimeoutSec 30
+        if ($anonymous.StatusCode -ne 401) { throw 'MCP_AUTH_CHALLENGE_REQUIRED' }
+        Assert-HermesCookieFreeResponse $anonymous
+        $steps.Add(@{Id='cookie-free-anonymous-mcp-challenge';Status='PASS'})
         $phase='hermes-connection'
         New-CleanEvent (Join-Path $Context.Run 'journal.jsonl') @{Kind='hermes-connection-started';TimeoutSeconds=600}
         Invoke-HermesInteractiveProcess -Arguments @('mcp','add','shale-acceptance','--url',($script:LiveOrigin+'/mcp'),'--auth','oauth','--connect-timeout','600') -TimeoutMilliseconds 600000 -FailurePrefix 'HERMES_CONNECTION'
@@ -72,7 +83,7 @@ function Invoke-HermesAcceptanceWindow($Context) {
         [void](Get-LiveBinding $Context.Evidence.Directory $Context.Owner); Assert-LiveSynthetic $Context.Owner
         $steps.Add(@{Id='operator-functional-check';Status='MANUAL_REVIEW_REQUIRED'})
         $clientWindowCompleted=$true
-    } catch { $failure=$phase; $failureCode=if($_.Exception.Message -cin @('HERMES_CONNECTION_TIMEOUT','HERMES_CONNECTION_FAILED','HERMES_CLIENT_TIMEOUT','HERMES_CLIENT_FAILED','HERMES_AZURE_TIMEOUT','HERMES_AZURE_FAILED')){$_.Exception.Message}else{Get-LiveSafeCampaignFailure $_}; $diagnostic=Get-LiveCampaignDiagnostic $_ } finally {
+    } catch { $failure=$phase; $failureCode=if($_.Exception.Message -cin @('HERMES_CONNECTION_TIMEOUT','HERMES_CONNECTION_FAILED','HERMES_CLIENT_TIMEOUT','HERMES_CLIENT_FAILED','HERMES_AZURE_TIMEOUT','HERMES_AZURE_FAILED','COOKIE_FREE_DORMANT_APP_REQUIRED','MCP_COOKIE_RESPONSE_REFUSED','MCP_AUTH_CHALLENGE_REQUIRED')){$_.Exception.Message}else{Get-LiveSafeCampaignFailure $_}; $diagnostic=Get-LiveCampaignDiagnostic $_ } finally {
         if ($approved) { $cleanup=Stop-LiveAcceptance $Context.Owner $Context.Credentials $Context.Run -VerifySqlOnly:(-not $sqlActivationAttempted) }
         if ($approved -and -not $clientWindowCompleted -and -not $failure) { $failure=$phase; $failureCode='HERMES_WINDOW_INTERRUPTED' }
         $pass=$approved -and $clientWindowCompleted -and -not $failure -and $cleanup.SqlOff -and $cleanup.AppOff -and $cleanup.ApplicationStopped
@@ -84,4 +95,12 @@ function Invoke-HermesAcceptanceWindow($Context) {
         New-CleanEvent (Join-Path $Context.Run 'journal.jsonl') @{Kind='finished';Status=$result.Status;Cleanup=$cleanup}
     }
     return $result
+}
+
+function Assert-HermesCookieFreeResponse($Response) {
+    foreach($header in $Response.Headers.Keys) {
+        if ([string]$header -ieq 'Set-Cookie' -and @($Response.Headers[$header] | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }).Count) {
+            throw 'MCP_COOKIE_RESPONSE_REFUSED'
+        }
+    }
 }

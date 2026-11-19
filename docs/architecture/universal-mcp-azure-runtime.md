@@ -427,3 +427,24 @@ with structured arguments, memory-only output and a 180-second process limit; `a
 so a console interrupt cannot leave a batch-job prompt in cleanup. Existing target validation and
 JSON/setting parsing are reused. Journals contain closed stages only. None of this creates
 an audit schema or bypasses existing transaction-owned approval/consent/disclosure audits.
+
+
+### Stock-client affinity-cookie compatibility
+
+Read-only inspection of the first Hermes trial established three intents, two saved consents,
+two issued codes and two redeemed codes. The third intent had no saved consent/code. Those facts
+establish successful OAuth exchanges, not MCP tool discovery or a proven SQL/expiry failure.
+The acceptance App Service was independently found with `clientAffinityEnabled=true`.
+The automated client explicitly used `NoCookies`; stock Hermes uses a normal HTTP cookie jar.
+Shale's MCP gate deliberately rejects every cookie, including infrastructure ARRAffinity cookies,
+before admitting a bearer credential. Do not weaken that boundary or patch the stock client.
+
+The short Hermes runner's existing human approval now explicitly includes disabling client affinity
+on the fixed, single-worker acceptance App Service. The change occurs only after approval, is read
+back with the app still stopped, and remains disabled for subsequent acceptance client use. No
+production resource, shared plan, SQL binding, permission or security/expiry setting is changed.
+Dormant responses and the enabled anonymous MCP 401 challenge must contain no Set-Cookie header
+before opening Hermes. A failed readback/header check enters the existing independent OFF/stop
+cleanup. Native verification, token validation and all existing audit owners remain unchanged;
+this resource setting has operator evidence and no new tenant/domain audit vocabulary or migration.
+A fresh stock-client trial is still required to confirm the suspected cause of repeated authorization.

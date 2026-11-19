@@ -51,7 +51,7 @@ class HermesAcceptanceTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "LOOPBACK_MODEL_REQUIRED"):
                     profile.prepare(source, root / "private")
                 self.assertFalse((root / "private").exists())
-    def campaign(self, phrase, complete=False, interrupt=False):
+    def campaign(self, phrase, complete=False, interrupt=False, affinity_rejected=False):
         with tempfile.TemporaryDirectory() as tmp:
             run=Path(tmp).as_posix()
             script = f"""
@@ -74,9 +74,9 @@ function Assert-LiveAzureConfiguration { $script:Events.Add('preflight') }
 function Assert-LiveSettings { param($a,$b) };function Get-LiveSettings { @{} }
 function Assert-LiveSqlOff { param($x) };function Assert-LiveSynthetic { param($x) }
 function Assert-LiveJar { param($a,$b,$c) };function Assert-CleanResources {}
-function Invoke-CleanAzure { param($a) @{state='Stopped'} }
+function Invoke-CleanAzure { param($a) if($a[1] -ceq 'update'){$script:Events.Add('affinity-disabled')};@{state='Stopped';clientAffinityEnabled=$false} }
 function Start-LiveWorker { param($a) };function Assert-LiveWorker { param($a,$b,[switch]$Ready) if($Ready){'ready'}else{'AI_CASE_SQL_READINESS disabled'} }
-function Invoke-WebRequest { param($Uri,$Method,$ContentType,$Body,[switch]$SkipHttpErrorCheck,$MaximumRedirection,$TimeoutSec,$Headers) if($Uri.EndsWith('/login')){@{StatusCode=200;Content='<div id="root">'}}else{@{StatusCode=404}} }
+function Invoke-WebRequest { param($Uri,$Method,$ContentType,$Body,[switch]$SkipHttpErrorCheck,$MaximumRedirection,$TimeoutSec,$Headers) if($Uri.EndsWith('/login')){@{StatusCode=200;Content='<div id="root">';Headers=@{}}}elseif($script:Events.Contains('app-enabled')){if($Headers.Accept -cne 'application/json'){throw 'JSON_CHALLENGE_REQUIRED'};@{StatusCode=401;Headers=@{}}}else{@{StatusCode=404;Headers=@{}}} }
 function Get-LiveBinding { param($a,$b) };function Invoke-LiveRls { param($a) }
 function Invoke-LiveNativeChecks { param($a,$b,$c) };function Get-LiveAuditBaseline { param($a) @{Access=1;Phi=1} }
 function Set-LiveSqlControls { param($enabled,$a,$b) $script:Events.Add('sql-enabled') }
@@ -85,6 +85,8 @@ function Invoke-HermesInteractiveProcess { param($Arguments,$TimeoutMilliseconds
 $script:LiveOrigin='https://acceptance.invalid';$context.Zones=@{Java='UTC'};$context.Id='synthetic'
 $result=Invoke-HermesAcceptanceWindow $context
 """)
+            if affinity_rejected:
+                script=script.replace("clientAffinityEnabled=$false", "clientAffinityEnabled=$true")
             if interrupt:
                 script=script.replace("$script:LiveOrigin='https://acceptance.invalid'", "function Invoke-HermesInteractiveProcess { param($Arguments,$TimeoutMilliseconds,$FailurePrefix) exit 0 }; $script:LiveOrigin='https://acceptance.invalid'")
             result=subprocess.run(['pwsh','-NoProfile','-NonInteractive','-Command',script],cwd=ROOT,capture_output=True,text=True)
@@ -147,10 +149,26 @@ if((Invoke-HermesCapturedProcess $ok 10000) -cne 'synthetic-json-output'){throw 
         self.assertTrue(result['Cleanup']['SqlOff'])
         self.assertTrue(result['Cleanup']['AppOff'])
         self.assertTrue(result['Cleanup']['ApplicationStopped'])
+    def test_affinity_readback_failure_cleans_up_before_deployment_or_activation(self):
+        result=self.campaign('CONNECT_SHALE_MCP_HERMES_ACCEPTANCE',complete=True,affinity_rejected=True)
+        self.assertEqual('FAIL',result['Status'])
+        self.assertEqual('cookie-free-app-configuration',result['Failure'])
+        self.assertEqual(['preflight','affinity-disabled','cleanup'],result['Events'])
+    def test_cookie_headers_are_rejected_without_exposing_their_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            body="""
+. ./build/azure-mcp-acceptance/HermesAcceptance.ps1
+Assert-HermesCookieFreeResponse @{Headers=@{}}
+foreach($name in @('Set-Cookie','set-cookie')) {
+ try { Assert-HermesCookieFreeResponse @{Headers=@{$name=@('ARRAffinity=SENSITIVE_ROUTING_VALUE')}};throw 'COOKIE_REJECTION_REQUIRED' }
+ catch {if($_.Exception.Message -cne 'MCP_COOKIE_RESPONSE_REFUSED'){throw}}
+}
+"""
+            self.ps(body)
     def test_approved_window_uses_hermes_without_automated_campaign_replay(self):
         result=self.campaign('CONNECT_SHALE_MCP_HERMES_ACCEPTANCE', complete=True)
         self.assertEqual('WINDOW_COMPLETED',result['Status'], result)
-        self.assertEqual(['preflight','sql-enabled','app-enabled','hermes-connect','hermes-chat','cleanup'],result['Events'])
+        self.assertEqual(['preflight','affinity-disabled','sql-enabled','app-enabled','hermes-connect','hermes-chat','cleanup'],result['Events'])
     def test_declined_gate_cannot_execute_preflight_deployment_or_cleanup_mutations(self):
         result=self.campaign('no')
         self.assertFalse(result['Approved']);self.assertEqual([],result['Events']);self.assertEqual('FAIL',result['Status'])
