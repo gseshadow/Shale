@@ -373,3 +373,13 @@ PHI/entity audit events, schema/grant change, deployment or activation. The prec
 S3 capacity comparison restored S0; this batching comparison requires no capacity change.
 Read-only candidate timings are separate from the preserved completed acceptance evidence;
 normal ten-second admission and changed-worker/client acceptance remain unverified.
+
+Native read-only S0 validation passed for this candidate: complete predecessor + external
+verification took 89,792 ms with 73 SQL executions (previous shape: 112). A separate
+controlled comparison of only the two changed checks measured 2,129 / 2,048 ms for the
+original loops around a 181 ms candidate run: 41 queries became two, about 91% faster.
+The earlier unchanged full-baseline attempts exceeded a 120-second profiling cap; no whole
+request speedup is inferred. The full candidate used the already-established 600-second
+read-only diagnostic budget, without changing deployed runtime limits or S0 capacity.
+Private class/source/metric evidence remains under work/readonly-module-timezone-8f5278e488234249a59b9763f3b8f270.
+The original completed SQL/client/audit evidence is preserved; no functional campaign replay.
