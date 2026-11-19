@@ -117,6 +117,51 @@ print('OFFLINE_REAL_SDK_PASS')
             self.assertNotIn('PRIVATE_', out)
             self.assertIn('waiting for checkpoint evidence', out)
 
+
+    def test_audit_verifier_requires_exact_unavailable_reason_and_valid_baseline(self):
+        self.ps(r'''
+$script:sql='';$script:calls=0
+function Invoke-LiveOwner($Sql,$Owner){$script:sql=$Sql;$script:calls++;return 'LIVE_AUDIT_PASS:8'}
+Assert-LiveAudits $null @{Access=13;Phi=3} 8 6
+if($script:sql -notmatch "Outcome='UNAVAILABLE' AND Reason='CASE_UNAVAILABLE' AND ReturnedCount=0" -or
+   $script:sql -notmatch "Outcome='INVALID_INPUT' AND Reason='INPUT' AND ReturnedCount=0" -or
+   $script:sql -notmatch "Reason IS NULL OR Reason<>'CASE_UNAVAILABLE'" -or
+   $script:sql -notmatch 'HandoffConsumed=1' -or $script:sql -notmatch 'ReleasedAt IS NOT NULL'){throw 'Durable audit checks weakened'}
+$script:calls=0
+try{Assert-LiveAudits $null @{Access='PRIVATE_SENTINEL';Phi=3} 8 6}catch{if($_.Exception.Message -cne 'AUDIT_BASELINE_REQUIRED'){throw 'Baseline diagnostic leaked'}}
+if($script:calls -ne 0){throw 'Untrusted baseline reached SQL'}
+function Invoke-LiveOwner {throw 'PRIVATE_DRIVER_SENTINEL'}
+try{Assert-LiveAudits $null @{Access=13;Phi=3} 8 6}catch{if($_.Exception.Message -cne 'DURABLE_AUDIT_VERIFICATION_FAILED'){throw 'SQL failure text escaped'}}
+''')
+
+    def test_audit_recovery_rejects_incomplete_evidence_and_has_no_mutation_entrypoint(self):
+        self.ps(r'''
+function Invoke-LiveOwner {throw 'UNEXPECTED_SQL'}
+try{Get-LiveRecoveredAuditBaseline 'unused' $null 7 5 'UTC';throw 'Recovery accepted partial client'}catch{if($_.Exception.Message -cne 'AUDIT_RECOVERY_REFUSED'){throw}}
+''')
+        entry = (TOOL / 'Complete-LiveAuditVerification.ps1').read_text(encoding='utf-8')
+        for forbidden in ('Set-LiveSqlControls', 'Set-LiveAppControls', 'Start-LiveWorker',
+                          'Invoke-LiveCampaign', 'Initialize-LiveConfiguration'):
+            self.assertNotIn(forbidden, entry)
+        self.assertNotIn('RUN_SHALE_MCP_ACCEPTANCE', entry)
+        self.assertIn('Assert-LiveSqlOff', entry)
+        self.assertIn('AUDIT_EVIDENCE_CHANGED', entry)
+
+    def test_audit_recovery_requires_one_marker_and_preserves_window_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / 'report.json').write_text('{}')
+            self.ps(r"""
+$script:captured=''
+function Invoke-LiveOwner($Sql,$Owner){$script:captured=$Sql;return 'LIVE_RECOVER_BASE:13:3'}
+$b=Get-LiveRecoveredAuditBaseline 'RUN_PATH' $null 8 6 'UTC'
+if($b.Access -ne 13 -or $b.Phi -ne 3 -or $b.Source -cne 'RECOVERED_WINDOW' -or -not $b.WindowStartUtc -or -not $b.WindowEndUtc){throw 'Recovery provenance missing'}
+foreach($guard in @('@events<>16','@phi<>6','AUDIT_RECOVERY_WINDOW_REFUSED','AUDIT_RECOVERY_PHI_REFUSED','UserId=71','UserId=81','IS NULL')){if(-not $script:captured.Contains($guard)){throw 'Recovery isolation guard missing'}}
+function Invoke-LiveOwner {return @('LIVE_RECOVER_BASE:13:3','LIVE_RECOVER_BASE:14:3')}
+try{Get-LiveRecoveredAuditBaseline 'RUN_PATH' $null 8 6 'UTC';throw 'Ambiguous recovery accepted'}catch{if($_.Exception.Message -cne 'AUDIT_RECOVERY_REFUSED'){throw}}
+function Invoke-LiveOwner {throw 'PRIVATE_DRIVER_SENTINEL'}
+try{Get-LiveRecoveredAuditBaseline 'RUN_PATH' $null 8 6 'UTC';throw 'SQL failure accepted'}catch{if($_.Exception.Message -cne 'AUDIT_RECOVERY_REFUSED'){throw 'Raw SQL failure escaped'}}
+""".replace('RUN_PATH', directory.replace("'", "''")))
+
     def test_nested_sdk_errors_keep_only_closed_kinds_and_numeric_codes(self):
         mcp_error = type('MCPError', (Exception,), {'__module__': 'mcp.shared.exceptions', 'code': -32603})
         error = ExceptionGroup('PRIVATE_GROUP_SENTINEL', [ValueError('PRIVATE_VALUE'), mcp_error('PRIVATE_MESSAGE')])

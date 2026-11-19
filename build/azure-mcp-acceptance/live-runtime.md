@@ -509,3 +509,26 @@ authority fails again. SDK response hooks now persist bounded progress after eac
 The parent heartbeat prints elapsed minutes, allowlisted checkpoint and numeric completed
 response/disclosure counts; it never echoes report text, tokens, payloads or credentials.
 Audit vocabulary/schema are unchanged; extra login/authorization uses existing lifecycle paths.
+
+
+## Final audit completion without functional replay
+
+Preserved run c329cd66ca214380842544cb70d33220 passed all eight client checkpoints
+with eight disclosures and six overview reads. Its final verifier incorrectly counted
+concealed case denials as DENIED; the authoritative 59104 mapping is
+UNAVAILABLE / CASE_UNAVAILABLE. The verifier now requires exactly six such zero-result
+overview events and two INVALID_INPUT / INPUT search events, while retaining consumed
+handoffs, released quotas, returned-resource isolation and PHI count checks. Generic
+UNAVAILABLE failures never satisfy this contract. No server or audit-schema change occurs.
+
+Complete-LiveAuditVerification.ps1 -RunDirectory <preserved-run> verifies the private
+hashed PASS client evidence, fixed reviewed JAR and original SQL journal before prompting
+for the owner in memory. It performs read-only SQL checks with the app stopped and all
+controls OFF, and writes a separate audit-completion report. It never deploys, activates,
+changes SQL or replays functional tests. The original FAIL report remains unchanged.
+Future campaigns persist their audit baseline before activation. For this older run only,
+missing baseline recovery requires exactly sixteen latest access events in the original
+run window and six correctly attributed PHI entries, with no later PHI entries. Ambiguous
+or altered evidence is refused. The supplemental report labels this RECOVERED_WINDOW,
+not an originally persisted baseline. Native completion remains unverified until this
+separate read-only check passes; offline test success alone is insufficient.
