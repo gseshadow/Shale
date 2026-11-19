@@ -296,8 +296,8 @@ No tenant/domain or PHI mutation occurs during preparation, so no SQL audit row/
 The approved campaign retains its existing SQL policy/product/read audit semantics.
 
 Configuration successor verification (2026-11-16): `python -m unittest discover -s
-build/azure-mcp-acceptance -p 'test_live_*.py' -v` — **26 PASS** (10 configuration regressions and
-16 existing live-driver/runtime regressions). `mvn test` via the existing local JDK/Maven wrapper —
+build/azure-mcp-acceptance -p 'test_live_*.py' -v` â€” **26 PASS** (10 configuration regressions and
+16 existing live-driver/runtime regressions). `mvn test` via the existing local JDK/Maven wrapper â€”
 **283 PASS**, zero failures/errors/skips. Selector executed against `origin/codex/latest`; no affected
 Maven area maps to these operator scripts, and the all-tests suggestion remains informational.
 Diff whitespace and relative-link checks PASS. Tests use mock Azure/REST/SQL seams and real portable
@@ -603,3 +603,27 @@ request speedup is inferred. The full candidate used the already-established 600
 read-only diagnostic budget, without changing deployed runtime limits or S0 capacity.
 Private class/source/metric evidence remains under work/readonly-module-timezone-8f5278e488234249a59b9763f3b8f270.
 The original completed SQL/client/audit evidence is preserved; no functional campaign replay.
+
+
+## Short local Hermes browser trial (separate from automated acceptance)
+
+After local checks, prepare a separate artifact with
+`python build/azure-mcp-acceptance/prepare-hermes-browser.py --output work/<new-private-build-directory>`.
+Review its exact source and `artifact.json` SHA256 before running
+`Start-HermesAcceptance.ps1 -ServerJar <artifact> -ExpectedJarSHA256 <reviewed-hash> -ExpectedBuildVersion 1.0.138`.
+The launcher requests only the acceptance database owner; synthetic user login happens directly
+in the normal browser. Existing contained credentials and settings are reused, not regenerated.
+The human must type `CONNECT_SHALE_MCP_HERMES_ACCEPTANCE` at the gate. The approved scope is the
+same fixed acceptance app/database: dormant deployment, full verification, temporary activation,
+Hermes connection and interactive synthetic-case checks, then OFF and stop. No production change,
+SQL installer, fixture reset, performance scaling, or automated functional replay is included.
+
+The isolated Hermes profile uses the existing loopback model selection, excludes other MCP servers
+and secrets, and is removed in finally. Do not enable transcripts or record authorization URLs,
+OAuth tokens or browser credentials. Sign in as synthetic tenant-A admin, approve the application,
+then separately consent. Ask the local model to discover tools, search cases and open Case 100;
+Case 200 belongs to the other tenant and must remain unavailable. Exit Hermes to close the window.
+The chat window has a 30-minute limit; failure cleanup independently attempts SQL OFF, app OFF
+and stop, with safe reports retained. A host/terminal failure still requires recovery verification.
+`WINDOW_COMPLETED` records infrastructure/window completion only; manual outcomes and durable
+audits must be reviewed separately, and the historical 51/51 and 8/8 evidence stays unchanged.

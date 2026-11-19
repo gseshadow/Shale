@@ -383,3 +383,28 @@ request speedup is inferred. The full candidate used the already-established 600
 read-only diagnostic budget, without changing deployed runtime limits or S0 capacity.
 Private class/source/metric evidence remains under work/readonly-module-timezone-8f5278e488234249a59b9763f3b8f270.
 The original completed SQL/client/audit evidence is preserved; no functional campaign replay.
+
+
+## Acceptance-only same-origin browser package
+
+`AcceptanceBrowserConfiguration` is inactive in ordinary artifacts: its classpath resource condition
+requires separately packaged `acceptance-browser/index.html`, and its profile is `azure` only.
+When present it refuses any public/browser origin other than the fixed acceptance hostname.
+`prepare-hermes-browser.py` builds the existing, unchanged Shale SPA with its API URL explicitly
+bound to that origin and adds only index/hashed assets to a separate JAR under `work/`.
+No production web host, App Service plan, SQL schema, permission or identity is changed.
+
+A narrow servlet filter serves GET HTML fragment navigation at `/login` and
+`/oauth/mcp/authorize`, and safe hashed asset names. Initial OAuth query navigation, WEB bearer
+requests, JSON requests and all API/mutation paths retain their original authentication chains.
+No-store, no-referrer, same-origin CSP and anti-framing headers apply. This supplies transport only;
+existing WEB login/session authority, tenant approval and separate consent remain mandatory.
+
+`Start-HermesAcceptance.ps1` reuses successful SQL evidence, native checks, dormant deployment,
+worker verification and OFF/stop cleanup. A distinct interactive approval phrase gates deployment
+and activation. It opens a private Hermes profile containing only the loopback model selection,
+not existing secrets or MCP connections; the profile is removed after the window, even on failure.
+The original automated campaign is never replayed or modified. Window completion is not a claimed
+functional/audit PASS: operator observations and subsequent durable audit inspection remain separate.
+Existing login/session, approval/consent and tool disclosure transactions retain their existing
+security/PHI/entity audit integration; serving static assets creates no tenant event or audit migration.
