@@ -84,6 +84,16 @@ class McpTransportTest {
         }
         assertEquals(200,send(request("server/discover")).getStatus());
     }
+    @Test void modernToolCatalogCarriesAllRequiredCacheMetadata() throws Exception {
+        var response=send(request("tools/list"));
+        assertEquals(200,response.getStatus());
+        var result=McpTransportConfiguration.mapper().getJsonMapper().readTree(response.getContentAsString()).path("result");
+        for(String field:List.of("tools","cacheScope","resultType","ttlMs"))
+            assertTrue(result.has(field),"Modern ListToolsResult requires "+field);
+        assertEquals("private",result.path("cacheScope").asText());
+        assertEquals("complete",result.path("resultType").asText());
+        assertEquals(0,result.path("ttlMs").asLong());
+    }
     @Test void infrastructureAffinityCookiesDoNotBypassTheBearerOnlyBoundary() throws Exception {
         var request=request("server/discover");
         request.setCookies(new jakarta.servlet.http.Cookie("ARRAffinity","synthetic-routing-value"));
