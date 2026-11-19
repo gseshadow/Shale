@@ -12,7 +12,9 @@ import org.springframework.core.env.Environment;
 public class McpCimdConfiguration {
     @Bean(destroyMethod="close") AiCimdCaseData cimdCaseData(McpAiCaseData predecessor,CimdCaseConnections connections,
                                                           McpOAuthProperties identity,Environment env) {
-        return new AiCimdCaseData(predecessor::attestation,connections.data(),connections.reviewer(),
+        var external=new AiCimdCaseData(predecessor::attestation,connections.data(),connections.reviewer(),
                 env.getRequiredProperty("shale.ai.data.database"),identity.issuer(),identity.resource(),com.shale.server.oauth.CimdRuntimeEligibility.contract(env));
+        try { predecessor.verifiedByExternalRefresh();return external; }
+        catch(RuntimeException | Error failure) { external.close();throw failure; }
     }
 }

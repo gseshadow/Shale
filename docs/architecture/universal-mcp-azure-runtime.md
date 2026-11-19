@@ -5,6 +5,46 @@ This successor implements runtime wiring only. All controls remain default-OFF.
 No deployment, production SQL connection, configuration/secret change or activation is authorized.
 [Azure readiness](../universal-mcp-azure-readiness.md) still governs staged rollout and approvals.
 
+## Approved installation-integrity lifetime — 2026-11-19
+
+The operator explicitly accepted moving full installation inspection out of each MCP request.
+This source successor supersedes historical per-admission full-catalog requirements below and
+in prior acceptance evidence; it does not reinterpret the preserved 51/51 or 8/8 results.
+Full module/source/receipt, role/permission, identity, binding, reference-data and time-zone
+verification is unchanged before readiness. Handler creation, readiness observation and DCR
+composition inspect that installation state rather than independently executing the same scans.
+
+Each credential admission still calls the existing namespace-specific SQL authenticator. No
+credential, session, tenant, scope, policy revision, grant or authorization outcome is cached.
+Legacy/external namespace resolution remains live; its duplicate full legacy installation scan
+is removed. SDK discovery and tools/list pass the same live authentication gate and retain their
+existing scope/header/body limits and fixed catalogs. Case readers, RLS, live handoff, deadlines,
+quotas and transaction-owned denial/disclosure/PHI audits are unchanged.
+
+A daemon monitor waits five minutes after startup and after each completed refresh. It performs
+one complete recheck at a time. For an external composition, its unchanged verifier also checks
+the configured predecessor, so one successful combined refresh renews both installation states.
+A fifteen-minute monotonic maximum age bounds serving if monitoring stops or stalls. Failed,
+expired or closed installation state cannot reopen: repair the deployment and restart. A failure
+withdraws both boundaries. Readiness checks and admission state checks execute no catalog SQL.
+Unavailable installation returns HTTP 503 without WWW-Authenticate, avoiding an OAuth login loop;
+invalid/expired/revoked credentials retain their existing authentication failure behavior.
+
+Planned schema, module, identity, grant, permission, binding or credential changes MUST drain/stop
+MCP first and restart afterward. No new control-plane mutation endpoint is introduced. Unexpected
+drift is detected on a periodic recheck rather than immediately before every request; the retained
+positive installation proof expires after fifteen minutes. This is the accepted security tradeoff,
+not a claim of immediate drift detection. The monitor is conditional on explicit Case composition,
+is stopped with its Spring context, and never starts SQL work in ordinary all-OFF composition.
+
+Audit review: SQL authentication, approval/consent and Case transaction owners remain authoritative;
+no audit schema, SQL module, receipt, grant or permission migration is required. Data-free integrity
+refreshes/readiness observations are operational events, not PHI/entity actions; their fixed outcome
+logs contain no identities, exception text, source metadata, SQL, credentials or payloads. Historical
+installation faults are still tested against the complete verifier; HTTP withdrawal now follows an
+explicit failed refresh and remains unavailable after repair until reconstruction. Native fault tests
+require their original disposable-SQL opt-in and are not authorized against ShaleMcpAcceptance.
+
 ## Wiring and eligibility
 
 `CimdRuntimeConfiguration` is conditional on `shale.ai.cimd.enabled=true` and `azure`/`prod`.
@@ -29,15 +69,16 @@ The old unconditional production bans are replaced by `CimdRuntimeEligibility`:
   All capability SIDs must differ from each other and the existing predecessor Case, catalog,
   bootstrap and ordinary auth/runtime SIDs. New capabilities share the predecessor's actual
   server/database. Fixed failures name only a closed capability key, never credentials or SQL.
-- Existing complete `McpAiCaseData` and `AiCimdCaseData` startup/admission verification still
+- Existing complete `McpAiCaseData` and `AiCimdCaseData` startup/background verification still
   validates catalog/module source, exact permissions/role members, historical receipts, immutable
   binding, reference data and live authority. A failed verifier cannot retry another contract.
   DCR also requires successful Case verification and its live SQL control before startup completes.
 
 A configuration value or successful principal check is not a substitute for catalog verification.
 The new principal check runs at source construction; the existing complete Case verifiers still
-run at startup and each admission. Verification placement, withdrawal and reconstruction rules
-are unchanged. No new per-lease catalog framework, signing authority or attestation cache is added.
+run before startup readiness and in a serialized background recheck. Only bounded installation
+integrity is retained; request credentials and authority are never cached. The approved lifetime
+and drift-detection tradeoff below supersedes the former per-admission full-scan requirement.
 
 `CimdServices`, `CimdCaseConnections` and `DcrCapabilities` now receive production providers.
 Each additional identity uses an unpooled `SQLServerDataSource` following the existing bootstrap

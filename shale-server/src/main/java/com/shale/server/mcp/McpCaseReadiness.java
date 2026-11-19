@@ -1,7 +1,5 @@
 package com.shale.server.mcp;
 
-import com.shale.data.config.AcceptanceVerificationBudget;
-
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -15,21 +13,21 @@ public final class McpCaseReadiness {
         this.boundary = boundary;
     }
 
-    /** Fresh bounded attestation on explicit internal inspection; never returns diagnostic details. */
+    /** Bounded installation readiness observation without catalog execution; never returns diagnostic details. */
     public String state() {
         if (!policy.boundaryRequired()) return "disabled";
         try {
             policy.requireBoundary();
             var data = boundary.getIfAvailable();
             if (data == null) return "not-ready";
-            data.ready(System.nanoTime() + AcceptanceVerificationBudget.operationNanos(10_000_000_000L));
+            data.requireInstallationReady();
             return "ready";
         } catch (RuntimeException unavailable) {
             return "not-ready";
         }
     }
 
-    /** Deployment observation only. Every protected request independently reattests. */
+    /** Deployment observation only. Request authorization remains live; installation integrity is refreshed separately. */
     public void report() {
         LoggerFactory.getLogger(McpCaseReadiness.class).info("AI_CASE_SQL_READINESS {}", state());
     }

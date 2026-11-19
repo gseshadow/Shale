@@ -79,6 +79,9 @@ final class McpGate extends OncePerRequestFilter {
             } catch (RuntimeException denied) {
                 attempt.rejected(denied);
                 check(deadline);
+                if(denied instanceof com.shale.data.security.ai.AiInstallationReadiness.Unavailable) {
+                    fail(response,503,"unavailable");return;
+                }
                 response.setHeader("WWW-Authenticate","Bearer resource_metadata=\""+identity.publicOrigin()+OAuthMetadataContract.PROTECTED_RESOURCE_PATH+"\"");
                 fail(response,401,"unauthorized");return;
             }

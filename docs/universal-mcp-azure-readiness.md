@@ -339,3 +339,15 @@ Primary supporting records: [deployment preflight](production-mcp-deployment-pre
 [C2](architecture/universal-mcp-pr-c2.md), [integration verification](testing/universal-mcp-dcr-integration.md),
 [C2 acceptance](testing/universal-mcp-pr-c2-verification.md),
 [Azure egress/concurrency limits](testing/universal-mcp-pr-b-stabilization.md).
+
+
+### Approved request-path verification successor — 2026-11-19
+
+The operator accepted startup/background full installation verification with live per-request SQL
+authorization. See `architecture/universal-mcp-azure-runtime.md`, approved installation-integrity
+lifetime, for the five-minute fixed-delay refresh, fifteen-minute maximum age, restart/withdrawal
+semantics and intentional periodic drift-detection tradeoff. This supersedes per-admission catalog
+scan placement only. Existing SQL, issuer/resource/PKCE, identity, tenant, session, grant, revocation,
+scope, quota, audit and handoff requirements remain. Source tests are not changed-worker native
+acceptance; deployment/activation still requires the existing operator gate. No production rollout
+or replay/reset of preserved acceptance evidence is authorized by this documentation.

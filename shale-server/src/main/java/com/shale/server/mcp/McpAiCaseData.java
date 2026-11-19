@@ -10,7 +10,8 @@ import javax.sql.DataSource;
 import java.util.List;
 
 /** Enabled Case composition has one independent AI pool and a live, separately governed catalog verifier. */
-final class McpAiCaseData {
+final class McpAiCaseData implements AutoCloseable {
+    private final AiInstallationReadiness installation=new AiInstallationReadiness();
     private final DataSource data,verifier;
     private final List<DataSource> forbidden;
     private final String database;
@@ -37,18 +38,25 @@ final class McpAiCaseData {
         ready(System.nanoTime()+AcceptanceVerificationBudget.operationNanos(10_000_000_000L));
     }
     void ready(long deadline) {
-        attestation(deadline).verify();
+        installation.requireOpen();
+        try { attestation(deadline).verify();installation.verified(); }
+        catch(RuntimeException | Error failure) { installation.close();throw failure; }
     }
+    void requireInstallationReady() { installation.requireReady(); }
+    // Called only after the configured external verifier has freshly verified this predecessor.
+    void verifiedByExternalRefresh() { installation.verified(); }
+    @Override public void close() { installation.close(); }
     AiCaseDataAttestation attestation(long deadline) {
         return new AiCaseDataAttestation(new McpJdbcDeadline(data,deadline),new McpJdbcDeadline(verifier,deadline),
                 forbidden.stream().map(d->(DataSource)new McpJdbcDeadline(d,deadline)).toList(),database,identity.issuer(),identity.resource(),
                 identity.identity()==McpOAuthProperties.Identity.PRODUCTION,contract,externalContract);
     }
     AiCaseDataRequest authenticate(String token,long deadline) {
-        ready(deadline);
+        requireInstallationReady();
         return AiCaseDataAccess.authenticate(new McpJdbcDeadline(data,deadline),token,identity.issuer(),identity.resource(),deadline);
     }
     IntegrationCaseReader reader(long deadline,AiCaseDataRequest request) {
+        requireInstallationReady();
         return new AiCaseDataAccess(new McpJdbcDeadline(data,deadline),until->new McpJdbcDeadline(data,until),request);
     }
     private static DataSource configuredData(Environment env,DataSources sources) {

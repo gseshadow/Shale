@@ -136,6 +136,17 @@ public class McpTransportConfiguration {
         policy.requireBoundary();
         return new McpAiCaseData(env,identity,sources);
     }
+    @Bean(destroyMethod="close")
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${shale.ai.mcp.case-data-composition-enabled:false}' == 'true' || ('${shale.ai.enabled:false}' == 'true' && '${shale.ai.mcp.enabled:false}' == 'true' && ('${shale.ai.mcp.search-cases-enabled:false}' == 'true' || '${shale.ai.mcp.get-case-overview-enabled:false}' == 'true'))")
+    McpInstallationMonitor mcpInstallationMonitor(McpAiCaseData predecessor,
+            ObjectProvider<com.shale.data.security.ai.AiCimdCaseData> externalProvider) {
+        var external=externalProvider.getIfAvailable();
+        return new McpInstallationMonitor(()->{
+            long deadline=System.nanoTime()+AcceptanceVerificationBudget.operationNanos(10_000_000_000L);
+            if(external==null)predecessor.ready(deadline);
+            else { external.ready(deadline);predecessor.verifiedByExternalRefresh(); }
+        },()->{predecessor.close();if(external!=null)external.close();});
+    }
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({AiAccessTokenValidator.class,DeadlineAccess.class})
     @ConditionalOnProperty(name={"shale.ai.mcp.enabled","shale.ai.enabled"},havingValue="true")

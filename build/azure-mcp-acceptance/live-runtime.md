@@ -681,3 +681,22 @@ interpolated and multiline assignments fail closed. Existing finally cleanup rem
 with the private profile; the client summary never reads `.env` or includes key material. This is
 local model authentication, separate from memory-only SQL owner credentials. No Shale domain,
 PHI/entity audit, SQL schema/permission, app activation or production resource changes occur.
+
+
+## Installation-integrity successor (2026-11-19)
+
+Full installation checks now run before readiness and on a serialized background refresh, five
+minutes after the previous refresh finishes. Successful installation integrity lasts at most fifteen
+minutes. No credential or tenant authority is cached: every RPC still invokes live SQL authentication,
+and existing Case permissions/RLS, revocation, quotas, auditing and handoff checks remain active.
+Discovery no longer initiates full catalog inspection. Failed/expired integrity returns 503 without
+an OAuth challenge and requires repair plus restart; removing a database fault alone cannot reopen it.
+
+Stop/drain MCP before planned schema/module/grant/identity/binding/credential changes and restart
+subsequently. Unexpected drift detection is periodic, with the bounded installation-proof lifetime.
+The existing operator gate is still mandatory for deployment/activation. Rebuild and review a new
+artifact/hash for this source successor; 67208872E1114EB9157DB0E179D5AB48A3886FF3646F828DF29E44BD3FDFE6FA
+contains the previous per-admission scans. S0 remains the acceptance baseline; no further scaling is
+implied. Preserved 51/51 SQL and 8/8 client/audit reports remain historical and immutable. Validate the
+new worker with a fresh unmodified Hermes connection under its normal ten-second discovery probe;
+do not call this native/client PASS based only on offline tests or preserved prior-worker reports.

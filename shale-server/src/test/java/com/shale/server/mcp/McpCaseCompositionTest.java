@@ -91,15 +91,15 @@ class McpCaseCompositionTest {
         for(String key:List.of(GLOBAL,TRANSPORT,SEARCH,OVERVIEW,McpCaseCompositionPolicy.COMPOSITION))env.setProperty(key,"true");
         var policy=new McpCaseCompositionPolicy(env,PRODUCTION);
         var data=mock(McpAiCaseData.class);
-        doThrow(new IllegalStateException("private-sentinel SQL details")).when(data).ready(anyLong());
+        doThrow(new IllegalStateException("private-sentinel SQL details")).when(data).requireInstallationReady();
         assertThrows(IllegalStateException.class,()->new McpSearchConfiguration().mcpSearchHandler(policy,data));
         assertThrows(IllegalStateException.class,()->new McpOverviewConfiguration().mcpOverviewHandler(policy,data));
         var factory=new DefaultListableBeanFactory();factory.registerSingleton("boundary",data);
         var readiness=new McpCaseReadiness(policy,factory.getBeanProvider(McpAiCaseData.class));
         assertEquals("not-ready",readiness.state());
-        doNothing().when(data).ready(anyLong());assertEquals("ready",readiness.state());
-        doThrow(new IllegalStateException("stale catalog")).when(data).ready(anyLong());
-        assertEquals("not-ready",readiness.state(),"A previous success cannot cache authority or readiness.");
+        doNothing().when(data).requireInstallationReady();assertEquals("ready",readiness.state());
+        doThrow(new IllegalStateException("stale catalog")).when(data).requireInstallationReady();
+        assertEquals("not-ready",readiness.state(),"Withdrawn installation readiness must remain unavailable.");
     }
 
     @Test void productionOffModeNeverTouchesAnyDatasourceAndRetainsOrdinaryRoutes()throws Exception {
@@ -149,7 +149,7 @@ class McpCaseCompositionTest {
         try {
             readiness.report();verifyNoInteractions(data);
             env.setProperty(McpCaseCompositionPolicy.COMPOSITION,"true");readiness.report();
-            doThrow(new IllegalStateException("SQL username/hash/proof private-sentinel")).when(data).ready(anyLong());
+            doThrow(new IllegalStateException("SQL username/hash/proof private-sentinel")).when(data).requireInstallationReady();
             readiness.report();
             assertEquals(List.of("AI_CASE_SQL_READINESS disabled","AI_CASE_SQL_READINESS ready","AI_CASE_SQL_READINESS not-ready"),
                     appender.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage).toList());
@@ -164,7 +164,7 @@ class McpCaseCompositionTest {
         try(var context=context("azure",Map.of(McpCaseCompositionPolicy.COMPOSITION,"true",
                 "shale.ai.oauth.public-origin","https://shale.example"),data)) {
             assertEquals("ready",context.getBean(McpCaseReadiness.class).state());
-            verify(data,atLeastOnce()).ready(anyLong());
+            verify(data,atLeastOnce()).requireInstallationReady();
             verify(data,never()).authenticate(anyString(),anyLong());
             assertFalse(context.containsBean("mcpServlet"));
             assertFalse(context.containsBean("oauthCodeBootstrap"));
