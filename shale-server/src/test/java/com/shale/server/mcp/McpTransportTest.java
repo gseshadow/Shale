@@ -84,6 +84,12 @@ class McpTransportTest {
         }
         assertEquals(200,send(request("server/discover")).getStatus());
     }
+    @Test void infrastructureAffinityCookiesDoNotBypassTheBearerOnlyBoundary() throws Exception {
+        var request=request("server/discover");
+        request.setCookies(new jakarta.servlet.http.Cookie("ARRAffinity","synthetic-routing-value"));
+        assertEquals(401,send(request).getStatus());
+        assertEquals(0,authentications.get(),"Cookie rejection must precede credential admission");
+    }
     @Test void onlyPostIsTransportNoGetStreamAndOptionsIsBounded()throws Exception {
         for(String method:List.of("GET","PUT","PATCH","DELETE","OPTIONS","HEAD")) {
             var r=request("server/discover");r.setMethod(method);var response=send(r);

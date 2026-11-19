@@ -642,3 +642,14 @@ can be localized without copying an authorization URL or credentials. A timeout 
 approval was rolled back; no automatic decision replay is permitted. OAuth intent and credential
 expiry remain enforced by the server. These changes address known client deadline and cleanup
 defects; the earlier generic browser error did not establish an exact server rejection.
+
+
+For stock Hermes compatibility, the approval phrase also authorizes disabling session-affinity
+cookies on the existing single-worker `shale-mcp-acceptance` App Service. This is performed only
+after the human gate, before deployment or activation, and read back while stopped. Affinity stays
+disabled for future acceptance use. The runner refuses any dormant endpoint response or enabled
+anonymous MCP challenge carrying Set-Cookie. Shale's cookie rejection remains intact; the old
+automated client's NoCookies policy is not evidence that a normal stock cookie jar works.
+No production app, shared plan, database/issuer/resource binding or SQL schema/permission is changed.
+Reuse the already reviewed 0CC5E0B90DE4A1A6F9F43256E1FAAA481032E3F12F93D26A912B767E32CA21B6
+browser/server artifact for this operator-only configuration correction; no new backend build is needed.
