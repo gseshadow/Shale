@@ -32,6 +32,7 @@ final class McpGate extends OncePerRequestFilter {
     private final java.util.function.BiFunction<String,Long,?> authenticate;
     private final Semaphore active=new Semaphore(5);
     private final java.util.function.LongSupplier nanoTime;
+    private final McpAdmissionDiagnostics diagnostics;
     private final io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper mapper=McpTransportConfiguration.mapper();
     McpGate(McpTransportProperties properties, McpOAuthProperties identity, boolean global,
             Function<String,VerifiedIntegrationContext> authenticate) {
@@ -43,7 +44,7 @@ final class McpGate extends OncePerRequestFilter {
     }
     McpGate(McpTransportProperties properties,McpOAuthProperties identity,boolean global,
             java.util.function.BiFunction<String,Long,?> authenticate,java.util.function.LongSupplier nanoTime) {
-        this.properties=properties;this.identity=identity;this.global=global;this.authenticate=authenticate;this.nanoTime=nanoTime;
+        this.properties=properties;this.identity=identity;this.global=global;this.authenticate=authenticate;this.nanoTime=nanoTime;this.diagnostics=new McpAdmissionDiagnostics(nanoTime);
     }
     @Override protected boolean shouldNotFilterAsyncDispatch() { return false; }
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)
@@ -68,6 +69,7 @@ final class McpGate extends OncePerRequestFilter {
         try {
             check(deadline);
             VerifiedIntegrationContext authority;
+            var attempt=diagnostics.begin(request.getHeader("Mcp-Method"));
             try {
                 if (!global || request.getQueryString()!=null || request.getCookies()!=null && request.getCookies().length>0) throw new SecurityException();
                 Object authenticated=authenticate.apply(AiBearerParser.extract(Collections.list(request.getHeaders("Authorization"))),deadline);
@@ -75,10 +77,12 @@ final class McpGate extends OncePerRequestFilter {
                 else authority=(VerifiedIntegrationContext)authenticated;
                 if (authority==null || authority.credentialId()==null) throw new SecurityException();
             } catch (RuntimeException denied) {
+                attempt.rejected(denied);
                 check(deadline);
                 response.setHeader("WWW-Authenticate","Bearer resource_metadata=\""+identity.publicOrigin()+OAuthMetadataContract.PROTECTED_RESOURCE_PATH+"\"");
                 fail(response,401,"unauthorized");return;
             }
+            attempt.accepted();
             check(deadline);
             byte[] body;
             if (request.getContentLengthLong()>8192) throw new Rejected(413,"body_limit");

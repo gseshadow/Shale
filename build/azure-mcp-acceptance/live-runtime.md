@@ -653,3 +653,13 @@ automated client's NoCookies policy is not evidence that a normal stock cookie j
 No production app, shared plan, database/issuer/resource binding or SQL schema/permission is changed.
 Reuse the already reviewed 0CC5E0B90DE4A1A6F9F43256E1FAAA481032E3F12F93D26A912B767E32CA21B6
 browser/server artifact for this operator-only configuration correction; no new backend build is needed.
+
+
+Post-OAuth diagnostics now retain a sanitized client-summary.json before private-profile deletion:
+closed protocol/retry labels and timestamps, token-file timestamp, numeric lifetime/expiry and a
+refresh-present boolean only. It contains no credentials, raw logs or callback URLs. The final hash
+manifest includes the summary. The separately reviewed server candidate adds acceptance-only
+SHALE_MCP_ADMISSION events with fixed method/outcome/timing/failure fields, enabling diagnosis of
+repeat authorization after a successful code exchange. No verification, token lifetime, public
+response, SQL permission or security control is relaxed. This successor needs its new reviewed
+server JAR/hash; the old 0CC5 artifact does not contain the admission events.

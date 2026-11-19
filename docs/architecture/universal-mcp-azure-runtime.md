@@ -448,3 +448,32 @@ before opening Hermes. A failed readback/header check enters the existing indepe
 cleanup. Native verification, token validation and all existing audit owners remain unchanged;
 this resource setting has operator evidence and no new tenant/domain audit vocabulary or migration.
 A fresh stock-client trial is still required to confirm the suspected cause of repeated authorization.
+
+
+### Post-OAuth MCP admission diagnostics
+
+The cookie-free run `hermes-mcp-9b5ac4321716425ca1656dbaf04da38a` passed affinity readback,
+cookie-free MCP challenge, native verification and enabled-worker startup, but timed out before
+Hermes tool discovery. Cleanup confirmed SQL OFF, app OFF and stopped. The affinity correction
+therefore did not complete stock-client acceptance. A later AUTHORIZE_HTTP_400 came from the
+new authorization attempt, not a successful tools connection. Prior OAuth code exchanges remain
+successful within their separate scope; do not reset passwords or replay the 51/51 SQL campaign.
+
+A loopback-only synthetic probe with unmodified installed Hermes and MCP SDK 2.3.0 successfully
+performed initialize rejection, server/discover and tools/list with correct modern headers and two
+synthetic tools. This isolates basic negotiation support, not Azure authority/timing behavior.
+
+`McpAdmissionDiagnostics` emits only when the already target-validated dedicated acceptance budget
+is active. It records fixed method labels, start/accepted/rejected state, bounded elapsed time,
+closed failure category, trusted verifier stage and numeric SQL code. No token, request identifier,
+header/body, raw exception text or stack is logged. Ordinary profiles emit nothing and do not make
+extra deadline-clock reads. Authentication, cookie refusal, verification placement, expiry, response
+status and existing transaction-owned audits are unchanged; these are operational events, not new
+PHI/entity audit rows or a schema change.
+
+Before deleting its private profile, the runner saves client-summary.json containing only fixed
+protocol/retry event labels with log times and token issue-lifetime/absolute-expiry/presence metadata.
+It never copies credentials, client identifiers or raw logs. The final run hash manifest includes
+this summary. A summary failure does not prevent profile cleanup or release of credential references
+and locks. Retained evidence can distinguish a protocol/schema retry from slow admission or expiry
+without a second password prompt just to inspect database state.
