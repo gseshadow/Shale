@@ -1,5 +1,10 @@
+. (Join-Path $PSScriptRoot 'HermesProcess.ps1')
 function Invoke-HermesAcceptanceWindow($Context) {
-    $approved=$false; $sqlActivationAttempted=$false; $failure=$null; $failureCode=$null; $diagnostic=$null; $phase='approval'; $cleanup=$null; $steps=[Collections.Generic.List[object]]::new()
+    # Scope this safe CLI transport to this operator window. Existing parsing, targets and
+    # independent shutdown attempts remain in the reviewed Invoke-CleanAzure/Stop-LiveAcceptance.
+    function az { $raw=Invoke-HermesAzureRaw -Arguments @($args); $global:LASTEXITCODE=0; $raw }
+
+    $approved=$false; $clientWindowCompleted=$false; $sqlActivationAttempted=$false; $failure=$null; $failureCode=$null; $diagnostic=$null; $phase='approval'; $cleanup=$null; $steps=[Collections.Generic.List[object]]::new()
     try {
         # The ONLY approval. No Force/switch/environment/parameter can supply this acknowledgement.
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
@@ -56,20 +61,21 @@ function Invoke-HermesAcceptanceWindow($Context) {
         Write-Host 'Sign in as admin@example.invalid in the browser; approve the application and separately consent.'
         Write-Host 'In Hermes, ask it to search synthetic cases and open Case 100. Case 200 must not disclose tenant B data.'
         Write-Host 'Exit Hermes when finished. The window has a 30-minute limit, followed by OFF and stop.'
-        & hermes mcp add shale-acceptance --url ($script:LiveOrigin+'/mcp') --auth oauth --connect-timeout 600
-        if ($LASTEXITCODE -ne 0) { throw 'HERMES_CONNECTION_FAILED' }
-        $clientProcess=Start-Process -FilePath (Get-Command hermes -CommandType Application | Select-Object -First 1 -ExpandProperty Source) -ArgumentList @("chat","--cli","--toolsets","shale-acceptance") -NoNewWindow -PassThru
-        try {
-            if (-not $clientProcess.WaitForExit(1800000)) { $clientProcess.Kill($true); throw 'HERMES_WINDOW_TIMEOUT' }
-            if ($clientProcess.ExitCode -ne 0) { throw 'HERMES_CLIENT_FAILED' }
-        } finally { if (-not $clientProcess.HasExited) { $clientProcess.Kill($true) } }
+        $phase='hermes-connection'
+        New-CleanEvent (Join-Path $Context.Run 'journal.jsonl') @{Kind='hermes-connection-started';TimeoutSeconds=600}
+        Invoke-HermesInteractiveProcess -Arguments @('mcp','add','shale-acceptance','--url',($script:LiveOrigin+'/mcp'),'--auth','oauth','--connect-timeout','600') -TimeoutMilliseconds 600000 -FailurePrefix 'HERMES_CONNECTION'
+        New-CleanEvent (Join-Path $Context.Run 'journal.jsonl') @{Kind='hermes-connection-complete'}
+        $phase='hermes-chat'
+        Invoke-HermesInteractiveProcess -Arguments @('chat','--cli','--toolsets','shale-acceptance') -TimeoutMilliseconds 1800000 -FailurePrefix 'HERMES_CLIENT'
 
         $steps.Add(@{Id='live-client';Status='PASS'})
         [void](Get-LiveBinding $Context.Evidence.Directory $Context.Owner); Assert-LiveSynthetic $Context.Owner
         $steps.Add(@{Id='operator-functional-check';Status='MANUAL_REVIEW_REQUIRED'})
-    } catch { $failure=$phase; $failureCode=Get-LiveSafeCampaignFailure $_; $diagnostic=Get-LiveCampaignDiagnostic $_ } finally {
+        $clientWindowCompleted=$true
+    } catch { $failure=$phase; $failureCode=if($_.Exception.Message -cin @('HERMES_CONNECTION_TIMEOUT','HERMES_CONNECTION_FAILED','HERMES_CLIENT_TIMEOUT','HERMES_CLIENT_FAILED','HERMES_AZURE_TIMEOUT','HERMES_AZURE_FAILED')){$_.Exception.Message}else{Get-LiveSafeCampaignFailure $_}; $diagnostic=Get-LiveCampaignDiagnostic $_ } finally {
         if ($approved) { $cleanup=Stop-LiveAcceptance $Context.Owner $Context.Credentials $Context.Run -VerifySqlOnly:(-not $sqlActivationAttempted) }
-        $pass=$approved -and -not $failure -and $cleanup.SqlOff -and $cleanup.AppOff -and $cleanup.ApplicationStopped
+        if ($approved -and -not $clientWindowCompleted -and -not $failure) { $failure=$phase; $failureCode='HERMES_WINDOW_INTERRUPTED' }
+        $pass=$approved -and $clientWindowCompleted -and -not $failure -and $cleanup.SqlOff -and $cleanup.AppOff -and $cleanup.ApplicationStopped
         if (-not $failure -and -not $pass) { $failureCode='CLEANUP_NOT_CONFIRMED' }
         $result=@{Status=$(if($pass){'WINDOW_COMPLETED'}else{'FAIL'});Approved=$approved;Failure=$failure;FailureCode=$failureCode;FailureDiagnostic=$diagnostic;Cleanup=$cleanup;Steps=$steps.ToArray();
           JarSHA256=$Context.Hash;BuildVersion=$Context.Version;SqlJournalHash=$Context.Evidence.JournalHash;

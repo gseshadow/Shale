@@ -1,18 +1,18 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { OAuthConsent, callbackTarget } from './OAuthConsent';
+import { OAuthConsent, callbackTarget, oauthRequest, oauthRequestDeadline } from './OAuthConsent';
 import { bindSessionRequests } from './sessionRequests';
 import { apiBaseUrl } from './api';
 const user = { authenticated: true as const, userId: 72, shaleClientId: 7, email: 'synthetic@example.invalid', displayName: 'Synthetic User',
   nameFirst: null, nameLast: null, isAdmin: false, isAttorney: false, initials: null, color: null };
-const request = new URLSearchParams({ client_id: 'hermes', redirect_uri: 'https://client.test/cb', state: 'exact + & = é' }).toString();
+const request = new URLSearchParams({ client_id: 'hermes', redirect_uri: 'https://client.test/cb', state: 'exact + & = ÃƒÂ©' }).toString();
 const details = () => ({ client_id: 'hermes', client_name: 'Hermes', scopes: ['cases.search', 'cases.overview.read'], state: 'server-nonce',
   tenant: 7, user: 72, intent_expires_at: new Date(Date.now()+300000).toISOString(), expires_at: new Date(Date.now()+3600000).toISOString(), notice: 'Case data may leave Shale.' });
 const response = (body: unknown, status=200) => new Response(JSON.stringify(body), { status });
 const fetchMock = vi.fn<typeof fetch>();
 let end: () => void;
 beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal('fetch',fetchMock); end=bindSessionRequests('web-token',()=>true,()=>{}); });
-afterEach(() => { cleanup();end();vi.unstubAllGlobals(); });
+afterEach(() => { cleanup();end();vi.useRealTimers();vi.unstubAllEnvs();vi.unstubAllGlobals(); });
 function setup(overrides = {}) {
   fetchMock.mockResolvedValueOnce(response({redirect: `${apiBaseUrl()}/oauth/mcp/consent?client_id=hermes&state=server-nonce`}))
     .mockResolvedValueOnce(response({...details(),...overrides}));
@@ -33,7 +33,7 @@ it('shows integration, permissions and actor, and never approves on load',async(
 });
 it.each([true,false])('submits exactly one explicit decision, approval=%s',async approve=>{
   const complete=setup();await screen.findByRole('heading',{name:'Hermes'});
-  const target=`https://client.test/cb?${new URLSearchParams({[approve?'code':'error']:approve?'synthetic-code':'access_denied',state:'exact + & = é'})}`;
+  const target=`https://client.test/cb?${new URLSearchParams({[approve?'code':'error']:approve?'synthetic-code':'access_denied',state:'exact + & = ÃƒÂ©'})}`;
   fetchMock.mockResolvedValueOnce(response({redirect:target}));
   const button=screen.getByRole('button',{name:approve?'Approve access':'Deny'});
   fireEvent.click(button);fireEvent.click(button);
@@ -141,4 +141,54 @@ it('DCR uses the existing administrator approval, then a separate explicit conse
   await waitFor(() => expect(complete).toHaveBeenCalledWith(target));
   expect(() => callbackTarget(target, redirect, 'exact')).toThrow();
   expect(() => callbackTarget(target.replace(':3334', ':3335'), redirect, 'exact', client)).toThrow();
+});
+
+
+it('extends the browser deadline only for the explicitly bound acceptance package', () => {
+  vi.stubEnv('VITE_SHALE_MCP_ACCEPTANCE_BROWSER', 'true');
+  vi.stubEnv('VITE_SHALE_API_BASE_URL', 'https://production.invalid');
+  expect(oauthRequestDeadline()).toBe(8000);
+  vi.stubEnv('VITE_SHALE_API_BASE_URL', 'https://shale-mcp-acceptance.azurewebsites.net.evil.invalid');
+  expect(oauthRequestDeadline()).toBe(8000);
+  vi.stubEnv('VITE_SHALE_API_BASE_URL', 'https://shale-mcp-acceptance.azurewebsites.net');
+  expect(oauthRequestDeadline()).toBe(600000);
+  vi.stubEnv('VITE_SHALE_MCP_ACCEPTANCE_BROWSER', 'false');
+  expect(oauthRequestDeadline()).toBe(8000);
+});
+it('shows a closed onboarding status without echoing response bodies, URLs or tokens', async () => {
+  fetchMock.mockResolvedValueOnce(response({error:'SENSITIVE_RESPONSE_SENTINEL'}, 503));
+  render(<OAuthConsent token="web-token" user={user} request={externalRequest}/>);
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('ONBOARDING_HTTP_503');
+  for (const secret of ['SENSITIVE_RESPONSE_SENTINEL', 'web-token', external, 'server-nonce']) expect(alert.textContent).not.toContain(secret);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+it('labels a rejected authorization after tenant approval without replaying the decision', async () => {
+  fetchMock.mockResolvedValueOnce(response(pending(true)));
+  render(<OAuthConsent token="web-token" user={user} request={externalRequest}/>);
+  const approval = await screen.findByRole('button', {name:'Approve tenant application'});
+  fetchMock.mockResolvedValueOnce(response({...pending(true),state:'APPROVED'}))
+    .mockResolvedValueOnce(response({...pending(true),state:'APPROVED'}))
+    .mockResolvedValueOnce(response({error:'SENSITIVE_RESPONSE_SENTINEL'},400));
+  fireEvent.click(approval);
+  expect((await screen.findByRole('alert')).textContent).toContain('AUTHORIZE_HTTP_400');
+  expect(fetchMock.mock.calls.filter(call => String(call[0]).endsWith('/approval'))).toHaveLength(1);
+  expect(fetchMock).toHaveBeenCalledTimes(4);
+});
+it('labels invalid consent responses without displaying untrusted error messages', async () => {
+  setup({intent_expires_at:'SENSITIVE_RESPONSE_SENTINEL'});
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('CONSENT_INVALID_RESPONSE');
+  expect(alert.textContent).not.toContain('SENSITIVE_RESPONSE_SENTINEL');
+});
+it('labels deadline cancellation and never retries an uncertain approval', async () => {
+  vi.useFakeTimers();
+  fetchMock.mockImplementation((_input, init) => new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(new Error('SENSITIVE_TRANSPORT_SENTINEL')));
+  }));
+  const outcome = oauthRequest('web-token', '/oauth/mcp/approval', new URLSearchParams({decision:'APPROVE'}), 'APPROVAL').catch(error => error);
+  await vi.advanceTimersByTimeAsync(8001);
+  const error = await outcome;
+  expect(error).toMatchObject({reference:'APPROVAL_TIMEOUT', message:expect.not.stringContaining('SENSITIVE_TRANSPORT_SENTINEL')});
+  expect(fetchMock).toHaveBeenCalledTimes(1);
 });

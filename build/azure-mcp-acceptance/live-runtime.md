@@ -627,3 +627,18 @@ The chat window has a 30-minute limit; failure cleanup independently attempts SQ
 and stop, with safe reports retained. A host/terminal failure still requires recovery verification.
 `WINDOW_COMPLETED` records infrastructure/window completion only; manual outcomes and durable
 audits must be reviewed separately, and the historical 51/51 and 8/8 evidence stays unchanged.
+
+
+The private Hermes runtime is prepared before the approval gate. The full browser connection
+(including the interactive callback prompt) has a 600-second watchdog, followed by a separate
+30-minute chat watchdog. Wait notices are elapsed-time notices, not test results. Cancellation
+or failure ends the owned child process tree and enters OFF/stop cleanup; scoped Azure operations
+avoid the Windows batch wrapper and use a 180-second memory-only subprocess limit.
+
+The acceptance UI build alone permits 600-second browser OAuth requests at the exact acceptance
+API origin. Other frontend builds retain eight seconds. A failed page displays a closed reference
+such as `APPROVAL_TIMEOUT`, `AUTHORIZE_HTTP_400`, or `CONSENT_INVALID_RESPONSE`, so a fresh failure
+can be localized without copying an authorization URL or credentials. A timeout does not prove
+approval was rolled back; no automatic decision replay is permitted. OAuth intent and credential
+expiry remain enforced by the server. These changes address known client deadline and cleanup
+defects; the earlier generic browser error did not establish an exact server rejection.
