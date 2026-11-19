@@ -33,6 +33,7 @@ def main():
     output.mkdir(exist_ok=False)
     env = {k: v for k, v in os.environ.items() if not k.startswith(("SHALE_", "SPRING_", "VITE_", "SQLCMD", "SQLCONNSTR_", "SQLAZURECONNSTR_"))}
     env["VITE_SHALE_API_BASE_URL"] = ORIGIN
+    env["VITE_SHALE_MCP_ACCEPTANCE_BROWSER"] = "true"
     npm = shutil.which("npm.cmd") or shutil.which("npm")
     mvn = shutil.which("mvn.cmd") or shutil.which("mvn")
     if not npm or not mvn:

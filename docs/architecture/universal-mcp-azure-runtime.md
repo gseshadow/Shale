@@ -408,3 +408,43 @@ The original automated campaign is never replayed or modified. Window completion
 functional/audit PASS: operator observations and subsequent durable audit inspection remain separate.
 Existing login/session, approval/consent and tool disclosure transactions retain their existing
 security/PHI/entity audit integration; serving static assets creates no tenant event or audit migration.
+
+
+### Acceptance browser deadlines and connection cancellation
+
+The separately built acceptance browser explicitly sets `VITE_SHALE_MCP_ACCEPTANCE_BROWSER=true`.
+Only that flag together with the exact acceptance API origin permits a 600-second OAuth browser
+request deadline, matching the existing dedicated admission budget. Ordinary frontend builds keep
+the existing eight-second deadline. Server credential/intent expiry, session validation, scope,
+tenant, redirect and mutation authority are unchanged. Requests and uncertain approval decisions
+are never automatically retried. Closed stage/status/timeout references replace the ambiguous
+error message; response bodies, credentials, identifiers and callback URLs are never echoed.
+
+The short runner prepares the isolated Hermes runtime before approval/activation, then gives the
+entire interactive connect process a 600-second watchdog and chat a 30-minute watchdog. Failure or
+cancellation kills the owned child tree and enters the original independent OFF/stop cleanup.
+Within this operator window only, Azure CLI calls use the existing MSI Python module entry point
+with structured arguments, memory-only output and a 180-second process limit; `az.cmd` is avoided
+so a console interrupt cannot leave a batch-job prompt in cleanup. Existing target validation and
+JSON/setting parsing are reused. Logs/journals contain closed stages only. None of this creates
+an audit schema or bypasses the existing transaction-owned approval/consent/disclosure audits.
+
+
+### Acceptance browser deadlines and connection cancellation
+
+The separate acceptance browser build sets `VITE_SHALE_MCP_ACCEPTANCE_BROWSER=true`.
+Only that flag together with the exact acceptance API origin permits a 600-second OAuth browser
+request deadline, matching the existing dedicated admission budget. Ordinary frontend builds keep
+the existing eight-second deadline. Server credential/intent expiry, session validation, scope,
+tenant, redirect and mutation authority are unchanged. Requests and uncertain approval decisions
+are never automatically retried. Closed stage/status/timeout references replace the ambiguous
+error message; response bodies, credentials, identifiers and callback URLs are never echoed.
+
+The short runner prepares the isolated Hermes runtime before approval/activation, then gives the
+entire interactive connect process a 600-second watchdog and chat a 30-minute watchdog. Failure or
+cancellation kills the owned child tree and enters the original independent OFF/stop cleanup.
+Within this operator window only, Azure CLI calls use the existing MSI Python module entry point
+with structured arguments, memory-only output and a 180-second process limit; `az.cmd` is avoided
+so a console interrupt cannot leave a batch-job prompt in cleanup. Existing target validation and
+JSON/setting parsing are reused. Journals contain closed stages only. None of this creates
+an audit schema or bypasses existing transaction-owned approval/consent/disclosure audits.

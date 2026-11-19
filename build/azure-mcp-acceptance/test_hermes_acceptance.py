@@ -81,15 +81,61 @@ function Get-LiveBinding { param($a,$b) };function Invoke-LiveRls { param($a) }
 function Invoke-LiveNativeChecks { param($a,$b,$c) };function Get-LiveAuditBaseline { param($a) @{Access=1;Phi=1} }
 function Set-LiveSqlControls { param($enabled,$a,$b) $script:Events.Add('sql-enabled') }
 function Set-LiveAppControls { param($enabled,$run) $script:Events.Add('app-enabled') }
-function hermes { $global:LASTEXITCODE=0; $script:Events.Add('hermes-connect') }
-function Get-Command { param($a,$CommandType) @{Source='not-executed.exe'};@{Source='not-executed.cmd'} }
-function Start-Process { param($FilePath,$ArgumentList,[switch]$NoNewWindow,[switch]$PassThru) if($FilePath -cne 'not-executed.exe'){throw 'SINGLE_EXECUTABLE_REQUIRED'};$script:Events.Add('hermes-chat');$p=[pscustomobject]@{HasExited=$true;ExitCode=0};$p | Add-Member ScriptMethod WaitForExit { param($ms) $true };$p }
+function Invoke-HermesInteractiveProcess { param($Arguments,$TimeoutMilliseconds,$FailurePrefix) if($Arguments[0] -ceq 'mcp'){$script:Events.Add('hermes-connect')}else{$script:Events.Add('hermes-chat')} }
 $script:LiveOrigin='https://acceptance.invalid';$context.Zones=@{Java='UTC'};$context.Id='synthetic'
 $result=Invoke-HermesAcceptanceWindow $context
 """)
             result=subprocess.run(['pwsh','-NoProfile','-NonInteractive','-Command',script],cwd=ROOT,capture_output=True,text=True)
             self.assertEqual(0,result.returncode,result.stderr)
             return json.loads(result.stdout.splitlines()[-1])
+    def ps(self, body):
+        result=subprocess.run(['pwsh','-NoProfile','-NonInteractive','-Command',"$ErrorActionPreference='Stop'; . ./build/azure-mcp-acceptance/HermesProcess.ps1; "+body+"\nexit 0"],cwd=ROOT,capture_output=True,text=True)
+        self.assertEqual(0,result.returncode,result.stdout+result.stderr)
+        return result.stdout
+    def test_interactive_process_watchdog_kills_stalled_connection_and_chooses_one_executable(self):
+        self.ps("""
+$script:killed=$false;$script:disposed=$false
+function Get-Command { param($a,$CommandType) [pscustomobject]@{Source='first.exe'};[pscustomobject]@{Source='other.cmd'} }
+function Start-Process {
+ param($FilePath,$ArgumentList,[switch]$NoNewWindow,[switch]$PassThru)
+ if($FilePath -cne 'first.exe'){throw 'SINGLE_EXECUTABLE_REQUIRED'}
+ $p=[pscustomobject]@{HasExited=$false;ExitCode=0}
+ $p|Add-Member ScriptMethod WaitForExit {param($milliseconds) $false}
+ $p|Add-Member ScriptMethod Kill {param($tree) if(-not $tree){throw 'TREE_REQUIRED'};$script:killed=$true;$this.HasExited=$true}
+ $p|Add-Member ScriptMethod Dispose {$script:disposed=$true}
+ $p
+}
+try { Invoke-HermesInteractiveProcess @('mcp','add') 0 'HERMES_CONNECTION';throw 'TIMEOUT_REQUIRED' }
+catch { if($_.Exception.Message -cne 'HERMES_CONNECTION_TIMEOUT'){throw} }
+if(-not $script:killed -or -not $script:disposed){throw 'CHILD_CLEANUP_REQUIRED'}
+""")
+    def test_azure_transport_uses_installed_python_with_argument_list_not_batch_shell(self):
+        self.ps("""
+function Invoke-HermesCapturedProcess {
+ param($StartInfo)
+ if(-not $StartInfo.FileName.EndsWith('python.exe')){throw 'PYTHON_ENTRY_REQUIRED'}
+ if($StartInfo.ArgumentList[0] -cne '-IBm' -or $StartInfo.ArgumentList[1] -cne 'azure.cli'){throw 'CLI_MODULE_REQUIRED'}
+ if($StartInfo.ArgumentList[2] -cne 'account' -or $StartInfo.ArgumentList[3] -cne 'show'){throw 'ARGUMENTS_REQUIRED'}
+ if($StartInfo.Environment['AZ_INSTALLER'] -cne 'MSI'){throw 'MSI_CONTEXT_REQUIRED'}
+ 'synthetic-json'
+}
+if((Invoke-HermesAzureRaw @('account','show')) -cne 'synthetic-json'){throw 'CAPTURE_REQUIRED'}
+""")
+    def test_captured_cli_transport_bounds_time_and_does_not_echo_stderr(self):
+        self.ps("""
+$exe=Get-Command pwsh -CommandType Application | Select-Object -First 1 -ExpandProperty Source
+$start=[Diagnostics.ProcessStartInfo]::new();$start.FileName=$exe
+foreach($arg in @('-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 5')){$start.ArgumentList.Add($arg)}
+try { Invoke-HermesCapturedProcess $start 50;throw 'TIMEOUT_REQUIRED' }
+catch { if($_.Exception.Message -cne 'HERMES_AZURE_TIMEOUT'){throw} }
+$bad=[Diagnostics.ProcessStartInfo]::new();$bad.FileName=$exe
+foreach($arg in @('-NoProfile','-NonInteractive','-Command',"[Console]::Error.WriteLine('SENSITIVE_STDERR_SENTINEL');exit 7")){$bad.ArgumentList.Add($arg)}
+try { Invoke-HermesCapturedProcess $bad 10000;throw 'FAILURE_REQUIRED' }
+catch { if($_.Exception.Message -cne 'HERMES_AZURE_FAILED'){throw} }
+$ok=[Diagnostics.ProcessStartInfo]::new();$ok.FileName=$exe
+foreach($arg in @('-NoProfile','-NonInteractive','-Command',"[Console]::Write('synthetic-json-output')")){$ok.ArgumentList.Add($arg)}
+if((Invoke-HermesCapturedProcess $ok 10000) -cne 'synthetic-json-output'){throw 'CAPTURE_REQUIRED'}
+""")
     def test_approved_window_uses_hermes_without_automated_campaign_replay(self):
         result=self.campaign('CONNECT_SHALE_MCP_HERMES_ACCEPTANCE', complete=True)
         self.assertEqual('WINDOW_COMPLETED',result['Status'], result)

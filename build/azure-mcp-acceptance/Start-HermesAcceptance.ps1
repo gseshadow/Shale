@@ -45,6 +45,9 @@ try {
     & python (Join-Path $PSScriptRoot 'prepare-hermes-profile.py') $profile
     if ($LASTEXITCODE -ne 0) { throw 'LOCAL_HERMES_PROFILE_REQUIRED' }
     $env:HERMES_HOME=$profile
+    $operation='hermes-runtime-preparation'
+    Write-Host 'Preparing the private Hermes runtime before any deployment or activation approval.'
+    Invoke-HermesInteractiveProcess -Arguments @('mcp','list') -TimeoutMilliseconds 600000 -FailurePrefix 'HERMES_PREPARATION'
     $operation='azure-and-sql-preflight'
     Assert-LiveConfigurationTarget
     Assert-LiveSqlOff $owner; Assert-LiveSynthetic $owner
