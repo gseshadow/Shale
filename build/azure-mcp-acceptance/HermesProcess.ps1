@@ -3,16 +3,20 @@ function Invoke-HermesCapturedProcess([Diagnostics.ProcessStartInfo]$StartInfo,[
     $StartInfo.UseShellExecute=$false; $StartInfo.CreateNoWindow=$true
     $StartInfo.RedirectStandardOutput=$true; $StartInfo.RedirectStandardError=$true
     $process=[Diagnostics.Process]::new();$process.StartInfo=$StartInfo
-    $stdout=$null;$stderr=$null
+    $stdout=$null;$stderr=$null;$started=$false
     try {
         if (-not $process.Start()) { throw 'HERMES_AZURE_PROCESS_FAILED' }
+        $started=$true
         $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
         if (-not $process.WaitForExit($TimeoutMilliseconds)) { throw 'HERMES_AZURE_TIMEOUT' }
         if ($process.ExitCode -ne 0) { throw 'HERMES_AZURE_FAILED' }
         $result=$stdout.GetAwaiter().GetResult();[void]$stderr.GetAwaiter().GetResult()
         return $result
+    } catch {
+        if ($_.Exception.Message -cin @('HERMES_AZURE_TIMEOUT','HERMES_AZURE_FAILED','HERMES_AZURE_PROCESS_FAILED')) { throw }
+        throw 'HERMES_AZURE_PROCESS_FAILED'
     } finally {
-        if ($process.Id -and -not $process.HasExited) { $process.Kill($true);[void]$process.WaitForExit(10000) }
+        if ($started -and -not $process.HasExited) { $process.Kill($true);[void]$process.WaitForExit(10000) }
         $stdout=$null;$stderr=$null;$process.Dispose()
     }
 }
