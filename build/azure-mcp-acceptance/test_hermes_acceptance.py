@@ -82,8 +82,8 @@ function Invoke-LiveNativeChecks { param($a,$b,$c) };function Get-LiveAuditBasel
 function Set-LiveSqlControls { param($enabled,$a,$b) $script:Events.Add('sql-enabled') }
 function Set-LiveAppControls { param($enabled,$run) $script:Events.Add('app-enabled') }
 function hermes { $global:LASTEXITCODE=0; $script:Events.Add('hermes-connect') }
-function Get-Command { param($a,$CommandType) @{Source='not-executed'} }
-function Start-Process { param($FilePath,$ArgumentList,[switch]$NoNewWindow,[switch]$PassThru) $script:Events.Add('hermes-chat');$p=[pscustomobject]@{HasExited=$true;ExitCode=0};$p | Add-Member ScriptMethod WaitForExit { param($ms) $true };$p }
+function Get-Command { param($a,$CommandType) @{Source='not-executed.exe'};@{Source='not-executed.cmd'} }
+function Start-Process { param($FilePath,$ArgumentList,[switch]$NoNewWindow,[switch]$PassThru) if($FilePath -cne 'not-executed.exe'){throw 'SINGLE_EXECUTABLE_REQUIRED'};$script:Events.Add('hermes-chat');$p=[pscustomobject]@{HasExited=$true;ExitCode=0};$p | Add-Member ScriptMethod WaitForExit { param($ms) $true };$p }
 $script:LiveOrigin='https://acceptance.invalid';$context.Zones=@{Java='UTC'};$context.Id='synthetic'
 $result=Invoke-HermesAcceptanceWindow $context
 """)
