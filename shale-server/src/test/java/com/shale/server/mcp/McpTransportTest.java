@@ -200,6 +200,11 @@ class McpTransportTest {
         } finally {release.countDown();}
         assertEquals(401,send(request("server/discover")).getStatus());
     }
+    @Test void installationWithdrawalReturnsUnavailableWithoutStartingAnotherOAuthLogin()throws Exception {
+        gate=new McpGate(new McpTransportProperties(true,Set.of()),identity,true,t->{throw new com.shale.data.security.ai.AiInstallationReadiness.Unavailable();});
+        var response=send(request("server/discover"));assertEquals(503,response.getStatus());
+        assertNull(response.getHeader("WWW-Authenticate"));assertFalse(response.getContentAsString().contains("restart"));
+    }
     @Test void deadlineStartsBeforeAuthenticationAndCannotBeRestartedAtDispatch()throws Exception {
         var time=new java.util.concurrent.atomic.AtomicLong();
         gate=new McpGate(new McpTransportProperties(true,Set.of()),identity,true,t->{time.set(10_000_000_001L);return authority;},time::get);

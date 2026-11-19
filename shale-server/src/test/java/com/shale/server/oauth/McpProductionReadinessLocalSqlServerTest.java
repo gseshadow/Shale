@@ -90,30 +90,37 @@ class McpProductionReadinessLocalSqlServerTest {
                 assertThrows(IllegalStateException.class,()->new com.shale.data.security.ai.AiCaseDataAttestation(aiSource,catalogSource,forbidden,h.db,"https://wrong.example/oauth/mcp",OAuthAuthorizationFlowTest.RESOURCE,true).verify());
                 assertThrows(IllegalStateException.class,()->new com.shale.data.security.ai.AiCaseDataAttestation(aiSource,catalogSource,List.of(aiSource,ordinarySource,bootstrapSource),h.db,OAuthAuthorizationFlowTest.ISSUER,OAuthAuthorizationFlowTest.RESOURCE,true).verify());
                 assertThrows(IllegalStateException.class,()->new com.shale.data.security.ai.AiCaseDataAttestation(aiSource,catalogSource,List.of(ordinarySource,ordinarySource,catalogSource),h.db,OAuthAuthorizationFlowTest.ISSUER,OAuthAuthorizationFlowTest.RESOURCE,true).verify());
+                // Faults below exercise the full startup/background inspection directly.
+                // Observing readiness no longer initiates SQL work; worker withdrawal is covered separately.
+                java.util.function.Supplier<String> inspect=()->{
+                    try {new com.shale.data.security.ai.AiCaseDataAttestation(aiSource,catalogSource,forbidden,h.db,OAuthAuthorizationFlowTest.ISSUER,OAuthAuthorizationFlowTest.RESOURCE,true,
+                        com.shale.data.security.ai.AiCaseDataAttestation.Contract.valueOf(System.getProperty("shale.acceptance.confinement","V1"))).verify();return "ready";}
+                    catch(IllegalStateException refused){return "not-ready";}
+                };
                 try(var c=h.owner(h.db)){sql(c,"GRANT SELECT ON dbo.Cases(Name) TO ["+catalog+"]");}
-                assertEquals("not-ready",readiness.state(),"Catalog verifier must lose readiness on excess privilege");
+                assertEquals("not-ready",inspect.get(),"Catalog verifier must lose readiness on excess privilege");
                 try(var c=h.owner(h.db)){sql(c,"REVOKE SELECT ON dbo.Cases(Name) FROM ["+catalog+"]");}
-                assertEquals("ready",readiness.state());
+                assertEquals("ready",inspect.get());
                 try(var c=h.owner(h.db)){sql(c,"GRANT SELECT ON dbo.Cases TO public");}
                 try {
                     try(var c=catalogSource.getConnection()) {
                         sql(c,"EXEC sys.sp_set_session_context @key=N'ShaleClientId',@value=7; EXEC sys.sp_set_session_context @key=N'PrincipalUserId',@value=72");
                         assertEquals(1,count(c,"SELECT COUNT(*) FROM dbo.Cases WHERE Id=100"),"Fault injection must create real excess verifier authority");
                     }
-                    assertEquals("not-ready",readiness.state(),"Catalog verifier must reject inherited public Case read authority");
+                    assertEquals("not-ready",inspect.get(),"Catalog verifier must reject inherited public Case read authority");
                 } finally {try(var c=h.owner(h.db)){sql(c,"REVOKE SELECT ON dbo.Cases FROM public");}}
-                assertEquals("ready",readiness.state());
+                assertEquals("ready",inspect.get());
                 for(String[] fault:com.shale.server.mcp.McpCatalogVerifierServingChecks.authorityFaults(ai,catalog)) {
                     try(var c=h.owner(h.db)){sql(c,fault[0]);}
-                    try{assertEquals("not-ready",readiness.state(),fault[0]);}
+                    try{assertEquals("not-ready",inspect.get(),fault[0]);}
                     finally{try(var c=h.owner(h.db)){sql(c,fault[1]);}}
-                    assertEquals("ready",readiness.state(),"Each removed privilege fault requires fresh attestation");
+                    assertEquals("ready",inspect.get(),"Each removed privilege fault requires fresh attestation");
                 }
                 // Live changes invalidate the previous success; restoration requires a new attestation.
                 try(var c=h.owner(h.db)){sql(c,"GRANT SELECT ON dbo.Cases(Name) TO ["+ai+"]");}
-                assertEquals("not-ready",readiness.state());
+                assertEquals("not-ready",inspect.get());
                 try(var c=h.owner(h.db)){sql(c,"REVOKE SELECT ON dbo.Cases(Name) FROM ["+ai+"]");}
-                assertEquals("ready",readiness.state());
+                assertEquals("ready",inspect.get());
                 int port=((WebServerApplicationContext)context).getWebServer().getPort();
                 try(var client=HttpClient.newHttpClient()) {
                     for(String path:List.of("/mcp","/oauth/mcp/token","/oauth/mcp/authorize")){var response=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());assertEquals(404,response.statusCode());assertFalse(response.body().contains("access_token"));}

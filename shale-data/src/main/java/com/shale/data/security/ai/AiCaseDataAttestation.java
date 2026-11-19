@@ -9,7 +9,8 @@ import java.time.*;
 import java.util.*;
 
 /** Live read-only catalog/effective-authority attestation using separately governed catalog visibility.
- * Run before readiness, each request and any pool rebuild. No installer, grant or unchecked receipt file. */
+ * Run before readiness and on explicit/background revalidation. Request authorization is separate.
+ * No installer, grant or unchecked receipt file. */
 public final class AiCaseDataAttestation {
     private static final Set<String> PUBLIC=Set.of("AiDataAuthenticateV1","AiDataSearchCasesV1","AiDataGetCaseOverviewV1","AiDataRecordCaseFailureV1","AiDataFinishCaseQuotaV1","AiDataAuthorizeCaseHandoffV1");
     private final DataSource ai,verifier;

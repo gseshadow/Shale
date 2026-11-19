@@ -10,7 +10,7 @@ function Invoke-HermesAcceptanceWindow($Context) {
         Write-Host "Target: $script:LiveAppId / ShaleMcpAcceptance; JAR SHA256 $($Context.Hash); build $($Context.Version)"
         Write-Host 'Disable affinity cookies on the single-worker acceptance app, deploy dormant, verify worker, activate synthetic acceptance, open Hermes, then OFF and stop.'
         Write-Host 'Affinity will remain disabled on acceptance for future stock-client connections.'
-        Write-Host 'Dedicated acceptance verification budget: 600 seconds per admission, 180-second SQL/network reads, 30-second login. Every security check remains enabled; SQL tool transactions retain their existing short limits.'
+        Write-Host 'Full installation verification: startup/background, 600-second acceptance budget. Every RPC still checks live authorization; SQL tool transaction limits are unchanged.'
         Write-Host 'Hermes connection/discovery budget: 600 seconds; interactive chat window: 30 minutes. No natural-expiry campaign replay.'
         if ((Read-Host 'Type CONNECT_SHALE_MCP_HERMES_ACCEPTANCE to approve this whole controlled run') -cne 'CONNECT_SHALE_MCP_HERMES_ACCEPTANCE') { throw 'OPERATOR_DECLINED' }
         $approved=$true

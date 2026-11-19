@@ -1,7 +1,5 @@
 package com.shale.server.oauth;
 
-import com.shale.data.config.AcceptanceVerificationBudget;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.*;
@@ -21,7 +19,7 @@ public class DcrConnectionConfiguration {
                 ||services.resolver().contract()!=com.shale.data.security.ai.AiExternalContract.DCR_V3
                 ||services.neutral().contract()!=com.shale.data.security.ai.AiExternalContract.DCR_V3)
             throw new IllegalStateException("Explicit DCR_V3 composition required.");
-        cases.ready(System.nanoTime()+AcceptanceVerificationBudget.operationNanos(10_000_000_000L));
+        cases.requireInstallationReady();
         if(!capabilities.admission().enabled())throw new IllegalStateException("Verified SQL DCR control required.");
         return new Object();
     }

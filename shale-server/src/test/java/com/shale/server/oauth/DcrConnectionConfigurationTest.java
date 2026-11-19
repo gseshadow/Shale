@@ -34,10 +34,10 @@ class DcrConnectionConfigurationTest {
         var identity=new McpOAuthProperties("https://shale.example",McpOAuthProperties.Identity.PRODUCTION,true);
         var config=new DcrConnectionConfiguration();
         assertThrows(IllegalStateException.class,()->config.dcrVerifiedComposition(capabilities,services,cases,identity));
-        org.mockito.Mockito.verify(cases).ready(org.mockito.ArgumentMatchers.anyLong());
+        org.mockito.Mockito.verify(cases).requireInstallationReady();
         org.mockito.Mockito.when(admission.enabled()).thenReturn(true);
         assertNotNull(config.dcrVerifiedComposition(capabilities,services,cases,identity));
-        org.mockito.Mockito.doThrow(new IllegalStateException("Synthetic verification failure")).when(cases).ready(org.mockito.ArgumentMatchers.anyLong());
+        org.mockito.Mockito.doThrow(new IllegalStateException("Synthetic verification failure")).when(cases).requireInstallationReady();
         assertThrows(IllegalStateException.class,()->config.dcrVerifiedComposition(capabilities,services,cases,identity));
         org.mockito.Mockito.when(metadata.contract()).thenReturn(com.shale.data.security.ai.AiExternalContract.CIMD_V1);
         assertThrows(IllegalStateException.class,()->config.dcrVerifiedComposition(capabilities,services,cases,identity));

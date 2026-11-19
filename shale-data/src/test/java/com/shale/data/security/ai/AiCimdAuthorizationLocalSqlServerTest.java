@@ -41,7 +41,7 @@ class AiCimdAuthorizationLocalSqlServerTest extends AiCimdOAuthLocalSqlServerTes
         return new AiCimdCaseData(deadline->attestation(),deadline->source("cimd"),
                 deadline->source("cimdreview"),db,ISSUER,RESOURCE);
     }
-    @Test void concurrentAdmissionsRunIndependentVerificationWithoutHoldingReaderStateMonitor()throws Exception {
+    @Test void concurrentExplicitRechecksRunIndependentVerificationWithoutHoldingReaderStateMonitor()throws Exception {
         var armed=new AtomicBoolean();var calls=new AtomicInteger();
         var entered=new CountDownLatch(2);var release=new CountDownLatch(1);
         try(var composition=new AiCimdCaseData(deadline->{
@@ -52,10 +52,10 @@ class AiCimdAuthorizationLocalSqlServerTest extends AiCimdOAuthLocalSqlServerTes
             armed.set(true);
             var first=workers.submit(()->composition.ready(System.nanoTime()+8_000_000_000L));
             var second=workers.submit(()->composition.ready(System.nanoTime()+8_000_000_000L));
-            try {assertTrue(entered.await(2,TimeUnit.SECONDS),"Each admission must reach its own verifier; JDBC must not hold the reader-state monitor.");}
+            try {assertTrue(entered.await(2,TimeUnit.SECONDS),"Each explicit recheck must reach its own verifier; JDBC must not hold the reader-state monitor.");}
             finally {release.countDown();}
             first.get(10,TimeUnit.SECONDS);second.get(10,TimeUnit.SECONDS);
-            assertEquals(2,calls.get(),"Concurrent requests must not share or cache a positive verification.");
+            assertEquals(2,calls.get(),"Concurrent explicit rechecks must each execute the complete verifier.");
         } finally {release.countDown();}
     }
     @Test void concurrentVerificationFailureWithdrawsAnAlreadyRunningVerifier()throws Exception {
@@ -143,11 +143,12 @@ class AiCimdAuthorizationLocalSqlServerTest extends AiCimdOAuthLocalSqlServerTes
             disclosure(composition,second.accessToken(),8,82,200);
         }
     }
-    @Test void admissionRejectsAdditiveDriftWithoutChangingHistoricalVerification()throws Exception {
+    @Test void periodicRecheckRejectsAdditiveDriftAndWithdrawsAdmissionUntilReconstruction()throws Exception {
         var first=redeem(consent(7,72));
         try(var composition=composition()) {
             try(var c=owner(db)) { sql(c,"GRANT SELECT ON dbo.Cases(Name) TO ["+prefix+"_cimd]"); }
-            try { assertThrows(IllegalStateException.class,()->composition.authenticate(first.accessToken(),System.nanoTime()+8_000_000_000L)); }
+            try { assertThrows(IllegalStateException.class,()->composition.ready(System.nanoTime()+8_000_000_000L));
+                assertThrows(AiInstallationReadiness.Unavailable.class,()->composition.authenticate(first.accessToken(),System.nanoTime()+8_000_000_000L)); }
             finally { try(var c=owner(db)) { sql(c,"REVOKE SELECT ON dbo.Cases(Name) FROM ["+prefix+"_cimd]"); } }
             assertThrows(IllegalStateException.class,()->composition.ready(System.nanoTime()+8_000_000_000L),"Detected drift withdraws readiness until reconstruction.");
         }

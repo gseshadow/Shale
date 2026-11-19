@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Owner-only authority faults: a valid ACCESS must be denied before serving under drift. */
+/** Owner-only authority faults: full checks reject drift; a failed periodic recheck withdraws serving until restart. */
 public final class McpCatalogVerifierServingChecks {
     public static void run(String url,String token,Phase3b7FaultSource.Owner owner,String ai,String catalog)throws Exception {
         try(var client=HttpClient.newHttpClient()) {
@@ -15,13 +15,22 @@ public final class McpCatalogVerifierServingChecks {
             for(String[] fault:authorityFaults(ai,catalog)) {
                 try(var c=owner.open();var s=c.createStatement()){s.execute(fault[0]);}
                 try {
-                    var denied=send(client,url,token);assertEquals(401,denied.statusCode(),fault[0]);
-                    assertFalse(denied.body().contains("structuredContent"));assertFalse(denied.body().contains("Direct overview"));
-                    var overview=send(client,url,token,true);assertEquals(401,overview.statusCode(),fault[0]);
-                    assertFalse(overview.body().contains("structuredContent"));assertFalse(overview.body().contains("Direct overview"));
-                } finally {try(var c=owner.open();var s=c.createStatement()){s.execute(fault[1]);}}
-                assertEquals(200,send(client,url,token).statusCode(),"Restoration requires fresh attestation");
+                    assertThrows(IllegalStateException.class,McpConfinedClientFixture::inspectInstallation,fault[0]);
+                } finally {try(var c=owner.open();var statement=c.createStatement()){statement.execute(fault[1]);}}
+                McpConfinedClientFixture.inspectInstallation();
+                assertEquals(200,send(client,url,token).statusCode(),"Restored catalogs must pass a full inspection; request authentication remains live");
             }
+            // One actual periodic failure withdraws this worker; removing the fault must not reopen it.
+            String[] fault=publicFaults().getFirst();
+            try(var connection=owner.open();var statement=connection.createStatement()){statement.execute(fault[0]);}
+            try {
+                assertThrows(IllegalStateException.class,McpConfinedClientFixture::recheckInstallation);
+                for(boolean overview:List.of(false,true)) {
+                    var denied=send(client,url,token,overview);assertEquals(503,denied.statusCode());
+                    assertFalse(denied.body().contains("structuredContent"));assertFalse(denied.body().contains("Direct overview"));
+                }
+            } finally {try(var connection=owner.open();var statement=connection.createStatement()){statement.execute(fault[1]);}}
+            assertEquals(503,send(client,url,token).statusCode(),"A withdrawn worker requires restart even after catalogs are repaired");
         }
     }
     /** Each fault is independently installed and removed; names come from nonce-owned fixtures. */

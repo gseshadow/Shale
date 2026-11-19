@@ -14,6 +14,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Scoped two-client regression over production proof/SQL/transport. Explicit loopback fixture TLS only. */
 public final class McpConfinedClientFixture {
+    private static final ThreadLocal<McpAiCaseData> INSPECTION=new ThreadLocal<>();
+    public static void inspectInstallation() { INSPECTION.get().attestation(System.nanoTime()+10_000_000_000L).verify(); }
+    public static void recheckInstallation() { INSPECTION.get().ready(System.nanoTime()+10_000_000_000L); }
+
     @FunctionalInterface public interface ServingCheck { void run(String url)throws Exception; }
     public static void verify(DataSource ai,DataSource catalog,List<DataSource> forbidden,String database,String token,String expiryToken,String kind,Path temp)throws Exception {
         withServer(ai,catalog,forbidden,database,temp,url->{
@@ -71,14 +75,16 @@ public final class McpConfinedClientFixture {
             var body=new FilterDef();body.setFilterName("body");body.setAsyncSupported("true");body.setFilter(new McpBodyFilter());tc.addFilterDef(body);
             var bodyMapping=new FilterMap();bodyMapping.setFilterName("body");bodyMapping.addURLPattern("/mcp");bodyMapping.setDispatcher("REQUEST");bodyMapping.setDispatcher("ASYNC");tc.addFilterMapBefore(bodyMapping);
             tomcat.start();String url="http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/mcp";
-            check.run(url);
+            INSPECTION.set(context.getBean(McpAiCaseData.class));
+            try { check.run(url); } finally { INSPECTION.remove(); }
             if(production) {
                 available.set(false);
+                assertThrows(IllegalStateException.class,()->context.getBean(McpAiCaseData.class).ready(System.nanoTime()+10_000_000_000L));
                 assertEquals("not-ready",context.getBean(McpCaseReadiness.class).state());
                 try(var client=java.net.http.HttpClient.newHttpClient()) {
                     var request=java.net.http.HttpRequest.newBuilder(java.net.URI.create(url)).header("Authorization","Bearer "+"a".repeat(43)).header("Content-Type","application/json").header("Accept","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString("{}")).build();
                     var response=client.send(request,java.net.http.HttpResponse.BodyHandlers.ofString());
-                    assertEquals(401,response.statusCode());assertFalse(response.body().contains("Direct overview"));assertFalse(response.body().contains("MCP literal"));
+                    assertEquals(503,response.statusCode());assertFalse(response.body().contains("Direct overview"));assertFalse(response.body().contains("MCP literal"));
                 }
                 assertEquals(0,fallbackCalls.get(),"Unavailable confinement must not consult ordinary ACCESS authority");
             }

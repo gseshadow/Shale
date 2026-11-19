@@ -9,7 +9,7 @@ import java.util.*;
 import java.util.function.LongFunction;
 
 /** Explicit dormant composition; owns no pools and registers no HTTP routes.
- * Complete predecessor/additive verification runs at startup and admission, never per lease.
+ * Complete predecessor/additive verification runs at startup and explicit background refresh.
  * Callers supply deadline-bound sources and the unchanged predecessor attestation.
  * All providers are trusted composition dependencies, never request-selected identities. */
 public final class AiCimdCaseData implements AutoCloseable {
@@ -17,6 +17,7 @@ public final class AiCimdCaseData implements AutoCloseable {
     private final LongFunction<DataSource> data, catalog;
     private final String database, issuer, resource, verification;
     private boolean closed;
+    private final AiInstallationReadiness installation=new AiInstallationReadiness();
     private final AiExternalContract contract;
     private final AiCaseDataAccess.Namespace namespace;
 
@@ -46,6 +47,7 @@ public final class AiCimdCaseData implements AutoCloseable {
     /** Unchanged predecessor verification followed by the complete additive checks. */
     public void ready(long deadline) {
         synchronized(this) { if(closed)throw unavailable(); }
+        installation.requireOpen();
         String stage="PREDECESSOR";
         try {
             checkDeadline(deadline);
@@ -77,25 +79,29 @@ public final class AiCimdCaseData implements AutoCloseable {
                 }
             }
             checkDeadline(deadline);
-            // Verification is independent per request. Never hold the state monitor across
+            // Explicit rechecks remain independent. Never hold the state monitor across
             // JDBC: another admission must not block an already-verified request's reader.
             // A failure/close in another verifier still withdraws this in-flight admission.
-            synchronized(this) { if(closed)throw unavailable(); }
+            synchronized(this) { if(closed)throw unavailable();installation.verified(); }
         } catch(Exception failure) {
-            synchronized(this) { closed=true; }
+            synchronized(this) { closed=true;installation.close(); }
             int code=failure instanceof SQLException sql?sql.getErrorCode():0;
             throw new IllegalStateException("CIMD verification failed closed; stage="+stage+"; sqlCode="+code);
         }
     }
 
+    public void requireInstallationReady() {
+        installation.requireReady();
+        synchronized(this) { if(closed)throw new AiInstallationReadiness.Unavailable(); }
+    }
     public AiCaseDataRequest authenticate(String token,long deadline) {
-        ready(deadline);
+        requireInstallationReady();checkDeadline(deadline);
         return AiCaseDataAccess.authenticate(data.apply(deadline),token,issuer,resource,deadline,
                 namespace);
     }
 
     public IntegrationCaseReader reader(AiCaseDataRequest request,long deadline) {
-        synchronized(this) { if(closed)throw unavailable(); }
+        requireInstallationReady();
         if(request.namespace()!=namespace)throw unavailable();
         return new AiCaseDataAccess(data.apply(deadline),data,request);
     }
@@ -156,6 +162,6 @@ public final class AiCimdCaseData implements AutoCloseable {
     private static void checkDeadline(long deadline) { if(deadline-System.nanoTime()<=0||Thread.currentThread().isInterrupted())throw unavailable(); }
     private static int millis(long deadline) { checkDeadline(deadline);return (int)Math.max(1,Math.min(AcceptanceVerificationBudget.networkMillis(10_000),(deadline-System.nanoTime())/1_000_000)); }
     private static int seconds(long deadline) { return Math.max(1,Math.min(AcceptanceVerificationBudget.querySeconds(5),millis(deadline)/1000)); }
-    @Override public synchronized void close() { closed=true; } // Sources belong to the composition root.
+    @Override public synchronized void close() { closed=true;installation.close(); } // Sources belong to the composition root.
     private static IllegalStateException unavailable() { return new IllegalStateException("CIMD Case composition unavailable; verification required."); }
 }
