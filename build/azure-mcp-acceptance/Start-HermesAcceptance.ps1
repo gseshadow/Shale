@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$ServerJar,
+    [string]$ModelOrigin,
     [string]$ExpectedJarSHA256,
     [string]$ExpectedBuildVersion,
     [string]$SuccessfulRun='work/clean-slate-06a67de3fd7340378f9e0db9d6934d89'
@@ -36,14 +37,17 @@ try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $browserArchive=[IO.Compression.ZipFile]::OpenRead($jar)
     try { if ($null -eq $browserArchive.GetEntry('BOOT-INF/classes/acceptance-browser/index.html')) { throw 'ACCEPTANCE_BROWSER_PACKAGE_REQUIRED' } } finally { $browserArchive.Dispose() }
+    $operation='local-model-profile'
+    $profile=Join-Path $run 'hermes-private'
+    $profileArguments=@($profile)
+    if ($ModelOrigin) { $profileArguments+=@('--model-origin',$ModelOrigin) }
+    & python (Join-Path $PSScriptRoot 'prepare-hermes-profile.py') @profileArguments
+    if ($LASTEXITCODE -ne 0) { throw 'LOCAL_HERMES_PROFILE_REQUIRED' }
     $operation='credentials'
     $credentials=Get-LiveCredentials $evidence.Directory
     $owner=Get-Credential -UserName brian -Message 'Existing ShaleMcpAcceptance database owner ONLY; memory only'
     if ($null -eq $owner -or $credentials.ContainsKey($owner.UserName)) { throw 'INDEPENDENT_OWNER_REQUIRED' }
     $priorHermesHome=$env:HERMES_HOME
-    $profile=Join-Path $run 'hermes-private'
-    & python (Join-Path $PSScriptRoot 'prepare-hermes-profile.py') $profile
-    if ($LASTEXITCODE -ne 0) { throw 'LOCAL_HERMES_PROFILE_REQUIRED' }
     $env:HERMES_HOME=$profile
     $operation='hermes-runtime-preparation'
     Write-Host 'Preparing the private Hermes runtime before any deployment or activation approval.'
