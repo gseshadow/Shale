@@ -58,7 +58,7 @@ function Invoke-HermesAcceptanceWindow($Context) {
         Write-Host 'Exit Hermes when finished. The window has a 30-minute limit, followed by OFF and stop.'
         & hermes mcp add shale-acceptance --url ($script:LiveOrigin+'/mcp') --auth oauth --connect-timeout 600
         if ($LASTEXITCODE -ne 0) { throw 'HERMES_CONNECTION_FAILED' }
-        $clientProcess=Start-Process -FilePath (Get-Command hermes -CommandType Application).Source -ArgumentList @("chat","--cli","--toolsets","shale-acceptance") -NoNewWindow -PassThru
+        $clientProcess=Start-Process -FilePath (Get-Command hermes -CommandType Application | Select-Object -First 1 -ExpandProperty Source) -ArgumentList @("chat","--cli","--toolsets","shale-acceptance") -NoNewWindow -PassThru
         try {
             if (-not $clientProcess.WaitForExit(1800000)) { $clientProcess.Kill($true); throw 'HERMES_WINDOW_TIMEOUT' }
             if ($clientProcess.ExitCode -ne 0) { throw 'HERMES_CLIENT_FAILED' }
