@@ -14,9 +14,9 @@ $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $lock=$null; $oldLock=$null; $run=$null; $operation='tools'; $campaign=$false; $result=$null
 try {
     $id=[guid]::NewGuid().ToString('N'); $run=Join-Path $repo ('work/hermes-mcp-'+$id); New-LiveDirectory $run
-    foreach ($tool in @('az','python')) { if(-not (Get-Command $tool -CommandType Application -ErrorAction SilentlyContinue)){throw 'TOOLS_REQUIRED'} }
-    $imports=@(& python -c 'import sys,mcp,httpx2; from mcp.client.streamable_http import streamable_http_client; sys.exit(1 if sys.flags.optimize else 0)' 2>&1)
-    if ($LASTEXITCODE -ne 0) { throw 'MCP_HARNESS_DEPENDENCIES_REQUIRED' }
+    foreach ($tool in @('az','python','hermes')) { if(-not (Get-Command $tool -CommandType Application -ErrorAction SilentlyContinue)){throw 'TOOLS_REQUIRED'} }
+    & python -c 'import yaml'
+    if ($LASTEXITCODE -ne 0) { throw 'LOCAL_PROFILE_YAML_REQUIRED' }
     $operation='successful-sql-evidence'
     if (-not [IO.Path]::IsPathRooted($SuccessfulRun)) { $SuccessfulRun=Join-Path $repo $SuccessfulRun }
     $evidence=Read-LiveSqlEvidence $SuccessfulRun
