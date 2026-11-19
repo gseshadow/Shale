@@ -31,6 +31,13 @@ class HermesAcceptanceTest(unittest.TestCase):
             self.assertNotIn('SENSITIVE',json.dumps(result));self.assertEqual(['LEGACY_TO_DISCOVER','CONNECT_RETRY'],[x['Code'] for x in result['Events']])
             self.assertEqual('2026-11-19 16:09:04',result['Events'][0]['LogTime']);self.assertEqual(300,result['TokenMetadata']['expires_in']);self.assertTrue(result['TokenMetadata']['RefreshPresent'])
             self.assertEqual({'FileModifiedUtc','RefreshPresent','expires_in','expires_at'},set(result['TokenMetadata']))
+    def test_client_summary_cli_writes_only_a_sanitized_supplement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run=Path(tmp);original=run/'report.json';original.write_text('{"Status":"FAIL"}',encoding='utf-8')
+            result=subprocess.run([__import__('sys').executable,'-I',str(TOOL/'summarize-hermes-client.py'),str(run)],capture_output=True,text=True)
+            self.assertEqual(0,result.returncode,result.stderr);self.assertEqual('',result.stdout)
+            self.assertEqual('{"Status":"FAIL"}',original.read_text())
+            self.assertFalse(json.loads((run/'client-summary.json').read_text())['ProfilePresent'])
     def test_empty_profile_summary_does_not_invent_authentication(self):
         with tempfile.TemporaryDirectory() as tmp:
             result=client_summary.summarize(Path(tmp));self.assertFalse(result['ProfilePresent']);self.assertEqual({},result['TokenMetadata']);self.assertEqual([],result['Events'])

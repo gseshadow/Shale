@@ -75,27 +75,27 @@ try {
     throw "Acceptance failed during $operation ($failureCode). Preserve $run; inspect safe reports. No automatic retry or reset."
 } finally {
     try {
-    $env:HERMES_HOME=$priorHermesHome
-    if ($run -and $profile -and (Test-Path -LiteralPath $profile)) {
-        try {
-            $summaryStart=[Diagnostics.ProcessStartInfo]::new()
-            $summaryStart.FileName=Get-Command python -CommandType Application|Select-Object -First 1 -ExpandProperty Source
-            $summaryStart.ArgumentList.Add('-I');$summaryStart.ArgumentList.Add((Join-Path $PSScriptRoot 'summarize-hermes-client.py'));$summaryStart.ArgumentList.Add($run)
-            [void](Invoke-HermesCapturedProcess $summaryStart 10000)
-        } catch { try { [IO.File]::WriteAllText((Join-Path $run 'client-summary.json'),'["CLIENT_SUMMARY_UNAVAILABLE"]') } catch { } }
-    }
-    if ($profile -and (Test-Path -LiteralPath $profile)) {
-        $expectedProfile=[IO.Path]::GetFullPath((Join-Path $run 'hermes-private'))
-        if ([IO.Path]::GetFullPath($profile) -ceq $expectedProfile -and $expectedProfile.StartsWith([IO.Path]::GetFullPath((Join-Path $repo 'work'))+[IO.Path]::DirectorySeparatorChar)) {
-            Remove-Item -LiteralPath $expectedProfile -Recurse -Force
+        $env:HERMES_HOME=$priorHermesHome
+        if ($run -and $profile -and (Test-Path -LiteralPath $profile)) {
+            try {
+                $summaryStart=[Diagnostics.ProcessStartInfo]::new()
+                $summaryStart.FileName=Get-Command python -CommandType Application|Select-Object -First 1 -ExpandProperty Source
+                $summaryStart.ArgumentList.Add('-I');$summaryStart.ArgumentList.Add((Join-Path $PSScriptRoot 'summarize-hermes-client.py'));$summaryStart.ArgumentList.Add($run)
+                [void](Invoke-HermesCapturedProcess $summaryStart 10000)
+            } catch { try { [IO.File]::WriteAllText((Join-Path $run 'client-summary.json'),'["CLIENT_SUMMARY_UNAVAILABLE"]') } catch { } }
         }
-    }
-    if ($run -and (Test-Path -LiteralPath $run)) {
-        $finalFiles=@(Get-ChildItem -LiteralPath $run -File|Where-Object Name -CNE 'sha256.json'|ForEach-Object {@{File=$_.Name;SHA256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
-        [IO.File]::WriteAllText((Join-Path $run 'sha256.json'),($finalFiles|ConvertTo-Json -Depth 4))
-    }
+        if ($profile -and (Test-Path -LiteralPath $profile)) {
+            $expectedProfile=[IO.Path]::GetFullPath((Join-Path $run 'hermes-private'))
+            if ([IO.Path]::GetFullPath($profile) -ceq $expectedProfile -and $expectedProfile.StartsWith([IO.Path]::GetFullPath((Join-Path $repo 'work'))+[IO.Path]::DirectorySeparatorChar)) {
+                Remove-Item -LiteralPath $expectedProfile -Recurse -Force
+            }
+        }
+        if ($run -and (Test-Path -LiteralPath $run)) {
+            $finalFiles=@(Get-ChildItem -LiteralPath $run -File|Where-Object Name -CNE 'sha256.json'|ForEach-Object {@{File=$_.Name;SHA256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
+            [IO.File]::WriteAllText((Join-Path $run 'sha256.json'),($finalFiles|ConvertTo-Json -Depth 4))
+        }
     } finally {
-    if ($null -ne $oldLock) { $oldLock.Dispose() }; if ($null -ne $lock) { $lock.Dispose() }
-    $owner=$null; $credentials=$null; $humans=$null; $context=$null; $imports=$null; $script:CleanLastLines.Clear()
-}
+        if ($null -ne $oldLock) { $oldLock.Dispose() }; if ($null -ne $lock) { $lock.Dispose() }
+        $owner=$null; $credentials=$null; $humans=$null; $context=$null; $imports=$null; $script:CleanLastLines.Clear()
+    }
 }
