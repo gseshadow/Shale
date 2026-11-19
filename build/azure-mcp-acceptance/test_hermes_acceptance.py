@@ -51,7 +51,7 @@ class HermesAcceptanceTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "LOOPBACK_MODEL_REQUIRED"):
                     profile.prepare(source, root / "private")
                 self.assertFalse((root / "private").exists())
-    def campaign(self, phrase, complete=False):
+    def campaign(self, phrase, complete=False, interrupt=False):
         with tempfile.TemporaryDirectory() as tmp:
             run=Path(tmp).as_posix()
             script = f"""
@@ -85,8 +85,12 @@ function Invoke-HermesInteractiveProcess { param($Arguments,$TimeoutMilliseconds
 $script:LiveOrigin='https://acceptance.invalid';$context.Zones=@{Java='UTC'};$context.Id='synthetic'
 $result=Invoke-HermesAcceptanceWindow $context
 """)
+            if interrupt:
+                script=script.replace("$script:LiveOrigin='https://acceptance.invalid'", "function Invoke-HermesInteractiveProcess { param($Arguments,$TimeoutMilliseconds,$FailurePrefix) exit 0 }; $script:LiveOrigin='https://acceptance.invalid'")
             result=subprocess.run(['pwsh','-NoProfile','-NonInteractive','-Command',script],cwd=ROOT,capture_output=True,text=True)
             self.assertEqual(0,result.returncode,result.stderr)
+            if interrupt:
+                return json.loads((Path(tmp)/'report.json').read_text(encoding='utf-8'))
             return json.loads(result.stdout.splitlines()[-1])
     def ps(self, body):
         result=subprocess.run(['pwsh','-NoProfile','-NonInteractive','-Command',"$ErrorActionPreference='Stop'; . ./build/azure-mcp-acceptance/HermesProcess.ps1; "+body+"\nexit 0"],cwd=ROOT,capture_output=True,text=True)
@@ -136,6 +140,13 @@ $ok=[Diagnostics.ProcessStartInfo]::new();$ok.FileName=$exe
 foreach($arg in @('-NoProfile','-NonInteractive','-Command',"[Console]::Write('synthetic-json-output')")){$ok.ArgumentList.Add($arg)}
 if((Invoke-HermesCapturedProcess $ok 10000) -cne 'synthetic-json-output'){throw 'CAPTURE_REQUIRED'}
 """)
+    def test_pipeline_exit_still_cleans_up_and_cannot_claim_window_completion(self):
+        result=self.campaign('CONNECT_SHALE_MCP_HERMES_ACCEPTANCE',complete=True,interrupt=True)
+        self.assertEqual('FAIL',result['Status'])
+        self.assertEqual('HERMES_WINDOW_INTERRUPTED',result['FailureCode'])
+        self.assertTrue(result['Cleanup']['SqlOff'])
+        self.assertTrue(result['Cleanup']['AppOff'])
+        self.assertTrue(result['Cleanup']['ApplicationStopped'])
     def test_approved_window_uses_hermes_without_automated_campaign_replay(self):
         result=self.campaign('CONNECT_SHALE_MCP_HERMES_ACCEPTANCE', complete=True)
         self.assertEqual('WINDOW_COMPLETED',result['Status'], result)
