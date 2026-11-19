@@ -185,17 +185,7 @@ public final class AiCaseDataAttestation {
                 p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));try(var r=p.executeQuery()){if(!r.next()||!definitions.getProperty("Source").equalsIgnoreCase(r.getString(1))||r.next())throw refused();}
             }
             stage="MODULE_BODIES";
-            for(String module:definitions.stringPropertyNames())if(!module.equals("Source")) {
-                try(var p=review.prepareStatement("SELECT m.definition,m.execute_as_principal_id,COALESCE(o.principal_id,s.principal_id),s.name FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE s.name='dbo' AND o.name=?")) {
-                    p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));p.setString(1,module);
-                    try(var r=p.executeQuery()) {
-                        if(!r.next()||!definitions.getProperty(module).equals(HexFormat.of().formatHex(AiSql.hash(r.getString(1).getBytes(StandardCharsets.UTF_16LE))))||r.getInt(3)!=1)throw refused();
-                        int execution=r.getInt(2);boolean callerIdentity=r.wasNull();
-                        if(module.equals("AiDataLocateAccessOwnerV1")?callerIdentity||execution!=-2:!callerIdentity)throw refused();
-                        if(r.next())throw refused();
-                    }
-                }
-            }
+            verifyModules(review,definitions);
             stage="OWNERSHIP";
             for(int token:tokens)try(var p=review.prepareStatement("SELECT (SELECT COUNT(*) FROM sys.schemas WHERE principal_id=?)+(SELECT COUNT(*) FROM sys.objects WHERE principal_id=?)+(SELECT COUNT(*) FROM sys.database_principals WHERE owning_principal_id=?)+(SELECT COUNT(*) FROM sys.database_permissions WHERE grantee_principal_id=? AND state='W')")) {
                 p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));for(int n=1;n<=4;n++)p.setInt(n,token);
@@ -216,15 +206,7 @@ public final class AiCaseDataAttestation {
             try(var s=statement(review);var r=s.executeQuery("SELECT Issuer,Resource,JavaTimeZone,SqlTimeZone FROM dbo.AiCaseDataDeployment WHERE Id=1")) {
                 if(!r.next()||!issuer.equals(r.getString(1))||!resource.equals(r.getString(2))||!ZoneId.systemDefault().equals(ZoneId.of(r.getString(3))))throw refused();
                 String javaZone=r.getString(3),sqlZone=r.getString(4);if(r.next())throw refused();
-                // Pin SQL/Java wall-time mapping at both sides of every supported DST transition.
-                ZoneId zone=ZoneId.of(javaZone);
-                for(int year=2025;year<=2028;year++)for(int month:List.of(1,3,4,7,10,11,12)) {
-                    Instant sample=LocalDate.of(year,month,15).atStartOfDay(ZoneOffset.UTC).toInstant();
-                    try(var p=review.prepareStatement("SELECT CONVERT(datetime2(7),(CONVERT(datetime2(7),?) AT TIME ZONE 'UTC') AT TIME ZONE ?)")) {
-                        p.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));com.shale.data.util.UtcJdbcTimestamp.set(p,1,sample);p.setString(2,sqlZone);
-                        try(var dates=p.executeQuery()){if(!dates.next()||!dates.getTimestamp(1).toLocalDateTime().equals(LocalDateTime.ofInstant(sample,zone)))throw refused();}
-                    }
-                }
+                verifyTimeZones(review,ZoneId.of(javaZone),sqlZone);
             }
             }
         } catch(Exception failure) {
@@ -238,6 +220,62 @@ public final class AiCaseDataAttestation {
                     +" [step="+((stage.equals("IDENTITY")||stage.equals("PLATFORM"))?identityStep:"NONE")+" kind="+kind
                     +" origin="+failureOrigin(failure)
                     +" elapsedMillis="+elapsedMillis+" interrupted="+Thread.currentThread().isInterrupted()+"]");
+        }
+    }
+    /** Same independently visible bodies and execution/ownership checks, with bounded transport. */
+    static void verifyModules(Connection review,Properties definitions)throws SQLException {
+        var modules=definitions.stringPropertyNames().stream().filter(name->!name.equals("Source")).sorted().toList();
+        for(int start=0;start<modules.size();start+=64) {
+            var batch=modules.subList(start,Math.min(start+64,modules.size()));
+            var cases=new ArrayList<String>();
+            for(int index=0;index<batch.size();index++)cases.add("WHEN o.name=? THEN "+index);
+            String sql="SELECT CASE "+String.join(" ",cases)+" ELSE -1 END AS ModuleOrdinal,m.definition,m.execute_as_principal_id,"
+                    +"COALESCE(o.principal_id,s.principal_id) AS OwnerPrincipalId FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id "
+                    +"JOIN sys.sql_modules m ON m.object_id=o.object_id WHERE s.name='dbo' AND o.name IN("
+                    +String.join(",",Collections.nCopies(batch.size(),"?"))+")";
+            try(var query=review.prepareStatement(sql)) {
+                query.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));
+                for(int index=0;index<batch.size();index++) {
+                    query.setString(index+1,batch.get(index));query.setString(batch.size()+index+1,batch.get(index));
+                }
+                var seen=new HashSet<Integer>();
+                try(var rows=query.executeQuery()) {
+                    while(rows.next()) {
+                        int index=rows.getInt(1);
+                        if(rows.wasNull()||index<0||index>=batch.size()||!seen.add(index))throw refused();
+                        String module=batch.get(index),body=rows.getString(2);
+                        int execution=rows.getInt(3);boolean callerIdentity=rows.wasNull();
+                        if(body==null||!Objects.equals(definitions.getProperty(module),HexFormat.of().formatHex(AiSql.hash(body.getBytes(StandardCharsets.UTF_16LE))))||rows.getInt(4)!=1)throw refused();
+                        if(module.equals("AiDataLocateAccessOwnerV1")?callerIdentity||execution!=-2:!callerIdentity)throw refused();
+                    }
+                }
+                if(seen.size()!=batch.size())throw refused();
+            }
+        }
+    }
+
+    /** Pin every original UTC sample and compare the same SQL wall time, without 28 round trips. */
+    static void verifyTimeZones(Connection review,ZoneId zone,String sqlZone)throws SQLException {
+        var samples=new ArrayList<Instant>();
+        for(int year=2025;year<=2028;year++)for(int month:List.of(1,3,4,7,10,11,12))
+            samples.add(LocalDate.of(year,month,15).atStartOfDay(ZoneOffset.UTC).toInstant());
+        var values=new ArrayList<String>();
+        for(int index=0;index<samples.size();index++)values.add("("+index+",?)");
+        String sql="SELECT v.SampleOrdinal,CONVERT(datetime2(7),(CONVERT(datetime2(7),v.SampleUtc) AT TIME ZONE 'UTC') AT TIME ZONE ?) "
+                +"FROM (VALUES "+String.join(",",values)+") AS v(SampleOrdinal,SampleUtc)";
+        try(var query=review.prepareStatement(sql)) {
+            query.setQueryTimeout(AcceptanceVerificationBudget.querySeconds(3));query.setString(1,sqlZone);
+            for(int index=0;index<samples.size();index++)com.shale.data.util.UtcJdbcTimestamp.set(query,index+2,samples.get(index));
+            var seen=new HashSet<Integer>();
+            try(var rows=query.executeQuery()) {
+                while(rows.next()) {
+                    int index=rows.getInt(1);
+                    if(rows.wasNull()||index<0||index>=samples.size()||!seen.add(index))throw refused();
+                    var actual=rows.getTimestamp(2);
+                    if(actual==null||!actual.toLocalDateTime().equals(LocalDateTime.ofInstant(samples.get(index),zone)))throw refused();
+                }
+            }
+            if(seen.size()!=samples.size())throw refused();
         }
     }
     // Inspect a bounded cause/next-exception graph without emitting messages, states or class names.
