@@ -402,8 +402,8 @@ existing WEB login/session authority, tenant approval and separate consent remai
 
 `Start-HermesAcceptance.ps1` reuses successful SQL evidence, native checks, dormant deployment,
 worker verification and OFF/stop cleanup. A distinct interactive approval phrase gates deployment
-and activation. It opens a private Hermes profile containing only the loopback model selection,
-not existing secrets or MCP connections; the profile is removed after the window, even on failure.
+and activation. It opens a private Hermes profile containing the selected model configuration,
+with only its required model credential as described below and no other MCP connections; the profile is removed after the window, even on failure.
 The original automated campaign is never replayed or modified. Window completion is not a claimed
 functional/audit PASS: operator observations and subsequent durable audit inspection remain separate.
 Existing login/session, approval/consent and tool disclosure transactions retain their existing
@@ -477,3 +477,21 @@ It never copies credentials, client identifiers or raw logs. The final run hash 
 this summary. A summary failure does not prevent profile cleanup or release of credential references
 and locks. Retained evidence can distinguish a protocol/schema retry from slow admission or expiry
 without a second password prompt just to inspect database state.
+
+
+### Explicit private HTTPS model profile
+
+The default remains loopback-only. An operator can pass `-ModelOrigin https://192.168.1.14:8443`
+for the existing private model device. Only HTTPS to an RFC1918 literal address with an exact
+origin match is accepted; public endpoints, HTTP LAN endpoints, URL credentials and query secrets
+remain rejected. Normal TLS certificate verification is retained. The ordinary Hermes profile is
+unchanged. Local profile validation now runs before the owner-password prompt.
+
+The private profile includes only the selected model configuration and its `${ENVIRONMENT_KEY}`
+reference. If the key is not already inherited, only that one literal single-line assignment is
+copied from the existing Hermes `.env` into the access-restricted temporary profile. No unrelated
+keys, MCP servers or source profile are copied. Literal keys in YAML, missing/duplicate assignments,
+interpolated and multiline assignments fail closed. Existing finally cleanup removes this file
+with the private profile; the client summary never reads `.env` or includes key material. This is
+local model authentication, separate from memory-only SQL owner credentials. No Shale domain,
+PHI/entity audit, SQL schema/permission, app activation or production resource changes occur.

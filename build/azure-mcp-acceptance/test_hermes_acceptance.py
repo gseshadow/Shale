@@ -74,6 +74,54 @@ class HermesAcceptanceTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "LOOPBACK_MODEL_REQUIRED"):
                     profile.prepare(source, root / "private")
                 self.assertFalse((root / "private").exists())
+    def test_private_https_requires_exact_opt_in_and_only_copies_selected_model_secret(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); source=root/'source.yaml'
+            source.write_text(yaml.safe_dump({'model':{'default':'qwen','base_url':'https://192.168.1.14:8443/v1','api_key':'${SHALE_TEST_ONLY_MODEL_KEY}'},'mcp_servers':{'other':{}}}))
+            (root/'.env').write_text('UNRELATED_SECRET=never-copy\nSHALE_TEST_ONLY_MODEL_KEY="synthetic-selected"\n')
+            with self.assertRaisesRegex(RuntimeError,'LOOPBACK_MODEL_REQUIRED'):
+                profile.prepare(source,root/'refused')
+            with __import__('unittest.mock',fromlist=['patch']).patch.dict(__import__('os').environ,{},clear=True):
+                profile.prepare(source,root/'private','https://192.168.1.14:8443')
+            result=yaml.safe_load((root/'private/config.yaml').read_text())
+            self.assertEqual('${SHALE_TEST_ONLY_MODEL_KEY}',result['model']['api_key'])
+            self.assertNotIn('mcp_servers',result)
+            self.assertEqual('SHALE_TEST_ONLY_MODEL_KEY="synthetic-selected"\n',(root/'private/.env').read_text())
+            self.assertNotIn('synthetic-selected',(root/'private/config.yaml').read_text())
+    def test_private_https_rejects_public_http_and_mismatched_origins(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); source=root/'source.yaml'
+            for endpoint,origin in [('https://8.8.8.8/v1','https://8.8.8.8'),('http://192.168.1.14/v1','http://192.168.1.14'),('https://192.168.1.15:8443/v1','https://192.168.1.14:8443')]:
+                source.write_text(yaml.safe_dump({'model':{'default':'qwen','base_url':endpoint}}))
+                with self.assertRaisesRegex(RuntimeError,'LOOPBACK_MODEL_REQUIRED'):
+                    profile.prepare(source,root/'private',origin)
+                self.assertFalse((root/'private').exists())
+    def test_private_https_inherits_selected_environment_key_without_copying_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source.yaml'
+            source.write_text(yaml.safe_dump({'model':{'default':'qwen','base_url':'https://192.168.1.14:8443/v1','api_key':'${SHALE_TEST_ONLY_MODEL_KEY}'}}))
+            with __import__('unittest.mock',fromlist=['patch']).patch.dict(__import__('os').environ,{'SHALE_TEST_ONLY_MODEL_KEY':'synthetic-memory'}):
+                profile.prepare(source,root/'private','https://192.168.1.14:8443')
+            self.assertFalse((root/'private/.env').exists())
+            self.assertNotIn('synthetic-memory',(root/'private/config.yaml').read_text())
+    def test_private_https_rejects_literal_or_unavailable_model_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source.yaml'
+            for value,reason in [('literal-secret','MODEL_KEY_ENVIRONMENT_REFERENCE_REQUIRED'),('${SHALE_TEST_ONLY_MISSING_KEY}','MODEL_KEY_ENVIRONMENT_REQUIRED')]:
+                source.write_text(yaml.safe_dump({'model':{'default':'qwen','base_url':'https://192.168.1.14:8443/v1','api_key':value}}))
+                with self.assertRaisesRegex(RuntimeError,reason):
+                    profile.prepare(source,root/'private','https://192.168.1.14:8443')
+                self.assertFalse((root/'private').exists())
+    def test_private_https_rejects_ambiguous_or_interpolated_dotenv_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source.yaml'
+            source.write_text(yaml.safe_dump({'model':{'default':'qwen','base_url':'https://192.168.1.14:8443/v1','api_key':'${SHALE_TEST_ONLY_MODEL_KEY}'}}))
+            for contents in ['SHALE_TEST_ONLY_MODEL_KEY=one\nSHALE_TEST_ONLY_MODEL_KEY=two\n','SHALE_TEST_ONLY_MODEL_KEY=${OTHER_SECRET}\n','SHALE_TEST_ONLY_MODEL_KEY="first\nsecond"\n']:
+                (root/'.env').write_text(contents)
+                with __import__('unittest.mock',fromlist=['patch']).patch.dict(__import__('os').environ,{},clear=True):
+                    with self.assertRaisesRegex(RuntimeError,'MODEL_KEY_'):
+                        profile.prepare(source,root/'private','https://192.168.1.14:8443')
+                self.assertFalse((root/'private').exists())
     def campaign(self, phrase, complete=False, interrupt=False, affinity_rejected=False):
         with tempfile.TemporaryDirectory() as tmp:
             run=Path(tmp).as_posix()
