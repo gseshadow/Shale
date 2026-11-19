@@ -6,13 +6,33 @@ import subprocess
 import tempfile
 import unittest
 import yaml
+import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = Path(__file__).parent
 spec = importlib.util.spec_from_file_location("profile_builder", TOOL / "prepare-hermes-profile.py")
 profile = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(profile)
 
+build_spec=importlib.util.spec_from_file_location("browser_builder", TOOL / "prepare-hermes-browser.py")
+browser_builder=importlib.util.module_from_spec(build_spec)
+build_spec.loader.exec_module(browser_builder)
+
 class HermesAcceptanceTest(unittest.TestCase):
+    def test_builder_selects_versioned_maven_artifact_and_rejects_missing_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target=Path(tmp)
+            (target/'shale-server.jar').write_bytes(b'stale-unversioned-copy')
+            candidate=target/'shale-server-1.0.138.jar'
+            entries=['BOOT-INF/classes/com/shale/server/ShaleServerApplication.class',
+                     'BOOT-INF/classes/com/shale/server/oauth/CimdRuntimeConfiguration.class',
+                     'BOOT-INF/classes/com/shale/server/config/AcceptanceBrowserConfiguration.class',
+                     'META-INF/build-info.properties']
+            with zipfile.ZipFile(candidate,'w') as jar:
+                for name in entries: jar.writestr(name,b'synthetic')
+            self.assertEqual(candidate,browser_builder.server_artifact(target,'1.0.138'))
+            with zipfile.ZipFile(candidate,'w') as jar: jar.writestr(entries[0],b'synthetic')
+            with self.assertRaisesRegex(RuntimeError,'CURRENT_EXECUTABLE_SERVER_REQUIRED'):
+                browser_builder.server_artifact(target,'1.0.138')
     def test_local_model_profile_excludes_credentials_and_other_servers(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); source = root / "source.yaml"
